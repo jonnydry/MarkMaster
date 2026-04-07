@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
+import { patchCollectionSchema } from "@/lib/validations";
 
 export async function GET(
   _req: NextRequest,
@@ -47,14 +48,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = patchCollectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
   const updateData: Record<string, unknown> = {};
 
-  if (body.name !== undefined) updateData.name = body.name;
-  if (body.description !== undefined) updateData.description = body.description;
-  if (body.isPublic !== undefined) {
-    updateData.isPublic = body.isPublic;
-    if (body.isPublic) {
+  if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+  if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
+  if (parsed.data.isPublic !== undefined) {
+    updateData.isPublic = parsed.data.isPublic;
+    if (parsed.data.isPublic) {
       const existing = await prisma.collection.findUnique({
         where: { id },
         select: { shareSlug: true },

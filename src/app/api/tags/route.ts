@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createTagSchema, deleteTagSchema, patchTagSchema } from "@/lib/validations";
 
 export async function GET() {
   const user = await getDbUser();
@@ -23,7 +24,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name, color, bookmarkId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = createTagSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { name, color, bookmarkId } = parsed.data;
+
+  if (bookmarkId) {
+    const bookmark = await prisma.bookmark.findUnique({
+      where: { id: bookmarkId, userId: user.id },
+      select: { id: true },
+    });
+    if (!bookmark) {
+      return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
+    }
+  }
 
   const tag = await prisma.tag.upsert({
     where: { userId_name: { userId: user.id, name } },
@@ -48,9 +68,28 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { tagId, bookmarkId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = deleteTagSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { tagId, bookmarkId } = parsed.data;
 
   if (bookmarkId) {
+    const bookmarkTag = await prisma.bookmarkTag.findFirst({
+      where: {
+        bookmarkId,
+        tagId,
+        bookmark: { userId: user.id },
+      },
+    });
+    if (!bookmarkTag) {
+      return NextResponse.json({ error: "Tag assignment not found" }, { status: 404 });
+    }
     await prisma.bookmarkTag.delete({
       where: { bookmarkId_tagId: { bookmarkId, tagId } },
     });
@@ -69,7 +108,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { tagId, name, color } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = patchTagSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { tagId, name, color } = parsed.data;
 
   const tag = await prisma.tag.update({
     where: { id: tagId, userId: user.id },

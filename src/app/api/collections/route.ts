@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
+import { createCollectionSchema } from "@/lib/validations";
 
 export async function GET() {
   const user = await getDbUser();
@@ -24,7 +25,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name, description, isPublic } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = createCollectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { name, description, isPublic } = parsed.data;
 
   const collection = await prisma.collection.create({
     data: {

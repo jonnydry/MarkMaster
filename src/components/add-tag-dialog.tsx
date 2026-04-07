@@ -9,18 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PRESET_COLORS } from "@/lib/constants";
 import type { TagWithCount } from "@/types";
-
-const PRESET_COLORS = [
-  "#1d9bf0",
-  "#71717a",
-  "#52525b",
-  "#3f3f46",
-  "#a1a1aa",
-  "#27272a",
-  "#d4d4d8",
-  "#18181b",
-];
 
 interface AddTagDialogProps {
   open: boolean;
@@ -71,7 +61,7 @@ export function AddTagDialog({
                       className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
                         isApplied
                           ? "bg-primary/12 text-primary font-medium"
-                          : "bg-card text-[#52525b] border border-border hover:text-foreground"
+                          : "bg-card text-muted-foreground border border-border hover:text-foreground"
                       }`}
                       onClick={() => {
                         if (!bookmarkId) return;

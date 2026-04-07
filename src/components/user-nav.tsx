@@ -25,15 +25,15 @@ export function UserNav({ user }: UserNavProps) {
       <DropdownMenuTrigger className="outline-none">
         <Avatar className="h-8 w-8 border border-border">
           <AvatarImage src={user.profileImageUrl || undefined} />
-          <AvatarFallback className="bg-secondary text-[#52525b] text-xs font-semibold">
+          <AvatarFallback className="bg-secondary text-zinc-500 text-xs font-semibold">
             {user.displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5">
-          <p className="text-sm font-medium text-[#a1a1aa]">{user.displayName}</p>
-          <p className="text-xs text-[#3f3f46]">@{user.username}</p>
+          <p className="text-sm font-medium text-zinc-300">{user.displayName}</p>
+          <p className="text-xs text-zinc-500">@{user.username}</p>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem

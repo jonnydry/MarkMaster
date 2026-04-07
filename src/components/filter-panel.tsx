@@ -47,7 +47,7 @@ export function FilterPanel({
   return (
     <div className="space-y-4 p-4 border-b border-border bg-card/50">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold text-[#3f3f46] uppercase tracking-[0.08em]">
+        <h3 className="text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em]">
           Filters
         </h3>
         {hasActiveFilters && (
@@ -132,7 +132,7 @@ export function FilterPanel({
                   className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
                     selectedTags.includes(tag.id)
                       ? "bg-primary/12 text-primary font-medium"
-                      : "bg-card text-[#52525b] hover:text-foreground border border-border"
+                      : "bg-card text-zinc-500 dark:text-zinc-400 hover:text-foreground border border-border"
                   }`}
                   onClick={() => onTagToggle(tag.id)}
                 >

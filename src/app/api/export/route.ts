@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { exportQuerySchema } from "@/lib/validations";
 
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
@@ -8,7 +9,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const format = req.nextUrl.searchParams.get("format") || "json";
+  const rawParams = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const parsed = exportQuerySchema.safeParse(rawParams);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid query parameters" },
+      { status: 400 }
+    );
+  }
+
+  const { format } = parsed.data;
 
   const bookmarks = await prisma.bookmark.findMany({
     where: { userId: user.id },

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, startTransition } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Filter, ChevronLeft, ChevronRight } from "lucide-react";
@@ -18,11 +18,11 @@ import { AddTagDialog } from "@/components/add-tag-dialog";
 import { AddNoteDialog } from "@/components/add-note-dialog";
 import { AddToCollectionDialog } from "@/components/add-to-collection-dialog";
 import { CreateCollectionDialog } from "@/components/create-collection-dialog";
-import { toast } from "sonner";
+import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
+import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
+import { useCreateCollection } from "@/hooks/use-create-collection";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type {
-  SortField,
-  SortDirection,
-  MediaFilter,
   ViewMode,
   BookmarkWithRelations,
   TagWithCount,
@@ -30,57 +30,28 @@ import type {
 } from "@/types";
 import type { DbUser } from "@/lib/auth";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
-  const queryClient = useQueryClient();
 
-  const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<SortField>("bookmarkedAt");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
-  const [authorFilter, setAuthorFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const filters = useBookmarkFilters();
+  const actions = useBookmarkActions();
+  const { createCollectionQuick, createCollection } = useCreateCollection();
+
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [showFilters, setShowFilters] = useState(false);
-  const [page, setPage] = useState(1);
-
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
 
-  const resetPage = () => setPage(1);
-  const setSearchAndReset = (v: string) => { setSearch(v); resetPage(); };
-  const setSortFieldAndReset = (v: SortField) => { setSortField(v); resetPage(); };
-  const setSortDirectionAndReset = (v: SortDirection) => { setSortDirection(v); resetPage(); };
-  const setMediaFilterAndReset = (v: MediaFilter) => { setMediaFilter(v); resetPage(); };
-  const setAuthorFilterAndReset = (v: string) => { setAuthorFilter(v); resetPage(); };
-  const setDateFromAndReset = (v: string) => { setDateFrom(v); resetPage(); };
-  const setDateToAndReset = (v: string) => { setDateTo(v); resetPage(); };
-
-  const params = new URLSearchParams({
-    page: page.toString(),
-    limit: "20",
-    search,
-    sortField,
-    sortDirection,
-    mediaFilter,
-    authorFilter,
-    tagFilter: selectedTags.join(","),
-    ...(dateFrom && { dateFrom }),
-    ...(dateTo && { dateTo }),
-  });
-
   const { data: bookmarkData, isLoading } = useQuery({
-    queryKey: ["bookmarks", params.toString()],
+    queryKey: ["bookmarks", filters.queryString],
     queryFn: async () => {
-      const res = await fetch(`/api/bookmarks?${params}`);
+      const res = await fetch(`/api/bookmarks?${filters.queryString}`);
       return res.json();
     },
   });
@@ -101,212 +72,39 @@ export default function DashboardPage() {
     },
   });
 
-  const bookmarks: BookmarkWithRelations[] = useMemo(
-    () => bookmarkData?.bookmarks || [],
-    [bookmarkData?.bookmarks]
-  );
+  const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks || [];
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
-
-  const refreshAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-    queryClient.invalidateQueries({ queryKey: ["tags"] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-  }, [queryClient]);
-
-  const toggleTag = (tagId: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
-    );
-    resetPage();
-  };
 
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
   useEffect(() => {
     if (tagsFromUrl) {
       const next = tagsFromUrl.split(",").filter(Boolean);
-      if (next.length === 0) return;
-      startTransition(() => {
-        setSelectedTags(next);
-        setPage(1);
-      });
+      filters.setSelectedTags(next);
+      filters.setPage(1);
     } else if (tagFromUrl) {
-      startTransition(() => {
-        setSelectedTags([tagFromUrl]);
-        setPage(1);
-      });
+      filters.setSelectedTags([tagFromUrl]);
+      filters.setPage(1);
+    } else {
+      filters.setSelectedTags([]);
+      filters.setPage(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tagFromUrl, tagsFromUrl]);
-
-  const hasActiveFilters =
-    mediaFilter !== "all" ||
-    authorFilter !== "" ||
-    dateFrom !== "" ||
-    dateTo !== "" ||
-    selectedTags.length > 0;
-
-  const clearFilters = () => {
-    setMediaFilter("all");
-    setAuthorFilter("");
-    setDateFrom("");
-    setDateTo("");
-    setSelectedTags([]);
-    resetPage();
-  };
-
-  const handleAddTag = async (
-    bookmarkId: string,
-    name: string,
-    color: string
-  ) => {
-    const res = await fetch("/api/tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, name, color }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not add tag");
-      return;
-    }
-    refreshAll();
-    toast.success("Tag added");
-  };
-
-  const handleRemoveTag = async (bookmarkId: string, tagId: string) => {
-    const res = await fetch("/api/tags", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, tagId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not remove tag");
-      return;
-    }
-    refreshAll();
-  };
-
-  const handleAddNote = async (bookmarkId: string, content: string) => {
-    const res = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, content }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not save note");
-      return;
-    }
-    refreshAll();
-    toast.success("Note saved");
-  };
-
-  const handleAddToCollection = async (
-    bookmarkId: string,
-    collectionId: string
-  ) => {
-    const res = await fetch(`/api/collections/${collectionId}/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not add to collection");
-      return;
-    }
-    refreshAll();
-    toast.success("Added to collection");
-  };
-
-  const handleCreateCollection = async (name: string): Promise<string> => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    const col = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message =
-        (col as { error?: string }).error || "Could not create collection";
-      toast.error(message);
-      throw new Error(message);
-    }
-    refreshAll();
-    return (col as { id: string }).id;
-  };
-
-  const handleCreateCollectionFull = async (
-      name: string,
-      description: string,
-      isPublic: boolean
-    ) => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, isPublic }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message =
-        (data as { error?: string }).error || "Could not create collection";
-      toast.error(message);
-      throw new Error(message);
-    }
-    refreshAll();
-    toast.success("Collection created");
-  };
-
-  const handleDeleteBookmark = async (bookmarkId: string) => {
-    const res = await fetch("/api/bookmarks", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(
-        (data as { error?: string }).error || "Could not remove bookmark"
-      );
-      return;
-    }
-    refreshAll();
-    toast.success("Bookmark removed");
-  };
 
   const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
 
-  const dbUser = session?.dbUser;
+  useKeyboardShortcuts({
+    activeBookmarkId,
+    bookmarks,
+    onNavigate: setActiveBookmarkId,
+    onTag: () => setTagDialogOpen(true),
+    onCollection: () => setCollectionDialogOpen(true),
+    onNote: () => setNoteDialogOpen(true),
+  });
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "j" || e.key === "k") {
-        e.preventDefault();
-        const currentIndex = bookmarks.findIndex((b) => b.id === activeBookmarkId);
-        let nextIndex: number;
-        if (e.key === "j") {
-          nextIndex = currentIndex < bookmarks.length - 1 ? currentIndex + 1 : currentIndex;
-        } else {
-          nextIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-        }
-        setActiveBookmarkId(bookmarks[nextIndex]?.id || null);
-      }
-      if (e.key === "t" && activeBookmarkId) {
-        setTagDialogOpen(true);
-      }
-      if (e.key === "c" && activeBookmarkId) {
-        setCollectionDialogOpen(true);
-      }
-      if (e.key === "n" && activeBookmarkId) {
-        setNoteDialogOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [activeBookmarkId, bookmarks]);
+  const dbUser = session?.dbUser;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -314,8 +112,8 @@ export default function DashboardPage() {
         <Sidebar
           tags={tags}
           collections={collections}
-          selectedTags={selectedTags}
-          onTagToggle={toggleTag}
+          selectedTags={filters.selectedTags}
+          onTagToggle={filters.toggleTag}
           onCreateCollection={() => setCreateCollectionOpen(true)}
         />
       </div>
@@ -326,21 +124,21 @@ export default function DashboardPage() {
             <MobileSidebar
               tags={tags}
               collections={collections}
-              selectedTags={selectedTags}
-              onTagToggle={toggleTag}
+              selectedTags={filters.selectedTags}
+              onTagToggle={filters.toggleTag}
               onCreateCollection={() => setCreateCollectionOpen(true)}
             />
             <div className="flex items-baseline gap-2.5">
               <h1 className="text-2xl font-extrabold tracking-[-0.04em] text-foreground">
                 Bookmarks
               </h1>
-              <span className="text-[13px] text-[#3f3f46]">
+              <span className="text-[13px] text-muted-foreground">
                 {total.toLocaleString()}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <SearchBar value={search} onChange={setSearchAndReset} />
+            <SearchBar value={filters.search} onChange={filters.setSearch} />
             <Button
               variant={showFilters ? "secondary" : "ghost"}
               size="sm"
@@ -349,13 +147,13 @@ export default function DashboardPage() {
             >
               <Filter className="w-3.5 h-3.5" />
               Filters
-              {hasActiveFilters && (
+              {filters.hasActiveFilters && (
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               )}
             </Button>
             <SyncButton
               lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-              onSyncComplete={refreshAll}
+              onSyncComplete={actions.refreshAll}
             />
             {dbUser && <UserNav user={dbUser} />}
           </div>
@@ -363,28 +161,28 @@ export default function DashboardPage() {
 
         {showFilters && (
           <FilterPanel
-            mediaFilter={mediaFilter}
-            onMediaFilterChange={setMediaFilterAndReset}
-            authorFilter={authorFilter}
-            onAuthorFilterChange={setAuthorFilterAndReset}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onDateFromChange={setDateFromAndReset}
-            onDateToChange={setDateToAndReset}
-            selectedTags={selectedTags}
-            onTagToggle={toggleTag}
+            mediaFilter={filters.mediaFilter}
+            onMediaFilterChange={filters.setMediaFilter}
+            authorFilter={filters.authorFilter}
+            onAuthorFilterChange={filters.setAuthorFilter}
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onDateFromChange={filters.setDateFrom}
+            onDateToChange={filters.setDateTo}
+            selectedTags={filters.selectedTags}
+            onTagToggle={filters.toggleTag}
             tags={tags}
-            onClearAll={clearFilters}
-            hasActiveFilters={hasActiveFilters}
+            onClearAll={filters.clearFilters}
+            hasActiveFilters={filters.hasActiveFilters}
           />
         )}
 
         <SortControls
-          sortField={sortField}
-          sortDirection={sortDirection}
+          sortField={filters.sortField}
+          sortDirection={filters.sortDirection}
           viewMode={viewMode}
-          onSortFieldChange={setSortFieldAndReset}
-          onSortDirectionChange={setSortDirectionAndReset}
+          onSortFieldChange={filters.setSortField}
+          onSortDirectionChange={filters.setSortDirection}
           onViewModeChange={setViewMode}
           total={total}
         />
@@ -404,7 +202,7 @@ export default function DashboardPage() {
               <div className="text-center">
                 <p className="text-lg font-medium mb-2">No bookmarks found</p>
                 <p className="text-sm text-muted-foreground">
-                  {search || hasActiveFilters
+                  {filters.search || filters.hasActiveFilters
                     ? "Try adjusting your filters or search query"
                     : "Click Sync to fetch your bookmarks from X"}
                 </p>
@@ -419,7 +217,7 @@ export default function DashboardPage() {
                   viewMode={viewMode}
                   selected={activeBookmarkId === bookmark.id}
                   onSelect={setActiveBookmarkId}
-                  onTagClick={toggleTag}
+                  onTagClick={filters.toggleTag}
                   onAddTag={(id) => {
                     setActiveBookmarkId(id);
                     setTagDialogOpen(true);
@@ -432,7 +230,7 @@ export default function DashboardPage() {
                     setActiveBookmarkId(id);
                     setNoteDialogOpen(true);
                   }}
-                  onDelete={handleDeleteBookmark}
+                  onDelete={actions.handleDeleteBookmark}
                 />
               ))}
             </div>
@@ -445,7 +243,7 @@ export default function DashboardPage() {
                   viewMode={viewMode}
                   selected={activeBookmarkId === bookmark.id}
                   onSelect={setActiveBookmarkId}
-                  onTagClick={toggleTag}
+                  onTagClick={filters.toggleTag}
                   onAddTag={(id) => {
                     setActiveBookmarkId(id);
                     setTagDialogOpen(true);
@@ -458,7 +256,7 @@ export default function DashboardPage() {
                     setActiveBookmarkId(id);
                     setNoteDialogOpen(true);
                   }}
-                  onDelete={handleDeleteBookmark}
+                  onDelete={actions.handleDeleteBookmark}
                 />
               ))}
             </div>
@@ -469,19 +267,19 @@ export default function DashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
+                disabled={filters.page <= 1}
+                onClick={() => filters.setPage((p) => p - 1)}
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
+                Page {filters.page} of {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                disabled={filters.page >= totalPages}
+                onClick={() => filters.setPage((p) => p + 1)}
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -495,8 +293,8 @@ export default function DashboardPage() {
         onOpenChange={setTagDialogOpen}
         bookmarkId={activeBookmarkId}
         existingTags={tags}
-        onAddTag={handleAddTag}
-        onRemoveTag={handleRemoveTag}
+        onAddTag={actions.handleAddTag}
+        onRemoveTag={actions.handleRemoveTag}
         bookmarkTags={
           activeBookmark?.tags.map((t) => t.tag.id) || []
         }
@@ -507,7 +305,7 @@ export default function DashboardPage() {
         onOpenChange={setNoteDialogOpen}
         bookmarkId={activeBookmarkId}
         existingNote={activeBookmark?.notes[0]?.content}
-        onSave={handleAddNote}
+        onSave={actions.handleAddNote}
       />
 
       <AddToCollectionDialog
@@ -520,15 +318,29 @@ export default function DashboardPage() {
             (ci) => ci.collection.id
           ) || []
         }
-        onAddToCollection={handleAddToCollection}
-        onCreateCollection={handleCreateCollection}
+        onAddToCollection={actions.handleAddToCollection}
+        onCreateCollection={createCollectionQuick}
       />
 
       <CreateCollectionDialog
         open={createCollectionOpen}
         onOpenChange={setCreateCollectionOpen}
-        onCreateCollection={handleCreateCollectionFull}
+        onCreateCollection={createCollection}
       />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }

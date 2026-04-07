@@ -48,13 +48,13 @@ export function SearchBar({
 
   return (
     <div className="relative w-full max-w-[260px]">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#3f3f46]" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
       <Input
         ref={inputRef}
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-9 pr-8 h-8 text-[13px] bg-card border-border rounded-lg placeholder:text-[#3f3f46] focus:ring-primary"
+        className="pl-9 pr-8 h-8 text-[13px] bg-card border-border rounded-lg placeholder:text-zinc-500 focus:ring-primary"
       />
       {local && (
         <button
@@ -65,7 +65,7 @@ export function SearchBar({
         </button>
       )}
       {!local && (
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#3f3f46] bg-muted px-1.5 py-0.5 rounded border border-border">
+        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 bg-muted px-1.5 py-0.5 rounded border border-border">
           /
         </kbd>
       )}

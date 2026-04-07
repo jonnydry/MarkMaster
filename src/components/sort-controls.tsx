@@ -39,14 +39,14 @@ export function SortControls({
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-border">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] text-[#3f3f46]">
+        <span className="text-[13px] text-muted-foreground">
           {total.toLocaleString()} bookmark{total !== 1 ? "s" : ""}
         </span>
       </div>
       <div className="flex items-center gap-2">
         <Select
           value={sortField}
-          onValueChange={(v) => onSortFieldChange(v as SortField)}
+          onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
         >
           <SelectTrigger className="w-[160px] h-8 text-xs">
             <SelectValue />

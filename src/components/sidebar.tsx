@@ -71,7 +71,7 @@ export function Sidebar({
 
         {tags.length > 0 && (
           <div className="px-4 pt-6">
-            <h3 className="px-3 mb-2 text-[11px] font-semibold text-[#3f3f46] uppercase tracking-[0.08em]">
+            <h3 className="px-3 mb-2 text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em]">
               Tags
             </h3>
             <div className="space-y-0.5">
@@ -87,7 +87,7 @@ export function Sidebar({
                 >
                   <Tag className="w-3.5 h-3.5" />
                   <span className="truncate">{tag.name}</span>
-                  <span className="ml-auto text-[11px] text-[#3f3f46]">
+                  <span className="ml-auto text-[11px] text-zinc-600">
                     {tag._count.bookmarks}
                   </span>
                 </button>
@@ -98,20 +98,20 @@ export function Sidebar({
 
         <div className="px-4 pt-6 pb-3">
           <div className="flex items-center justify-between px-3 mb-2">
-            <h3 className="text-[11px] font-semibold text-[#3f3f46] uppercase tracking-[0.08em]">
+            <h3 className="text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em]">
               Collections
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 text-[#27272a] hover:text-muted-foreground"
+              className="h-5 w-5 text-zinc-500 hover:text-muted-foreground"
               onClick={onCreateCollection}
             >
               <Plus className="w-3.5 h-3.5" />
             </Button>
           </div>
           {collections.length === 0 ? (
-            <p className="px-3 text-[11px] text-[#3f3f46]">
+            <p className="px-3 text-[11px] text-zinc-600">
               No collections yet
             </p>
           ) : (
@@ -128,7 +128,7 @@ export function Sidebar({
                 >
                   <FolderOpen className="w-3.5 h-3.5" />
                   <span className="truncate">{col.name}</span>
-                  <span className="ml-auto text-[11px] text-[#3f3f46]">
+                  <span className="ml-auto text-[11px] text-zinc-600">
                     {col._count.items}
                   </span>
                 </Link>

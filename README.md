@@ -51,6 +51,9 @@ NEXTAUTH_URL="http://localhost:3000"
 ENCRYPTION_KEY="openssl rand -hex 32"
 ```
 
+`ENCRYPTION_KEY` must be a 64-character hex string. If an older deployment was
+using a shorter or non-hex key, rotate it before starting this version.
+
 ### 3. Set up the database
 
 ```bash

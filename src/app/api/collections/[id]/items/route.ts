@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  addCollectionItemSchema,
+  deleteCollectionItemSchema,
+  reorderCollectionItemsSchema,
+} from "@/lib/validations";
 
 async function requireCollection(
   collectionId: string,
@@ -27,7 +32,24 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { bookmarkId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = addCollectionItemSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { bookmarkId } = parsed.data;
+
+  const bookmark = await prisma.bookmark.findUnique({
+    where: { id: bookmarkId, userId: user.id },
+    select: { id: true },
+  });
+  if (!bookmark) {
+    return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
+  }
 
   const maxOrder = await prisma.collectionItem.findFirst({
     where: { collectionId },
@@ -64,11 +86,18 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { bookmarkId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = deleteCollectionItemSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
 
   await prisma.collectionItem.delete({
     where: {
-      collectionId_bookmarkId: { collectionId, bookmarkId },
+      collectionId_bookmarkId: { collectionId, bookmarkId: parsed.data.bookmarkId },
     },
   });
 
@@ -89,10 +118,17 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { items } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = reorderCollectionItemsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
 
   await prisma.$transaction(
-    items.map((item: { bookmarkId: string; sortOrder: number }) =>
+    parsed.data.items.map((item) =>
       prisma.collectionItem.update({
         where: {
           collectionId_bookmarkId: {
