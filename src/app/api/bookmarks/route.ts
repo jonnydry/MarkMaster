@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import type { SortField, SortDirection, MediaFilter } from "@/types";
+import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
 
 const bookmarkInclude = {
   tags: { include: { tag: true } },
@@ -41,18 +41,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const params = req.nextUrl.searchParams;
-  const page = parseInt(params.get("page") || "1");
-  const limit = parseInt(params.get("limit") || "20");
-  const search = params.get("search") || "";
-  const sortField = (params.get("sortField") || "bookmarkedAt") as SortField;
-  const sortDirection = (params.get("sortDirection") || "desc") as SortDirection;
-  const mediaFilter = (params.get("mediaFilter") || "all") as MediaFilter;
-  const authorFilter = params.get("authorFilter") || "";
-  const tagFilter = params.get("tagFilter")?.split(",").filter(Boolean) || [];
-  const dateFrom = params.get("dateFrom");
-  const dateTo = params.get("dateTo");
-  const collectionId = params.get("collectionId");
+  const rawParams = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const parsed = bookmarksQuerySchema.safeParse(rawParams);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid query parameters", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const {
+    page,
+    limit,
+    search,
+    sortField,
+    sortDirection,
+    mediaFilter,
+    authorFilter,
+    tagFilter,
+    dateFrom,
+    dateTo,
+    collectionId,
+  } = parsed.data;
+
+  const tagIds = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
 
@@ -61,6 +73,7 @@ export async function GET(req: NextRequest) {
       { tweetText: { contains: search, mode: "insensitive" } },
       { authorUsername: { contains: search, mode: "insensitive" } },
       { authorDisplayName: { contains: search, mode: "insensitive" } },
+      { notes: { some: { content: { contains: search, mode: "insensitive" } } } },
     ];
   }
 
@@ -68,8 +81,8 @@ export async function GET(req: NextRequest) {
     where.authorUsername = { contains: authorFilter, mode: "insensitive" };
   }
 
-  if (tagFilter.length > 0) {
-    where.tags = { some: { tagId: { in: tagFilter } } };
+  if (tagIds.length > 0) {
+    where.tags = { some: { tagId: { in: tagIds } } };
   }
 
   if (dateFrom || dateTo) {
@@ -82,9 +95,7 @@ export async function GET(req: NextRequest) {
     where.collectionItems = { some: { collectionId } };
   }
 
-  if (mediaFilter === "images") {
-    where.media = { not: Prisma.JsonNull };
-  } else if (mediaFilter === "video") {
+  if (mediaFilter === "images" || mediaFilter === "video") {
     where.media = { not: Prisma.JsonNull };
   } else if (mediaFilter === "links") {
     where.urls = { not: Prisma.JsonNull };
@@ -216,11 +227,36 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { bookmarkId } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const parsed = deleteBookmarkSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
 
-  await prisma.bookmark.delete({
-    where: { id: bookmarkId, userId: user.id },
+  const bookmark = await prisma.bookmark.findUnique({
+    where: { id: parsed.data.bookmarkId, userId: user.id },
+    select: { tweetId: true },
   });
+
+  if (!bookmark) {
+    return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.hiddenBookmark.upsert({
+      where: {
+        userId_tweetId: { userId: user.id, tweetId: bookmark.tweetId },
+      },
+      update: {},
+      create: { userId: user.id, tweetId: bookmark.tweetId },
+    }),
+    prisma.bookmark.delete({
+      where: { id: parsed.data.bookmarkId, userId: user.id },
+    }),
+  ]);
 
   return NextResponse.json({ success: true });
 }

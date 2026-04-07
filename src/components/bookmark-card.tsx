@@ -31,6 +31,7 @@ interface BookmarkCardProps {
   onAddToCollection?: (bookmarkId: string) => void;
   onAddNote?: (bookmarkId: string) => void;
   onDelete?: (bookmarkId: string) => void;
+  deleteLabel?: string;
   selected?: boolean;
   onSelect?: (bookmarkId: string) => void;
 }
@@ -81,7 +82,7 @@ function TagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="px-2 py-0.5 rounded bg-card text-[11px] font-medium text-[#52525b] hover:text-foreground transition-colors"
+      className="px-2 py-0.5 rounded bg-card text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-foreground transition-colors"
     >
       {name}
     </button>
@@ -96,6 +97,7 @@ export function BookmarkCard({
   onAddToCollection,
   onAddNote,
   onDelete,
+  deleteLabel = "Hide from MarkMaster",
   selected,
   onSelect,
 }: BookmarkCardProps) {
@@ -112,23 +114,23 @@ export function BookmarkCard({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-[#e4e4e7] truncate">
+            <span className="font-semibold text-zinc-200 truncate">
               {bookmark.authorDisplayName}
             </span>
             {bookmark.authorVerified && (
               <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" />
             )}
-            <span className="text-[#3f3f46] truncate">
+            <span className="text-zinc-500 truncate">
               @{bookmark.authorUsername}
             </span>
-            <span className="text-[#27272a]">·</span>
-            <span className="text-[#3f3f46] text-xs whitespace-nowrap">
+            <span className="text-zinc-700 dark:text-zinc-300">·</span>
+            <span className="text-zinc-500 text-xs whitespace-nowrap">
               {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
                 addSuffix: true,
               })}
             </span>
           </div>
-          <p className="text-sm text-[#d4d4d8] mt-0.5 line-clamp-1">
+          <p className="text-sm text-zinc-300 mt-0.5 line-clamp-1">
             {bookmark.tweetText}
           </p>
           {bookmark.tags.length > 0 && (
@@ -144,7 +146,7 @@ export function BookmarkCard({
           )}
         </div>
         {metrics && (
-          <div className="flex items-center gap-3 text-xs text-[#27272a] shrink-0">
+          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 shrink-0">
             <span className="flex items-center gap-1">
               <Heart className="w-3 h-3" />
               {formatCount(metrics.like_count)}
@@ -188,11 +190,11 @@ export function BookmarkCard({
                 className="w-5 h-5 rounded-full"
               />
             )}
-            <span className="text-xs font-medium text-[#71717a] truncate">
+            <span className="text-xs font-medium text-zinc-500 truncate">
               @{bookmark.authorUsername}
             </span>
           </div>
-          <p className="text-sm text-[#d4d4d8] line-clamp-3">
+          <p className="text-sm text-zinc-300 line-clamp-3">
             {bookmark.tweetText}
           </p>
           {bookmark.tags.length > 0 && (
@@ -224,7 +226,7 @@ export function BookmarkCard({
           />
         ) : (
           <div className="w-[38px] h-[38px] rounded-full bg-secondary shrink-0 flex items-center justify-center">
-            <span className="text-[13px] font-semibold text-[#52525b]">
+            <span className="text-[13px] font-semibold text-zinc-400">
               {bookmark.authorDisplayName.charAt(0).toUpperCase()}
             </span>
           </div>
@@ -232,17 +234,17 @@ export function BookmarkCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-semibold text-sm text-[#e4e4e7] truncate">
+              <span className="font-semibold text-sm text-zinc-200 truncate">
                 {bookmark.authorDisplayName}
               </span>
               {bookmark.authorVerified && (
                 <BadgeCheck className="w-[14px] h-[14px] text-primary shrink-0" />
               )}
-              <span className="text-[13px] text-[#3f3f46] truncate">
+              <span className="text-[13px] text-zinc-500 truncate">
                 @{bookmark.authorUsername}
               </span>
-              <span className="text-[13px] text-[#27272a]">·</span>
-              <span className="text-[13px] text-[#3f3f46] whitespace-nowrap">
+              <span className="text-[13px] text-zinc-700 dark:text-zinc-300">·</span>
+              <span className="text-[13px] text-zinc-500 whitespace-nowrap">
                 {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
                   addSuffix: true,
                 })}
@@ -253,7 +255,7 @@ export function BookmarkCard({
                 render={<Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-[#27272a]"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 dark:text-zinc-500"
                 />}
               >
                 <MoreHorizontal className="w-4 h-4" />
@@ -279,13 +281,13 @@ export function BookmarkCard({
                   className="text-destructive"
                   onClick={() => onDelete?.(bookmark.id)}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Remove
+                  <Trash2 className="w-4 h-4 mr-2" /> {deleteLabel}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          <div className="mt-1.5 text-[15px] leading-[23px] text-[#d4d4d8] whitespace-pre-wrap">
+          <div className="mt-1.5 text-[15px] leading-[23px] text-zinc-300 whitespace-pre-wrap">
             {highlightText(bookmark.tweetText)}
           </div>
 
@@ -322,14 +324,14 @@ export function BookmarkCard({
           {bookmark.quotedTweet && (
             <div className="mt-3 border border-border rounded-[10px] p-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="font-medium text-sm text-[#e4e4e7]">
+                <span className="font-medium text-sm text-zinc-200">
                   {bookmark.quotedTweet.author?.name}
                 </span>
-                <span className="text-[13px] text-[#3f3f46]">
+                <span className="text-[13px] text-zinc-500">
                   @{bookmark.quotedTweet.author?.username}
                 </span>
               </div>
-              <p className="text-sm text-[#d4d4d8] line-clamp-3">
+              <p className="text-sm text-zinc-300 line-clamp-3">
                 {bookmark.quotedTweet.text}
               </p>
             </div>
@@ -337,7 +339,7 @@ export function BookmarkCard({
 
           {bookmark.notes.length > 0 && (
             <div className="mt-3 pl-3.5 py-2.5 pr-3 border-l-2 border-l-primary rounded-r-md bg-primary/[0.04]">
-              <p className="text-[13px] leading-[18px] text-[#5b8fb8]">
+              <p className="text-[13px] leading-[18px] text-primary/80">
                 {bookmark.notes[0].content}
               </p>
             </div>
@@ -356,7 +358,7 @@ export function BookmarkCard({
           )}
 
           {metrics && (
-            <div className="flex items-center gap-4 mt-2.5 text-[#27272a]">
+            <div className="flex items-center gap-4 mt-2.5 text-zinc-500 dark:text-zinc-500">
               <span className="flex items-center gap-1 text-xs" title={`${metrics.reply_count} replies`}>
                 <MessageCircle className="w-[13px] h-[13px]" />
                 {formatCount(metrics.reply_count)}
@@ -373,7 +375,7 @@ export function BookmarkCard({
                 href={tweetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 text-xs text-[#52525b] hover:text-primary transition-colors"
+                className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-primary transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>

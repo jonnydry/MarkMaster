@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "MarkMaster — X Bookmark Manager",
   description:
-    "Search, sort, categorize, and curate your X bookmarks. Built for power users.",
+    "Search, tag, annotate, and curate your X bookmarks with a local synced archive.",
 };
 
 export default function RootLayout({

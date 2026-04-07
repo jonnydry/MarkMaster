@@ -21,6 +21,7 @@ model User {
   updatedAt       DateTime     @updatedAt
 
   bookmarks   Bookmark[]
+  hiddenBookmarks HiddenBookmark[]
   tags        Tag[]
   collections Collection[]
   notes       Note[]
@@ -115,4 +116,14 @@ model Note {
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([bookmarkId, userId])
+}
+
+model HiddenBookmark {
+  userId    String
+  tweetId   String
+  hiddenAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tweetId])
 }

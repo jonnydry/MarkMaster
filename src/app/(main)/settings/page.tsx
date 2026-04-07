@@ -17,24 +17,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
 import { CreateCollectionDialog } from "@/components/create-collection-dialog";
 import { useTheme } from "@/components/providers";
+import { useCreateCollection } from "@/hooks/use-create-collection";
+import { PRESET_COLORS } from "@/lib/constants";
 import { toast } from "sonner";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
-
-const PRESET_COLORS = [
-  "#1d9bf0",
-  "#71717a",
-  "#52525b",
-  "#3f3f46",
-  "#a1a1aa",
-  "#27272a",
-  "#d4d4d8",
-  "#18181b",
-];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -43,6 +35,7 @@ export default function SettingsPage() {
   };
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
+  const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: tags = [] } = useQuery<TagWithCount[]>({
@@ -100,42 +93,34 @@ export default function SettingsPage() {
     toast.success("Tag updated");
   };
 
-  const handleCreateCollection = async (
-    name: string,
-    description: string,
-    isPublic: boolean
-  ) => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, isPublic }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message =
-        (data as { error?: string }).error || "Could not create collection";
-      toast.error(message);
-      throw new Error(message);
-    }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Collection created");
-  };
-
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        tags={tags}
-        collections={collections}
-        selectedTags={[]}
-        onTagToggle={(tagId) =>
-          router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-        }
-        onCreateCollection={() => setCreateOpen(true)}
-      />
+    <div className="flex h-screen overflow-hidden bg-background">
+      <div className="hidden md:block">
+        <Sidebar
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={(tagId) =>
+            router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+          }
+          onCreateCollection={() => setCreateOpen(true)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Settings</h1>
+          <div className="flex items-center gap-3">
+            <MobileSidebar
+              tags={tags}
+              collections={collections}
+              selectedTags={[]}
+              onTagToggle={(tagId) =>
+                router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+              }
+              onCreateCollection={() => setCreateOpen(true)}
+            />
+            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Settings</h1>
+          </div>
           {session?.dbUser && <UserNav user={session.dbUser} />}
         </header>
 
@@ -301,7 +286,7 @@ export default function SettingsPage() {
       <CreateCollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreateCollection={handleCreateCollection}
+        onCreateCollection={createCollection}
       />
     </div>
   );

@@ -1,10 +1,27 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function LoginPage() {
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  AccessDenied:
+    "Sign-in was denied. If this keeps happening, check that PostgreSQL is running, migrations are applied, and ENCRYPTION_KEY is set in .env.",
+  Configuration:
+    "Auth isn’t configured correctly (for example AUTH_SECRET or provider credentials).",
+  Verification: "The sign-in link is invalid or has expired.",
+  Default: "Something went wrong during sign-in. Try again.",
+};
+
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+  const errorMessage = error
+    ? AUTH_ERROR_MESSAGES[error] ?? `${AUTH_ERROR_MESSAGES.Default} (${error})`
+    : null;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm mx-auto px-6">
@@ -17,6 +34,16 @@ export default function LoginPage() {
             Sign in with your X account to get started
           </p>
         </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+          >
+            {errorMessage}
+          </div>
+        )}
+
         <Button
           className="w-full h-12 text-base gap-3"
           onClick={() => signIn("twitter", { callbackUrl: "/dashboard" })}
@@ -29,9 +56,23 @@ export default function LoginPage() {
         <p className="text-xs text-muted-foreground text-center mt-6">
           We request read access to your bookmarks and profile.
           <br />
-          We never post on your behalf without permission.
+          This build does not request posting permissions.
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
-  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +44,6 @@ export default function CollectionDetailPage({
   const queryClient = useQueryClient();
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState("");
-  const [publishing, setPublishing] = useState(false);
   const [reordering, setReordering] = useState(false);
 
   const {
@@ -170,30 +168,6 @@ export default function CollectionDetailPage({
     }
   };
 
-  const handlePublishThread = async () => {
-    if (!collection || collection.items.length === 0 || publishing) return;
-    setPublishing(true);
-    try {
-      const res = await fetch(`/api/collections/${id}/publish`, {
-        method: "POST",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(
-          (data as { error?: string }).error || "Could not post thread to X"
-        );
-        return;
-      }
-      toast.success("Thread posted to X");
-      const threadUrl = (data as { threadUrl?: string }).threadUrl;
-      if (threadUrl) {
-        window.open(threadUrl, "_blank", "noopener,noreferrer");
-      }
-    } finally {
-      setPublishing(false);
-    }
-  };
-
   if (isPending) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -258,16 +232,6 @@ export default function CollectionDetailPage({
               )}
               {collection.isPublic ? "Public" : "Private"}
             </Badge>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              disabled={sortedItems.length === 0 || publishing}
-              onClick={handlePublishThread}
-            >
-              <Megaphone className="w-3.5 h-3.5" />
-              {publishing ? "Posting…" : "Post thread"}
-            </Button>
             <Button variant="outline" size="sm" onClick={handleTogglePublic}>
               {collection.isPublic ? "Make Private" : "Make Public"}
             </Button>
@@ -349,6 +313,7 @@ export default function CollectionDetailPage({
                     bookmark={item.bookmark}
                     viewMode="feed"
                     onDelete={() => handleRemoveItem(item.bookmark.id)}
+                    deleteLabel="Remove from collection"
                   />
                 </div>
                 <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">

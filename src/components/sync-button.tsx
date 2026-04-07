@@ -29,6 +29,10 @@ export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
         toast.warning(
           `Synced ${data.newBookmarks} new bookmarks. Rate limited — try again later.`
         );
+      } else if (data.hitExisting && data.newBookmarks === 0) {
+        toast.success("Already up to date.");
+      } else if (data.hitExisting) {
+        toast.success(`Synced ${data.newBookmarks} new bookmarks.`);
       } else {
         toast.success(
           `Synced ${data.newBookmarks} new, ${data.updatedBookmarks} updated bookmarks.`
@@ -58,7 +62,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
       {lastSyncAt && (
         <div className="flex items-center gap-1.5">
           <div className="w-[5px] h-[5px] rounded-full bg-primary" />
-          <span className="text-[11px] text-[#3f3f46]">
+          <span className="text-[11px] text-zinc-600">
             {formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}
           </span>
         </div>

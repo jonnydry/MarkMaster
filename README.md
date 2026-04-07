@@ -1,19 +1,19 @@
 # MarkMaster — X Bookmark Manager
 
-Search, sort, categorize, and curate your X bookmarks. Built for power users who actually want to find what they saved.
+Search, tag, annotate, and curate your X bookmarks. Built for power users who actually want to find what they saved.
 
 ## Features
 
 - **Full-text search** across tweet content, authors, and notes
 - **Sort & filter** by date, engagement metrics, content type, author, and tags
-- **Custom tags** with color coding and smart auto-categorization
-- **Collections** — curate themed bookmark lists with drag-and-drop ordering
-- **Share collections** via public links or post them as X threads
+- **Custom tags** with color coding
+- **Collections** — curate themed bookmark lists with manual ordering
+- **Share collections** via public links
 - **Analytics** — see who you bookmark most, content breakdown, and trends
 - **Export** to JSON or CSV with all metadata
-- **Keyboard shortcuts** — `j/k` navigate, `/` search, `t` tag, `c` collect
+- **Keyboard shortcuts** — `j/k` navigate, `/` search, `t` tag, `c` collect, `n` note
 - **Dark/light theme** with amber accent branding
-- **Infinite history** — syncs and caches bookmarks beyond X's 800-bookmark API limit
+- **Synced archive** — once bookmarks are synced into MarkMaster, they remain searchable locally
 
 ## Tech Stack
 
@@ -62,7 +62,7 @@ npx prisma migrate dev --name init
 1. Go to [developer.x.com](https://developer.x.com) and create a project/app
 2. Under **User authentication settings**, enable OAuth 2.0
 3. Set the callback URL to `http://localhost:3000/api/auth/callback/twitter`
-4. Request scopes: `tweet.read`, `tweet.write`, `users.read`, `bookmark.read`, `bookmark.write`, `offline.access`
+4. Request scopes: `tweet.read`, `users.read`, `bookmark.read`, `offline.access`
 5. Copy your Client ID and Client Secret into `.env`
 
 ### 5. Run the development server
@@ -93,7 +93,7 @@ src/
 │   ├── auth.ts                     # NextAuth configuration
 │   ├── x-api.ts                    # X API client
 │   ├── sync.ts                     # Bookmark sync engine
-│   ├── auto-tag.ts                 # Smart tagging
+│   ├── auto-tag.ts                 # Tag suggestion rules
 │   ├── prisma.ts                   # Database client
 │   └── encryption.ts               # Token encryption
 └── types/                          # TypeScript types
@@ -104,7 +104,6 @@ src/
 MarkMaster requires X API bookmark access (Basic tier at $200/month or pay-per-use):
 
 - **Reads**: $0.005 per API read (fetching bookmarks)
-- **Writes**: $0.01 per API write (posting threads)
 - A full sync of 800 bookmarks costs approximately $4
 
-The app caches everything locally to minimize repeated API calls.
+The app uses incremental syncs and local storage to minimize repeated API calls.

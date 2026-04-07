@@ -20,12 +20,12 @@ const FEATURES = [
   {
     title: "Collections",
     outcome: "Curate",
-    desc: "Ordered lists with drag-and-drop; share a clean thread of saves.",
+    desc: "Ordered lists of saves you can keep tidy and revisit later.",
   },
   {
     title: "Share",
     outcome: "Publish",
-    desc: "Public links for a set, or push to X as a thread when you are ready.",
+    desc: "Public links for a set when you want to share it outside your account.",
   },
   {
     title: "Analytics",
@@ -33,9 +33,9 @@ const FEATURES = [
     desc: "Who you save and when—useful signal, not dashboard theater.",
   },
   {
-    title: "Past 800 saves",
+    title: "Synced archive",
     outcome: "Keep history",
-    desc: "While the list caps, your archive stays queryable in MarkMaster.",
+    desc: "Bookmarks you already synced stay queryable in MarkMaster as your X feed moves on.",
   },
 ] as const;
 
@@ -263,8 +263,8 @@ export function LandingExperience() {
             <span style={{ color: x.textDim }}>Bookmarks for X · not affiliated with X Corp.</span>
           </div>
           <p className="max-w-sm" style={{ color: x.textDim }}>
-            OAuth read access to bookmarks and profile only—we don&apos;t post on
-            your behalf. Hosting and retention follow your deployment.
+            OAuth read access to bookmarks and profile only. Hosting and
+            retention follow your deployment.
           </p>
         </div>
       </footer>

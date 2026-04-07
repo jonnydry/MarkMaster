@@ -8,9 +8,11 @@ import { FolderOpen, Plus, Globe, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CreateCollectionDialog } from "@/components/create-collection-dialog";
+import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
+import { useCreateCollection } from "@/hooks/use-create-collection";
 import { toast } from "sonner";
 import type { CollectionWithCount, TagWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
@@ -21,6 +23,7 @@ export default function CollectionsPage() {
     data: { dbUser?: DbUser } | null;
   };
   const queryClient = useQueryClient();
+  const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: collections = [] } = useQuery<CollectionWithCount[]>({
@@ -38,27 +41,6 @@ export default function CollectionsPage() {
       return res.json();
     },
   });
-
-  const handleCreate = async (
-    name: string,
-    description: string,
-    isPublic: boolean
-  ) => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, isPublic }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message =
-        (data as { error?: string }).error || "Could not create collection";
-      toast.error(message);
-      throw new Error(message);
-    }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Collection created");
-  };
 
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
@@ -78,18 +60,29 @@ export default function CollectionsPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        tags={tags}
-        collections={collections}
-        selectedTags={[]}
-        onTagToggle={goToTagOnDashboard}
-        onCreateCollection={() => setCreateOpen(true)}
-      />
+    <div className="flex h-screen overflow-hidden bg-background">
+      <div className="hidden md:block">
+        <Sidebar
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={goToTagOnDashboard}
+          onCreateCollection={() => setCreateOpen(true)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Collections</h1>
+          <div className="flex items-center gap-3">
+            <MobileSidebar
+              tags={tags}
+              collections={collections}
+              selectedTags={[]}
+              onTagToggle={goToTagOnDashboard}
+              onCreateCollection={() => setCreateOpen(true)}
+            />
+            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Collections</h1>
+          </div>
           <div className="flex items-center gap-3">
             <Button
               size="sm"
@@ -172,7 +165,7 @@ export default function CollectionsPage() {
       <CreateCollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreateCollection={handleCreate}
+        onCreateCollection={createCollection}
       />
     </div>
   );

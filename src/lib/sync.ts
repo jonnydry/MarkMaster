@@ -91,19 +91,17 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
     rateLimited: false,
   };
 
-  let paginationToken: string | undefined;
-  const existingTweetIds = new Set(
+  const hiddenTweetIds = new Set(
     (
-      await prisma.bookmark.findMany({
+      await prisma.hiddenBookmark.findMany({
         where: { userId },
         select: { tweetId: true },
-        orderBy: { bookmarkedAt: "desc" },
-        take: 1000,
       })
-    ).map((b) => b.tweetId)
+    ).map((bookmark: { tweetId: string }) => bookmark.tweetId)
   );
 
-  const isIncremental = existingTweetIds.size > 0;
+  let paginationToken: string | undefined;
+  let shouldStop = false;
 
   try {
     do {
@@ -115,30 +113,24 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
         paginationToken
       );
 
-      let hitExistingInPage = false;
-
       for (const bookmark of page.bookmarks) {
-        result.totalFetched++;
-
-        if (isIncremental && existingTweetIds.has(bookmark.tweet.id)) {
-          hitExistingInPage = true;
-          const op = await upsertBookmark(userId, bookmark);
-          if (op === "updated") result.updatedBookmarks++;
+        if (hiddenTweetIds.has(bookmark.tweet.id)) {
           continue;
         }
 
+        result.totalFetched++;
         const op = await upsertBookmark(userId, bookmark);
         if (op === "created") result.newBookmarks++;
-        else result.updatedBookmarks++;
+        else {
+          result.updatedBookmarks++;
+          result.hitExisting = true;
+          shouldStop = true;
+          break;
+        }
       }
 
-      if (isIncremental && hitExistingInPage) {
-        result.hitExisting = true;
-        break;
-      }
-
-      paginationToken = page.nextToken;
-    } while (paginationToken);
+      paginationToken = shouldStop ? undefined : page.nextToken;
+    } while (paginationToken && !shouldStop);
   } catch (error) {
     if (error instanceof RateLimitError) {
       result.rateLimited = true;

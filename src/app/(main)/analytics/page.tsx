@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Bookmark, Tag, FolderOpen, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
 import {
@@ -26,16 +27,16 @@ import type { PieLabelRenderProps } from "recharts";
 import type { AnalyticsData, TagWithCount, CollectionWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
 import { CreateCollectionDialog } from "@/components/create-collection-dialog";
-import { toast } from "sonner";
+import { useCreateCollection } from "@/hooks/use-create-collection";
 
-const PIE_COLORS = ["#1d9bf0", "#3babf3", "#52525b"];
+const PIE_COLORS = ["#1d9bf0", "#3babf3", "#71717a"];
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
+  const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
@@ -62,42 +63,34 @@ export default function AnalyticsPage() {
     },
   });
 
-  const handleCreateCollection = async (
-    name: string,
-    description: string,
-    isPublic: boolean
-  ) => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, isPublic }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message =
-        (data as { error?: string }).error || "Could not create collection";
-      toast.error(message);
-      throw new Error(message);
-    }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Collection created");
-  };
-
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        tags={tags}
-        collections={collections}
-        selectedTags={[]}
-        onTagToggle={(tagId) =>
-          router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-        }
-        onCreateCollection={() => setCreateOpen(true)}
-      />
+    <div className="flex h-screen overflow-hidden bg-background">
+      <div className="hidden md:block">
+        <Sidebar
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={(tagId) =>
+            router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+          }
+          onCreateCollection={() => setCreateOpen(true)}
+        />
+      </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Analytics</h1>
+          <div className="flex items-center gap-3">
+            <MobileSidebar
+              tags={tags}
+              collections={collections}
+              selectedTags={[]}
+              onTagToggle={(tagId) =>
+                router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+              }
+              onCreateCollection={() => setCreateOpen(true)}
+            />
+            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Analytics</h1>
+          </div>
           {session?.dbUser && <UserNav user={session.dbUser} />}
         </header>
 
@@ -285,8 +278,8 @@ export default function AnalyticsPage() {
                           key={t.tag}
                           className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border"
                         >
-                          <span className="text-sm font-medium text-[#a1a1aa]">{t.tag}</span>
-                          <span className="text-xs text-[#3f3f46]">
+                          <span className="text-sm font-medium text-foreground">{t.tag}</span>
+                          <span className="text-xs text-muted-foreground">
                             {t.count}
                           </span>
                         </div>
@@ -303,7 +296,7 @@ export default function AnalyticsPage() {
       <CreateCollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreateCollection={handleCreateCollection}
+        onCreateCollection={createCollection}
       />
     </div>
   );
