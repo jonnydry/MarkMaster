@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String       @id @default(cuid())
+  xId             String       @unique
+  username        String
+  displayName     String
+  profileImageUrl String?
+  accessToken     String
+  refreshToken    String
+  tokenExpiresAt  DateTime?
+  lastSyncAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  bookmarks   Bookmark[]
+  tags        Tag[]
+  collections Collection[]
+  notes       Note[]
+}
+
+model Bookmark {
+  id                 String   @id @default(cuid())
+  userId             String
+  tweetId            String
+  authorId           String
+  authorUsername     String
+  authorDisplayName  String
+  authorProfileImage String?
+  authorVerified     Boolean  @default(false)
+  tweetText          String
+  publicMetrics      Json?
+  media              Json?
+  urls               Json?
+  quotedTweet        Json?
+  tweetCreatedAt     DateTime
+  bookmarkedAt       DateTime @default(now())
+  syncedAt           DateTime @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags            BookmarkTag[]
+  collectionItems CollectionItem[]
+  notes           Note[]
+
+  @@unique([userId, tweetId])
+  @@index([userId, bookmarkedAt(sort: Desc)])
+  @@index([userId, tweetCreatedAt(sort: Desc)])
+}
+
+model Tag {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+  color  String @default("#1d9bf0")
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmarks BookmarkTag[]
+
+  @@unique([userId, name])
+}
+
+model BookmarkTag {
+  bookmarkId String
+  tagId      String
+
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([bookmarkId, tagId])
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  shareSlug   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CollectionItem[]
+}
+
+model CollectionItem {
+  id           String @id @default(cuid())
+  collectionId String
+  bookmarkId   String
+  sortOrder    Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  bookmark   Bookmark   @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, bookmarkId])
+  @@index([collectionId, sortOrder])
+}
+
+model Note {
+  id         String   @id @default(cuid())
+  bookmarkId String
+  userId     String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookmarkId, userId])
+}
