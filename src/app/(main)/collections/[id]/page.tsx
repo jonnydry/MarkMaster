@@ -8,14 +8,32 @@ import {
   Globe,
   Lock,
   Trash2,
-  GripVertical,
+  ChevronUp,
+  ChevronDown,
   Copy,
   ExternalLink,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
+import type { BookmarkWithRelations } from "@/types";
+
+type CollectionItemRow = {
+  id: string;
+  sortOrder: number;
+  bookmark: BookmarkWithRelations;
+};
+
+type CollectionDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  shareSlug: string | null;
+  items: CollectionItemRow[];
+};
 
 export default function CollectionDetailPage({
   params,
@@ -27,15 +45,30 @@ export default function CollectionDetailPage({
   const queryClient = useQueryClient();
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
-  const { data: collection } = useQuery({
+  const {
+    data: collection,
+    isPending,
+    isError,
+  } = useQuery({
     queryKey: ["collection", id],
     queryFn: async () => {
       const res = await fetch(`/api/collections/${id}`);
-      if (!res.ok) throw new Error("Not found");
-      return res.json();
+      if (res.status === 404) {
+        throw new Error("NOT_FOUND");
+      }
+      if (!res.ok) {
+        throw new Error("LOAD_FAILED");
+      }
+      return res.json() as Promise<CollectionDetail>;
     },
   });
+
+  const sortedItems = collection
+    ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder)
+    : [];
 
   const handleTogglePublic = async () => {
     if (!collection) return;
@@ -44,11 +77,19 @@ export default function CollectionDetailPage({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isPublic: !collection.isPublic }),
     });
-    const updated = await res.json();
+    const updated = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (updated as { error?: string }).error || "Could not update visibility"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["collection", id] });
     queryClient.invalidateQueries({ queryKey: ["collections"] });
-    if (updated.shareSlug) {
-      toast.success("Collection is now public!");
+    if ((updated as { isPublic?: boolean }).isPublic) {
+      toast.success("Collection is now public");
+    } else {
+      toast.success("Collection is now private");
     }
   };
 
@@ -60,11 +101,18 @@ export default function CollectionDetailPage({
   };
 
   const handleRemoveItem = async (bookmarkId: string) => {
-    await fetch(`/api/collections/${id}/items`, {
+    const res = await fetch(`/api/collections/${id}/items`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not remove bookmark"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["collection", id] });
     queryClient.invalidateQueries({ queryKey: ["collections"] });
     toast.success("Removed from collection");
@@ -72,20 +120,98 @@ export default function CollectionDetailPage({
 
   const handleUpdateName = async () => {
     if (!name.trim()) return;
-    await fetch(`/api/collections/${id}`, {
+    const res = await fetch(`/api/collections/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim() }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not update name"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["collection", id] });
     queryClient.invalidateQueries({ queryKey: ["collections"] });
     setEditingName(false);
+    toast.success("Name updated");
   };
 
-  if (!collection) {
+  const moveItem = async (fromIndex: number, direction: -1 | 1) => {
+    if (!collection || reordering) return;
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= sortedItems.length) return;
+
+    const next = [...sortedItems];
+    [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+    const payload = next.map((it, i) => ({
+      bookmarkId: it.bookmark.id,
+      sortOrder: i,
+    }));
+
+    setReordering(true);
+    try {
+      const res = await fetch(`/api/collections/${id}/items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(
+          (data as { error?: string }).error || "Could not reorder items"
+        );
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["collection", id] });
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const handlePublishThread = async () => {
+    if (!collection || collection.items.length === 0 || publishing) return;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/collections/${id}/publish`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(
+          (data as { error?: string }).error || "Could not post thread to X"
+        );
+        return;
+      }
+      toast.success("Thread posted to X");
+      const threadUrl = (data as { threadUrl?: string }).threadUrl;
+      if (threadUrl) {
+        window.open(threadUrl, "_blank", "noopener,noreferrer");
+      }
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  if (isPending) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isError || !collection) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-muted-foreground text-center">
+          This collection could not be loaded. It may have been deleted or you
+          may not have access.
+        </p>
+        <Button variant="outline" onClick={() => router.push("/collections")}>
+          Back to collections
+        </Button>
       </div>
     );
   }
@@ -123,7 +249,7 @@ export default function CollectionDetailPage({
               </h1>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <Badge variant="outline" className="gap-1.5">
               {collection.isPublic ? (
                 <Globe className="w-3 h-3 text-green-500" />
@@ -133,10 +259,16 @@ export default function CollectionDetailPage({
               {collection.isPublic ? "Public" : "Private"}
             </Badge>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
-              onClick={handleTogglePublic}
+              className="gap-1.5"
+              disabled={sortedItems.length === 0 || publishing}
+              onClick={handlePublishThread}
             >
+              <Megaphone className="w-3.5 h-3.5" />
+              {publishing ? "Posting…" : "Post thread"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleTogglePublic}>
               {collection.isPublic ? "Make Private" : "Make Public"}
             </Button>
             {collection.isPublic && collection.shareSlug && (
@@ -172,11 +304,11 @@ export default function CollectionDetailPage({
         )}
 
         <div className="text-sm text-muted-foreground px-6 py-3 border-b border-border">
-          {collection.items.length} bookmark
-          {collection.items.length !== 1 ? "s" : ""}
+          {sortedItems.length} bookmark
+          {sortedItems.length !== 1 ? "s" : ""}
         </div>
 
-        {collection.items.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
               No bookmarks in this collection yet.
@@ -186,60 +318,54 @@ export default function CollectionDetailPage({
           </div>
         ) : (
           <div>
-            {collection.items.map(
-              (item: {
-                id: string;
-                sortOrder: number;
-                bookmark: BookmarkWithRelationsFromApi;
-              }) => (
-                <div key={item.id} className="flex group">
-                  <div className="flex items-center px-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                    <GripVertical className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <BookmarkCard
-                      bookmark={item.bookmark as never}
-                      viewMode="feed"
-                      onDelete={() =>
-                        handleRemoveItem(item.bookmark.id)
-                      }
-                    />
-                  </div>
-                  <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleRemoveItem(item.bookmark.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+            {sortedItems.map((item, index) => (
+              <div key={item.id} className="flex group">
+                <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity border-r border-transparent">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    disabled={reordering || index === 0}
+                    onClick={() => moveItem(index, -1)}
+                    aria-label="Move bookmark up"
+                  >
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    disabled={reordering || index === sortedItems.length - 1}
+                    onClick={() => moveItem(index, 1)}
+                    aria-label="Move bookmark down"
+                  >
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  </Button>
                 </div>
-              )
-            )}
+                <div className="flex-1 min-w-0">
+                  <BookmarkCard
+                    bookmark={item.bookmark}
+                    viewMode="feed"
+                    onDelete={() => handleRemoveItem(item.bookmark.id)}
+                  />
+                </div>
+                <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => handleRemoveItem(item.bookmark.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>
     </div>
   );
 }
-
-type BookmarkWithRelationsFromApi = {
-  id: string;
-  tweetId: string;
-  authorId: string;
-  authorUsername: string;
-  authorDisplayName: string;
-  authorProfileImage: string | null;
-  authorVerified: boolean;
-  tweetText: string;
-  publicMetrics: Record<string, number> | null;
-  media: unknown[] | null;
-  urls: unknown[] | null;
-  quotedTweet: unknown | null;
-  tweetCreatedAt: string;
-  bookmarkedAt: string;
-  tags: Array<{ tag: { id: string; name: string; color: string } }>;
-  notes: Array<{ id: string; content: string }>;
-};

@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+async function requireCollection(
+  collectionId: string,
+  userId: string
+): Promise<boolean> {
+  const col = await prisma.collection.findFirst({
+    where: { id: collectionId, userId },
+    select: { id: true },
+  });
+  return col !== null;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -10,6 +21,10 @@ export async function POST(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await requireCollection(collectionId, user.id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const { bookmarkId } = await req.json();
@@ -45,6 +60,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!(await requireCollection(collectionId, user.id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const { bookmarkId } = await req.json();
 
   await prisma.collectionItem.delete({
@@ -64,6 +83,10 @@ export async function PATCH(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await requireCollection(collectionId, user.id))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const { items } = await req.json();

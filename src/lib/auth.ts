@@ -8,7 +8,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Twitter({
       clientId: process.env.AUTH_TWITTER_ID!,
       clientSecret: process.env.AUTH_TWITTER_SECRET!,
+      // Must set `url`: passing only `params` replaces the default string URL and
+      // normalizeEndpoint falls back to https://authjs.dev (broken OAuth).
       authorization: {
+        url: "https://x.com/i/oauth2/authorize",
         params: {
           scope:
             "tweet.read tweet.write users.read bookmark.read bookmark.write offline.access",

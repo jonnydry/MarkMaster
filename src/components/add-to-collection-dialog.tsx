@@ -37,10 +37,13 @@ export function AddToCollectionDialog({
   const handleCreate = async () => {
     if (!newName.trim() || !bookmarkId) return;
     setCreating(true);
-    const id = await onCreateCollection(newName.trim());
-    onAddToCollection(bookmarkId, id);
-    setNewName("");
-    setCreating(false);
+    try {
+      const id = await onCreateCollection(newName.trim());
+      onAddToCollection(bookmarkId, id);
+      setNewName("");
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (

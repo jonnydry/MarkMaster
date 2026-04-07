@@ -124,6 +124,17 @@ async function getValidToken(
   return currentToken;
 }
 
+/** Resolves a non-expired user access token (refreshes when near expiry). */
+export async function getFreshXAccessToken(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { accessToken: true, tokenExpiresAt: true },
+  });
+  if (!user) throw new Error("User not found");
+  const accessToken = decrypt(user.accessToken);
+  return getValidToken(userId, accessToken, user.tokenExpiresAt);
+}
+
 export async function fetchBookmarks(
   userId: string,
   accessToken: string,

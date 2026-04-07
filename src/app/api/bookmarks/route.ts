@@ -4,6 +4,37 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { SortField, SortDirection, MediaFilter } from "@/types";
 
+const bookmarkInclude = {
+  tags: { include: { tag: true } },
+  notes: { select: { id: true, content: true } },
+  collectionItems: {
+    include: { collection: { select: { id: true, name: true } } },
+  },
+} as const;
+
+function hasVideoMedia(media: unknown): boolean {
+  if (!Array.isArray(media)) return false;
+  return media.some(
+    (m) =>
+      m &&
+      typeof m === "object" &&
+      "type" in m &&
+      ((m as { type: string }).type === "video" ||
+        (m as { type: string }).type === "animated_gif")
+  );
+}
+
+function metricScore(
+  publicMetrics: unknown,
+  sortField: "likes" | "retweets" | "replies"
+): number {
+  const pm = publicMetrics as Record<string, number> | null;
+  if (!pm) return 0;
+  if (sortField === "likes") return Number(pm.like_count) || 0;
+  if (sortField === "retweets") return Number(pm.retweet_count) || 0;
+  return Number(pm.reply_count) || 0;
+}
+
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
@@ -62,49 +93,120 @@ export async function GET(req: NextRequest) {
     where.urls = { equals: Prisma.JsonNull };
   }
 
-  let orderBy: Prisma.BookmarkOrderByWithRelationInput;
-  switch (sortField) {
-    case "tweetCreatedAt":
-      orderBy = { tweetCreatedAt: sortDirection };
-      break;
-    case "likes":
-      orderBy = { publicMetrics: sortDirection };
-      break;
-    case "retweets":
-      orderBy = { publicMetrics: sortDirection };
-      break;
-    case "replies":
-      orderBy = { publicMetrics: sortDirection };
-      break;
-    case "authorUsername":
-      orderBy = { authorUsername: sortDirection };
-      break;
-    default:
-      orderBy = { bookmarkedAt: sortDirection };
+  const needsInMemorySort =
+    sortField === "likes" ||
+    sortField === "retweets" ||
+    sortField === "replies";
+
+  const needsInMemoryMedia = mediaFilter === "video";
+
+  if (!needsInMemorySort && !needsInMemoryMedia) {
+    let orderBy: Prisma.BookmarkOrderByWithRelationInput;
+    switch (sortField) {
+      case "tweetCreatedAt":
+        orderBy = { tweetCreatedAt: sortDirection };
+        break;
+      case "authorUsername":
+        orderBy = { authorUsername: sortDirection };
+        break;
+      default:
+        orderBy = { bookmarkedAt: sortDirection };
+    }
+
+    const [bookmarks, total] = await Promise.all([
+      prisma.bookmark.findMany({
+        where,
+        include: bookmarkInclude,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.bookmark.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      bookmarks,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   }
 
-  const [bookmarks, total] = await Promise.all([
-    prisma.bookmark.findMany({
-      where,
-      include: {
-        tags: { include: { tag: true } },
-        notes: { select: { id: true, content: true } },
-        collectionItems: {
-          include: { collection: { select: { id: true, name: true } } },
-        },
-      },
-      orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.bookmark.count({ where }),
-  ]);
+  const light = await prisma.bookmark.findMany({
+    where,
+    select: {
+      id: true,
+      publicMetrics: true,
+      bookmarkedAt: true,
+      tweetCreatedAt: true,
+      authorUsername: true,
+      media: true,
+    },
+  });
+
+  let rows = light;
+  if (needsInMemoryMedia) {
+    rows = rows.filter((r) => hasVideoMedia(r.media));
+  }
+
+  const dir = sortDirection === "asc" ? 1 : -1;
+  rows.sort((a, b) => {
+    let cmp = 0;
+    switch (sortField) {
+      case "likes":
+        cmp =
+          metricScore(a.publicMetrics, "likes") -
+          metricScore(b.publicMetrics, "likes");
+        break;
+      case "retweets":
+        cmp =
+          metricScore(a.publicMetrics, "retweets") -
+          metricScore(b.publicMetrics, "retweets");
+        break;
+      case "replies":
+        cmp =
+          metricScore(a.publicMetrics, "replies") -
+          metricScore(b.publicMetrics, "replies");
+        break;
+      case "tweetCreatedAt":
+        cmp =
+          new Date(a.tweetCreatedAt).getTime() -
+          new Date(b.tweetCreatedAt).getTime();
+        break;
+      case "authorUsername":
+        cmp = a.authorUsername.localeCompare(b.authorUsername);
+        break;
+      default:
+        cmp =
+          new Date(a.bookmarkedAt).getTime() -
+          new Date(b.bookmarkedAt).getTime();
+        break;
+    }
+    if (cmp !== 0) return cmp * dir;
+    return a.id.localeCompare(b.id) * dir;
+  });
+
+  const total = rows.length;
+  const pageIds = rows
+    .slice((page - 1) * limit, page * limit)
+    .map((r) => r.id);
+
+  const bookmarks =
+    pageIds.length === 0
+      ? []
+      : await prisma.bookmark.findMany({
+          where: { id: { in: pageIds } },
+          include: bookmarkInclude,
+        });
+
+  const order = new Map(pageIds.map((id, i) => [id, i]));
+  bookmarks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 
   return NextResponse.json({
     bookmarks,
     total,
     page,
-    totalPages: Math.ceil(total / limit),
+    totalPages: Math.ceil(total / limit) || 1,
   });
 }
 

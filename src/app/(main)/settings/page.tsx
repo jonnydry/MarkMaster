@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Download,
   Trash2,
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
+import { CreateCollectionDialog } from "@/components/create-collection-dialog";
 import { useTheme } from "@/components/providers";
 import { toast } from "sonner";
 import type { TagWithCount, CollectionWithCount } from "@/types";
@@ -35,11 +37,13 @@ const PRESET_COLORS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: tags = [] } = useQuery<TagWithCount[]>({
     queryKey: ["tags"],
@@ -62,24 +66,59 @@ export default function SettingsPage() {
   const [editTagColor, setEditTagColor] = useState("");
 
   const handleDeleteTag = async (tagId: string) => {
-    await fetch("/api/tags", {
+    const res = await fetch("/api/tags", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tagId }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not delete tag"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["tags"] });
     toast.success("Tag deleted");
   };
 
   const handleUpdateTag = async (tagId: string) => {
-    await fetch("/api/tags", {
+    const res = await fetch("/api/tags", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tagId, name: editTagName, color: editTagColor }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not update tag"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["tags"] });
     setEditingTag(null);
     toast.success("Tag updated");
+  };
+
+  const handleCreateCollection = async (
+    name: string,
+    description: string,
+    isPublic: boolean
+  ) => {
+    const res = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description, isPublic }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message =
+        (data as { error?: string }).error || "Could not create collection";
+      toast.error(message);
+      throw new Error(message);
+    }
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    toast.success("Collection created");
   };
 
   return (
@@ -88,8 +127,10 @@ export default function SettingsPage() {
         tags={tags}
         collections={collections}
         selectedTags={[]}
-        onTagToggle={() => {}}
-        onCreateCollection={() => {}}
+        onTagToggle={(tagId) =>
+          router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+        }
+        onCreateCollection={() => setCreateOpen(true)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -256,6 +297,12 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      <CreateCollectionDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreateCollection={handleCreateCollection}
+      />
     </div>
   );
 }

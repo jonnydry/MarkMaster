@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, startTransition } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/sidebar";
@@ -30,6 +31,7 @@ import type {
 import type { DbUser } from "@/lib/auth";
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
@@ -119,6 +121,24 @@ export default function DashboardPage() {
     resetPage();
   };
 
+  const tagFromUrl = searchParams.get("tag");
+  const tagsFromUrl = searchParams.get("tags");
+  useEffect(() => {
+    if (tagsFromUrl) {
+      const next = tagsFromUrl.split(",").filter(Boolean);
+      if (next.length === 0) return;
+      startTransition(() => {
+        setSelectedTags(next);
+        setPage(1);
+      });
+    } else if (tagFromUrl) {
+      startTransition(() => {
+        setSelectedTags([tagFromUrl]);
+        setPage(1);
+      });
+    }
+  }, [tagFromUrl, tagsFromUrl]);
+
   const hasActiveFilters =
     mediaFilter !== "all" ||
     authorFilter !== "" ||
@@ -140,29 +160,45 @@ export default function DashboardPage() {
     name: string,
     color: string
   ) => {
-    await fetch("/api/tags", {
+    const res = await fetch("/api/tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId, name, color }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error((data as { error?: string }).error || "Could not add tag");
+      return;
+    }
     refreshAll();
+    toast.success("Tag added");
   };
 
   const handleRemoveTag = async (bookmarkId: string, tagId: string) => {
-    await fetch("/api/tags", {
+    const res = await fetch("/api/tags", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId, tagId }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error((data as { error?: string }).error || "Could not remove tag");
+      return;
+    }
     refreshAll();
   };
 
   const handleAddNote = async (bookmarkId: string, content: string) => {
-    await fetch("/api/notes", {
+    const res = await fetch("/api/notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId, content }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error((data as { error?: string }).error || "Could not save note");
+      return;
+    }
     refreshAll();
     toast.success("Note saved");
   };
@@ -171,11 +207,16 @@ export default function DashboardPage() {
     bookmarkId: string,
     collectionId: string
   ) => {
-    await fetch(`/api/collections/${collectionId}/items`, {
+    const res = await fetch(`/api/collections/${collectionId}/items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error((data as { error?: string }).error || "Could not add to collection");
+      return;
+    }
     refreshAll();
     toast.success("Added to collection");
   };
@@ -186,31 +227,51 @@ export default function DashboardPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
-    const col = await res.json();
+    const col = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message =
+        (col as { error?: string }).error || "Could not create collection";
+      toast.error(message);
+      throw new Error(message);
+    }
     refreshAll();
-    return col.id;
+    return (col as { id: string }).id;
   };
 
   const handleCreateCollectionFull = async (
-    name: string,
-    description: string,
-    isPublic: boolean
-  ) => {
-    await fetch("/api/collections", {
+      name: string,
+      description: string,
+      isPublic: boolean
+    ) => {
+    const res = await fetch("/api/collections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, description, isPublic }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message =
+        (data as { error?: string }).error || "Could not create collection";
+      toast.error(message);
+      throw new Error(message);
+    }
     refreshAll();
     toast.success("Collection created");
   };
 
   const handleDeleteBookmark = async (bookmarkId: string) => {
-    await fetch("/api/bookmarks", {
+    const res = await fetch("/api/bookmarks", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookmarkId }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not remove bookmark"
+      );
+      return;
+    }
     refreshAll();
     toast.success("Bookmark removed");
   };

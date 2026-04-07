@@ -6,7 +6,6 @@ import {
   Heart,
   Repeat2,
   MessageCircle,
-  Bookmark,
   ExternalLink,
   Tag,
   FolderPlus,
@@ -199,7 +198,11 @@ export function BookmarkCard({
           {bookmark.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {bookmark.tags.map(({ tag }) => (
-                <TagPill key={tag.id} name={tag.name} />
+                <TagPill
+                  key={tag.id}
+                  name={tag.name}
+                  onClick={() => onTagClick?.(tag.id)}
+                />
               ))}
             </div>
           )}

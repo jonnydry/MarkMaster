@@ -20,7 +20,7 @@ interface CreateCollectionDialogProps {
     name: string,
     description: string,
     isPublic: boolean
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export function CreateCollectionDialog({
@@ -31,14 +31,22 @@ export function CreateCollectionDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleCreate = () => {
-    if (!name.trim()) return;
-    onCreateCollection(name.trim(), description.trim(), isPublic);
-    setName("");
-    setDescription("");
-    setIsPublic(false);
-    onOpenChange(false);
+  const handleCreate = async () => {
+    if (!name.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onCreateCollection(name.trim(), description.trim(), isPublic);
+      setName("");
+      setDescription("");
+      setIsPublic(false);
+      onOpenChange(false);
+    } catch {
+      /* parent shows error via toast */
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -54,7 +62,9 @@ export function CreateCollectionDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Collection name"
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              onKeyDown={(e) =>
+                e.key === "Enter" && void handleCreate()
+              }
             />
           </div>
           <div>
@@ -80,8 +90,11 @@ export function CreateCollectionDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={!name.trim()}>
-              Create
+            <Button
+              onClick={() => void handleCreate()}
+              disabled={!name.trim() || submitting}
+            >
+              {submitting ? "Creating…" : "Create"}
             </Button>
           </div>
         </div>

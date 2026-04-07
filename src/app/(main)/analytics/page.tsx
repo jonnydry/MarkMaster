@@ -1,7 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Bookmark, Tag, FolderOpen, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
@@ -23,13 +25,18 @@ import {
 import type { PieLabelRenderProps } from "recharts";
 import type { AnalyticsData, TagWithCount, CollectionWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
+import { CreateCollectionDialog } from "@/components/create-collection-dialog";
+import { toast } from "sonner";
 
 const PIE_COLORS = ["#1d9bf0", "#3babf3", "#52525b"];
 
 export default function AnalyticsPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ["analytics"],
@@ -55,14 +62,37 @@ export default function AnalyticsPage() {
     },
   });
 
+  const handleCreateCollection = async (
+    name: string,
+    description: string,
+    isPublic: boolean
+  ) => {
+    const res = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description, isPublic }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message =
+        (data as { error?: string }).error || "Could not create collection";
+      toast.error(message);
+      throw new Error(message);
+    }
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    toast.success("Collection created");
+  };
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         tags={tags}
         collections={collections}
         selectedTags={[]}
-        onTagToggle={() => {}}
-        onCreateCollection={() => {}}
+        onTagToggle={(tagId) =>
+          router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
+        }
+        onCreateCollection={() => setCreateOpen(true)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -269,6 +299,12 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      <CreateCollectionDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreateCollection={handleCreateCollection}
+      />
     </div>
   );
 }

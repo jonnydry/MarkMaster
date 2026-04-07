@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FolderOpen, Plus, Globe, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import type { CollectionWithCount, TagWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
 
 export default function CollectionsPage() {
+  const router = useRouter();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
@@ -42,19 +44,37 @@ export default function CollectionsPage() {
     description: string,
     isPublic: boolean
   ) => {
-    await fetch("/api/collections", {
+    const res = await fetch("/api/collections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, description, isPublic }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message =
+        (data as { error?: string }).error || "Could not create collection";
+      toast.error(message);
+      throw new Error(message);
+    }
     queryClient.invalidateQueries({ queryKey: ["collections"] });
     toast.success("Collection created");
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/collections/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        (data as { error?: string }).error || "Could not delete collection"
+      );
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["collections"] });
     toast.success("Collection deleted");
+  };
+
+  const goToTagOnDashboard = (tagId: string) => {
+    router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
   };
 
   return (
@@ -63,7 +83,7 @@ export default function CollectionsPage() {
         tags={tags}
         collections={collections}
         selectedTags={[]}
-        onTagToggle={() => {}}
+        onTagToggle={goToTagOnDashboard}
         onCreateCollection={() => setCreateOpen(true)}
       />
 
