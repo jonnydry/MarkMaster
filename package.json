@@ -1,6 +1,8 @@
 {
   "name": "markmaster",
   "version": "0.1.0",
+  "description": "Search, tag, annotate, and curate your X bookmarks with collections, analytics, and local sync.",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev",
