@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Download,
   Trash2,
@@ -19,14 +20,22 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
+import { RightPanel } from "@/components/right-panel";
 import { UserNav } from "@/components/user-nav";
-import { CreateCollectionDialog } from "@/components/create-collection-dialog";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
+import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { PRESET_COLORS } from "@/lib/constants";
 import { toast } from "sonner";
-import type { TagWithCount, CollectionWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
+
+const CreateCollectionDialog = dynamic(
+  () =>
+    import("@/components/create-collection-dialog").then(
+      (m) => m.CreateCollectionDialog
+    ),
+  { ssr: false }
+);
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -38,21 +47,19 @@ export default function SettingsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: tags = [] } = useQuery<TagWithCount[]>({
-    queryKey: ["tags"],
-    queryFn: async () => {
-      const res = await fetch("/api/tags");
-      return res.json();
-    },
-  });
+  const {
+    data: tags = [],
+    isError: tagsError,
+    error: tagsErrorValue,
+    refetch: refetchTags,
+  } = useTagsQuery();
 
-  const { data: collections = [] } = useQuery<CollectionWithCount[]>({
-    queryKey: ["collections"],
-    queryFn: async () => {
-      const res = await fetch("/api/collections");
-      return res.json();
-    },
-  });
+  const {
+    data: collections = [],
+    isError: collectionsError,
+    error: collectionsErrorValue,
+    refetch: refetchCollections,
+  } = useCollectionsQuery();
 
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editTagName, setEditTagName] = useState("");
@@ -93,6 +100,10 @@ export default function SettingsPage() {
     toast.success("Tag updated");
   };
 
+  const goToTagOnDashboard = (tagId: string) => {
+    router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <div className="hidden md:block">
@@ -100,31 +111,51 @@ export default function SettingsPage() {
           tags={tags}
           collections={collections}
           selectedTags={[]}
-          onTagToggle={(tagId) =>
-            router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-          }
+          onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <MobileSidebar
-              tags={tags}
-              collections={collections}
-              selectedTags={[]}
-              onTagToggle={(tagId) =>
-                router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-              }
-              onCreateCollection={() => setCreateOpen(true)}
-            />
-            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Settings</h1>
+        <header className="border-b border-border px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <MobileSidebar
+                tags={tags}
+                collections={collections}
+                selectedTags={[]}
+                onTagToggle={goToTagOnDashboard}
+                onCreateCollection={() => setCreateOpen(true)}
+              />
+              <h1 className="text-xl font-bold tracking-tight">Settings</h1>
+            </div>
+            {session?.dbUser && <UserNav user={session.dbUser} />}
           </div>
-          {session?.dbUser && <UserNav user={session.dbUser} />}
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 max-w-2xl space-y-6">
+          {(tagsError || collectionsError) && (
+            <Card className="p-5 border-destructive/30">
+              <h2 className="font-semibold mb-2">Settings data could not be loaded</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                {tagsErrorValue instanceof Error
+                  ? tagsErrorValue.message
+                  : collectionsErrorValue instanceof Error
+                    ? collectionsErrorValue.message
+                    : "Please try again."}
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void refetchTags();
+                  void refetchCollections();
+                }}
+              >
+                Retry
+              </Button>
+            </Card>
+          )}
+
           <Card className="p-5">
             <h2 className="font-semibold mb-4">Appearance</h2>
             <div className="flex items-center justify-between">
@@ -155,17 +186,18 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-2">
                 {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center gap-3 py-2"
-                  >
+                  <div key={tag.id} className="flex items-center gap-3 py-2">
                     {editingTag === tag.id ? (
                       <>
                         <div className="flex gap-1">
                           {PRESET_COLORS.map((c) => (
                             <button
                               key={c}
-                              className={`w-5 h-5 rounded-full ${editTagColor === c ? "ring-2 ring-foreground ring-offset-1 ring-offset-background" : ""}`}
+                              className={`w-5 h-5 rounded-full ${
+                                editTagColor === c
+                                  ? "ring-2 ring-foreground ring-offset-1 ring-offset-background"
+                                  : ""
+                              }`}
                               style={{ backgroundColor: c }}
                               onClick={() => setEditTagColor(c)}
                             />
@@ -179,10 +211,7 @@ export default function SettingsPage() {
                             e.key === "Enter" && handleUpdateTag(tag.id)
                           }
                         />
-                        <Button
-                          size="sm"
-                          onClick={() => handleUpdateTag(tag.id)}
-                        >
+                        <Button size="sm" onClick={() => handleUpdateTag(tag.id)}>
                           Save
                         </Button>
                         <Button
@@ -259,9 +288,7 @@ export default function SettingsPage() {
           <Separator />
 
           <Card className="p-5 border-destructive/30">
-            <h2 className="font-semibold mb-4 text-destructive">
-              Danger Zone
-            </h2>
+            <h2 className="font-semibold mb-4 text-destructive">Danger Zone</h2>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Sign out</p>
@@ -281,6 +308,16 @@ export default function SettingsPage() {
             </div>
           </Card>
         </div>
+      </div>
+
+      <div className="hidden xl:block">
+        <RightPanel
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={goToTagOnDashboard}
+          onCreateCollection={() => setCreateOpen(true)}
+        />
       </div>
 
       <CreateCollectionDialog

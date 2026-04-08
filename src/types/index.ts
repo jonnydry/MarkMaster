@@ -78,6 +78,8 @@ export interface CollectionWithCount {
   description: string | null;
   isPublic: boolean;
   shareSlug: string | null;
+   externalSource: string | null;
+   externalSourceId: string | null;
   createdAt: string;
   _count: { items: number };
 }

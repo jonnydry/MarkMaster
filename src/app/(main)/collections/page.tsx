@@ -1,21 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { FolderOpen, Plus, Globe, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CreateCollectionDialog } from "@/components/create-collection-dialog";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
+import { RightPanel } from "@/components/right-panel";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
+import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { toast } from "sonner";
-import type { CollectionWithCount, TagWithCount } from "@/types";
 import type { DbUser } from "@/lib/auth";
+
+const CreateCollectionDialog = dynamic(
+  () =>
+    import("@/components/create-collection-dialog").then(
+      (m) => m.CreateCollectionDialog
+    ),
+  { ssr: false }
+);
 
 export default function CollectionsPage() {
   const router = useRouter();
@@ -26,21 +35,15 @@ export default function CollectionsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: collections = [] } = useQuery<CollectionWithCount[]>({
-    queryKey: ["collections"],
-    queryFn: async () => {
-      const res = await fetch("/api/collections");
-      return res.json();
-    },
-  });
+  const {
+    data: collections = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCollectionsQuery();
 
-  const { data: tags = [] } = useQuery<TagWithCount[]>({
-    queryKey: ["tags"],
-    queryFn: async () => {
-      const res = await fetch("/api/tags");
-      return res.json();
-    },
-  });
+  const { data: tags = [] } = useTagsQuery();
 
   const handleDelete = async (id: string) => {
     const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
@@ -72,32 +75,48 @@ export default function CollectionsPage() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <MobileSidebar
-              tags={tags}
-              collections={collections}
-              selectedTags={[]}
-              onTagToggle={goToTagOnDashboard}
-              onCreateCollection={() => setCreateOpen(true)}
-            />
-            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Collections</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              New Collection
-            </Button>
-            {session?.dbUser && <UserNav user={session.dbUser} />}
+        <header className="border-b border-border px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <MobileSidebar
+                tags={tags}
+                collections={collections}
+                selectedTags={[]}
+                onTagToggle={goToTagOnDashboard}
+                onCreateCollection={() => setCreateOpen(true)}
+              />
+              <h1 className="text-xl font-bold tracking-tight">Collections</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                onClick={() => setCreateOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New
+              </Button>
+              {session?.dbUser && <UserNav user={session.dbUser} />}
+            </div>
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {collections.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+              <p className="text-lg font-medium">Collections could not be loaded</p>
+              <p className="text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "Please try again."}
+              </p>
+              <Button size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : collections.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
               <h2 className="text-lg font-medium mb-2">No collections yet</h2>
@@ -132,34 +151,48 @@ export default function CollectionsPage() {
                       ) : (
                         <Lock className="w-4 h-4 text-muted-foreground" />
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                        onClick={() => handleDelete(col.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {col.description && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {col.description}
-                    </p>
-                  )}
+                       {col.externalSource !== "x-bookmark-folder" && (
+                         <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                           onClick={() => handleDelete(col.id)}
+                         >
+                           <Trash2 className="w-3.5 h-3.5" />
+                         </Button>
+                       )}
+                     </div>
+                   </div>
+                   {col.externalSource === "x-bookmark-folder" && (
+                     <p className="text-xs text-primary mb-2">Synced from X folder</p>
+                   )}
+                   {col.description && (
+                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                       {col.description}
+                     </p>
+                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>
-                      {col._count.items} bookmark{col._count.items !== 1 ? "s" : ""}
+                      {col._count.items} bookmark
+                      {col._count.items !== 1 ? "s" : ""}
                     </span>
-                    <span>
-                      {new Date(col.createdAt).toLocaleDateString()}
-                    </span>
+                    <span>{new Date(col.createdAt).toLocaleDateString()}</span>
                   </div>
                 </Card>
               ))}
             </div>
           )}
         </div>
+      </div>
+
+      <div className="hidden xl:block">
+        <RightPanel
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={goToTagOnDashboard}
+          onCreateCollection={() => setCreateOpen(true)}
+        />
       </div>
 
       <CreateCollectionDialog

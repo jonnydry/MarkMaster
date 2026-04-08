@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import Image from "next/image";
 import {
   Heart,
   Repeat2,
@@ -12,15 +13,8 @@ import {
   StickyNote,
   Trash2,
   BadgeCheck,
-  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -89,6 +83,36 @@ function TagPill({
   );
 }
 
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  shortcut,
+  active,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  shortcut?: string;
+  active?: boolean;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`h-8 px-2 text-xs gap-1.5 ${active ? "text-primary" : "text-muted-foreground"}`}
+      title={shortcut ? `${label} (${shortcut})` : label}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      <span className="sr-only">{label}</span>
+    </Button>
+  );
+}
+
 export function BookmarkCard({
   bookmark,
   viewMode,
@@ -109,7 +133,9 @@ export function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${selected ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+        className={`flex items-start gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${
+          selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
+        }`}
         onClick={() => onSelect?.(bookmark.id)}
       >
         <div className="flex-1 min-w-0">
@@ -163,20 +189,27 @@ export function BookmarkCard({
 
   if (viewMode === "grid") {
     const firstMedia = mediaItems?.[0];
+    const firstMediaUrl = firstMedia?.url || firstMedia?.preview_image_url;
+    const hasTag = bookmark.tags.length > 0;
+    const hasCollection = bookmark.collectionItems && bookmark.collectionItems.length > 0;
+
     return (
       <div
-        className={`group rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all cursor-pointer ${selected ? "ring-2 ring-primary" : ""}`}
+        className={`group rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all cursor-pointer ${
+          selected ? "ring-2 ring-primary" : ""
+        }`}
         onClick={() => onSelect?.(bookmark.id)}
       >
-        {firstMedia?.url && !imageError.has(firstMedia.url) && (
-          <div className="aspect-video bg-muted overflow-hidden">
-            <img
-              src={firstMedia.url || firstMedia.preview_image_url}
-              alt=""
-              className="w-full h-full object-cover"
+        {firstMediaUrl && !imageError.has(firstMediaUrl) && (
+          <div className="relative aspect-video bg-muted overflow-hidden">
+            <Image
+              src={firstMediaUrl}
+              alt={`Media from @${bookmark.authorUsername}`}
+              fill
+              sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              className="object-cover"
               onError={() => {
-                const url = firstMedia.url || firstMedia.preview_image_url || "";
-                setImageError((prev) => new Set(prev).add(url));
+                setImageError((prev) => new Set(prev).add(firstMediaUrl));
               }}
             />
           </div>
@@ -184,9 +217,11 @@ export function BookmarkCard({
         <div className="p-3">
           <div className="flex items-center gap-2 mb-1">
             {bookmark.authorProfileImage && (
-              <img
+              <Image
                 src={bookmark.authorProfileImage}
-                alt=""
+                alt={`${bookmark.authorDisplayName} avatar`}
+                width={20}
+                height={20}
                 className="w-5 h-5 rounded-full"
               />
             )}
@@ -208,6 +243,45 @@ export function BookmarkCard({
               ))}
             </div>
           )}
+          <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border">
+            {onAddTag && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddTag(bookmark.id);
+                }}
+                className={`h-7 px-2 text-xs gap-1 ${hasTag ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <Tag className="w-3 h-3" />
+              </Button>
+            )}
+            {onAddToCollection && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCollection(bookmark.id);
+                }}
+                className={`h-7 px-2 text-xs gap-1 ${hasCollection ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <FolderPlus className="w-3 h-3" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(tweetUrl, "_blank");
+              }}
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground ml-auto"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -215,24 +289,28 @@ export function BookmarkCard({
 
   return (
     <div
-      className={`group px-8 py-5 border-b border-border hover:bg-muted/20 transition-colors ${selected ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+      className={`group px-6 py-4 border-b border-border hover:bg-muted/10 transition-colors ${
+        selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
+      }`}
     >
-      <div className="flex gap-3.5">
+      <div className="flex gap-4">
         {bookmark.authorProfileImage ? (
-          <img
+          <Image
             src={bookmark.authorProfileImage}
-            alt=""
-            className="w-[38px] h-[38px] rounded-full shrink-0"
+            alt={`${bookmark.authorDisplayName} avatar`}
+            width={44}
+            height={44}
+            className="w-[44px] h-[44px] rounded-full shrink-0"
           />
         ) : (
-          <div className="w-[38px] h-[38px] rounded-full bg-secondary shrink-0 flex items-center justify-center">
-            <span className="text-[13px] font-semibold text-zinc-400">
+          <div className="w-[44px] h-[44px] rounded-full bg-secondary shrink-0 flex items-center justify-center">
+            <span className="text-[15px] font-semibold text-zinc-400">
               {bookmark.authorDisplayName.charAt(0).toUpperCase()}
             </span>
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-semibold text-sm text-zinc-200 truncate">
                 {bookmark.authorDisplayName}
@@ -250,67 +328,77 @@ export function BookmarkCard({
                 })}
               </span>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 dark:text-zinc-500"
-                />}
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onAddTag?.(bookmark.id)}>
-                  <Tag className="w-4 h-4 mr-2" /> Add Tag
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onAddToCollection?.(bookmark.id)}
-                >
-                  <FolderPlus className="w-4 h-4 mr-2" /> Add to Collection
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onAddNote?.(bookmark.id)}>
-                  <StickyNote className="w-4 h-4 mr-2" /> Add Note
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => window.open(tweetUrl, "_blank")}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" /> Open on X
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => onDelete?.(bookmark.id)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> {deleteLabel}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1 shrink-0">
+              {onAddTag && (
+                <ActionButton
+                  icon={Tag}
+                  label="Add Tag"
+                  onClick={() => onAddTag(bookmark.id)}
+                  shortcut="T"
+                  active={bookmark.tags.length > 0}
+                />
+              )}
+              {onAddToCollection && (
+                <ActionButton
+                  icon={FolderPlus}
+                  label="Add to Collection"
+                  onClick={() => onAddToCollection(bookmark.id)}
+                  shortcut="C"
+                  active={bookmark.collectionItems && bookmark.collectionItems.length > 0}
+                />
+              )}
+              {onAddNote && (
+                <ActionButton
+                  icon={StickyNote}
+                  label="Add Note"
+                  onClick={() => onAddNote(bookmark.id)}
+                  shortcut="N"
+                  active={bookmark.notes.length > 0}
+                />
+              )}
+              <ActionButton
+                icon={ExternalLink}
+                label="Open on X"
+                onClick={() => window.open(tweetUrl, "_blank")}
+                shortcut="O"
+              />
+              {onDelete && (
+                <ActionButton
+                  icon={Trash2}
+                  label={deleteLabel}
+                  onClick={() => onDelete(bookmark.id)}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="mt-1.5 text-[15px] leading-[23px] text-zinc-300 whitespace-pre-wrap">
+          <div className="mt-2 text-[15px] leading-[22px] text-zinc-300 whitespace-pre-wrap">
             {highlightText(bookmark.tweetText)}
           </div>
 
           {mediaItems && mediaItems.length > 0 && (
             <div
               className={`mt-3 rounded-[10px] overflow-hidden border border-border ${
-                mediaItems.length === 1
-                  ? ""
-                  : "grid grid-cols-2 gap-0.5"
+                mediaItems.length === 1 ? "" : "grid grid-cols-2 gap-0.5"
               }`}
             >
               {mediaItems.slice(0, 4).map((m, i) => {
                 const url = m.url || m.preview_image_url;
                 if (!url || imageError.has(url)) return null;
                 return (
-                  <img
+                  <Image
                     key={i}
                     src={url}
-                    alt=""
-                    className={`w-full object-cover ${
+                    alt={`Media ${i + 1} from @${bookmark.authorUsername}`}
+                    width={m.width || 1200}
+                    height={m.height || 900}
+                    sizes={
                       mediaItems.length === 1
-                        ? "max-h-80"
-                        : "aspect-square"
+                        ? "(max-width: 768px) 100vw, 672px"
+                        : "(max-width: 768px) 50vw, 336px"
+                    }
+                    className={`w-full object-cover ${
+                      mediaItems.length === 1 ? "max-h-80" : "aspect-square"
                     }`}
                     onError={() =>
                       setImageError((prev) => new Set(prev).add(url))
@@ -359,26 +447,27 @@ export function BookmarkCard({
 
           {metrics && (
             <div className="flex items-center gap-4 mt-2.5 text-zinc-500 dark:text-zinc-500">
-              <span className="flex items-center gap-1 text-xs" title={`${metrics.reply_count} replies`}>
+              <span
+                className="flex items-center gap-1 text-xs"
+                title={`${metrics.reply_count} replies`}
+              >
                 <MessageCircle className="w-[13px] h-[13px]" />
                 {formatCount(metrics.reply_count)}
               </span>
-              <span className="flex items-center gap-1 text-xs" title={`${metrics.retweet_count} retweets`}>
+              <span
+                className="flex items-center gap-1 text-xs"
+                title={`${metrics.retweet_count} retweets`}
+              >
                 <Repeat2 className="w-[13px] h-[13px]" />
                 {formatCount(metrics.retweet_count)}
               </span>
-              <span className="flex items-center gap-1 text-xs" title={`${metrics.like_count} likes`}>
+              <span
+                className="flex items-center gap-1 text-xs"
+                title={`${metrics.like_count} likes`}
+              >
                 <Heart className="w-[13px] h-[13px]" />
                 {formatCount(metrics.like_count)}
               </span>
-              <a
-                href={tweetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 text-xs text-zinc-400 hover:text-primary transition-colors"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
           )}
         </div>

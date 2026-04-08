@@ -12,27 +12,107 @@ const bookmarkInclude = {
   },
 } as const;
 
-function hasVideoMedia(media: unknown): boolean {
-  if (!Array.isArray(media)) return false;
-  return media.some(
-    (m) =>
-      m &&
-      typeof m === "object" &&
-      "type" in m &&
-      ((m as { type: string }).type === "video" ||
-        (m as { type: string }).type === "animated_gif")
-  );
+function buildSlowPathWhereSql({
+  userId,
+  search,
+  authorFilter,
+  tagIds,
+  dateFrom,
+  dateTo,
+  collectionId,
+  mediaFilter,
+}: {
+  userId: string;
+  search: string;
+  authorFilter: string;
+  tagIds: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  collectionId?: string;
+  mediaFilter: "all" | "images" | "video" | "links" | "text-only";
+}) {
+  const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
+
+  if (search) {
+    const searchLike = `%${search}%`;
+    conditions.push(Prisma.sql`
+      (
+        b."tweetText" ILIKE ${searchLike}
+        OR b."authorUsername" ILIKE ${searchLike}
+        OR b."authorDisplayName" ILIKE ${searchLike}
+        OR EXISTS (
+          SELECT 1
+          FROM "Note" n
+          WHERE n."bookmarkId" = b."id" AND n."content" ILIKE ${searchLike}
+        )
+      )
+    `);
+  }
+
+  if (authorFilter) {
+    conditions.push(Prisma.sql`b."authorUsername" ILIKE ${`%${authorFilter}%`}`);
+  }
+
+  if (tagIds.length > 0) {
+    conditions.push(Prisma.sql`
+      EXISTS (
+        SELECT 1
+        FROM "BookmarkTag" bt
+        WHERE bt."bookmarkId" = b."id"
+          AND bt."tagId" IN (${Prisma.join(tagIds)})
+      )
+    `);
+  }
+
+  if (dateFrom) {
+    conditions.push(Prisma.sql`b."tweetCreatedAt" >= ${new Date(dateFrom)}`);
+  }
+
+  if (dateTo) {
+    conditions.push(Prisma.sql`b."tweetCreatedAt" <= ${new Date(dateTo)}`);
+  }
+
+  if (collectionId) {
+    conditions.push(Prisma.sql`
+      EXISTS (
+        SELECT 1
+        FROM "CollectionItem" ci
+        WHERE ci."bookmarkId" = b."id" AND ci."collectionId" = ${collectionId}
+      )
+    `);
+  }
+
+  if (mediaFilter === "video") {
+    conditions.push(Prisma.sql`
+      b."media" IS NOT NULL
+      AND b."media" <> 'null'::jsonb
+      AND jsonb_path_exists(
+        b."media",
+        '$[*] ? (@.type == "video" || @.type == "animated_gif")'
+      )
+    `);
+  }
+
+  return Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
 }
 
-function metricScore(
-  publicMetrics: unknown,
-  sortField: "likes" | "retweets" | "replies"
-): number {
-  const pm = publicMetrics as Record<string, number> | null;
-  if (!pm) return 0;
-  if (sortField === "likes") return Number(pm.like_count) || 0;
-  if (sortField === "retweets") return Number(pm.retweet_count) || 0;
-  return Number(pm.reply_count) || 0;
+function getSlowPathOrderSql(
+  sortField: Prisma.BookmarkScalarFieldEnum | "likes" | "retweets" | "replies"
+) {
+  switch (sortField) {
+    case "likes":
+      return Prisma.sql`COALESCE((b."publicMetrics"->>'like_count')::int, 0)`;
+    case "retweets":
+      return Prisma.sql`COALESCE((b."publicMetrics"->>'retweet_count')::int, 0)`;
+    case "replies":
+      return Prisma.sql`COALESCE((b."publicMetrics"->>'reply_count')::int, 0)`;
+    case "tweetCreatedAt":
+      return Prisma.sql`b."tweetCreatedAt"`;
+    case "authorUsername":
+      return Prisma.sql`b."authorUsername"`;
+    default:
+      return Prisma.sql`b."bookmarkedAt"`;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -143,64 +223,37 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const light = await prisma.bookmark.findMany({
-    where,
-    select: {
-      id: true,
-      publicMetrics: true,
-      bookmarkedAt: true,
-      tweetCreatedAt: true,
-      authorUsername: true,
-      media: true,
-    },
+  const slowWhereSql = buildSlowPathWhereSql({
+    userId: user.id,
+    search,
+    authorFilter,
+    tagIds,
+    dateFrom,
+    dateTo,
+    collectionId,
+    mediaFilter,
   });
+  const orderSql = getSlowPathOrderSql(sortField);
+  const directionSql = Prisma.raw(sortDirection.toUpperCase());
 
-  let rows = light;
-  if (needsInMemoryMedia) {
-    rows = rows.filter((r) => hasVideoMedia(r.media));
-  }
+  const [pageRows, totalRows] = await Promise.all([
+    prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT b."id"
+      FROM "Bookmark" b
+      ${slowWhereSql}
+      ORDER BY ${orderSql} ${directionSql}, b."id" ${directionSql}
+      OFFSET ${(page - 1) * limit}
+      LIMIT ${limit}
+    `),
+    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      FROM "Bookmark" b
+      ${slowWhereSql}
+    `),
+  ]);
 
-  const dir = sortDirection === "asc" ? 1 : -1;
-  rows.sort((a, b) => {
-    let cmp = 0;
-    switch (sortField) {
-      case "likes":
-        cmp =
-          metricScore(a.publicMetrics, "likes") -
-          metricScore(b.publicMetrics, "likes");
-        break;
-      case "retweets":
-        cmp =
-          metricScore(a.publicMetrics, "retweets") -
-          metricScore(b.publicMetrics, "retweets");
-        break;
-      case "replies":
-        cmp =
-          metricScore(a.publicMetrics, "replies") -
-          metricScore(b.publicMetrics, "replies");
-        break;
-      case "tweetCreatedAt":
-        cmp =
-          new Date(a.tweetCreatedAt).getTime() -
-          new Date(b.tweetCreatedAt).getTime();
-        break;
-      case "authorUsername":
-        cmp = a.authorUsername.localeCompare(b.authorUsername);
-        break;
-      default:
-        cmp =
-          new Date(a.bookmarkedAt).getTime() -
-          new Date(b.bookmarkedAt).getTime();
-        break;
-    }
-    if (cmp !== 0) return cmp * dir;
-    return a.id.localeCompare(b.id) * dir;
-  });
-
-  const total = rows.length;
-  const pageIds = rows
-    .slice((page - 1) * limit, page * limit)
-    .map((r) => r.id);
+  const pageIds = pageRows.map((row) => row.id);
+  const total = Number(totalRows[0]?.count ?? 0);
 
   const bookmarks =
     pageIds.length === 0

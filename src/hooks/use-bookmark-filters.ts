@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useDeferredValue } from "react";
 import type { SortField, SortDirection, MediaFilter } from "@/types";
 
 export function useBookmarkFilters() {
@@ -13,6 +13,7 @@ export function useBookmarkFilters() {
   const [dateTo, setDateTo] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search);
 
   const resetPage = useCallback(() => setPage(1), []);
 
@@ -43,7 +44,7 @@ export function useBookmarkFilters() {
     return new URLSearchParams({
       page: page.toString(),
       limit: "20",
-      search,
+      search: deferredSearch,
       sortField,
       sortDirection,
       mediaFilter,
@@ -52,7 +53,7 @@ export function useBookmarkFilters() {
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
     }).toString();
-  }, [page, search, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
+  }, [page, deferredSearch, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
 
   return {
     search,
@@ -77,5 +78,6 @@ export function useBookmarkFilters() {
     hasActiveFilters,
     clearFilters,
     queryString,
+    isSearchPending: search !== deferredSearch,
   };
 }

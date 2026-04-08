@@ -31,6 +31,8 @@ type CollectionDetail = {
   description: string | null;
   isPublic: boolean;
   shareSlug: string | null;
+  externalSource: string | null;
+  externalSourceId: string | null;
   items: CollectionItemRow[];
 };
 
@@ -67,6 +69,7 @@ export default function CollectionDetailPage({
   const sortedItems = collection
     ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
+  const isSyncedFromX = collection?.externalSource === "x-bookmark-folder";
 
   const handleTogglePublic = async () => {
     if (!collection) return;
@@ -208,13 +211,18 @@ export default function CollectionDetailPage({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={handleUpdateName}
-                onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleUpdateName(); } }}
                 className="text-lg font-semibold bg-transparent border-b border-primary outline-none w-full"
               />
             ) : (
               <h1
-                className="text-lg font-semibold truncate cursor-pointer hover:text-primary transition-colors"
+                className={`text-lg font-semibold truncate transition-colors ${
+                  isSyncedFromX
+                    ? "cursor-default"
+                    : "cursor-pointer hover:text-primary"
+                }`}
                 onClick={() => {
+                  if (isSyncedFromX) return;
                   setName(collection.name);
                   setEditingName(true);
                 }}
@@ -224,6 +232,11 @@ export default function CollectionDetailPage({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            {isSyncedFromX && (
+              <Badge variant="outline" className="text-primary border-primary/30">
+                Synced from X
+              </Badge>
+            )}
             <Badge variant="outline" className="gap-1.5">
               {collection.isPublic ? (
                 <Globe className="w-3 h-3 text-green-500" />
@@ -284,48 +297,58 @@ export default function CollectionDetailPage({
           <div>
             {sortedItems.map((item, index) => (
               <div key={item.id} className="flex group">
-                <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity border-r border-transparent">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    disabled={reordering || index === 0}
-                    onClick={() => moveItem(index, -1)}
-                    aria-label="Move bookmark up"
-                  >
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    disabled={reordering || index === sortedItems.length - 1}
-                    onClick={() => moveItem(index, 1)}
-                    aria-label="Move bookmark down"
-                  >
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </div>
+                {!isSyncedFromX && (
+                  <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity border-r border-transparent">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      disabled={reordering || index === 0}
+                      onClick={() => moveItem(index, -1)}
+                      aria-label="Move bookmark up"
+                    >
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      disabled={reordering || index === sortedItems.length - 1}
+                      onClick={() => moveItem(index, 1)}
+                      aria-label="Move bookmark down"
+                    >
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <BookmarkCard
                     bookmark={item.bookmark}
                     viewMode="feed"
-                    onDelete={() => handleRemoveItem(item.bookmark.id)}
-                    deleteLabel="Remove from collection"
+                    onDelete={
+                      isSyncedFromX
+                        ? undefined
+                        : () => handleRemoveItem(item.bookmark.id)
+                    }
+                    deleteLabel={
+                      isSyncedFromX ? undefined : "Remove from collection"
+                    }
                   />
                 </div>
-                <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => handleRemoveItem(item.bookmark.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {!isSyncedFromX && (
+                  <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleRemoveItem(item.bookmark.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

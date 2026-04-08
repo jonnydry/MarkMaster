@@ -22,6 +22,7 @@ export function useKeyboardShortcuts({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (e.key === "j" || e.key === "k") {
         e.preventDefault();

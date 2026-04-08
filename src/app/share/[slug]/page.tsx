@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Bookmark, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -53,9 +54,11 @@ export default async function PublicSharePage({
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             {collection.user.profileImageUrl && (
-              <img
+              <Image
                 src={collection.user.profileImageUrl}
-                alt=""
+                alt={`${collection.user.displayName} avatar`}
+                width={32}
+                height={32}
                 className="w-8 h-8 rounded-full"
               />
             )}
@@ -90,9 +93,11 @@ export default async function PublicSharePage({
               >
                 <div className="flex gap-3">
                   {b.authorProfileImage && (
-                    <img
+                    <Image
                       src={b.authorProfileImage}
-                      alt=""
+                      alt={`${b.authorDisplayName} avatar`}
+                      width={40}
+                      height={40}
                       className="w-10 h-10 rounded-full shrink-0"
                     />
                   )}

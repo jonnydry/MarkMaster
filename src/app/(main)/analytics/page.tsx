@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Bookmark, Tag, FolderOpen, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
+import { RightPanel } from "@/components/right-panel";
 import { UserNav } from "@/components/user-nav";
 import {
   BarChart,
@@ -24,10 +27,21 @@ import {
   Line,
 } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
-import type { AnalyticsData, TagWithCount, CollectionWithCount } from "@/types";
+import type {
+  AnalyticsData,
+} from "@/types";
 import type { DbUser } from "@/lib/auth";
-import { CreateCollectionDialog } from "@/components/create-collection-dialog";
 import { useCreateCollection } from "@/hooks/use-create-collection";
+import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import { fetchJson } from "@/lib/fetch-json";
+
+const CreateCollectionDialog = dynamic(
+  () =>
+    import("@/components/create-collection-dialog").then(
+      (m) => m.CreateCollectionDialog
+    ),
+  { ssr: false }
+);
 
 const PIE_COLORS = ["#1d9bf0", "#3babf3", "#71717a"];
 
@@ -39,29 +53,24 @@ export default function AnalyticsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+  const {
+    data: analytics,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<AnalyticsData>({
     queryKey: ["analytics"],
-    queryFn: async () => {
-      const res = await fetch("/api/analytics");
-      return res.json();
-    },
+    queryFn: () => fetchJson("/api/analytics"),
   });
 
-  const { data: tags = [] } = useQuery<TagWithCount[]>({
-    queryKey: ["tags"],
-    queryFn: async () => {
-      const res = await fetch("/api/tags");
-      return res.json();
-    },
-  });
+  const { data: tags = [] } = useTagsQuery();
 
-  const { data: collections = [] } = useQuery<CollectionWithCount[]>({
-    queryKey: ["collections"],
-    queryFn: async () => {
-      const res = await fetch("/api/collections");
-      return res.json();
-    },
-  });
+  const { data: collections = [] } = useCollectionsQuery();
+
+  const goToTagOnDashboard = (tagId: string) => {
+    router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -70,34 +79,42 @@ export default function AnalyticsPage() {
           tags={tags}
           collections={collections}
           selectedTags={[]}
-          onTagToggle={(tagId) =>
-            router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-          }
+          onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border flex items-center justify-between px-8 py-5 shrink-0">
-          <div className="flex items-center gap-3">
-            <MobileSidebar
-              tags={tags}
-              collections={collections}
-              selectedTags={[]}
-              onTagToggle={(tagId) =>
-                router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`)
-              }
-              onCreateCollection={() => setCreateOpen(true)}
-            />
-            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">Analytics</h1>
+        <header className="border-b border-border px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <MobileSidebar
+                tags={tags}
+                collections={collections}
+                selectedTags={[]}
+                onTagToggle={goToTagOnDashboard}
+                onCreateCollection={() => setCreateOpen(true)}
+              />
+              <h1 className="text-xl font-bold tracking-tight">Analytics</h1>
+            </div>
+            {session?.dbUser && <UserNav user={session.dbUser} />}
           </div>
-          {session?.dbUser && <UserNav user={session.dbUser} />}
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {isLoading || !analytics ? (
+          {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : isError || !analytics ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
+              <p className="text-lg font-medium">Analytics could not be loaded</p>
+              <p className="text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "Please try again."}
+              </p>
+              <Button size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
             </div>
           ) : (
             <>
@@ -123,9 +140,7 @@ export default function AnalyticsPage() {
                       <Tag className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">
-                        {analytics.totalTags}
-                      </p>
+                      <p className="text-2xl font-bold">{analytics.totalTags}</p>
                       <p className="text-xs text-muted-foreground">Tags</p>
                     </div>
                   </div>
@@ -278,7 +293,9 @@ export default function AnalyticsPage() {
                           key={t.tag}
                           className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border"
                         >
-                          <span className="text-sm font-medium text-foreground">{t.tag}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {t.tag}
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             {t.count}
                           </span>
@@ -291,6 +308,16 @@ export default function AnalyticsPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="hidden xl:block">
+        <RightPanel
+          tags={tags}
+          collections={collections}
+          selectedTags={[]}
+          onTagToggle={goToTagOnDashboard}
+          onCreateCollection={() => setCreateOpen(true)}
+        />
       </div>
 
       <CreateCollectionDialog
