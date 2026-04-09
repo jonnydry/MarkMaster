@@ -25,6 +25,14 @@ model User {
   tags            Tag[]
   collections     Collection[]
   notes           Note[]
+  syncRuns        SyncRun[]
+}
+
+enum SyncRunStatus {
+  RUNNING
+  COMPLETED
+  RATE_LIMITED
+  FAILED
 }
 
 model Bookmark {
@@ -130,4 +138,24 @@ model HiddenBookmark {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, tweetId])
+}
+
+model SyncRun {
+  id                String        @id @default(cuid())
+  userId            String
+  status            SyncRunStatus @default(RUNNING)
+  newBookmarks      Int           @default(0)
+  updatedBookmarks  Int           @default(0)
+  totalFetched      Int           @default(0)
+  hitExisting       Boolean       @default(false)
+  rateLimited       Boolean       @default(false)
+  rateLimitResetsAt DateTime?
+  errorMessage      String?
+  startedAt         DateTime      @default(now())
+  completedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([userId, status, startedAt(sort: Desc)])
 }

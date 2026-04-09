@@ -100,3 +100,24 @@ export interface AnalyticsData {
   totalTags: number;
   totalCollections: number;
 }
+
+export type SyncRunStatus = "RUNNING" | "COMPLETED" | "RATE_LIMITED" | "FAILED";
+
+export interface SyncRunSummary {
+  id: string;
+  status: SyncRunStatus;
+  newBookmarks: number;
+  updatedBookmarks: number;
+  totalFetched: number;
+  hitExisting: boolean;
+  rateLimited: boolean;
+  rateLimitResetsAt: string | null;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface SyncStatusResponse {
+  currentRun: SyncRunSummary | null;
+  recentRuns: SyncRunSummary[];
+}
