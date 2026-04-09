@@ -57,6 +57,25 @@ export async function PATCH(
     );
   }
 
+  const existingCollection = await prisma.collection.findUnique({
+    where: { id, userId: user.id },
+    select: { shareSlug: true, externalSource: true },
+  });
+
+  if (!existingCollection) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (
+    existingCollection.externalSource &&
+    (parsed.data.name !== undefined || parsed.data.description !== undefined)
+  ) {
+    return NextResponse.json(
+      { error: "This collection is managed by sync and cannot be renamed." },
+      { status: 403 }
+    );
+  }
+
   const updateData: Record<string, unknown> = {};
 
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
@@ -64,11 +83,7 @@ export async function PATCH(
   if (parsed.data.isPublic !== undefined) {
     updateData.isPublic = parsed.data.isPublic;
     if (parsed.data.isPublic) {
-      const existing = await prisma.collection.findUnique({
-        where: { id },
-        select: { shareSlug: true },
-      });
-      if (!existing?.shareSlug) {
+      if (!existingCollection.shareSlug) {
         updateData.shareSlug = nanoid(10);
       }
     }
@@ -90,6 +105,22 @@ export async function DELETE(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const collection = await prisma.collection.findUnique({
+    where: { id, userId: user.id },
+    select: { externalSource: true },
+  });
+
+  if (!collection) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (collection.externalSource) {
+    return NextResponse.json(
+      { error: "This collection is managed by sync and cannot be deleted." },
+      { status: 403 }
+    );
   }
 
   await prisma.collection.delete({

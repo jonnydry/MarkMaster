@@ -33,14 +33,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { name, color, bookmarkId } = parsed.data;
+  const { name, color, bookmarkId, bookmarkIds } = parsed.data;
+  const targetBookmarkIds = bookmarkIds ?? (bookmarkId ? [bookmarkId] : []);
 
-  if (bookmarkId) {
-    const bookmark = await prisma.bookmark.findUnique({
-      where: { id: bookmarkId, userId: user.id },
+  if (targetBookmarkIds.length > 0) {
+    const bookmarks = await prisma.bookmark.findMany({
+      where: { id: { in: targetBookmarkIds }, userId: user.id },
       select: { id: true },
     });
-    if (!bookmark) {
+    if (bookmarks.length !== targetBookmarkIds.length) {
       return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
     }
   }
@@ -51,11 +52,10 @@ export async function POST(req: NextRequest) {
     create: { userId: user.id, name, color: color || "#1d9bf0" },
   });
 
-  if (bookmarkId) {
-    await prisma.bookmarkTag.upsert({
-      where: { bookmarkId_tagId: { bookmarkId, tagId: tag.id } },
-      update: {},
-      create: { bookmarkId, tagId: tag.id },
+  if (targetBookmarkIds.length > 0) {
+    await prisma.bookmarkTag.createMany({
+      data: targetBookmarkIds.map((id) => ({ bookmarkId: id, tagId: tag.id })),
+      skipDuplicates: true,
     });
   }
 
@@ -77,21 +77,26 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const { tagId, bookmarkId } = parsed.data;
+  const { tagId, bookmarkId, bookmarkIds } = parsed.data;
+  const targetBookmarkIds = bookmarkIds ?? (bookmarkId ? [bookmarkId] : []);
 
-  if (bookmarkId) {
-    const bookmarkTag = await prisma.bookmarkTag.findFirst({
+  if (targetBookmarkIds.length > 0) {
+    const bookmarkTags = await prisma.bookmarkTag.findMany({
       where: {
-        bookmarkId,
+        bookmarkId: { in: targetBookmarkIds },
         tagId,
         bookmark: { userId: user.id },
       },
+      select: { bookmarkId: true },
     });
-    if (!bookmarkTag) {
+    if (bookmarkTags.length === 0) {
       return NextResponse.json({ error: "Tag assignment not found" }, { status: 404 });
     }
-    await prisma.bookmarkTag.delete({
-      where: { bookmarkId_tagId: { bookmarkId, tagId } },
+    await prisma.bookmarkTag.deleteMany({
+      where: {
+        bookmarkId: { in: targetBookmarkIds },
+        tagId,
+      },
     });
   } else {
     await prisma.tag.delete({

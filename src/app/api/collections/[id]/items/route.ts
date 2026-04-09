@@ -10,12 +10,11 @@ import {
 async function requireCollection(
   collectionId: string,
   userId: string
-): Promise<boolean> {
-  const col = await prisma.collection.findFirst({
+): Promise<{ id: string; externalSource: string | null } | null> {
+  return prisma.collection.findFirst({
     where: { id: collectionId, userId },
-    select: { id: true },
+    select: { id: true, externalSource: true },
   });
-  return col !== null;
 }
 
 export async function POST(
@@ -28,8 +27,16 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!(await requireCollection(collectionId, user.id))) {
+  const collection = await requireCollection(collectionId, user.id);
+  if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (collection.externalSource) {
+    return NextResponse.json(
+      { error: "This collection is managed by sync and cannot be edited." },
+      { status: 403 }
+    );
   }
 
   const body = await req.json().catch(() => ({}));
@@ -41,13 +48,13 @@ export async function POST(
     );
   }
 
-  const { bookmarkId } = parsed.data;
+  const bookmarkIds = parsed.data.bookmarkIds ?? [parsed.data.bookmarkId!];
 
-  const bookmark = await prisma.bookmark.findUnique({
-    where: { id: bookmarkId, userId: user.id },
+  const bookmarks = await prisma.bookmark.findMany({
+    where: { id: { in: bookmarkIds }, userId: user.id },
     select: { id: true },
   });
-  if (!bookmark) {
+  if (bookmarks.length !== bookmarkIds.length) {
     return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
   }
 
@@ -57,19 +64,32 @@ export async function POST(
     select: { sortOrder: true },
   });
 
-  const item = await prisma.collectionItem.upsert({
-    where: {
-      collectionId_bookmarkId: { collectionId, bookmarkId },
-    },
-    update: {},
-    create: {
+  if (bookmarkIds.length === 1) {
+    const item = await prisma.collectionItem.upsert({
+      where: {
+        collectionId_bookmarkId: { collectionId, bookmarkId: bookmarkIds[0] },
+      },
+      update: {},
+      create: {
+        collectionId,
+        bookmarkId: bookmarkIds[0],
+        sortOrder: (maxOrder?.sortOrder ?? -1) + 1,
+      },
+    });
+
+    return NextResponse.json(item);
+  }
+
+  await prisma.collectionItem.createMany({
+    data: bookmarkIds.map((bookmarkId, index) => ({
       collectionId,
       bookmarkId,
-      sortOrder: (maxOrder?.sortOrder ?? -1) + 1,
-    },
+      sortOrder: (maxOrder?.sortOrder ?? -1) + index + 1,
+    })),
+    skipDuplicates: true,
   });
 
-  return NextResponse.json(item);
+  return NextResponse.json({ success: true, addedCount: bookmarkIds.length });
 }
 
 export async function DELETE(
@@ -82,8 +102,16 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!(await requireCollection(collectionId, user.id))) {
+  const collection = await requireCollection(collectionId, user.id);
+  if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (collection.externalSource) {
+    return NextResponse.json(
+      { error: "This collection is managed by sync and cannot be edited." },
+      { status: 403 }
+    );
   }
 
   const body = await req.json().catch(() => ({}));
@@ -95,9 +123,12 @@ export async function DELETE(
     );
   }
 
-  await prisma.collectionItem.delete({
+  const bookmarkIds = parsed.data.bookmarkIds ?? [parsed.data.bookmarkId!];
+
+  await prisma.collectionItem.deleteMany({
     where: {
-      collectionId_bookmarkId: { collectionId, bookmarkId: parsed.data.bookmarkId },
+      collectionId,
+      bookmarkId: { in: bookmarkIds },
     },
   });
 
@@ -114,8 +145,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!(await requireCollection(collectionId, user.id))) {
+  const collection = await requireCollection(collectionId, user.id);
+  if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (collection.externalSource) {
+    return NextResponse.json(
+      { error: "This collection is managed by sync and cannot be edited." },
+      { status: 403 }
+    );
   }
 
   const body = await req.json().catch(() => ({}));

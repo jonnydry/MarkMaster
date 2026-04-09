@@ -15,17 +15,17 @@ import type { TagWithCount } from "@/types";
 interface AddTagDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bookmarkId: string | null;
+  bookmarkIds: string[];
   existingTags: TagWithCount[];
-  onAddTag: (bookmarkId: string, name: string, color: string) => void;
-  onRemoveTag: (bookmarkId: string, tagId: string) => void;
+  onAddTag: (bookmarkIds: string[], name: string, color: string) => void | Promise<void>;
+  onRemoveTag: (bookmarkIds: string[], tagId: string) => void | Promise<void>;
   bookmarkTags: string[];
 }
 
 export function AddTagDialog({
   open,
   onOpenChange,
-  bookmarkId,
+  bookmarkIds,
   existingTags,
   onAddTag,
   onRemoveTag,
@@ -33,10 +33,11 @@ export function AddTagDialog({
 }: AddTagDialogProps) {
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
+  const isBulk = bookmarkIds.length > 1;
 
   const handleAdd = () => {
-    if (!name.trim() || !bookmarkId) return;
-    onAddTag(bookmarkId, name.trim(), color);
+    if (!name.trim() || bookmarkIds.length === 0) return;
+    onAddTag(bookmarkIds, name.trim(), color);
     setName("");
   };
 
@@ -44,9 +45,16 @@ export function AddTagDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Manage Tags</DialogTitle>
+          <DialogTitle>
+            {isBulk ? `Tag ${bookmarkIds.length} bookmarks` : "Manage Tags"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {isBulk && (
+            <p className="text-sm text-muted-foreground">
+              Apply or remove tags across the selected bookmarks.
+            </p>
+          )}
           {existingTags.length > 0 && (
             <div>
               <label className="text-sm text-muted-foreground mb-2 block">
@@ -64,9 +72,9 @@ export function AddTagDialog({
                           : "bg-card text-muted-foreground border border-border hover:text-foreground"
                       }`}
                       onClick={() => {
-                        if (!bookmarkId) return;
-                        if (isApplied) onRemoveTag(bookmarkId, tag.id);
-                        else onAddTag(bookmarkId, tag.name, tag.color);
+                        if (bookmarkIds.length === 0) return;
+                        if (isApplied) onRemoveTag(bookmarkIds, tag.id);
+                        else onAddTag(bookmarkIds, tag.name, tag.color);
                       }}
                     >
                       {tag.name}

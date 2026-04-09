@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+const bookmarkIdsSchema = z
+  .array(z.string().min(1, "Bookmark ID is required"))
+  .min(1, "At least one bookmark is required");
+
+const bookmarkTargetSchema = z
+  .object({
+    bookmarkId: z.string().min(1, "Bookmark ID is required").optional(),
+    bookmarkIds: bookmarkIdsSchema.optional(),
+  })
+  .refine((value) => value.bookmarkId || value.bookmarkIds?.length, {
+    message: "At least one bookmark target is required",
+    path: ["bookmarkIds"],
+  });
+
 export const createTagSchema = z.object({
   name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long"),
   color: z
@@ -7,11 +21,13 @@ export const createTagSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format")
     .optional(),
   bookmarkId: z.string().min(1).optional(),
+  bookmarkIds: bookmarkIdsSchema.optional(),
 });
 
 export const deleteTagSchema = z.object({
   tagId: z.string().min(1, "Tag ID is required"),
   bookmarkId: z.string().min(1).optional(),
+  bookmarkIds: bookmarkIdsSchema.optional(),
 });
 
 export const patchTagSchema = z.object({
@@ -41,13 +57,9 @@ export const patchCollectionSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
-export const addCollectionItemSchema = z.object({
-  bookmarkId: z.string().min(1, "Bookmark ID is required"),
-});
+export const addCollectionItemSchema = bookmarkTargetSchema;
 
-export const deleteCollectionItemSchema = z.object({
-  bookmarkId: z.string().min(1, "Bookmark ID is required"),
-});
+export const deleteCollectionItemSchema = bookmarkTargetSchema;
 
 export const reorderCollectionItemsSchema = z.object({
   items: z.array(
@@ -58,9 +70,7 @@ export const reorderCollectionItemsSchema = z.object({
   ).min(1, "Items array is required"),
 });
 
-export const deleteBookmarkSchema = z.object({
-  bookmarkId: z.string().min(1, "Bookmark ID is required"),
-});
+export const deleteBookmarkSchema = bookmarkTargetSchema;
 
 export const bookmarksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

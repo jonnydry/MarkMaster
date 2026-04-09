@@ -13,6 +13,7 @@ import {
   StickyNote,
   Trash2,
   BadgeCheck,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
@@ -28,6 +29,8 @@ interface BookmarkCardProps {
   deleteLabel?: string;
   selected?: boolean;
   onSelect?: (bookmarkId: string) => void;
+  selectionMode?: boolean;
+  onSelectionChange?: (bookmarkId: string, selected: boolean) => void;
 }
 
 function formatCount(n: number): string {
@@ -113,6 +116,32 @@ function ActionButton({
   );
 }
 
+function SelectionToggle({
+  selected,
+  onToggle,
+}: {
+  selected?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      aria-pressed={selected}
+      className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 ${
+        selected
+          ? "bg-primary border-primary text-primary-foreground"
+          : "bg-background/90 border-border text-transparent hover:border-primary/50"
+      }`}
+    >
+      <Check className="w-3.5 h-3.5" />
+    </button>
+  );
+}
+
 export function BookmarkCard({
   bookmark,
   viewMode,
@@ -124,6 +153,8 @@ export function BookmarkCard({
   deleteLabel = "Hide from MarkMaster",
   selected,
   onSelect,
+  selectionMode = false,
+  onSelectionChange,
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(new Set());
   const metrics = bookmark.publicMetrics;
@@ -136,8 +167,20 @@ export function BookmarkCard({
         className={`flex items-start gap-3 px-4 py-3 border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${
           selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
         }`}
-        onClick={() => onSelect?.(bookmark.id)}
+        onClick={() => {
+          if (selectionMode) {
+            onSelectionChange?.(bookmark.id, !selected);
+          } else {
+            onSelect?.(bookmark.id);
+          }
+        }}
       >
+        {selectionMode && (
+          <SelectionToggle
+            selected={selected}
+            onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-zinc-200 truncate">
@@ -195,11 +238,25 @@ export function BookmarkCard({
 
     return (
       <div
-        className={`group rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all cursor-pointer ${
+        className={`group relative rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-all cursor-pointer ${
           selected ? "ring-2 ring-primary" : ""
         }`}
-        onClick={() => onSelect?.(bookmark.id)}
+        onClick={() => {
+          if (selectionMode) {
+            onSelectionChange?.(bookmark.id, !selected);
+          } else {
+            onSelect?.(bookmark.id);
+          }
+        }}
       >
+        {selectionMode && (
+          <div className="absolute top-2 right-2 z-10">
+            <SelectionToggle
+              selected={selected}
+              onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
+            />
+          </div>
+        )}
         {firstMediaUrl && !imageError.has(firstMediaUrl) && (
           <div className="relative aspect-video bg-muted overflow-hidden">
             <Image
@@ -292,8 +349,19 @@ export function BookmarkCard({
       className={`group px-6 py-4 border-b border-border hover:bg-muted/10 transition-colors ${
         selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
       }`}
+      onClick={() => {
+        if (selectionMode) {
+          onSelectionChange?.(bookmark.id, !selected);
+        }
+      }}
     >
       <div className="flex gap-4">
+        {selectionMode && (
+          <SelectionToggle
+            selected={selected}
+            onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
+          />
+        )}
         {bookmark.authorProfileImage ? (
           <Image
             src={bookmark.authorProfileImage}

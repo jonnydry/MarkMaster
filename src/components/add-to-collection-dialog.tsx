@@ -15,17 +15,17 @@ import type { CollectionWithCount } from "@/types";
 interface AddToCollectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bookmarkId: string | null;
+  bookmarkIds: string[];
   collections: CollectionWithCount[];
   bookmarkCollections: string[];
-  onAddToCollection: (bookmarkId: string, collectionId: string) => void;
+  onAddToCollection: (bookmarkIds: string[], collectionId: string) => void | Promise<void>;
   onCreateCollection: (name: string) => Promise<string>;
 }
 
 export function AddToCollectionDialog({
   open,
   onOpenChange,
-  bookmarkId,
+  bookmarkIds,
   collections,
   bookmarkCollections,
   onAddToCollection,
@@ -33,13 +33,14 @@ export function AddToCollectionDialog({
 }: AddToCollectionDialogProps) {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const isBulk = bookmarkIds.length > 1;
 
   const handleCreate = async () => {
-    if (!newName.trim() || !bookmarkId) return;
+    if (!newName.trim() || bookmarkIds.length === 0) return;
     setCreating(true);
     try {
       const id = await onCreateCollection(newName.trim());
-      onAddToCollection(bookmarkId, id);
+      await onAddToCollection(bookmarkIds, id);
       setNewName("");
     } finally {
       setCreating(false);
@@ -50,29 +51,41 @@ export function AddToCollectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add to Collection</DialogTitle>
+          <DialogTitle>
+            {isBulk
+              ? `Add ${bookmarkIds.length} bookmarks to a collection`
+              : "Add to Collection"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {collections.length > 0 && (
             <div className="space-y-1.5 max-h-60 overflow-y-auto">
               {collections.map((col) => {
                 const isIn = bookmarkCollections.includes(col.id);
+                const isManaged = col.externalSource === "x-bookmark-folder";
                 return (
                   <button
                     key={col.id}
                     onClick={() => {
-                      if (!bookmarkId || isIn) return;
-                      onAddToCollection(bookmarkId, col.id);
+                      if (bookmarkIds.length === 0 || isIn || isManaged) return;
+                      void onAddToCollection(bookmarkIds, col.id);
                     }}
-                    disabled={isIn}
+                    disabled={isIn || isManaged}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
                       isIn
                         ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted text-foreground"
+                        : isManaged
+                          ? "bg-muted/60 text-muted-foreground cursor-not-allowed"
+                          : "hover:bg-muted text-foreground"
                     }`}
                   >
                     <FolderOpen className="w-4 h-4 shrink-0" />
                     <span className="truncate">{col.name}</span>
+                    {isManaged && (
+                      <span className="text-[10px] uppercase tracking-wide text-primary">
+                        Sync
+                      </span>
+                    )}
                     <span className="ml-auto text-xs text-muted-foreground">
                       {col._count.items}
                     </span>

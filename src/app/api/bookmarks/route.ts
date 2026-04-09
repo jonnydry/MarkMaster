@@ -289,27 +289,29 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const bookmark = await prisma.bookmark.findUnique({
-    where: { id: parsed.data.bookmarkId, userId: user.id },
-    select: { tweetId: true },
+  const bookmarkIds = parsed.data.bookmarkIds ?? [parsed.data.bookmarkId!];
+
+  const bookmarks = await prisma.bookmark.findMany({
+    where: { id: { in: bookmarkIds }, userId: user.id },
+    select: { id: true, tweetId: true },
   });
 
-  if (!bookmark) {
+  if (bookmarks.length !== bookmarkIds.length) {
     return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
   }
 
   await prisma.$transaction([
-    prisma.hiddenBookmark.upsert({
-      where: {
-        userId_tweetId: { userId: user.id, tweetId: bookmark.tweetId },
-      },
-      update: {},
-      create: { userId: user.id, tweetId: bookmark.tweetId },
+    prisma.hiddenBookmark.createMany({
+      data: bookmarks.map((bookmark) => ({
+        userId: user.id,
+        tweetId: bookmark.tweetId,
+      })),
+      skipDuplicates: true,
     }),
-    prisma.bookmark.delete({
-      where: { id: parsed.data.bookmarkId, userId: user.id },
+    prisma.bookmark.deleteMany({
+      where: { id: { in: bookmarkIds }, userId: user.id },
     }),
   ]);
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, hiddenCount: bookmarkIds.length });
 }

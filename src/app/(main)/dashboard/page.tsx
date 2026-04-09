@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -12,6 +12,10 @@ import {
   BarChart3,
   Filter,
   Search,
+  CheckSquare,
+  Tag,
+  FolderPlus,
+  Trash2,
   X,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +48,8 @@ type BookmarkResponse = {
   total: number;
   totalPages: number;
 };
+
+const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
 
 const CommandPalette = dynamic(
   () => import("@/components/command-palette").then((m) => m.CommandPalette),
@@ -82,6 +88,44 @@ const NAV_ITEMS = [
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
 ];
 
+function getSharedTagIds(bookmarks: BookmarkWithRelations[]) {
+  if (bookmarks.length === 0) return [];
+
+  const [first, ...rest] = bookmarks;
+  const shared = new Set(first.tags.map(({ tag }) => tag.id));
+
+  for (const bookmark of rest) {
+    const bookmarkTagIds = new Set(bookmark.tags.map(({ tag }) => tag.id));
+    for (const tagId of Array.from(shared)) {
+      if (!bookmarkTagIds.has(tagId)) {
+        shared.delete(tagId);
+      }
+    }
+  }
+
+  return Array.from(shared);
+}
+
+function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
+  if (bookmarks.length === 0) return [];
+
+  const [first, ...rest] = bookmarks;
+  const shared = new Set(first.collectionItems.map(({ collection }) => collection.id));
+
+  for (const bookmark of rest) {
+    const bookmarkCollectionIds = new Set(
+      bookmark.collectionItems.map(({ collection }) => collection.id)
+    );
+    for (const collectionId of Array.from(shared)) {
+      if (!bookmarkCollectionIds.has(collectionId)) {
+        shared.delete(collectionId);
+      }
+    }
+  }
+
+  return Array.from(shared);
+}
+
 function DashboardContent() {
   const searchParams = useSearchParams();
   const { data: session } = useSession() as {
@@ -100,6 +144,10 @@ function DashboardContent() {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<string[]>([]);
+  const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
+  const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -119,10 +167,22 @@ function DashboardContent() {
 
   const { data: collections = [] } = useCollectionsQuery();
 
-  const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks || [];
+  const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
   const { setSelectedTags, setPage, setMediaFilter } = filters;
+  const visibleBookmarkIdSet = useMemo(
+    () => new Set(bookmarks.map((bookmark) => bookmark.id)),
+    [bookmarks]
+  );
+  const visibleSelectedBookmarkIds = useMemo(
+    () => selectedBookmarkIds.filter((bookmarkId) => visibleBookmarkIdSet.has(bookmarkId)),
+    [selectedBookmarkIds, visibleBookmarkIdSet]
+  );
+  const selectedBookmarkIdSet = useMemo(
+    () => new Set(visibleSelectedBookmarkIds),
+    [visibleSelectedBookmarkIds]
+  );
 
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
@@ -141,14 +201,68 @@ function DashboardContent() {
   }, [tagFromUrl, tagsFromUrl, setPage, setSelectedTags]);
 
   const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
+  const tagTargetBookmarks = bookmarks.filter((bookmark) =>
+    tagTargetIds.includes(bookmark.id)
+  );
+  const collectionTargetBookmarks = bookmarks.filter((bookmark) =>
+    collectionTargetIds.includes(bookmark.id)
+  );
+
+  const clearSelection = () => {
+    setSelectedBookmarkIds([]);
+    setSelectionMode(false);
+  };
+
+  const toggleBookmarkSelection = (bookmarkId: string, selected: boolean) => {
+    setSelectedBookmarkIds((current) => {
+      if (selected) {
+        return current.includes(bookmarkId) ? current : [...current, bookmarkId];
+      }
+      return current.filter((id) => id !== bookmarkId);
+    });
+  };
+
+  const selectVisibleBookmarks = () => {
+    setSelectedBookmarkIds(bookmarks.map((bookmark) => bookmark.id));
+  };
+
+  const openBulkTagDialog = () => {
+    if (visibleSelectedBookmarkIds.length === 0) return;
+    setTagTargetIds(visibleSelectedBookmarkIds);
+    setTagDialogOpen(true);
+  };
+
+  const openBulkCollectionDialog = () => {
+    if (visibleSelectedBookmarkIds.length === 0) return;
+    setCollectionTargetIds(visibleSelectedBookmarkIds);
+    setCollectionDialogOpen(true);
+  };
+
+  const handleBulkHide = async () => {
+    if (visibleSelectedBookmarkIds.length === 0) return;
+    const confirmed = window.confirm(
+      `Hide ${visibleSelectedBookmarkIds.length} bookmark${visibleSelectedBookmarkIds.length === 1 ? "" : "s"} from MarkMaster?`
+    );
+    if (!confirmed) return;
+
+    await actions.handleDeleteBookmark(visibleSelectedBookmarkIds);
+  };
 
   useKeyboardShortcuts({
-    activeBookmarkId,
-    bookmarks,
+    activeBookmarkId: selectionMode ? null : activeBookmarkId,
+    bookmarks: selectionMode ? [] : bookmarks,
     onNavigate: setActiveBookmarkId,
     onSearch: () => searchInputRef.current?.focus(),
-    onTag: () => setTagDialogOpen(true),
-    onCollection: () => setCollectionDialogOpen(true),
+    onTag: () => {
+      if (!activeBookmarkId) return;
+      setTagTargetIds([activeBookmarkId]);
+      setTagDialogOpen(true);
+    },
+    onCollection: () => {
+      if (!activeBookmarkId) return;
+      setCollectionTargetIds([activeBookmarkId]);
+      setCollectionDialogOpen(true);
+    },
     onNote: () => setNoteDialogOpen(true),
   });
 
@@ -261,6 +375,23 @@ function DashboardContent() {
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => {
+                  if (selectionMode) {
+                    clearSelection();
+                  } else {
+                    setSelectionMode(true);
+                  }
+                }}
+                className={`gap-2 h-9 px-3 text-sm ${selectionMode ? "bg-muted" : ""}`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {selectionMode ? "Done" : "Select"}
+                </span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowFilters(!showFilters)}
                 className={`gap-2 h-9 px-3 text-sm ${
                   showFilters ? "bg-muted" : ""
@@ -331,6 +462,57 @@ function DashboardContent() {
           {(isFetching || filters.isSearchPending) && !isLoading && (
             <p className="mt-3 text-xs text-muted-foreground">Updating results...</p>
           )}
+          {selectionMode && (
+            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-medium text-foreground">
+                  {visibleSelectedBookmarkIds.length > 0
+                    ? `${visibleSelectedBookmarkIds.length} selected`
+                    : "Select bookmarks to apply bulk actions"}
+                </span>
+                <Button variant="outline" size="sm" onClick={selectVisibleBookmarks}>
+                  Select page
+                </Button>
+                {visibleSelectedBookmarkIds.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearSelection}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={visibleSelectedBookmarkIds.length === 0}
+                  onClick={openBulkTagDialog}
+                >
+                  <Tag className="w-4 h-4" />
+                  Tag
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={visibleSelectedBookmarkIds.length === 0}
+                  onClick={openBulkCollectionDialog}
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  Add to Collection
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-destructive hover:text-destructive"
+                  disabled={visibleSelectedBookmarkIds.length === 0}
+                  onClick={() => void handleBulkHide()}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Hide
+                </Button>
+              </div>
+            </div>
+          )}
         </header>
 
         {showFilters && (
@@ -391,15 +573,23 @@ function DashboardContent() {
                   key={bookmark.id}
                   bookmark={bookmark}
                   viewMode={viewMode}
-                  selected={activeBookmarkId === bookmark.id}
+                  selected={
+                    selectionMode
+                      ? selectedBookmarkIdSet.has(bookmark.id)
+                      : activeBookmarkId === bookmark.id
+                  }
                   onSelect={setActiveBookmarkId}
+                  selectionMode={selectionMode}
+                  onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
                   onAddTag={(id) => {
                     setActiveBookmarkId(id);
+                    setTagTargetIds([id]);
                     setTagDialogOpen(true);
                   }}
                   onAddToCollection={(id) => {
                     setActiveBookmarkId(id);
+                    setCollectionTargetIds([id]);
                     setCollectionDialogOpen(true);
                   }}
                   onAddNote={(id) => {
@@ -417,15 +607,23 @@ function DashboardContent() {
                   key={bookmark.id}
                   bookmark={bookmark}
                   viewMode={viewMode}
-                  selected={activeBookmarkId === bookmark.id}
+                  selected={
+                    selectionMode
+                      ? selectedBookmarkIdSet.has(bookmark.id)
+                      : activeBookmarkId === bookmark.id
+                  }
                   onSelect={setActiveBookmarkId}
+                  selectionMode={selectionMode}
+                  onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
                   onAddTag={(id) => {
                     setActiveBookmarkId(id);
+                    setTagTargetIds([id]);
                     setTagDialogOpen(true);
                   }}
                   onAddToCollection={(id) => {
                     setActiveBookmarkId(id);
+                    setCollectionTargetIds([id]);
                     setCollectionDialogOpen(true);
                   }}
                   onAddNote={(id) => {
@@ -476,12 +674,17 @@ function DashboardContent() {
 
       <AddTagDialog
         open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        bookmarkId={activeBookmarkId}
+        onOpenChange={(open) => {
+          setTagDialogOpen(open);
+          if (!open) {
+            setTagTargetIds([]);
+          }
+        }}
+        bookmarkIds={tagTargetIds}
         existingTags={tags}
         onAddTag={actions.handleAddTag}
         onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={activeBookmark?.tags.map((t) => t.tag.id) || []}
+        bookmarkTags={getSharedTagIds(tagTargetBookmarks)}
       />
 
       <AddNoteDialog
@@ -494,12 +697,15 @@ function DashboardContent() {
 
       <AddToCollectionDialog
         open={collectionDialogOpen}
-        onOpenChange={setCollectionDialogOpen}
-        bookmarkId={activeBookmarkId}
+        onOpenChange={(open) => {
+          setCollectionDialogOpen(open);
+          if (!open) {
+            setCollectionTargetIds([]);
+          }
+        }}
+        bookmarkIds={collectionTargetIds}
         collections={collections}
-        bookmarkCollections={
-          activeBookmark?.collectionItems.map((ci) => ci.collection.id) || []
-        }
+        bookmarkCollections={getSharedCollectionIds(collectionTargetBookmarks)}
         onAddToCollection={actions.handleAddToCollection}
         onCreateCollection={createCollectionQuick}
       />

@@ -6,6 +6,14 @@ import { toast } from "sonner";
 import { sendJson } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 
+function asBookmarkIds(bookmarkIds: string | string[]) {
+  return Array.isArray(bookmarkIds) ? bookmarkIds : [bookmarkIds];
+}
+
+function getBookmarkLabel(count: number) {
+  return `${count} bookmark${count === 1 ? "" : "s"}`;
+}
+
 export function useBookmarkActions() {
   const queryClient = useQueryClient();
 
@@ -14,17 +22,22 @@ export function useBookmarkActions() {
   }, [queryClient]);
 
   const handleAddTag = useCallback(async (
-    bookmarkId: string,
+    bookmarkIds: string | string[],
     name: string,
     color: string
   ) => {
+    const targets = asBookmarkIds(bookmarkIds);
     try {
       await sendJson("/api/tags", {
         method: "POST",
-        body: { bookmarkId, name, color },
+        body: { bookmarkIds: targets, name, color },
       });
       await invalidateLibraryQueries(queryClient);
-      toast.success("Tag added");
+      toast.success(
+        targets.length === 1
+          ? "Tag added"
+          : `Tag added to ${getBookmarkLabel(targets.length)}`
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not add tag"
@@ -32,13 +45,19 @@ export function useBookmarkActions() {
     }
   }, [queryClient]);
 
-  const handleRemoveTag = useCallback(async (bookmarkId: string, tagId: string) => {
+  const handleRemoveTag = useCallback(async (bookmarkIds: string | string[], tagId: string) => {
+    const targets = asBookmarkIds(bookmarkIds);
     try {
       await sendJson("/api/tags", {
         method: "DELETE",
-        body: { bookmarkId, tagId },
+        body: { bookmarkIds: targets, tagId },
       });
       await invalidateLibraryQueries(queryClient);
+      toast.success(
+        targets.length === 1
+          ? "Tag removed"
+          : `Tag removed from ${getBookmarkLabel(targets.length)}`
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not remove tag"
@@ -62,16 +81,21 @@ export function useBookmarkActions() {
   }, [queryClient]);
 
   const handleAddToCollection = useCallback(async (
-    bookmarkId: string,
+    bookmarkIds: string | string[],
     collectionId: string
   ) => {
+    const targets = asBookmarkIds(bookmarkIds);
     try {
       await sendJson(`/api/collections/${collectionId}/items`, {
         method: "POST",
-        body: { bookmarkId },
+        body: { bookmarkIds: targets },
       });
       await invalidateLibraryQueries(queryClient);
-      toast.success("Added to collection");
+      toast.success(
+        targets.length === 1
+          ? "Added to collection"
+          : `Added ${getBookmarkLabel(targets.length)} to the collection`
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not add to collection"
@@ -79,14 +103,19 @@ export function useBookmarkActions() {
     }
   }, [queryClient]);
 
-  const handleDeleteBookmark = useCallback(async (bookmarkId: string) => {
+  const handleDeleteBookmark = useCallback(async (bookmarkIds: string | string[]) => {
+    const targets = asBookmarkIds(bookmarkIds);
     try {
       await sendJson("/api/bookmarks", {
         method: "DELETE",
-        body: { bookmarkId },
+        body: { bookmarkIds: targets },
       });
       await invalidateLibraryQueries(queryClient);
-      toast.success("Hidden from MarkMaster");
+      toast.success(
+        targets.length === 1
+          ? "Hidden from MarkMaster"
+          : `Hidden ${getBookmarkLabel(targets.length)} from MarkMaster`
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not remove bookmark"
