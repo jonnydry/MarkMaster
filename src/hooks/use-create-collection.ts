@@ -2,6 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { sendJson } from "@/lib/fetch-json";
+import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 
 export function useCreateCollection() {
   const queryClient = useQueryClient();
@@ -11,37 +13,35 @@ export function useCreateCollection() {
     description: string,
     isPublic: boolean
   ) => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, isPublic }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson("/api/collections", {
+        method: "POST",
+        body: { name, description, isPublic },
+      });
+      await invalidateCollectionsQuery(queryClient);
+      toast.success("Collection created");
+    } catch (error) {
       const message =
-        (data as { error?: string }).error || "Could not create collection";
+        error instanceof Error ? error.message : "Could not create collection";
       toast.error(message);
       throw new Error(message);
     }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Collection created");
   };
 
   const createCollectionQuick = async (name: string): Promise<string> => {
-    const res = await fetch("/api/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    const col = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      const collection = await sendJson<{ id: string }>("/api/collections", {
+        method: "POST",
+        body: { name },
+      });
+      await invalidateCollectionsQuery(queryClient);
+      return collection.id;
+    } catch (error) {
       const message =
-        (col as { error?: string }).error || "Could not create collection";
+        error instanceof Error ? error.message : "Could not create collection";
       toast.error(message);
       throw new Error(message);
     }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    return (col as { id: string }).id;
   };
 
   return { createCollection, createCollectionQuick };

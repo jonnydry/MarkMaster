@@ -26,6 +26,8 @@ import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { PRESET_COLORS } from "@/lib/constants";
+import { sendJson } from "@/lib/fetch-json";
+import { invalidateTagsQuery } from "@/lib/query-invalidation";
 import { toast } from "sonner";
 import type { DbUser } from "@/lib/auth";
 
@@ -66,38 +68,34 @@ export default function SettingsPage() {
   const [editTagColor, setEditTagColor] = useState("");
 
   const handleDeleteTag = async (tagId: string) => {
-    const res = await fetch("/api/tags", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson("/api/tags", {
+        method: "DELETE",
+        body: { tagId },
+      });
+      await invalidateTagsQuery(queryClient);
+      toast.success("Tag deleted");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not delete tag"
+        error instanceof Error ? error.message : "Could not delete tag"
       );
-      return;
     }
-    queryClient.invalidateQueries({ queryKey: ["tags"] });
-    toast.success("Tag deleted");
   };
 
   const handleUpdateTag = async (tagId: string) => {
-    const res = await fetch("/api/tags", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagId, name: editTagName, color: editTagColor }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson("/api/tags", {
+        method: "PATCH",
+        body: { tagId, name: editTagName, color: editTagColor },
+      });
+      await invalidateTagsQuery(queryClient);
+      setEditingTag(null);
+      toast.success("Tag updated");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not update tag"
+        error instanceof Error ? error.message : "Could not update tag"
       );
-      return;
     }
-    queryClient.invalidateQueries({ queryKey: ["tags"] });
-    setEditingTag(null);
-    toast.success("Tag updated");
   };
 
   const goToTagOnDashboard = (tagId: string) => {

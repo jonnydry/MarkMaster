@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { invalidateCollectionQueries } from "@/lib/query-invalidation";
 import type { BookmarkWithRelations } from "@/types";
 
 type CollectionItemRow = {
@@ -55,14 +57,14 @@ export default function CollectionDetailPage({
   } = useQuery({
     queryKey: ["collection", id],
     queryFn: async () => {
-      const res = await fetch(`/api/collections/${id}`);
-      if (res.status === 404) {
-        throw new Error("NOT_FOUND");
-      }
-      if (!res.ok) {
+      try {
+        return await fetchJson<CollectionDetail>(`/api/collections/${id}`);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("404")) {
+          throw new Error("NOT_FOUND");
+        }
         throw new Error("LOAD_FAILED");
       }
-      return res.json() as Promise<CollectionDetail>;
     },
   });
 
@@ -73,24 +75,21 @@ export default function CollectionDetailPage({
 
   const handleTogglePublic = async () => {
     if (!collection) return;
-    const res = await fetch(`/api/collections/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isPublic: !collection.isPublic }),
-    });
-    const updated = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      const updated = await sendJson<{ isPublic?: boolean }>(`/api/collections/${id}`, {
+        method: "PATCH",
+        body: { isPublic: !collection.isPublic },
+      });
+      await invalidateCollectionQueries(queryClient, id);
+      if (updated.isPublic) {
+        toast.success("Collection is now public");
+      } else {
+        toast.success("Collection is now private");
+      }
+    } catch (error) {
       toast.error(
-        (updated as { error?: string }).error || "Could not update visibility"
+        error instanceof Error ? error.message : "Could not update visibility"
       );
-      return;
-    }
-    queryClient.invalidateQueries({ queryKey: ["collection", id] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    if ((updated as { isPublic?: boolean }).isPublic) {
-      toast.success("Collection is now public");
-    } else {
-      toast.success("Collection is now private");
     }
   };
 
@@ -102,41 +101,35 @@ export default function CollectionDetailPage({
   };
 
   const handleRemoveItem = async (bookmarkId: string) => {
-    const res = await fetch(`/api/collections/${id}/items`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson(`/api/collections/${id}/items`, {
+        method: "DELETE",
+        body: { bookmarkId },
+      });
+      await invalidateCollectionQueries(queryClient, id);
+      toast.success("Removed from collection");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not remove bookmark"
+        error instanceof Error ? error.message : "Could not remove bookmark"
       );
-      return;
     }
-    queryClient.invalidateQueries({ queryKey: ["collection", id] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Removed from collection");
   };
 
   const handleUpdateName = async () => {
     if (!name.trim()) return;
-    const res = await fetch(`/api/collections/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson(`/api/collections/${id}`, {
+        method: "PATCH",
+        body: { name: name.trim() },
+      });
+      await invalidateCollectionQueries(queryClient, id);
+      setEditingName(false);
+      toast.success("Name updated");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not update name"
+        error instanceof Error ? error.message : "Could not update name"
       );
-      return;
     }
-    queryClient.invalidateQueries({ queryKey: ["collection", id] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    setEditingName(false);
-    toast.success("Name updated");
   };
 
   const moveItem = async (fromIndex: number, direction: -1 | 1) => {
@@ -153,19 +146,15 @@ export default function CollectionDetailPage({
 
     setReordering(true);
     try {
-      const res = await fetch(`/api/collections/${id}/items`, {
+      await sendJson(`/api/collections/${id}/items`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: payload }),
+        body: { items: payload },
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(
-          (data as { error?: string }).error || "Could not reorder items"
-        );
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["collection", id] });
+      await invalidateCollectionQueries(queryClient, id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not reorder items"
+      );
     } finally {
       setReordering(false);
     }

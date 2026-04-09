@@ -15,6 +15,8 @@ import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import { sendJson } from "@/lib/fetch-json";
+import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import { toast } from "sonner";
 import type { DbUser } from "@/lib/auth";
 
@@ -46,16 +48,15 @@ export default function CollectionsPage() {
   const { data: tags = [] } = useTagsQuery();
 
   const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/collections/${id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson(`/api/collections/${id}`, { method: "DELETE" });
+      await invalidateCollectionsQuery(queryClient);
+      toast.success("Collection deleted");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not delete collection"
+        error instanceof Error ? error.message : "Could not delete collection"
       );
-      return;
     }
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
-    toast.success("Collection deleted");
   };
 
   const goToTagOnDashboard = (tagId: string) => {

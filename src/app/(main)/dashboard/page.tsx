@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -100,6 +100,7 @@ function DashboardContent() {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: bookmarkData,
@@ -145,6 +146,7 @@ function DashboardContent() {
     activeBookmarkId,
     bookmarks,
     onNavigate: setActiveBookmarkId,
+    onSearch: () => searchInputRef.current?.focus(),
     onTag: () => setTagDialogOpen(true),
     onCollection: () => setCollectionDialogOpen(true),
     onNote: () => setNoteDialogOpen(true),
@@ -244,6 +246,7 @@ function DashboardContent() {
               <div className="relative hidden sm:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
                   value={filters.search}
                   onChange={(e) => filters.setSearch(e.target.value)}
                   placeholder="Search..."

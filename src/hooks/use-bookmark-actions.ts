@@ -3,14 +3,14 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { sendJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 
 export function useBookmarkActions() {
   const queryClient = useQueryClient();
 
   const refreshAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-    queryClient.invalidateQueries({ queryKey: ["tags"] });
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    void invalidateLibraryQueries(queryClient);
   }, [queryClient]);
 
   const handleAddTag = useCallback(async (
@@ -18,83 +18,81 @@ export function useBookmarkActions() {
     name: string,
     color: string
   ) => {
-    const res = await fetch("/api/tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, name, color }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not add tag");
-      return;
+    try {
+      await sendJson("/api/tags", {
+        method: "POST",
+        body: { bookmarkId, name, color },
+      });
+      await invalidateLibraryQueries(queryClient);
+      toast.success("Tag added");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not add tag"
+      );
     }
-    refreshAll();
-    toast.success("Tag added");
-  }, [refreshAll]);
+  }, [queryClient]);
 
   const handleRemoveTag = useCallback(async (bookmarkId: string, tagId: string) => {
-    const res = await fetch("/api/tags", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, tagId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not remove tag");
-      return;
+    try {
+      await sendJson("/api/tags", {
+        method: "DELETE",
+        body: { bookmarkId, tagId },
+      });
+      await invalidateLibraryQueries(queryClient);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not remove tag"
+      );
     }
-    refreshAll();
-  }, [refreshAll]);
+  }, [queryClient]);
 
   const handleAddNote = useCallback(async (bookmarkId: string, content: string) => {
-    const res = await fetch("/api/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId, content }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not save note");
-      return;
+    try {
+      await sendJson("/api/notes", {
+        method: "POST",
+        body: { bookmarkId, content },
+      });
+      await invalidateLibraryQueries(queryClient);
+      toast.success("Note saved");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save note"
+      );
     }
-    refreshAll();
-    toast.success("Note saved");
-  }, [refreshAll]);
+  }, [queryClient]);
 
   const handleAddToCollection = useCallback(async (
     bookmarkId: string,
     collectionId: string
   ) => {
-    const res = await fetch(`/api/collections/${collectionId}/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error((data as { error?: string }).error || "Could not add to collection");
-      return;
+    try {
+      await sendJson(`/api/collections/${collectionId}/items`, {
+        method: "POST",
+        body: { bookmarkId },
+      });
+      await invalidateLibraryQueries(queryClient);
+      toast.success("Added to collection");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not add to collection"
+      );
     }
-    refreshAll();
-    toast.success("Added to collection");
-  }, [refreshAll]);
+  }, [queryClient]);
 
   const handleDeleteBookmark = useCallback(async (bookmarkId: string) => {
-    const res = await fetch("/api/bookmarks", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    try {
+      await sendJson("/api/bookmarks", {
+        method: "DELETE",
+        body: { bookmarkId },
+      });
+      await invalidateLibraryQueries(queryClient);
+      toast.success("Hidden from MarkMaster");
+    } catch (error) {
       toast.error(
-        (data as { error?: string }).error || "Could not remove bookmark"
+        error instanceof Error ? error.message : "Could not remove bookmark"
       );
-      return;
     }
-    refreshAll();
-    toast.success("Hidden from MarkMaster");
-  }, [refreshAll]);
+  }, [queryClient]);
 
   return {
     refreshAll,

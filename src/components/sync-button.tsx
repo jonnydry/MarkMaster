@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { sendJson } from "@/lib/fetch-json";
 
 interface SyncButtonProps {
   lastSyncAt: Date | null;
@@ -17,13 +18,12 @@ export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch("/api/bookmarks/sync", { method: "POST" });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Sync failed");
-        return;
-      }
+      const data = await sendJson<{
+        newBookmarks: number;
+        updatedBookmarks: number;
+        hitExisting: boolean;
+        rateLimited: boolean;
+      }>("/api/bookmarks/sync", { method: "POST" });
 
       if (data.rateLimited) {
         toast.warning(
@@ -40,8 +40,8 @@ export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
       }
 
       onSyncComplete?.();
-    } catch {
-      toast.error("Failed to sync bookmarks");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sync bookmarks");
     } finally {
       setSyncing(false);
     }

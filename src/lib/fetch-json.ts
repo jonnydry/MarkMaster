@@ -1,3 +1,13 @@
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
+export type JsonRequestInit<TBody extends JsonValue = JsonValue> = Omit<
+  RequestInit,
+  "body"
+> & {
+  body?: TBody;
+};
+
 export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const res = await fetch(input, init);
 
@@ -17,4 +27,22 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit)
   }
 
   return body as T;
+}
+
+export function sendJson<TResponse, TBody extends JsonValue = JsonValue>(
+  input: RequestInfo | URL,
+  init: JsonRequestInit<TBody> = {}
+) {
+  const { body, headers, ...requestInit } = init;
+  const requestHeaders = new Headers(headers);
+
+  if (body !== undefined && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
+  return fetchJson<TResponse>(input, {
+    ...requestInit,
+    headers: requestHeaders,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 }

@@ -6,6 +6,7 @@ interface UseKeyboardShortcutsOptions {
   activeBookmarkId: string | null;
   bookmarks: { id: string }[];
   onNavigate: (id: string | null) => void;
+  onSearch?: () => void;
   onTag: () => void;
   onCollection: () => void;
   onNote: () => void;
@@ -15,6 +16,7 @@ export function useKeyboardShortcuts({
   activeBookmarkId,
   bookmarks,
   onNavigate,
+  onSearch,
   onTag,
   onCollection,
   onNote,
@@ -35,6 +37,10 @@ export function useKeyboardShortcuts({
         }
         onNavigate(bookmarks[nextIndex]?.id || null);
       }
+      if (e.key === "/") {
+        e.preventDefault();
+        onSearch?.();
+      }
       if (e.key === "t" && activeBookmarkId) {
         onTag();
       }
@@ -47,5 +53,5 @@ export function useKeyboardShortcuts({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeBookmarkId, bookmarks, onNavigate, onTag, onCollection, onNote]);
+  }, [activeBookmarkId, bookmarks, onNavigate, onSearch, onTag, onCollection, onNote]);
 }

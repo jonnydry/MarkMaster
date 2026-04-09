@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { Bookmark, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -6,17 +8,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default async function PublicSharePage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-
-  const collection = await prisma.collection.findUnique({
-    where: { shareSlug: slug },
+const getPublicCollection = cache(async (slug: string) => {
+  return prisma.collection.findFirst({
+    where: {
+      shareSlug: slug,
+      isPublic: true,
+    },
     include: {
-      user: { select: { username: true, displayName: true, profileImageUrl: true } },
+      user: {
+        select: {
+          username: true,
+          displayName: true,
+          profileImageUrl: true,
+        },
+      },
       items: {
         include: {
           bookmark: {
@@ -27,8 +32,57 @@ export default async function PublicSharePage({
       },
     },
   });
+});
 
-  if (!collection || !collection.isPublic) {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const collection = await getPublicCollection(slug);
+
+  if (!collection) {
+    return {
+      title: "Collection not found | MarkMaster",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const description =
+    collection.description ||
+    `Public MarkMaster collection from ${collection.user.displayName} with ${collection.items.length} bookmarks.`;
+  const title = `${collection.name} | MarkMaster`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+  };
+}
+
+export default async function PublicSharePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const collection = await getPublicCollection(slug);
+
+  if (!collection) {
     notFound();
   }
 
