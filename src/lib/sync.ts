@@ -200,7 +200,6 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
   const syncedTweetIds = new Set<string>();
 
   let paginationToken: string | undefined;
-  let shouldStop = false;
 
   try {
     do {
@@ -222,17 +221,14 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
         if (op === "created") {
           result.newBookmarks++;
           existingTweetIds.add(bookmark.tweet.id);
-        }
-        else {
+        } else {
           result.updatedBookmarks++;
           result.hitExisting = true;
-          shouldStop = true;
-          break;
         }
       }
 
-      paginationToken = shouldStop ? undefined : page.nextToken;
-    } while (paginationToken && !shouldStop);
+      paginationToken = page.nextToken;
+    } while (paginationToken);
 
     const { folders } = await fetchBookmarkFolders(
       userId,

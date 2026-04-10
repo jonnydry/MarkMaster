@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { RightPanel } from "@/components/right-panel";
+import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import {
   BarChart,
@@ -34,6 +34,7 @@ import type { DbUser } from "@/lib/auth";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -47,6 +48,7 @@ const PIE_COLORS = ["#1d9bf0", "#3babf3", "#71717a"];
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
@@ -97,7 +99,22 @@ export default function AnalyticsPage() {
               />
               <h1 className="text-xl font-bold tracking-tight">Analytics</h1>
             </div>
-            {session?.dbUser && <UserNav user={session.dbUser} />}
+            {session?.dbUser && (
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <SyncButton
+                  lastSyncAt={
+                    session.dbUser.lastSyncAt
+                      ? new Date(session.dbUser.lastSyncAt)
+                      : null
+                  }
+                  onSyncComplete={() => {
+                    void invalidateLibraryQueries(queryClient);
+                    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+                  }}
+                />
+                <UserNav user={session.dbUser} />
+              </div>
+            )}
           </div>
         </header>
 
@@ -308,16 +325,6 @@ export default function AnalyticsPage() {
             </>
           )}
         </div>
-      </div>
-
-      <div className="hidden xl:block">
-        <RightPanel
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={() => setCreateOpen(true)}
-        />
       </div>
 
       <CreateCollectionDialog

@@ -47,14 +47,14 @@ export function Sidebar({
     >
       <Link
         href="/dashboard"
-        className={`rounded-xl bg-primary flex items-center justify-center mb-6 group relative ${
-          expanded ? "h-10 px-3 gap-2 self-stretch" : "w-10 h-10"
+        className={`flex items-center mb-6 group ${
+          expanded ? "h-10 px-2 gap-2.5 self-stretch" : "w-10 h-10 justify-center"
         }`}
         title="MarkMaster"
       >
-        <Bookmark className="w-5 h-5 text-primary-foreground" />
+        <Bookmark className="w-6 h-6 text-primary" />
         {expanded && (
-          <span className="text-sm font-semibold text-primary-foreground">
+          <span className="text-[15px] font-bold tracking-[-0.03em] text-foreground">
             MarkMaster
           </span>
         )}
@@ -112,7 +112,7 @@ export function Sidebar({
                       />
                       <span className="truncate">{tag.name}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground ml-2">
+                    <span className="text-xs text-muted-foreground ml-2 font-mono tabular-nums">
                       {tag._count.bookmarks}
                     </span>
                   </button>
@@ -157,7 +157,7 @@ export function Sidebar({
                         <FolderOpen className="w-4 h-4 shrink-0" />
                         <span className="truncate">{collection.name}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground ml-2">
+                      <span className="text-xs text-muted-foreground ml-2 font-mono tabular-nums">
                         {collection._count.items}
                       </span>
                     </Link>

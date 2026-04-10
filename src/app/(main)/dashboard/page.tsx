@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sidebar } from "@/components/sidebar";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { RightPanel } from "@/components/right-panel";
 import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkCard } from "@/components/bookmark-card";
@@ -311,8 +310,8 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden md:block">
+    <div className="flex h-screen overflow-hidden bg-background max-w-[100vw]">
+      <div className="hidden md:block shrink-0">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -322,10 +321,10 @@ function DashboardContent() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="border-b border-border px-4 sm:px-6 py-4 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex items-center gap-3 sm:gap-6 min-w-0">
               <div className="hidden md:flex items-center gap-1">
                 {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
                   const isActive = pathname === href;
@@ -356,22 +355,23 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative hidden sm:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  ref={searchInputRef}
-                  value={filters.search}
-                  onChange={(e) => filters.setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="pl-9 pr-16 h-9 w-[240px] text-sm bg-muted/50 border-0 rounded-full focus:ring-1 focus:ring-primary"
-                />
-                {!filters.search && (
-                  <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border">
-                    ⌘K
-                  </kbd>
-                )}
-              </div>
+            <div className="relative basis-full order-3 sm:order-none sm:basis-auto w-full sm:w-auto shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+              <Input
+                ref={searchInputRef}
+                value={filters.search}
+                onChange={(e) => filters.setSearch(e.target.value)}
+                placeholder="Search bookmarks…"
+                className="pl-9 pr-14 sm:pr-16 h-10 sm:h-9 w-full sm:w-[min(240px,36vw)] md:w-[240px] text-sm bg-muted/50 border-0 rounded-full focus:ring-1 focus:ring-primary"
+              />
+              {!filters.search && (
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:block text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border">
+                  ⌘K
+                </kbd>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 order-2 sm:order-none">
               <Button
                 variant="ghost"
                 size="sm"
@@ -413,14 +413,16 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold tracking-tight">All Bookmarks</h1>
+          <div className="flex flex-col gap-3 mt-4 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight shrink-0">
+                All Bookmarks
+              </h1>
               <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                 {total.toLocaleString()}
               </span>
               {filters.selectedTags.length > 0 && (
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1 min-w-0">
                   {filters.selectedTags.map((tagId) => {
                     const tag = tags.find((t) => t.id === tagId);
                     return tag ? (
@@ -449,15 +451,17 @@ function DashboardContent() {
                 </div>
               )}
             </div>
-            <SortControls
-              sortField={filters.sortField}
-              sortDirection={filters.sortDirection}
-              viewMode={viewMode}
-              onSortFieldChange={filters.setSortField}
-              onSortDirectionChange={filters.setSortDirection}
-              onViewModeChange={setViewMode}
-              total={total}
-            />
+            <div className="w-full shrink-0 overflow-x-auto lg:w-auto lg:overflow-visible pb-0.5 -mb-0.5">
+              <SortControls
+                sortField={filters.sortField}
+                sortDirection={filters.sortDirection}
+                viewMode={viewMode}
+                onSortFieldChange={filters.setSortField}
+                onSortDirectionChange={filters.setSortDirection}
+                onViewModeChange={setViewMode}
+                total={total}
+              />
+            </div>
           </div>
           {(isFetching || filters.isSearchPending) && !isLoading && (
             <p className="mt-3 text-xs text-muted-foreground">Updating results...</p>
@@ -567,7 +571,7 @@ function DashboardContent() {
               </div>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
               {bookmarks.map((bookmark) => (
                 <BookmarkCard
                   key={bookmark.id}
@@ -660,16 +664,6 @@ function DashboardContent() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="hidden xl:block">
-        <RightPanel
-          tags={tags}
-          collections={collections}
-          selectedTags={filters.selectedTags}
-          onTagToggle={filters.toggleTag}
-          onCreateCollection={() => setCreateCollectionOpen(true)}
-        />
       </div>
 
       <AddTagDialog

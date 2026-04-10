@@ -37,18 +37,18 @@ export function SortControls({
   total,
 }: SortControlsProps) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-border">
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-w-0">
+      <div className="hidden md:flex items-center gap-2">
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
           {total.toLocaleString()} bookmark{total !== 1 ? "s" : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 sm:flex-initial justify-end">
         <Select
           value={sortField}
           onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
         >
-          <SelectTrigger className="w-[160px] h-8 text-xs">
+          <SelectTrigger className="w-[min(100%,9rem)] sm:w-[160px] h-8 text-xs max-w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

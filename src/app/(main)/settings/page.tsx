@@ -20,14 +20,17 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { RightPanel } from "@/components/right-panel";
+import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { PRESET_COLORS } from "@/lib/constants";
 import { sendJson } from "@/lib/fetch-json";
-import { invalidateTagsQuery } from "@/lib/query-invalidation";
+import {
+  invalidateLibraryQueries,
+  invalidateTagsQuery,
+} from "@/lib/query-invalidation";
 import { toast } from "sonner";
 import type { DbUser } from "@/lib/auth";
 
@@ -127,7 +130,19 @@ export default function SettingsPage() {
               />
               <h1 className="text-xl font-bold tracking-tight">Settings</h1>
             </div>
-            {session?.dbUser && <UserNav user={session.dbUser} />}
+            {session?.dbUser && (
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <SyncButton
+                  lastSyncAt={
+                    session.dbUser.lastSyncAt
+                      ? new Date(session.dbUser.lastSyncAt)
+                      : null
+                  }
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                />
+                <UserNav user={session.dbUser} />
+              </div>
+            )}
           </div>
         </header>
 
@@ -306,16 +321,6 @@ export default function SettingsPage() {
             </div>
           </Card>
         </div>
-      </div>
-
-      <div className="hidden xl:block">
-        <RightPanel
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={() => setCreateOpen(true)}
-        />
       </div>
 
       <CreateCollectionDialog

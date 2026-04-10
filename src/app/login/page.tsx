@@ -26,9 +26,7 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm mx-auto px-6">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
-            <Bookmark className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <Bookmark className="w-10 h-10 text-primary mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Welcome to MarkMaster</h1>
           <p className="text-muted-foreground">
             Sign in with your X account to get started

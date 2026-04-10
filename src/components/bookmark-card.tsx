@@ -215,7 +215,7 @@ export function BookmarkCard({
           )}
         </div>
         {metrics && (
-          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 shrink-0">
+          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-500 shrink-0 font-mono tabular-nums">
             <span className="flex items-center gap-1">
               <Heart className="w-3 h-3" />
               {formatCount(metrics.like_count)}
@@ -514,7 +514,7 @@ export function BookmarkCard({
           )}
 
           {metrics && (
-            <div className="flex items-center gap-4 mt-2.5 text-zinc-500 dark:text-zinc-500">
+            <div className="flex items-center gap-4 mt-2.5 text-zinc-500 dark:text-zinc-500 font-mono tabular-nums">
               <span
                 className="flex items-center gap-1 text-xs"
                 title={`${metrics.reply_count} replies`}

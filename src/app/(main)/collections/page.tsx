@@ -10,13 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { RightPanel } from "@/components/right-panel";
+import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { sendJson } from "@/lib/fetch-json";
-import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
+import {
+  invalidateCollectionsQuery,
+  invalidateLibraryQueries,
+} from "@/lib/query-invalidation";
 import { toast } from "sonner";
 import type { DbUser } from "@/lib/auth";
 
@@ -88,7 +91,7 @@ export default function CollectionsPage() {
               />
               <h1 className="text-xl font-bold tracking-tight">Collections</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Button
                 size="sm"
                 onClick={() => setCreateOpen(true)}
@@ -97,7 +100,19 @@ export default function CollectionsPage() {
                 <Plus className="w-4 h-4" />
                 New
               </Button>
-              {session?.dbUser && <UserNav user={session.dbUser} />}
+              {session?.dbUser && (
+                <>
+                  <SyncButton
+                    lastSyncAt={
+                      session.dbUser.lastSyncAt
+                        ? new Date(session.dbUser.lastSyncAt)
+                        : null
+                    }
+                    onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                  />
+                  <UserNav user={session.dbUser} />
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -184,16 +199,6 @@ export default function CollectionsPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="hidden xl:block">
-        <RightPanel
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={() => setCreateOpen(true)}
-        />
       </div>
 
       <CreateCollectionDialog

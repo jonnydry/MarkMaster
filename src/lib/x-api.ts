@@ -104,6 +104,36 @@ function readRateLimit(response: Response): RateLimitInfo {
   };
 }
 
+async function readXApiErrorBody(response: Response): Promise<string | null> {
+  try {
+    const json = (await response.json()) as {
+      errors?: Array<{ message?: string; detail?: string; title?: string }>;
+      error?: string;
+      reason?: string;
+    };
+    if (json.errors?.length) {
+      return (
+        json.errors
+          .map((e) => e.message || e.detail || e.title)
+          .filter(Boolean)
+          .join("; ") || null
+      );
+    }
+    if (json.error) {
+      return json.error;
+    }
+    if (json.reason) {
+      return json.reason;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** X tweet lookup is documented up to 100 IDs; smaller batches avoid intermittent failures. */
+const TWEET_LOOKUP_BATCH_SIZE = 50;
+
 function parseBookmarkPayload(
   json: XApiResponse<XTweet[]>,
   orderIds?: string[]
@@ -246,7 +276,10 @@ export async function fetchBookmarks(
     if (response.status === 429) {
       throw new RateLimitError(rateLimit);
     }
-    throw new Error(`X API error: ${response.status} ${response.statusText}`);
+    const detail = await readXApiErrorBody(response);
+    throw new Error(
+      detail ?? `X API error: ${response.status} ${response.statusText}`
+    );
   }
 
   const json: XApiResponse<XTweet[]> = await response.json();
@@ -290,7 +323,11 @@ export async function fetchBookmarkFolders(
       if (response.status === 429) {
         throw new RateLimitError(lastRateLimit);
       }
-      throw new Error(`X bookmark folders error: ${response.status} ${response.statusText}`);
+      const detail = await readXApiErrorBody(response);
+      throw new Error(
+        detail ??
+          `X bookmark folders error: ${response.status} ${response.statusText}`
+      );
     }
 
     const json = (await response.json()) as XApiResponse<BookmarkFolder[]>;
@@ -301,63 +338,179 @@ export async function fetchBookmarkFolders(
   return { folders, rateLimit: lastRateLimit };
 }
 
-export async function fetchBookmarksByFolder(
+/**
+ * Preferred: same fields/expansions as GET bookmarks so posts hydrate in one call.
+ * Returns null if X rejects the query (then use ID list + /2/tweets batches).
+ */
+async function tryFetchBookmarkFolderHydrated(
+  userId: string,
+  xUserId: string,
+  folderId: string
+): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo } | null> {
+  const allBookmarks: BookmarkData[] = [];
+  let paginationToken: string | undefined;
+  let lastRateLimit: RateLimitInfo = {
+    remaining: 0,
+    limit: 180,
+    resetAt: new Date(0),
+  };
+
+  do {
+    const token = await getFreshXAccessToken(userId);
+    const params = buildTweetQueryParams();
+    params.set("max_results", "100");
+    if (paginationToken) {
+      params.set("pagination_token", paginationToken);
+    }
+
+    const response = await fetch(
+      `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}?${params}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    lastRateLimit = readRateLimit(response);
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new RateLimitError(lastRateLimit);
+      }
+      if (response.status === 400 && allBookmarks.length === 0) {
+        return null;
+      }
+      const detail = await readXApiErrorBody(response);
+      throw new Error(
+        detail ??
+          `X bookmark folder posts error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const json = (await response.json()) as XApiResponse<XTweet[]>;
+    allBookmarks.push(...parseBookmarkPayload(json));
+    paginationToken = json.meta?.next_token;
+  } while (paginationToken);
+
+  return { bookmarks: allBookmarks, rateLimit: lastRateLimit };
+}
+
+async function fetchBookmarkFolderTweetIdsOnly(
   userId: string,
   xUserId: string,
   folderId: string
 ): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
-  const token = await getFreshXAccessToken(userId);
-  const response = await fetch(
-    `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
+  const tweetIds: string[] = [];
+  const seenIds = new Set<string>();
+  let paginationToken: string | undefined;
+  let lastRateLimit: RateLimitInfo = {
+    remaining: 0,
+    limit: 180,
+    resetAt: new Date(0),
+  };
 
-  const rateLimit = readRateLimit(response);
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(rateLimit);
+  do {
+    const token = await getFreshXAccessToken(userId);
+    const params = new URLSearchParams({ max_results: "100" });
+    if (paginationToken) {
+      params.set("pagination_token", paginationToken);
     }
-    throw new Error(
-      `X bookmark folder posts error: ${response.status} ${response.statusText}`
+
+    const response = await fetch(
+      `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}?${params}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
     );
-  }
 
-  const json = (await response.json()) as XApiResponse<Array<{ id: string }>>;
-  const tweetIds = (json.data || []).map((tweet) => tweet.id);
+    lastRateLimit = readRateLimit(response);
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new RateLimitError(lastRateLimit);
+      }
+      const detail = await readXApiErrorBody(response);
+      throw new Error(
+        detail ??
+          `X bookmark folder posts error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const json = (await response.json()) as XApiResponse<Array<{ id: string }>>;
+    for (const row of json.data || []) {
+      if (row?.id && !seenIds.has(row.id)) {
+        seenIds.add(row.id);
+        tweetIds.push(row.id);
+      }
+    }
+    paginationToken = json.meta?.next_token;
+  } while (paginationToken);
 
   if (tweetIds.length === 0) {
-    return { bookmarks: [], rateLimit };
+    return { bookmarks: [], rateLimit: lastRateLimit };
   }
 
   const details = await fetchPostsByIds(userId, tweetIds);
   return { bookmarks: details.bookmarks, rateLimit: details.rateLimit };
 }
 
+export async function fetchBookmarksByFolder(
+  userId: string,
+  xUserId: string,
+  folderId: string
+): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
+  const hydrated = await tryFetchBookmarkFolderHydrated(
+    userId,
+    xUserId,
+    folderId
+  );
+  if (hydrated) {
+    return hydrated;
+  }
+  return fetchBookmarkFolderTweetIdsOnly(userId, xUserId, folderId);
+}
+
 async function fetchPostsByIds(
   userId: string,
   tweetIds: string[]
 ): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
-  const token = await getFreshXAccessToken(userId);
-  const params = buildTweetQueryParams(tweetIds);
-
-  const response = await fetch(`${BASE_URL}/tweets?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const rateLimit = readRateLimit(response);
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(rateLimit);
-    }
-    throw new Error(`X tweet lookup error: ${response.status} ${response.statusText}`);
+  const batches: string[][] = [];
+  for (let i = 0; i < tweetIds.length; i += TWEET_LOOKUP_BATCH_SIZE) {
+    batches.push(tweetIds.slice(i, i + TWEET_LOOKUP_BATCH_SIZE));
   }
 
-  const json = (await response.json()) as XApiResponse<XTweet[]>;
-  return { bookmarks: parseBookmarkPayload(json, tweetIds), rateLimit };
+  const combined: BookmarkData[] = [];
+  let lastRateLimit: RateLimitInfo = {
+    remaining: 0,
+    limit: 180,
+    resetAt: new Date(0),
+  };
+
+  for (const batch of batches) {
+    const token = await getFreshXAccessToken(userId);
+    const params = buildTweetQueryParams(batch);
+
+    const response = await fetch(`${BASE_URL}/tweets?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    lastRateLimit = readRateLimit(response);
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new RateLimitError(lastRateLimit);
+      }
+      const detail = await readXApiErrorBody(response);
+      throw new Error(
+        detail ??
+          `X tweet lookup error: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const json = (await response.json()) as XApiResponse<XTweet[]>;
+    combined.push(...parseBookmarkPayload(json, batch));
+  }
+
+  return { bookmarks: combined, rateLimit: lastRateLimit };
 }
 
 export class RateLimitError extends Error {

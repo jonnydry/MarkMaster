@@ -71,23 +71,19 @@ export function LandingExperience() {
     >
       <header
         className={cn(
-          "sticky top-0 z-50 border-b transition-[border-color,background-color] duration-200 ease-out",
-          headerActive ? "border-[#3f4444]" : "border-[#2f3336]",
+          "sticky top-0 z-50 border-b transition-all duration-200 ease-out",
+          headerActive
+            ? "border-[#3f4444] bg-black/85 backdrop-blur-md"
+            : "border-[#2f3336] bg-black",
         )}
-        style={{ backgroundColor: x.bg }}
       >
         <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-4 sm:h-[52px] sm:px-6">
           <div className="flex items-center gap-2">
-            <div
-              className="flex size-8 items-center justify-center rounded-full sm:size-9"
-              style={{ backgroundColor: x.blue }}
-            >
-              <Bookmark
-                className="size-4 sm:size-[18px]"
-                strokeWidth={2}
-                style={{ color: "#ffffff" }}
-              />
-            </div>
+            <Bookmark
+              className="size-[22px] sm:size-6"
+              strokeWidth={2}
+              style={{ color: x.blue }}
+            />
             <span
               className="text-lg font-bold tracking-[-0.03em] sm:text-[19px]"
               style={{ color: x.text }}
@@ -203,7 +199,7 @@ export function LandingExperience() {
                 >
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 md:contents">
                     <span
-                      className="w-7 shrink-0 text-[11px] font-semibold tabular-nums md:w-auto md:pt-0.5"
+                      className="w-7 shrink-0 text-[11px] font-semibold font-mono tabular-nums md:w-auto md:pt-0.5"
                       style={{ color: x.textDim }}
                     >
                       {String(i + 1).padStart(2, "0")}
@@ -215,7 +211,7 @@ export function LandingExperience() {
                       {title}
                     </h3>
                     <p
-                      className="text-[11px] font-semibold uppercase tracking-[0.1em] md:min-w-[5.5rem]"
+                      className="text-[11px] font-semibold font-mono uppercase tracking-[0.1em] md:min-w-[5.5rem]"
                       style={{ color: x.blue }}
                     >
                       {outcome}
@@ -258,13 +254,16 @@ export function LandingExperience() {
 
       <footer className="border-t border-[#2f3336] px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 text-[13px] leading-snug sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="flex flex-col gap-1" style={{ color: x.textSecondary }}>
-            <span className="font-semibold text-[#e7e9ea]">MarkMaster</span>
+          <div className="flex flex-col gap-1.5" style={{ color: x.textSecondary }}>
+            <div className="flex items-center gap-1.5">
+              <Bookmark className="size-3.5" style={{ color: x.blue }} />
+              <span className="font-semibold text-[#e7e9ea]">MarkMaster</span>
+            </div>
             <span style={{ color: x.textDim }}>Bookmarks for X · not affiliated with X Corp.</span>
           </div>
           <p className="max-w-sm" style={{ color: x.textDim }}>
-            OAuth read access to bookmarks and profile only. Hosting and
-            retention follow your deployment.
+            OAuth read access to bookmarks and profile only. Keyboard-first
+            interface—<span className="font-mono text-[12px]">⌘K</span> to search.
           </p>
         </div>
       </footer>
