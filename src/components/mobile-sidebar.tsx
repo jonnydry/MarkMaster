@@ -33,7 +33,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
             className="fixed inset-0 bg-black/50 z-40 md:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 w-64 z-50 md:hidden bg-sidebar">
+          <div className="fixed inset-y-0 left-0 w-64 z-50 md:hidden bg-sidebar border-r border-sidebar-border">
             <div className="absolute top-3 right-3 z-10">
               <Button
                 variant="ghost"

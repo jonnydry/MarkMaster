@@ -44,7 +44,7 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
-const PIE_COLORS = ["#1d9bf0", "#3babf3", "#71717a"];
+const PIE_COLORS = ["#3b82f6", "#60a5fa", "#71717a"];
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
                           contentStyle={{
                             background: "var(--popover)",
                             border: "1px solid var(--border)",
-                            borderRadius: "8px",
+                            borderRadius: "0.5rem",
                           }}
                         />
                         <Bar
@@ -286,7 +286,7 @@ export default function AnalyticsPage() {
                           contentStyle={{
                             background: "var(--popover)",
                             border: "1px solid var(--border)",
-                            borderRadius: "8px",
+                            borderRadius: "0.5rem",
                           }}
                         />
                         <Line
@@ -308,7 +308,7 @@ export default function AnalyticsPage() {
                       {analytics.tagDistribution.map((t) => (
                         <div
                           key={t.tag}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card border border-border"
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border"
                         >
                           <span className="text-sm font-medium text-foreground">
                             {t.tag}

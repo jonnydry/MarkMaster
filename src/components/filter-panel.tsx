@@ -45,11 +45,11 @@ export function FilterPanel({
   hasActiveFilters,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-4 p-4 border-b border-border bg-card/50">
+    <div className="space-y-4 px-6 py-3 border-b border-border bg-card/50">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold text-zinc-600 uppercase tracking-[0.08em]">
-          Filters
-        </h3>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Filters
+          </h3>
         {hasActiveFilters && (
           <Button
             variant="ghost"
@@ -129,10 +129,10 @@ export function FilterPanel({
               {tags.map((tag) => (
                 <button
                   key={tag.id}
-                  className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                  className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                     selectedTags.includes(tag.id)
-                      ? "bg-primary/12 text-primary font-medium"
-                      : "bg-card text-zinc-500 dark:text-zinc-400 hover:text-foreground border border-border"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}
                 >

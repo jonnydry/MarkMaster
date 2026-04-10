@@ -1,108 +1,62 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const FEATURES = [
   {
     title: "Search",
     outcome: "Find fast",
-    desc: "Full-text search across posts, authors, and the notes you attach.",
+    desc: "Full-text search across posts, authors, and your notes.",
   },
   {
     title: "Tags",
     outcome: "Stay sorted",
-    desc: "Categories and tags so saves stay legible as the pile grows.",
+    desc: "Color-coded labels. Filter your archive in one click.",
   },
   {
     title: "Collections",
     outcome: "Curate",
-    desc: "Ordered lists of saves you can keep tidy and revisit later.",
+    desc: "Ordered, shareable lists. Keep topics organized over time.",
   },
   {
-    title: "Share",
-    outcome: "Publish",
-    desc: "Public links for a set when you want to share it outside your account.",
+    title: "Notes",
+    outcome: "Remember why",
+    desc: "Annotations stay attached to every save, forever.",
   },
   {
     title: "Analytics",
     outcome: "See patterns",
-    desc: "Who you save and when—useful signal, not dashboard theater.",
+    desc: "Who you save, when, and what type. Real reading habits.",
   },
   {
-    title: "Synced archive",
+    title: "Sync",
     outcome: "Keep history",
-    desc: "Bookmarks you already synced stay queryable in MarkMaster as your X feed moves on.",
+    desc: "Bookmarks stay permanently. One-way read sync from X.",
   },
 ] as const;
 
-/** X dark-mode–style marketing tokens (aligned with X / Grok surfaces) */
-const x = {
-  bg: "#000000",
-  border: "#2f3336",
-  text: "#e7e9ea",
-  textSecondary: "#71767b",
-  textDim: "#536471",
-  blue: "#1d9bf0",
-  buttonBg: "#e7e9ea",
-  buttonFg: "#0f1419",
-} as const;
-
-const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d9bf0]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
-
 export function LandingExperience() {
-  const [headerActive, setHeaderActive] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setHeaderActive(window.scrollY > 2);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
-    <div
-      className="min-h-screen font-sans selection:bg-[#1d9bf0]/30"
-      style={{ backgroundColor: x.bg, color: x.text }}
-    >
-      <header
-        className={cn(
-          "sticky top-0 z-50 border-b transition-all duration-200 ease-out",
-          headerActive
-            ? "border-[#3f4444] bg-black/85 backdrop-blur-md"
-            : "border-[#2f3336] bg-black",
-        )}
-      >
-        <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-4 sm:h-[52px] sm:px-6">
-          <div className="flex items-center gap-2">
-            <Bookmark
-              className="size-[22px] sm:size-6"
-              strokeWidth={2}
-              style={{ color: x.blue }}
-            />
-            <span
-              className="text-lg font-bold tracking-[-0.03em] sm:text-[19px]"
-              style={{ color: x.text }}
-            >
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+      <header className="sticky top-0 z-50 border-b border-border bg-background">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary">
+              <span className="text-base font-bold text-primary-foreground">
+                M
+              </span>
+            </div>
+            <span className="text-[17px] font-bold tracking-[-0.02em]">
               MarkMaster
             </span>
           </div>
-          <Link
-            href="/login"
-            className={cn("rounded-full", focusRing)}
-          >
+          <Link href="/login">
             <Button
               variant="outline"
               size="sm"
-              className="h-8 rounded-full border px-3.5 text-[13px] font-bold bg-transparent hover:bg-white/[0.06] sm:h-[34px] sm:px-4 sm:text-sm"
-              style={{
-                borderColor: x.textDim,
-                color: x.text,
-              }}
+              className="h-9 rounded-lg px-4 text-sm font-medium"
             >
               Sign in
             </Button>
@@ -110,160 +64,214 @@ export function LandingExperience() {
         </div>
       </header>
 
-      <main>
-        <section
-          className="border-b border-[#2f3336] px-4 pb-16 pt-14 sm:px-6 md:pb-20 md:pt-16"
-          style={{ borderColor: x.border }}
-        >
-          <div className="mx-auto flex w-full max-w-md flex-col items-center text-center">
-            <p
-              className="text-[13px] font-medium uppercase tracking-[0.14em] sm:text-[14px]"
-              style={{ color: x.blue }}
-            >
-              Bookmark tooling for X
-            </p>
-            <h1
-              className="mt-4 text-[1.75rem] font-bold leading-[1.14] tracking-[-0.035em] text-balance sm:text-[2.125rem] sm:leading-[1.12] md:text-[2.25rem]"
-              style={{ color: x.text }}
-            >
-              Search every bookmark you saved on X.
-            </h1>
-            <p
-              className="mt-4 text-[15px] font-normal leading-relaxed sm:text-base"
-              style={{ color: x.textSecondary }}
-            >
-              Read-only sync from your account—then tags, collections, and
-              full-text recall. Your data stays in your workspace.
-            </p>
-            <div className="mt-8 flex flex-col items-center gap-3 sm:mt-9">
-              <Link href="/login" className={cn("rounded-full", focusRing)}>
-                <Button
-                  className="h-10 gap-2 rounded-full px-6 text-[14px] font-bold transition-opacity hover:opacity-90 sm:h-11 sm:px-7 sm:text-[15px]"
-                  style={{
-                    backgroundColor: x.buttonBg,
-                    color: x.buttonFg,
-                  }}
-                >
-                  Continue with X
-                  <ArrowRight className="size-3.5 sm:size-4" strokeWidth={2.5} />
-                </Button>
-              </Link>
-              <a
-                href="#capabilities"
-                className={cn(
-                  "text-[13px] font-semibold transition-colors hover:text-[#e7e9ea]",
-                  focusRing,
-                  "rounded-sm px-1 py-0.5",
-                )}
-                style={{ color: x.textDim }}
-              >
-                How it works →
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="capabilities"
-          className="scroll-mt-[52px] border-t border-[#2f3336] px-4 py-14 sm:px-6 md:py-16"
-        >
-          <div className="mx-auto max-w-5xl">
-            <div className="flex flex-col gap-5 pb-8 md:flex-row md:items-end md:justify-between md:gap-8 md:pb-10">
-              <div className="max-w-xl">
-                <p
-                  className="text-[11px] font-bold uppercase tracking-[0.12em]"
-                  style={{ color: x.textSecondary }}
-                >
-                  Capabilities
-                </p>
-                <h2
-                  className="mt-2 text-lg font-bold leading-tight tracking-[-0.02em] sm:text-[19px]"
-                  style={{ color: x.text }}
-                >
-                  One surface. Six jobs your saves actually need.
-                </h2>
-              </div>
-              <p
-                className="max-w-[240px] text-[13px] leading-snug md:text-right"
-                style={{ color: x.textDim }}
-              >
-                Tight scope—no fluff between you and what you saved.
+      <section className="border-b border-border">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-8 py-16 sm:grid-cols-2 sm:px-12 sm:py-20">
+          <div className="flex flex-col justify-center gap-6">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+                Your bookmark archive
+              </p>
+              <h1 className="text-[2.75rem] font-extrabold leading-[1.06] tracking-[-0.03em]">
+                Every save,
+                <br />
+                impossible to lose.
+              </h1>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                MarkMaster keeps every post you save on X in a searchable,
+                taggable archive. Your reading history, organized. Forever.
               </p>
             </div>
 
-            <ul className="divide-y divide-[#2f3336] border-t border-[#2f3336]">
-              {FEATURES.map(({ title, outcome, desc }, i) => (
-                <li
-                  key={title}
-                  className="flex flex-col gap-1 py-4 md:grid md:grid-cols-[1.75rem_7rem_5.75rem_1fr] md:items-baseline md:gap-x-5 md:gap-y-0 md:py-[14px]"
+            <div className="flex flex-col gap-3">
+              <Link href="/login">
+                <Button
+                  size="lg"
+                  className="h-11 gap-2 rounded-lg px-6 text-sm font-bold"
                 >
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 md:contents">
-                    <span
-                      className="w-7 shrink-0 text-[11px] font-semibold font-mono tabular-nums md:w-auto md:pt-0.5"
-                      style={{ color: x.textDim }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <h3
-                      className="min-w-0 text-[15px] font-bold"
-                      style={{ color: x.text }}
-                    >
-                      {title}
-                    </h3>
-                    <p
-                      className="text-[11px] font-semibold font-mono uppercase tracking-[0.1em] md:min-w-[5.5rem]"
-                      style={{ color: x.blue }}
-                    >
-                      {outcome}
-                    </p>
-                  </div>
-                  <p
-                    className="pl-10 text-[14px] font-normal leading-snug md:col-start-4 md:row-start-1 md:pl-0 md:leading-relaxed"
-                    style={{ color: x.textSecondary }}
-                  >
-                    {desc}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="border-t border-[#2f3336] px-4 py-14 sm:px-6 md:py-16">
-          <div className="mx-auto flex max-w-md flex-col items-center text-center">
-            <h2
-              className="text-lg font-bold leading-tight tracking-[-0.02em] sm:text-[19px]"
-              style={{ color: x.text }}
-            >
-              Authorize once. Use your saves on purpose.
-            </h2>
-            <Link href="/login" className={cn("mt-5 rounded-full", focusRing)}>
-              <Button
-                className="h-10 rounded-full px-6 text-[14px] font-bold transition-opacity hover:opacity-90 sm:h-11 sm:px-7 sm:text-[15px]"
-                style={{
-                  backgroundColor: x.buttonBg,
-                  color: x.buttonFg,
-                }}
-              >
-                Sign in with X
-              </Button>
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-[#2f3336] px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 text-[13px] leading-snug sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="flex flex-col gap-1.5" style={{ color: x.textSecondary }}>
-            <div className="flex items-center gap-1.5">
-              <Bookmark className="size-3.5" style={{ color: x.blue }} />
-              <span className="font-semibold text-[#e7e9ea]">MarkMaster</span>
+                  Connect with X
+                  <ArrowRight className="size-4" strokeWidth={2.5} />
+                </Button>
+              </Link>
+              <p className="text-xs text-muted-foreground/60">
+                Read-only access &middot; Your data stays yours
+              </p>
             </div>
-            <span style={{ color: x.textDim }}>Bookmarks for X · not affiliated with X Corp.</span>
           </div>
-          <p className="max-w-sm" style={{ color: x.textDim }}>
-            OAuth read access to bookmarks and profile only. Keyboard-first
-            interface—<span className="font-mono text-[12px]">⌘K</span> to search.
+
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+                <span className="text-xs font-bold text-primary-foreground">
+                  M
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                MarkMaster
+              </span>
+              <div className="ml-auto flex gap-2">
+                <div className="h-7 w-20 rounded-lg bg-muted" />
+                <div className="h-7 w-20 rounded-lg bg-primary" />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex gap-4 border-b border-border px-5 py-4">
+                <div className="size-10 shrink-0 rounded-full bg-secondary" />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold">
+                      Lenny Rachitsky
+                    </span>
+                    <div className="flex size-4 items-center justify-center rounded-full bg-primary text-[6px] font-bold text-primary-foreground">
+                      ✓
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      @lennysan
+                    </span>
+                    <span className="text-xs text-muted-foreground/50">·</span>
+                    <span className="text-xs text-muted-foreground">3 days</span>
+                  </div>
+                  <p className="mb-2 text-sm leading-snug text-muted-foreground">
+                    The best product writing does two jobs at once: it teaches the
+                    feature and tells the user how to feel about progress.
+                  </p>
+                  <div className="mb-2 flex gap-1.5">
+                    {["copywriting", "product"].map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-md px-2 py-0.5 text-[11px] bg-secondary text-muted-foreground"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-3 text-xs text-muted-foreground/50">
+                    <span>↩ 122</span>
+                    <span>↻ 41</span>
+                    <span>♡ 1.8K</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 border-b border-border px-5 py-4">
+                <div className="size-10 shrink-0 rounded-full bg-secondary" />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold">
+                      Packy McCormick
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      @packyM
+                    </span>
+                    <span className="text-xs text-muted-foreground/50">·</span>
+                    <span className="text-xs text-muted-foreground">1 week</span>
+                  </div>
+                  <div className="mb-2 flex gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-2 text-sm leading-snug text-muted-foreground">
+                        A good market map is less about categorizing competitors and
+                        more about exposing whitespace where new behavior is forming.
+                      </p>
+                      <div className="rounded-md border-l-2 border-l-note px-3 py-2 bg-secondary">
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                          Note
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Great framing for positioning section of launch doc.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-16 w-28 shrink-0 rounded-xl bg-muted" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    {["strategy", "positioning"].map((t) => (
+                      <span
+                        key={t}
+                        className="rounded-md px-2 py-0.5 text-[11px] bg-secondary text-muted-foreground"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 px-5 py-3">
+                <div className="size-8 shrink-0 rounded-full bg-secondary" />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-xs font-semibold">
+                      Dan Martens
+                    </span>
+                    <span className="text-xs text-muted-foreground">@danmartens</span>
+                    <span className="text-xs text-muted-foreground/50">·</span>
+                    <span className="text-xs text-muted-foreground">2 weeks</span>
+                  </div>
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    The main job of a landing page headline is to make people feel
+                    like they&apos;ve found what they were looking for.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-8 py-16 sm:px-12 sm:py-20">
+          <div className="mb-10 flex items-end justify-between gap-8">
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                What you get
+              </p>
+              <h2 className="text-[1.75rem] font-extrabold tracking-[-0.02em]">
+                Everything a serious saver needs.
+              </h2>
+            </div>
+            <p className="hidden max-w-xs text-right text-sm leading-relaxed text-muted-foreground/60 sm:block">
+              Built around the actual workflow of people who read and save on X. Not
+              a social clone.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map(({ title, outcome, desc }) => (
+              <div
+                key={title}
+                className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold">
+                    {title}
+                  </h3>
+                  <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                    {outcome}
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="px-8 py-6 sm:px-12">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
+              <span className="text-xs font-bold text-primary-foreground">
+                M
+              </span>
+            </div>
+            <span className="text-sm font-semibold text-muted-foreground">
+              MarkMaster
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground/50">
+            Not affiliated with X Corp. &middot; OAuth read-only access.
           </p>
         </div>
       </footer>

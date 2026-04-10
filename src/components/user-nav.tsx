@@ -2,7 +2,6 @@
 
 import { signOut } from "next-auth/react";
 import { Moon, Sun, LogOut, Download, User } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,18 +21,25 @@ export function UserNav({ user }: UserNavProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="outline-none">
-        <Avatar className="h-8 w-8 border border-border">
-          <AvatarImage src={user.profileImageUrl || undefined} />
-          <AvatarFallback className="bg-secondary text-zinc-500 text-xs font-semibold">
+      <DropdownMenuTrigger className="outline-none flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 hover:bg-muted transition-colors">
+        <div className="flex flex-col items-end gap-px">
+          <span className="text-[13px] text-foreground leading-tight">
+            {user.displayName}
+          </span>
+          <span className="text-[10px] text-muted-foreground leading-tight">
+            X connected
+          </span>
+        </div>
+        <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+          <span className="text-xs font-bold text-primary-foreground">
             {user.displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+          </span>
+        </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5">
-          <p className="text-sm font-medium text-zinc-300">{user.displayName}</p>
-          <p className="text-xs text-zinc-500">@{user.username}</p>
+          <p className="text-sm font-medium text-foreground">{user.displayName}</p>
+          <p className="text-xs text-muted-foreground">@{user.username}</p>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem

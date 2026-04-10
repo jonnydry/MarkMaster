@@ -281,20 +281,12 @@ export default function SettingsPage() {
               Download all your bookmarks with tags and notes.
             </p>
             <div className="flex gap-3">
-              <a
-                href="/api/export?format=json"
-                download
-                className="inline-flex items-center justify-center h-8 gap-1.5 px-2.5 rounded-lg border border-border bg-background hover:bg-muted text-sm font-medium transition-colors"
-              >
+              <Button variant="outline" size="sm" onClick={() => { window.location.href = "/api/export?format=json"; }}>
                 Export as JSON
-              </a>
-              <a
-                href="/api/export?format=csv"
-                download
-                className="inline-flex items-center justify-center h-8 gap-1.5 px-2.5 rounded-lg border border-border bg-background hover:bg-muted text-sm font-medium transition-colors"
-              >
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { window.location.href = "/api/export?format=csv"; }}>
                 Export as CSV
-              </a>
+              </Button>
             </div>
           </Card>
 

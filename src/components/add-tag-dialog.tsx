@@ -66,9 +66,9 @@ export function AddTagDialog({
                   return (
                     <button
                       key={tag.id}
-                      className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                      className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
                         isApplied
-                          ? "bg-primary/12 text-primary font-medium"
+                          ? "bg-primary/10 text-primary"
                           : "bg-card text-muted-foreground border border-border hover:text-foreground"
                       }`}
                       onClick={() => {

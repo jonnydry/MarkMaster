@@ -1,24 +1,18 @@
 "use client";
 
 import { useState, useEffect, Suspense, useRef, useMemo } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import {
-  Bookmark,
-  FolderOpen,
-  BarChart3,
-  Filter,
-  Search,
   CheckSquare,
   Tag,
   FolderPlus,
   Trash2,
-  X,
   ChevronLeft,
   ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +29,7 @@ import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
   ViewMode,
   BookmarkWithRelations,
@@ -81,12 +76,6 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
-const NAV_ITEMS = [
-  { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
-  { href: "/collections", icon: FolderOpen, label: "Collections" },
-  { href: "/analytics", icon: BarChart3, label: "Analytics" },
-];
-
 function getSharedTagIds(bookmarks: BookmarkWithRelations[]) {
   if (bookmarks.length === 0) return [];
 
@@ -127,6 +116,7 @@ function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
 
 function DashboardContent() {
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
@@ -137,6 +127,7 @@ function DashboardContent() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [showFilters, setShowFilters] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
@@ -294,7 +285,6 @@ function DashboardContent() {
   }, [setMediaFilter]);
 
   const dbUser = session?.dbUser;
-  const pathname = "/dashboard";
 
   const handleCommandPaletteFilter = (filter: {
     mediaFilter?: MediaFilter;
@@ -309,6 +299,13 @@ function DashboardContent() {
     }
   };
 
+  const mediaFilterLabels: Record<string, string> = {
+    images: "Images",
+    video: "Video",
+    links: "Links",
+    "text-only": "Text only",
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-background max-w-[100vw]">
       <div className="hidden md:block shrink-0">
@@ -318,156 +315,129 @@ function DashboardContent() {
           selectedTags={filters.selectedTags}
           onTagToggle={filters.toggleTag}
           onCreateCollection={() => setCreateCollectionOpen(true)}
+          expanded={sidebarExpanded}
+          onExpandedChange={setSidebarExpanded}
+          lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+          totalBookmarks={total}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="border-b border-border px-4 sm:px-6 py-4 shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-              <div className="hidden md:flex items-center gap-1">
-                {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-                  const isActive = pathname === href;
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </Link>
-                  );
-                })}
-              </div>
-              <div className="md:hidden">
-                <MobileSidebar
-                  tags={tags}
-                  collections={collections}
-                  selectedTags={filters.selectedTags}
-                  onTagToggle={filters.toggleTag}
-                  onCreateCollection={() => setCreateCollectionOpen(true)}
-                />
-              </div>
+        <header className="border-b border-border shrink-0">
+          <div className="flex items-center gap-3 px-6 py-3">
+            <div className="md:hidden">
+              <MobileSidebar
+                tags={tags}
+                collections={collections}
+                selectedTags={filters.selectedTags}
+                onTagToggle={filters.toggleTag}
+                onCreateCollection={() => setCreateCollectionOpen(true)}
+              />
             </div>
-
-            <div className="relative basis-full order-3 sm:order-none sm:basis-auto w-full sm:w-auto shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+            <div className="relative flex-1 min-w-0 max-w-md">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               <Input
                 ref={searchInputRef}
                 value={filters.search}
                 onChange={(e) => filters.setSearch(e.target.value)}
-                placeholder="Search bookmarks…"
-                className="pl-9 pr-14 sm:pr-16 h-10 sm:h-9 w-full sm:w-[min(240px,36vw)] md:w-[240px] text-sm bg-muted/50 border-0 rounded-full focus:ring-1 focus:ring-primary"
+                placeholder="Search bookmarks, authors, notes..."
+                className="pl-10 pr-12 h-9 w-full text-sm bg-card border-border rounded-lg focus:ring-1 focus:ring-primary"
               />
               {!filters.search && (
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:block text-[10px] text-muted-foreground bg-background px-1.5 py-0.5 rounded border">
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
                   ⌘K
                 </kbd>
               )}
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 order-2 sm:order-none">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (selectionMode) {
-                    clearSelection();
-                  } else {
-                    setSelectionMode(true);
-                  }
-                }}
-                className={`gap-2 h-9 px-3 text-sm ${selectionMode ? "bg-muted" : ""}`}
-              >
-                <CheckSquare className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {selectionMode ? "Done" : "Select"}
-                </span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={`gap-2 h-9 px-3 text-sm ${
-                  showFilters ? "bg-muted" : ""
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                <span className="hidden sm:inline">Filters</span>
-                {filters.hasActiveFilters && (
-                  <span className="w-2 h-2 rounded-full bg-primary" />
-                )}
-              </Button>
-              <SyncButton
-                lastSyncAt={
-                  dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
-                }
-                onSyncComplete={actions.refreshAll}
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <SortControls
+                sortField={filters.sortField}
+                viewMode={viewMode}
+                onSortFieldChange={filters.setSortField}
+                onViewModeChange={setViewMode}
               />
+              {dbUser && (
+                <SyncButton
+                  lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                />
+              )}
               {dbUser && <UserNav user={dbUser} />}
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 mt-4 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight shrink-0">
-                All Bookmarks
-              </h1>
-              <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                {total.toLocaleString()}
-              </span>
-              {filters.selectedTags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1 min-w-0">
-                  {filters.selectedTags.map((tagId) => {
-                    const tag = tags.find((t) => t.id === tagId);
-                    return tag ? (
-                      <span
-                        key={tagId}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary"
-                      >
-                        #{tag.name}
-                        <button
-                          onClick={() => filters.toggleTag(tagId)}
-                          className="hover:bg-primary/20 rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ) : null;
-                  })}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => filters.setSelectedTags([])}
-                    className="h-5 text-xs text-muted-foreground"
-                  >
-                    Clear
-                  </Button>
-                </div>
+          <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
+            <button
+              onClick={() => {
+                filters.setSelectedTags([]);
+                filters.setMediaFilter("all");
+              }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
+            >
+              All Bookmarks
+              <span className="text-xs opacity-70">{total.toLocaleString()}</span>
+            </button>
+            {filters.selectedTags.map((tagId) => {
+              const tag = tags.find((t) => t.id === tagId);
+              return tag ? (
+                <button
+                  key={tagId}
+                  onClick={() => filters.toggleTag(tagId)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted-foreground bg-secondary hover:text-foreground transition-colors border border-border"
+                >
+                  #{tag.name}
+                </button>
+              ) : null;
+            })}
+            {filters.mediaFilter !== "all" && (
+              <button
+                onClick={() => filters.setMediaFilter("all")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted-foreground bg-secondary hover:text-foreground transition-colors border border-border"
+              >
+                {mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter}
+              </button>
+            )}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                showFilters
+                  ? "bg-secondary text-foreground border-border"
+                  : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Filters</span>
+              {filters.hasActiveFilters && (
+                <span className="w-2 h-2 rounded-full bg-primary" />
               )}
-            </div>
-            <div className="w-full shrink-0 overflow-x-auto lg:w-auto lg:overflow-visible pb-0.5 -mb-0.5">
-              <SortControls
-                sortField={filters.sortField}
-                sortDirection={filters.sortDirection}
-                viewMode={viewMode}
-                onSortFieldChange={filters.setSortField}
-                onSortDirectionChange={filters.setSortDirection}
-                onViewModeChange={setViewMode}
-                total={total}
-              />
-            </div>
+            </button>
+            <button
+              onClick={() => {
+                if (selectionMode) {
+                  clearSelection();
+                } else {
+                  setSelectionMode(true);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                selectionMode
+                  ? "bg-secondary text-foreground border-border"
+                  : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {selectionMode ? "Done" : "Select"}
+              </span>
+            </button>
           </div>
+
           {(isFetching || filters.isSearchPending) && !isLoading && (
-            <p className="mt-3 text-xs text-muted-foreground">Updating results...</p>
+            <p className="px-6 pb-2 text-xs text-muted-foreground">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-2.5 border-t border-border bg-secondary/50">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-foreground">
                   {visibleSelectedBookmarkIds.length > 0
@@ -487,31 +457,31 @@ function DashboardContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-1.5"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={openBulkTagDialog}
                 >
-                  <Tag className="w-4 h-4" />
+                  <Tag className="w-3.5 h-3.5" />
                   Tag
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-1.5"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={openBulkCollectionDialog}
                 >
-                  <FolderPlus className="w-4 h-4" />
+                  <FolderPlus className="w-3.5 h-3.5" />
                   Add to Collection
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-destructive hover:text-destructive"
+                  className="gap-1.5 text-destructive hover:text-destructive"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={() => void handleBulkHide()}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   Hide
                 </Button>
               </div>
