@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import {
   BarChart,
@@ -83,6 +82,15 @@ export default function AnalyticsPage() {
           selectedTags={[]}
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
+          lastSyncAt={
+            session?.dbUser?.lastSyncAt
+              ? new Date(session.dbUser.lastSyncAt)
+              : null
+          }
+          onSyncComplete={() => {
+            void invalidateLibraryQueries(queryClient);
+            void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+          }}
         />
       </div>
 
@@ -96,22 +104,15 @@ export default function AnalyticsPage() {
                 selectedTags={[]}
                 onTagToggle={goToTagOnDashboard}
                 onCreateCollection={() => setCreateOpen(true)}
+                onSyncComplete={() => {
+                  void invalidateLibraryQueries(queryClient);
+                  void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+                }}
               />
               <h1 className="text-xl font-bold tracking-tight">Analytics</h1>
             </div>
             {session?.dbUser && (
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                <SyncButton
-                  lastSyncAt={
-                    session.dbUser.lastSyncAt
-                      ? new Date(session.dbUser.lastSyncAt)
-                      : null
-                  }
-                  onSyncComplete={() => {
-                    void invalidateLibraryQueries(queryClient);
-                    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-                  }}
-                />
                 <UserNav user={session.dbUser} />
               </div>
             )}

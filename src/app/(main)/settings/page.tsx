@@ -20,7 +20,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
@@ -114,6 +113,12 @@ export default function SettingsPage() {
           selectedTags={[]}
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
+          lastSyncAt={
+            session?.dbUser?.lastSyncAt
+              ? new Date(session.dbUser.lastSyncAt)
+              : null
+          }
+          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
         />
       </div>
 
@@ -127,19 +132,12 @@ export default function SettingsPage() {
                 selectedTags={[]}
                 onTagToggle={goToTagOnDashboard}
                 onCreateCollection={() => setCreateOpen(true)}
+                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
               <h1 className="text-xl font-bold tracking-tight">Settings</h1>
             </div>
             {session?.dbUser && (
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                <SyncButton
-                  lastSyncAt={
-                    session.dbUser.lastSyncAt
-                      ? new Date(session.dbUser.lastSyncAt)
-                      : null
-                  }
-                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
-                />
                 <UserNav user={session.dbUser} />
               </div>
             )}

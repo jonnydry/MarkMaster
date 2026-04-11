@@ -11,7 +11,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
-import { formatDistanceToNow } from "date-fns";
+import { useSidebar } from "@/components/sidebar-provider";
+import { SyncButton } from "@/components/sync-button";
 
 interface SidebarProps {
   tags: TagWithCount[];
@@ -19,10 +20,11 @@ interface SidebarProps {
   selectedTags: string[];
   onTagToggle: (tagId: string) => void;
   onCreateCollection: () => void;
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
+  /** Mobile drawer: full layout and hide collapse control. */
+  forceExpanded?: boolean;
   lastSyncAt?: Date | null;
   totalBookmarks?: number;
+  onSyncComplete?: () => void;
 }
 
 const NAV_ITEMS = [
@@ -32,57 +34,38 @@ const NAV_ITEMS = [
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
-function SyncStatusBlock({ lastSyncAt, totalBookmarks }: { lastSyncAt?: Date | null; totalBookmarks?: number }) {
-  const label = lastSyncAt
-    ? `Last sync ${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`
-    : "Never synced";
-  const count = totalBookmarks !== undefined ? ` · ${totalBookmarks.toLocaleString()} bookmarks` : "";
-
-  return (
-    <div className="mt-auto rounded-xl border border-border bg-card p-3.5 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <div
-          className={`w-2 h-2 rounded-full shrink-0 ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
-        />
-        <span className="text-xs text-muted-foreground">
-          {lastSyncAt ? "Up to date" : "Not synced"}
-        </span>
-      </div>
-      <div className="text-[11px] text-muted-foreground/60">
-        {label}{count}
-      </div>
-    </div>
-  );
-}
-
 export function Sidebar({
   tags,
   collections,
   selectedTags,
   onTagToggle,
   onCreateCollection,
-  expanded = false,
-  onExpandedChange,
+  forceExpanded = false,
   lastSyncAt,
   totalBookmarks,
+  onSyncComplete,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { expanded: ctxExpanded, toggle } = useSidebar();
+  const expanded = forceExpanded ? true : ctxExpanded;
+  const showToggle = !forceExpanded;
 
   return (
     <aside
-      className={`border-r border-sidebar-border bg-sidebar flex flex-col h-full py-4 ${
-        expanded ? "w-64 px-3" : "w-[60px] items-center"
+      suppressHydrationWarning
+      className={`flex h-full shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar/70 py-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none dark:bg-sidebar/45 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${
+        expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
       }`}
     >
       <Link
         href="/dashboard"
-        className={`flex items-center mb-6 group ${
-          expanded ? "h-10 px-2 gap-2.5 self-stretch rounded-xl" : "w-10 h-10 justify-center"
+        className={`group mb-6 flex items-center ${
+          expanded ? "h-10 gap-2.5 self-stretch rounded-xl px-2" : "h-10 w-10 justify-center"
         }`}
         title="MarkMaster"
       >
         <div className="flex items-center gap-2 rounded-lg bg-primary/10 p-1.5">
-          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary">
             <span className="text-xs font-bold text-primary-foreground">M</span>
           </div>
           {expanded && (
@@ -102,45 +85,24 @@ export function Sidebar({
               key={href}
               href={href}
               title={label}
-              className={`rounded-lg flex items-center transition-colors ${
+              className={`flex items-center rounded-lg transition-colors ${
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              } ${expanded ? "h-9 px-3 gap-3" : "w-10 h-10 justify-center"}`}
+              } ${expanded ? "h-9 gap-3 px-3" : "h-10 w-10 justify-center"}`}
             >
-              <Icon className="w-[18px] h-[18px]" />
+              <Icon className="h-[18px] w-[18px] shrink-0" />
               {expanded && <span className="text-sm font-medium">{label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {onExpandedChange && (
-        <button
-          onClick={() => onExpandedChange(!expanded)}
-          className={`mt-auto flex items-center transition-colors text-muted-foreground hover:text-foreground ${
-            expanded
-              ? "h-9 px-3 gap-3"
-              : "w-10 h-10 justify-center mx-auto"
-          }`}
-        >
-          {expanded ? (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs">Collapse</span>
-            </>
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-        </button>
-      )}
-
-      {expanded && (
-        <>
-          <div className="mt-6 flex-1 overflow-y-auto scrollbar-thin space-y-6">
+      {expanded ? (
+        <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto scrollbar-thin">
             <div>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Tags
                 </h3>
               </div>
@@ -151,21 +113,22 @@ export function Sidebar({
                   {tags.slice(0, 8).map((tag) => (
                     <button
                       key={tag.id}
+                      type="button"
                       onClick={() => onTagToggle(tag.id)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                         selectedTags.includes(tag.id)
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "hover:bg-sidebar-accent text-muted-foreground hover:text-foreground"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                       }`}
                     >
-                      <span className="flex items-center gap-2 min-w-0">
+                      <span className="flex min-w-0 items-center gap-2">
                         <span
-                          className="w-2 h-2 rounded-full shrink-0"
+                          className="h-2 w-2 shrink-0 rounded-full"
                           style={{ backgroundColor: tag.color }}
                         />
                         <span className="truncate">{tag.name}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground/50 ml-2 font-mono tabular-nums">
+                      <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
                         {tag._count.bookmarks}
                       </span>
                     </button>
@@ -175,21 +138,20 @@ export function Sidebar({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+              <div className="mb-2 flex items-center justify-between px-1">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Collections
                 </h3>
                 <button
+                  type="button"
                   onClick={onCreateCollection}
-                  className="text-muted-foreground/50 hover:text-muted-foreground text-sm leading-none w-5 h-5 flex items-center justify-center transition-colors rounded-md hover:bg-sidebar-accent"
+                  className="flex h-5 w-5 items-center justify-center rounded-md text-sm leading-none text-muted-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
                 >
                   +
                 </button>
               </div>
               {collections.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">
-                  No collections yet
-                </p>
+                <p className="px-1 text-xs text-muted-foreground">No collections yet</p>
               ) : (
                 <div className="space-y-0.5">
                   {collections.map((collection) => {
@@ -198,17 +160,17 @@ export function Sidebar({
                       <Link
                         key={collection.id}
                         href={`/collections/${collection.id}`}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-sm transition-colors ${
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                           isCollectionActive
                             ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "hover:bg-sidebar-accent text-muted-foreground hover:text-foreground"
+                            : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                         }`}
                       >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <FolderOpen className="w-4 h-4 shrink-0" />
+                        <span className="flex min-w-0 items-center gap-2">
+                          <FolderOpen className="h-4 w-4 shrink-0" />
                           <span className="truncate">{collection.name}</span>
                         </span>
-                        <span className="text-xs text-muted-foreground/50 ml-2 font-mono tabular-nums">
+                        <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
                           {collection._count.items}
                         </span>
                       </Link>
@@ -217,9 +179,40 @@ export function Sidebar({
                 </div>
               )}
             </div>
-          </div>
-          <SyncStatusBlock lastSyncAt={lastSyncAt} totalBookmarks={totalBookmarks} />
-        </>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1" aria-hidden />
+      )}
+
+      {showToggle && (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          className={`mt-2 flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground ${
+            expanded ? "h-9 gap-3 px-3" : "mx-auto h-10 w-10 justify-center"
+          }`}
+        >
+          {expanded ? (
+            <>
+              <ChevronLeft className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Collapse</span>
+            </>
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          )}
+        </button>
+      )}
+
+      {expanded && (
+        <div className="mt-2 w-full shrink-0 self-stretch">
+          <SyncButton
+            lastSyncAt={lastSyncAt ?? null}
+            onSyncComplete={onSyncComplete}
+            bookmarkCount={totalBookmarks}
+          />
+        </div>
       )}
     </aside>
   );

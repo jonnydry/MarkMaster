@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
-import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
@@ -75,6 +74,12 @@ export default function CollectionsPage() {
           selectedTags={[]}
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
+          lastSyncAt={
+            session?.dbUser?.lastSyncAt
+              ? new Date(session.dbUser.lastSyncAt)
+              : null
+          }
+          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
         />
       </div>
 
@@ -88,6 +93,7 @@ export default function CollectionsPage() {
                 selectedTags={[]}
                 onTagToggle={goToTagOnDashboard}
                 onCreateCollection={() => setCreateOpen(true)}
+                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
               <h1 className="text-xl font-bold tracking-tight">Collections</h1>
             </div>
@@ -100,19 +106,7 @@ export default function CollectionsPage() {
                 <Plus className="w-4 h-4" />
                 New
               </Button>
-              {session?.dbUser && (
-                <>
-                  <SyncButton
-                    lastSyncAt={
-                      session.dbUser.lastSyncAt
-                        ? new Date(session.dbUser.lastSyncAt)
-                        : null
-                    }
-                    onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
-                  />
-                  <UserNav user={session.dbUser} />
-                </>
-              )}
+              {session?.dbUser && <UserNav user={session.dbUser} />}
             </div>
           </div>
         </header>

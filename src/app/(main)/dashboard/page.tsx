@@ -21,7 +21,6 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkCard } from "@/components/bookmark-card";
-import { SyncButton } from "@/components/sync-button";
 import { UserNav } from "@/components/user-nav";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
@@ -127,7 +126,6 @@ function DashboardContent() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [showFilters, setShowFilters] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
@@ -315,16 +313,15 @@ function DashboardContent() {
           selectedTags={filters.selectedTags}
           onTagToggle={filters.toggleTag}
           onCreateCollection={() => setCreateCollectionOpen(true)}
-          expanded={sidebarExpanded}
-          onExpandedChange={setSidebarExpanded}
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
           totalBookmarks={total}
+          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="border-b border-border shrink-0">
-          <div className="flex items-center gap-3 px-6 py-3">
+          <div className="flex items-center gap-3 px-6 pt-3 pb-4">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -332,6 +329,7 @@ function DashboardContent() {
                 selectedTags={filters.selectedTags}
                 onTagToggle={filters.toggleTag}
                 onCreateCollection={() => setCreateCollectionOpen(true)}
+                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
             </div>
             <div className="relative flex-1 min-w-0 max-w-md">
@@ -357,12 +355,6 @@ function DashboardContent() {
                 onSortFieldChange={filters.setSortField}
                 onViewModeChange={setViewMode}
               />
-              {dbUser && (
-                <SyncButton
-                  lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
-                />
-              )}
               {dbUser && <UserNav user={dbUser} />}
             </div>
           </div>
@@ -536,7 +528,7 @@ function DashboardContent() {
                 <p className="text-sm text-muted-foreground">
                   {filters.search || filters.hasActiveFilters
                     ? "Try adjusting your filters or search query"
-                    : "Click Sync to fetch your bookmarks from X"}
+                    : "Use Sync in the sidebar (menu on mobile) to fetch your bookmarks from X"}
                 </p>
               </div>
             </div>

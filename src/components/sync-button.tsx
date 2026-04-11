@@ -12,9 +12,11 @@ import type { SyncRunSummary, SyncStatusResponse } from "@/types";
 interface SyncButtonProps {
   lastSyncAt: Date | null;
   onSyncComplete?: () => void;
+  /** Shown in the status line after the sync message, e.g. " · 99 bookmarks". */
+  bookmarkCount?: number;
 }
 
-export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
+export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<SyncStatusResponse>({
     queryKey: ["sync-status"],
@@ -62,24 +64,57 @@ export function SyncButton({ lastSyncAt, onSyncComplete }: SyncButtonProps) {
   };
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className="w-full shrink-0 rounded-xl border border-border/60 bg-card/35 p-3.5 backdrop-blur-md flex flex-col gap-3">
       <Button
+        type="button"
         onClick={handleSync}
         disabled={isAnySyncRunning}
-        className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 text-[13px] font-semibold h-8 px-3.5 rounded-lg"
+        className="h-9 w-full gap-2 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
       >
         <RefreshCw
-          className={`w-3.5 h-3.5 ${isAnySyncRunning ? "animate-spin" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
         />
         {isAnySyncRunning ? "Syncing..." : "Sync"}
       </Button>
-      {statusCopy && (
-        <div className="flex items-center gap-1.5 max-w-[240px] justify-end text-right">
-          <div className={`w-[5px] h-[5px] rounded-full shrink-0 ${statusCopy.dotClass}`} />
-          <span className="text-[11px] text-muted-foreground leading-tight">
+
+      {statusCopy ? (
+        <div className="flex items-start gap-2">
+          <div
+            className={`mt-0.5 h-[5px] w-[5px] shrink-0 rounded-full ${statusCopy.dotClass}`}
+          />
+          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground">
             {statusCopy.label}
+            {bookmarkCount !== undefined ? (
+              <span className="text-muted-foreground/80">
+                {" · "}
+                {bookmarkCount.toLocaleString()} bookmarks
+              </span>
+            ) : null}
           </span>
         </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <div
+              className={`h-2 w-2 shrink-0 rounded-full ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
+            />
+            <span className="text-xs text-muted-foreground">
+              {lastSyncAt ? "Up to date" : "Not synced"}
+            </span>
+          </div>
+          {(lastSyncAt || bookmarkCount !== undefined) && (
+            <div className="text-[11px] text-muted-foreground/60">
+              {[
+                lastSyncAt &&
+                  `Last sync ${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
+                bookmarkCount !== undefined &&
+                  `${bookmarkCount.toLocaleString()} bookmarks`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

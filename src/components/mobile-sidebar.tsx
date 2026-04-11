@@ -12,6 +12,7 @@ interface MobileSidebarProps {
   selectedTags: string[];
   onTagToggle: (tagId: string) => void;
   onCreateCollection: () => void;
+  onSyncComplete?: () => void;
 }
 
 export function MobileSidebar(props: MobileSidebarProps) {
@@ -33,8 +34,8 @@ export function MobileSidebar(props: MobileSidebarProps) {
             className="fixed inset-0 bg-black/50 z-40 md:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed inset-y-0 left-0 w-64 z-50 md:hidden bg-sidebar border-r border-sidebar-border">
-            <div className="absolute top-3 right-3 z-10">
+          <div className="fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border/70 bg-sidebar/75 shadow-lg backdrop-blur-xl backdrop-saturate-150 md:hidden dark:bg-sidebar/50">
+            <div className="absolute right-3 top-3 z-10">
               <Button
                 variant="ghost"
                 size="icon"
@@ -44,7 +45,9 @@ export function MobileSidebar(props: MobileSidebarProps) {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            <Sidebar {...props} expanded />
+            <div className="h-full pt-12">
+              <Sidebar {...props} forceExpanded />
+            </div>
           </div>
         </>
       )}
