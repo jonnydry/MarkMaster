@@ -58,36 +58,46 @@ export async function POST(
     return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
   }
 
-  const maxOrder = await prisma.collectionItem.findFirst({
-    where: { collectionId },
-    orderBy: { sortOrder: "desc" },
-    select: { sortOrder: true },
-  });
-
-  if (bookmarkIds.length === 1) {
-    const item = await prisma.collectionItem.upsert({
-      where: {
-        collectionId_bookmarkId: { collectionId, bookmarkId: bookmarkIds[0] },
-      },
-      update: {},
-      create: {
-        collectionId,
-        bookmarkId: bookmarkIds[0],
-        sortOrder: (maxOrder?.sortOrder ?? -1) + 1,
-      },
+  const result = await prisma.$transaction(async (tx) => {
+    const maxOrder = await tx.collectionItem.findFirst({
+      where: { collectionId },
+      orderBy: { sortOrder: "desc" },
+      select: { sortOrder: true },
     });
 
-    return NextResponse.json(item);
-  }
+    const baseOrder = (maxOrder?.sortOrder ?? -1) + 1;
 
-  await prisma.collectionItem.createMany({
-    data: bookmarkIds.map((bookmarkId, index) => ({
-      collectionId,
-      bookmarkId,
-      sortOrder: (maxOrder?.sortOrder ?? -1) + index + 1,
-    })),
-    skipDuplicates: true,
+    if (bookmarkIds.length === 1) {
+      const item = await tx.collectionItem.upsert({
+        where: {
+          collectionId_bookmarkId: { collectionId, bookmarkId: bookmarkIds[0] },
+        },
+        update: {},
+        create: {
+          collectionId,
+          bookmarkId: bookmarkIds[0],
+          sortOrder: baseOrder,
+        },
+      });
+
+      return item;
+    }
+
+    await tx.collectionItem.createMany({
+      data: bookmarkIds.map((bid, index) => ({
+        collectionId,
+        bookmarkId: bid,
+        sortOrder: baseOrder + index,
+      })),
+      skipDuplicates: true,
+    });
+
+    return null;
   });
+
+  if (bookmarkIds.length === 1 && result) {
+    return NextResponse.json(result);
+  }
 
   return NextResponse.json({ success: true, addedCount: bookmarkIds.length });
 }

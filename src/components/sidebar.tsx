@@ -102,7 +102,7 @@ export function Sidebar({
         <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto scrollbar-thin">
             <div>
               <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Tags
                 </h3>
               </div>
@@ -139,7 +139,7 @@ export function Sidebar({
 
             <div>
               <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Collections
                 </h3>
                 <button

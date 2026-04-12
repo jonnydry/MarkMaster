@@ -5,15 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  CheckSquare,
-  Tag,
-  FolderPlus,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
-} from "lucide-react";
+import { CheckSquare, Tag, FolderPlus, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sidebar } from "@/components/sidebar";
@@ -174,27 +166,22 @@ function DashboardContent() {
 
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
+  const tagFromUrlRef = useRef<string | null>(null);
+  const tagsFromUrlRef = useRef<string | null>(null);
   useEffect(() => {
-    if (tagsFromUrl) {
+    if (tagsFromUrl && tagsFromUrl !== tagsFromUrlRef.current) {
       const next = tagsFromUrl.split(",").filter(Boolean);
       setSelectedTags(next);
       setPage(1);
-    } else if (tagFromUrl) {
+    } else if (tagFromUrl && tagFromUrl !== tagFromUrlRef.current) {
       setSelectedTags([tagFromUrl]);
       setPage(1);
-    } else {
-      setSelectedTags([]);
-      setPage(1);
     }
+    tagFromUrlRef.current = tagFromUrl;
+    tagsFromUrlRef.current = tagsFromUrl;
   }, [tagFromUrl, tagsFromUrl, setPage, setSelectedTags]);
 
   const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
-  const tagTargetBookmarks = bookmarks.filter((bookmark) =>
-    tagTargetIds.includes(bookmark.id)
-  );
-  const collectionTargetBookmarks = bookmarks.filter((bookmark) =>
-    collectionTargetIds.includes(bookmark.id)
-  );
 
   const clearSelection = () => {
     setSelectedBookmarkIds([]);
@@ -321,7 +308,7 @@ function DashboardContent() {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="border-b border-border shrink-0">
-          <div className="flex items-center gap-3 px-6 pt-3 pb-4">
+          <div className="flex items-center gap-3 px-6 py-4">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -329,11 +316,13 @@ function DashboardContent() {
                 selectedTags={filters.selectedTags}
                 onTagToggle={filters.toggleTag}
                 onCreateCollection={() => setCreateCollectionOpen(true)}
+                lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                totalBookmarks={total}
                 onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
             </div>
             <div className="relative flex-1 min-w-0 max-w-md">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
               <Input
                 ref={searchInputRef}
                 value={filters.search}
@@ -342,7 +331,7 @@ function DashboardContent() {
                 className="pl-10 pr-12 h-9 w-full text-sm bg-card border-border rounded-lg focus:ring-1 focus:ring-primary"
               />
               {!filters.search && (
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
                   ⌘K
                 </kbd>
               )}
@@ -501,13 +490,22 @@ function DashboardContent() {
 
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">
-                  Loading bookmarks...
-                </p>
-              </div>
+            <div className="max-w-2xl mx-auto space-y-0">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="px-6 py-4 border-b border-border animate-pulse">
+                  <div className="flex gap-4">
+                    <div className="w-[44px] h-[44px] rounded-full bg-muted shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-24 bg-muted rounded" />
+                        <div className="h-3 w-16 bg-muted rounded" />
+                      </div>
+                      <div className="h-3 w-full bg-muted rounded" />
+                      <div className="h-3 w-3/4 bg-muted rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : isError ? (
             <div className="flex items-center justify-center h-64 px-6">
@@ -640,7 +638,15 @@ function DashboardContent() {
         existingTags={tags}
         onAddTag={actions.handleAddTag}
         onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={getSharedTagIds(tagTargetBookmarks)}
+        bookmarkTags={getSharedTagIds(
+          selectedBookmarkIds.length > 0
+            ? visibleSelectedBookmarkIds
+                .map((id) => bookmarks.find((b) => b.id === id))
+                .filter(Boolean) as BookmarkWithRelations[]
+            : tagTargetIds
+                .map((id) => bookmarks.find((b) => b.id === id))
+                .filter(Boolean) as BookmarkWithRelations[]
+        )}
       />
 
       <AddNoteDialog
@@ -661,7 +667,15 @@ function DashboardContent() {
         }}
         bookmarkIds={collectionTargetIds}
         collections={collections}
-        bookmarkCollections={getSharedCollectionIds(collectionTargetBookmarks)}
+        bookmarkCollections={getSharedCollectionIds(
+          selectedBookmarkIds.length > 0
+            ? visibleSelectedBookmarkIds
+                .map((id) => bookmarks.find((b) => b.id === id))
+                .filter(Boolean) as BookmarkWithRelations[]
+            : collectionTargetIds
+                .map((id) => bookmarks.find((b) => b.id === id))
+                .filter(Boolean) as BookmarkWithRelations[]
+        )}
         onAddToCollection={actions.handleAddToCollection}
         onCreateCollection={createCollectionQuick}
       />

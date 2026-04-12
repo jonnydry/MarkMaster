@@ -24,6 +24,12 @@ export function SearchBar({
   }, [value]);
 
   useEffect(() => {
+    return () => {
+      clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
         const tag = (e.target as HTMLElement).tagName;
@@ -54,7 +60,7 @@ export function SearchBar({
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
-        className="pl-9 pr-8 h-8 text-[13px] bg-card border-border rounded-lg placeholder:text-muted-foreground/60 focus:ring-primary"
+        className="pl-9 pr-8 h-8 text-sm bg-card border-border rounded-lg placeholder:text-muted-foreground/60 focus:ring-primary"
       />
       {local && (
         <button

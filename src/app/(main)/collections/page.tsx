@@ -8,6 +8,7 @@ import Link from "next/link";
 import { FolderOpen, Plus, Globe, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
@@ -50,6 +51,7 @@ export default function CollectionsPage() {
   const { data: tags = [] } = useTagsQuery();
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this collection? This cannot be undone.")) return;
     try {
       await sendJson(`/api/collections/${id}`, { method: "DELETE" });
       await invalidateCollectionsQuery(queryClient);
@@ -157,7 +159,7 @@ export default function CollectionsPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       {col.isPublic ? (
-                        <Globe className="w-4 h-4 text-green-500" />
+                        <Globe className="w-4 h-4 text-success" />
                       ) : (
                         <Lock className="w-4 h-4 text-muted-foreground" />
                       )}
@@ -165,7 +167,7 @@ export default function CollectionsPage() {
                          <Button
                            variant="ghost"
                            size="icon"
-                           className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                           className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive"
                            onClick={() => handleDelete(col.id)}
                          >
                            <Trash2 className="w-3.5 h-3.5" />
@@ -174,7 +176,7 @@ export default function CollectionsPage() {
                      </div>
                    </div>
                    {col.externalSource === "x-bookmark-folder" && (
-                     <p className="text-xs text-primary mb-2">Synced from X folder</p>
+                     <Badge variant="outline" className="text-primary border-primary/30 mb-2">Synced from X</Badge>
                    )}
                    {col.description && (
                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">

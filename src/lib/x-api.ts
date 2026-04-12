@@ -109,6 +109,7 @@ async function readXApiErrorBody(response: Response): Promise<string | null> {
     const json = (await response.json()) as {
       errors?: Array<{ message?: string; detail?: string; title?: string }>;
       error?: string;
+      error_description?: string;
       reason?: string;
     };
     if (json.errors?.length) {
@@ -118,6 +119,9 @@ async function readXApiErrorBody(response: Response): Promise<string | null> {
           .filter(Boolean)
           .join("; ") || null
       );
+    }
+    if (json.error && json.error_description) {
+      return `${json.error}: ${json.error_description}`;
     }
     if (json.error) {
       return json.error;
@@ -131,8 +135,18 @@ async function readXApiErrorBody(response: Response): Promise<string | null> {
   return null;
 }
 
+const FETCH_TIMEOUT_MS = 30_000;
+
 /** X tweet lookup is documented up to 100 IDs; smaller batches avoid intermittent failures. */
 const TWEET_LOOKUP_BATCH_SIZE = 50;
+
+function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: init?.signal ?? controller.signal }).finally(() => {
+    clearTimeout(timeout);
+  });
+}
 
 function parseBookmarkPayload(
   json: XApiResponse<XTweet[]>,
@@ -195,27 +209,61 @@ async function refreshAccessToken(
 
   const refreshToken = decrypt(user.refreshToken);
 
-  const response = await fetch("https://api.x.com/2/oauth2/token", {
+  const clientId = process.env.AUTH_TWITTER_ID;
+  const clientSecret = process.env.AUTH_TWITTER_SECRET;
+  if (!clientId) {
+    throw new Error("AUTH_TWITTER_ID is not configured");
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  // Confidential OAuth clients must authenticate to the token endpoint (X rejects
+  // refresh with client_id-only body for typical web apps).
+  if (clientSecret) {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    headers.Authorization = `Basic ${basic}`;
+  } else {
+    body.set("client_id", clientId);
+  }
+
+  const response = await fetchWithTimeout("https://api.x.com/2/oauth2/token", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: process.env.AUTH_TWITTER_ID!,
-    }),
+    headers,
+    body,
   });
 
   if (!response.ok) {
-    throw new Error(`Token refresh failed: ${response.status}`);
+    const detail = await readXApiErrorBody(response);
+    throw new Error(
+      detail
+        ? `Token refresh failed: ${detail}`
+        : `Token refresh failed: ${response.status} ${response.statusText}`
+    );
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as {
+    access_token: string;
+    refresh_token?: string;
+    expires_in: number;
+  };
+
+  const nextRefresh =
+    typeof data.refresh_token === "string" && data.refresh_token.length > 0
+      ? data.refresh_token
+      : refreshToken;
 
   await prisma.user.update({
     where: { id: userId },
     data: {
       accessToken: encrypt(data.access_token),
-      refreshToken: encrypt(data.refresh_token),
+      refreshToken: encrypt(nextRefresh),
       tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
     },
   });
@@ -263,7 +311,7 @@ export async function fetchBookmarks(
     params.set("pagination_token", paginationToken);
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${BASE_URL}/users/${xUserId}/bookmarks?${params}`,
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -310,7 +358,7 @@ export async function fetchBookmarkFolders(
       params.set("pagination_token", paginationToken);
     }
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${BASE_URL}/users/${xUserId}/bookmarks/folders?${params}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -339,66 +387,14 @@ export async function fetchBookmarkFolders(
 }
 
 /**
- * Preferred: same fields/expansions as GET bookmarks so posts hydrate in one call.
- * Returns null if X rejects the query (then use ID list + /2/tweets batches).
+ * GET /2/users/{id}/bookmarks/folders/{folder_id} only allows path params (id,
+ * folder_id). It returns tweet id stubs — hydrate via /2/tweets.
  */
-async function tryFetchBookmarkFolderHydrated(
+async function fetchBookmarkFolderTweetIds(
   userId: string,
   xUserId: string,
   folderId: string
-): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo } | null> {
-  const allBookmarks: BookmarkData[] = [];
-  let paginationToken: string | undefined;
-  let lastRateLimit: RateLimitInfo = {
-    remaining: 0,
-    limit: 180,
-    resetAt: new Date(0),
-  };
-
-  do {
-    const token = await getFreshXAccessToken(userId);
-    const params = buildTweetQueryParams();
-    params.set("max_results", "100");
-    if (paginationToken) {
-      params.set("pagination_token", paginationToken);
-    }
-
-    const response = await fetch(
-      `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}?${params}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    lastRateLimit = readRateLimit(response);
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        throw new RateLimitError(lastRateLimit);
-      }
-      if (response.status === 400 && allBookmarks.length === 0) {
-        return null;
-      }
-      const detail = await readXApiErrorBody(response);
-      throw new Error(
-        detail ??
-          `X bookmark folder posts error: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const json = (await response.json()) as XApiResponse<XTweet[]>;
-    allBookmarks.push(...parseBookmarkPayload(json));
-    paginationToken = json.meta?.next_token;
-  } while (paginationToken);
-
-  return { bookmarks: allBookmarks, rateLimit: lastRateLimit };
-}
-
-async function fetchBookmarkFolderTweetIdsOnly(
-  userId: string,
-  xUserId: string,
-  folderId: string
-): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
+): Promise<{ tweetIds: string[]; rateLimit: RateLimitInfo }> {
   const tweetIds: string[] = [];
   const seenIds = new Set<string>();
   let paginationToken: string | undefined;
@@ -410,17 +406,15 @@ async function fetchBookmarkFolderTweetIdsOnly(
 
   do {
     const token = await getFreshXAccessToken(userId);
-    const params = new URLSearchParams({ max_results: "100" });
-    if (paginationToken) {
-      params.set("pagination_token", paginationToken);
-    }
+    const path = `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}`;
+    const url =
+      paginationToken === undefined
+        ? path
+        : `${path}?${new URLSearchParams({ pagination_token: paginationToken })}`;
 
-    const response = await fetch(
-      `${BASE_URL}/users/${xUserId}/bookmarks/folders/${folderId}?${params}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const response = await fetchWithTimeout(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
     lastRateLimit = readRateLimit(response);
 
@@ -445,12 +439,7 @@ async function fetchBookmarkFolderTweetIdsOnly(
     paginationToken = json.meta?.next_token;
   } while (paginationToken);
 
-  if (tweetIds.length === 0) {
-    return { bookmarks: [], rateLimit: lastRateLimit };
-  }
-
-  const details = await fetchPostsByIds(userId, tweetIds);
-  return { bookmarks: details.bookmarks, rateLimit: details.rateLimit };
+  return { tweetIds, rateLimit: lastRateLimit };
 }
 
 export async function fetchBookmarksByFolder(
@@ -458,15 +447,18 @@ export async function fetchBookmarksByFolder(
   xUserId: string,
   folderId: string
 ): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
-  const hydrated = await tryFetchBookmarkFolderHydrated(
+  const { tweetIds, rateLimit } = await fetchBookmarkFolderTweetIds(
     userId,
     xUserId,
     folderId
   );
-  if (hydrated) {
-    return hydrated;
+
+  if (tweetIds.length === 0) {
+    return { bookmarks: [], rateLimit };
   }
-  return fetchBookmarkFolderTweetIdsOnly(userId, xUserId, folderId);
+
+  const details = await fetchPostsByIds(userId, tweetIds);
+  return { bookmarks: details.bookmarks, rateLimit: details.rateLimit };
 }
 
 async function fetchPostsByIds(
@@ -489,7 +481,7 @@ async function fetchPostsByIds(
     const token = await getFreshXAccessToken(userId);
     const params = buildTweetQueryParams(batch);
 
-    const response = await fetch(`${BASE_URL}/tweets?${params}`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/tweets?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 

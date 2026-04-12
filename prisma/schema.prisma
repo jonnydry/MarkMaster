@@ -83,6 +83,7 @@ model BookmarkTag {
   tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([bookmarkId, tagId])
+  @@index([tagId])
 }
 
 model Collection {
@@ -114,6 +115,7 @@ model CollectionItem {
 
   @@unique([collectionId, bookmarkId])
   @@index([collectionId, sortOrder])
+  @@index([bookmarkId])
 }
 
 model Note {
@@ -128,6 +130,7 @@ model Note {
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([bookmarkId, userId])
+  @@index([userId])
 }
 
 model HiddenBookmark {

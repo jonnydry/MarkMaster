@@ -55,9 +55,9 @@ export function FilterPanel({
             variant="ghost"
             size="sm"
             onClick={onClearAll}
-            className="h-6 text-xs text-muted-foreground hover:text-foreground"
+            className="h-6 text-xs text-muted-foreground hover:text-foreground gap-1"
           >
-            <X className="w-3 h-3 mr-1" /> Clear all
+            <X className="w-3 h-3" /> Clear all
           </Button>
         )}
       </div>
@@ -135,6 +135,7 @@ export function FilterPanel({
                       : "bg-secondary text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}
+                  aria-pressed={selectedTags.includes(tag.id)}
                 >
                   {tag.name}
                   <span className="ml-1 opacity-60">{tag._count.bookmarks}</span>

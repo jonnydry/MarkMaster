@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, memo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
@@ -131,7 +131,7 @@ function SelectionToggle({
         onToggle();
       }}
       aria-pressed={selected}
-      className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 ${
+      className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         selected
           ? "bg-primary border-primary text-primary-foreground"
           : "bg-background border-border text-transparent hover:border-primary/50"
@@ -142,7 +142,7 @@ function SelectionToggle({
   );
 }
 
-export function BookmarkCard({
+export const BookmarkCard = memo(function BookmarkCard({
   bookmark,
   viewMode,
   onTagClick,
@@ -160,6 +160,7 @@ export function BookmarkCard({
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
+  const highlightedText = useMemo(() => highlightText(bookmark.tweetText), [bookmark.tweetText]);
 
   if (viewMode === "compact") {
     return (
@@ -372,7 +373,7 @@ export function BookmarkCard({
           />
         ) : (
           <div className="w-[44px] h-[44px] rounded-full bg-secondary shrink-0 flex items-center justify-center">
-            <span className="text-[15px] font-semibold text-muted-foreground">
+            <span className="text-sm font-semibold text-muted-foreground">
               {bookmark.authorDisplayName.charAt(0).toUpperCase()}
             </span>
           </div>
@@ -386,11 +387,11 @@ export function BookmarkCard({
               {bookmark.authorVerified && (
                 <BadgeCheck className="w-[14px] h-[14px] text-primary shrink-0" />
               )}
-              <span className="text-[13px] text-muted-foreground truncate">
+              <span className="text-muted-foreground truncate">
                 @{bookmark.authorUsername}
               </span>
-              <span className="text-[13px] text-muted-foreground">·</span>
-              <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground whitespace-nowrap">
                 {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
                   addSuffix: true,
                 })}
@@ -440,8 +441,8 @@ export function BookmarkCard({
             </div>
           </div>
 
-          <div className="mt-2 text-[15px] leading-[22px] text-foreground whitespace-pre-wrap">
-            {highlightText(bookmark.tweetText)}
+          <div className="mt-2 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+            {highlightedText}
           </div>
 
           {mediaItems && mediaItems.length > 0 && (
@@ -483,7 +484,7 @@ export function BookmarkCard({
                 <span className="font-medium text-sm text-foreground">
                   {bookmark.quotedTweet.author?.name}
                 </span>
-                <span className="text-[13px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   @{bookmark.quotedTweet.author?.username}
                 </span>
               </div>
@@ -494,8 +495,8 @@ export function BookmarkCard({
           )}
 
           {bookmark.notes.length > 0 && (
-            <div className="mt-3 pl-3.5 py-2.5 pr-3 border-l-2 border-l-note rounded-r-md bg-secondary">
-              <p className="text-[13px] leading-[18px] text-muted-foreground">
+            <div className="mt-3 pl-3.5 py-2.5 pr-3 border-l-2 border-l-note rounded-r-md bg-muted/50">
+              <p className="text-xs leading-snug text-muted-foreground">
                 {bookmark.notes[0].content}
               </p>
             </div>
@@ -542,4 +543,4 @@ export function BookmarkCard({
       </div>
     </div>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Search, Image, Video, Link, FileText } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,10 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
 
+  useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
+
   const handleFilterSelect = useCallback((filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
     onFilterChange(filter);
     onOpenChange(false);
@@ -43,7 +47,7 @@ export function CommandPalette({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 gap-0 max-w-[560px] overflow-hidden" key={open ? "open" : "closed"}>
+      <DialogContent className="p-0 gap-0 max-w-[560px] overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <Input
@@ -62,7 +66,7 @@ export function CommandPalette({
           {query === "" && (
             <>
               <div className="px-2 py-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Quick Filters
                 </p>
                 <div className="space-y-1">
@@ -82,7 +86,7 @@ export function CommandPalette({
 
               {tags.length > 0 && (
                 <div className="px-2 py-1.5 border-t border-border mt-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     Tags
                   </p>
                   <div className="space-y-1">
@@ -110,7 +114,7 @@ export function CommandPalette({
 
           {query !== "" && filteredTags.length > 0 && (
             <div className="px-2 py-1.5">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 Tags
               </p>
               <div className="space-y-1">

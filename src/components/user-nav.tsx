@@ -23,14 +23,14 @@ export function UserNav({ user }: UserNavProps) {
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 hover:bg-muted transition-colors">
         <div className="flex flex-col items-end gap-px">
-          <span className="text-[13px] text-foreground leading-tight">
+          <span className="text-sm text-foreground leading-tight">
             {user.displayName}
           </span>
-          <span className="text-[10px] text-muted-foreground leading-tight">
+          <span className="text-xs text-muted-foreground leading-tight">
             X connected
           </span>
         </div>
-        <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
           <span className="text-xs font-bold text-primary-foreground">
             {user.displayName.charAt(0).toUpperCase()}
           </span>

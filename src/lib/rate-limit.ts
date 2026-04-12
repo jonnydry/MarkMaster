@@ -3,11 +3,22 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 60;
 
+function evictExpired(): void {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (now > entry.resetAt) {
+      rateLimitMap.delete(key);
+    }
+  }
+}
+
 export function checkRateLimit(identifier: string): {
   allowed: boolean;
   remaining: number;
   resetAt: number;
 } {
+  evictExpired();
+
   const now = Date.now();
   const entry = rateLimitMap.get(identifier);
 
@@ -20,10 +31,6 @@ export function checkRateLimit(identifier: string): {
   entry.count++;
   const remaining = Math.max(0, MAX_REQUESTS - entry.count);
   const allowed = entry.count <= MAX_REQUESTS;
-
-  if (!allowed) {
-    rateLimitMap.set(identifier, entry);
-  }
 
   return { allowed, remaining, resetAt: entry.resetAt };
 }

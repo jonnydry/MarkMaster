@@ -52,9 +52,16 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  await prisma.note.delete({
-    where: { id: parsed.data.noteId, userId: user.id },
-  });
+  try {
+    await prisma.note.delete({
+      where: { id: parsed.data.noteId, userId: user.id },
+    });
+  } catch (e: unknown) {
+    if (e instanceof Error && "code" in e && (e as { code: string }).code === "P2025") {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+    throw e;
+  }
 
   return NextResponse.json({ success: true });
 }

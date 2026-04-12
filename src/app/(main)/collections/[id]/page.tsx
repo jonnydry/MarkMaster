@@ -93,11 +93,15 @@ export default function CollectionDetailPage({
     }
   };
 
-  const handleCopyShareLink = () => {
+  const handleCopyShareLink = async () => {
     if (!collection?.shareSlug) return;
-    const url = `${window.location.origin}/share/${collection.shareSlug}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Share link copied!");
+    try {
+      const url = `${window.location.origin}/share/${collection.shareSlug}`;
+      await navigator.clipboard.writeText(url);
+      toast.success("Share link copied!");
+    } catch {
+      toast.error("Could not copy link to clipboard");
+    }
   };
 
   const handleRemoveItem = async (bookmarkId: string) => {
@@ -204,8 +208,8 @@ export default function CollectionDetailPage({
                 className="text-lg font-semibold bg-transparent border-b border-primary outline-none w-full"
               />
             ) : (
-              <h1
-                className={`text-lg font-semibold truncate transition-colors ${
+<h1
+                  className={`text-xl font-bold truncate transition-colors ${
                   isSyncedFromX
                     ? "cursor-default"
                     : "cursor-pointer hover:text-primary"
@@ -228,7 +232,7 @@ export default function CollectionDetailPage({
             )}
             <Badge variant="outline" className="gap-1.5">
               {collection.isPublic ? (
-                <Globe className="w-3 h-3 text-green-500" />
+                <Globe className="w-3 h-3 text-success" />
               ) : (
                 <Lock className="w-3 h-3" />
               )}
@@ -287,7 +291,7 @@ export default function CollectionDetailPage({
             {sortedItems.map((item, index) => (
               <div key={item.id} className="flex group">
                 {!isSyncedFromX && (
-                  <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity border-r border-transparent">
+                  <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity border-r border-transparent sm:border-transparent">
                     <Button
                       type="button"
                       variant="ghost"
@@ -327,7 +331,7 @@ export default function CollectionDetailPage({
                   />
                 </div>
                 {!isSyncedFromX && (
-                  <div className="flex items-start pt-4 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-start pt-4 pr-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       size="icon"

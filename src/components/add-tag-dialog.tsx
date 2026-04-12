@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,13 @@ export function AddTagDialog({
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const isBulk = bookmarkIds.length > 1;
+
+  useEffect(() => {
+    if (!open) {
+      setName("");
+      setColor(PRESET_COLORS[0]);
+    }
+  }, [open]);
 
   const handleAdd = () => {
     if (!name.trim() || bookmarkIds.length === 0) return;
@@ -104,6 +111,8 @@ export function AddTagDialog({
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
+                  aria-label={`Select color ${c}`}
+                  aria-pressed={color === c}
                   className={`w-6 h-6 rounded-full transition-transform ${
                     color === c ? "scale-125 ring-2 ring-foreground ring-offset-2 ring-offset-background" : ""
                   }`}

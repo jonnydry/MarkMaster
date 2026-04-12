@@ -183,7 +183,7 @@ export default async function PublicSharePage({
                           }) => (
                             <span
                               key={tag.id}
-                              className="px-2 py-0.5 rounded bg-card text-[11px] font-medium text-zinc-500 dark:text-zinc-400"
+                              className="px-2 py-0.5 rounded-md bg-secondary text-xs font-medium text-muted-foreground"
                             >
                               {tag.name}
                             </span>

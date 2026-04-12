@@ -73,31 +73,38 @@ export async function POST() {
     return rateLimitResponse(rate.resetAt);
   }
 
-  await expireStaleSyncRuns(user.id);
+  const syncRun = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      UPDATE "SyncRun" SET status = 'FAILED', "completedAt" = NOW(), "errorMessage" = 'Superseded by new sync'
+      WHERE "userId" = ${user.id} AND status = 'RUNNING' AND "startedAt" < NOW() - INTERVAL '5 minutes'
+    `;
 
-  const runningSync = await prisma.syncRun.findFirst({
-    where: { userId: user.id, status: "RUNNING" },
-    orderBy: { startedAt: "desc" },
-    select: syncRunSelect,
+    const running = await tx.syncRun.findFirst({
+      where: { userId: user.id, status: "RUNNING" },
+      select: syncRunSelect,
+    });
+
+    if (running) {
+      return { conflict: running } as const;
+    }
+
+    return { created: await tx.syncRun.create({ data: { userId: user.id }, select: { id: true } }) } as const;
   });
 
-  if (runningSync) {
+  if ("conflict" in syncRun && syncRun.conflict) {
     return NextResponse.json(
-      { error: "A sync is already running.", currentRun: runningSync },
+      { error: "A sync is already running.", currentRun: syncRun.conflict },
       { status: 409 }
     );
   }
 
-  const syncRun = await prisma.syncRun.create({
-    data: { userId: user.id },
-    select: { id: true },
-  });
+  const effectiveId = "created" in syncRun ? syncRun.created.id : "";
 
   try {
     const result = await syncBookmarks(user.id);
 
     await prisma.syncRun.update({
-      where: { id: syncRun.id },
+      where: { id: effectiveId },
       data: {
         status: result.rateLimited ? "RATE_LIMITED" : "COMPLETED",
         newBookmarks: result.newBookmarks,
@@ -110,12 +117,12 @@ export async function POST() {
       },
     });
 
-    return NextResponse.json({ ...result, runId: syncRun.id });
+    return NextResponse.json({ ...result, runId: effectiveId });
   } catch (error) {
     console.error("Sync error:", error);
 
     await prisma.syncRun.update({
-      where: { id: syncRun.id },
+      where: { id: effectiveId },
       data: {
         status: "FAILED",
         errorMessage: error instanceof Error ? error.message : "Sync failed",
@@ -126,7 +133,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Sync failed",
-        runId: syncRun.id,
+        runId: effectiveId,
       },
       { status: 500 }
     );

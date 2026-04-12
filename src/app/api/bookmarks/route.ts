@@ -219,7 +219,7 @@ export async function GET(req: NextRequest) {
       bookmarks,
       total,
       page,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
     });
   }
 

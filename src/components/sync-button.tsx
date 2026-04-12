@@ -69,7 +69,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
         type="button"
         onClick={handleSync}
         disabled={isAnySyncRunning}
-        className="h-9 w-full gap-2 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
+        className="h-9 w-full gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
       >
         <RefreshCw
           className={`h-3.5 w-3.5 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
@@ -82,7 +82,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
           <div
             className={`mt-0.5 h-[5px] w-[5px] shrink-0 rounded-full ${statusCopy.dotClass}`}
           />
-          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground">
+          <span className="min-w-0 text-xs leading-snug text-muted-foreground">
             {statusCopy.label}
             {bookmarkCount !== undefined ? (
               <span className="text-muted-foreground/80">
@@ -103,7 +103,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
             </span>
           </div>
           {(lastSyncAt || bookmarkCount !== undefined) && (
-            <div className="text-[11px] text-muted-foreground/60">
+            <div className="text-xs text-muted-foreground/60">
               {[
                 lastSyncAt &&
                   `Last sync ${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
@@ -127,7 +127,7 @@ function getSyncStatusCopy(
 ) {
   if (currentRun) {
     return {
-      dotClass: "bg-amber-500",
+      dotClass: "bg-chart-2",
       label: `Sync started ${formatDistanceToNow(new Date(currentRun.startedAt), {
         addSuffix: true,
       })}`,
@@ -149,7 +149,7 @@ function getSyncStatusCopy(
 
     if (latestRun.status === "RATE_LIMITED") {
       return {
-        dotClass: "bg-amber-500",
+        dotClass: "bg-chart-2",
         label: `Last sync ${relative}: ${latestRun.newBookmarks} new, rate limited`,
       };
     }

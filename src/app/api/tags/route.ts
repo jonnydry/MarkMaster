@@ -94,7 +94,7 @@ export async function DELETE(req: NextRequest) {
     }
     await prisma.bookmarkTag.deleteMany({
       where: {
-        bookmarkId: { in: targetBookmarkIds },
+        bookmarkId: { in: bookmarkTags.map((bt) => bt.bookmarkId) },
         tagId,
       },
     });
@@ -124,9 +124,17 @@ export async function PATCH(req: NextRequest) {
 
   const { tagId, name, color } = parsed.data;
 
+  const data: Record<string, unknown> = {};
+  if (name !== undefined) data.name = name;
+  if (color !== undefined) data.color = color;
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "At least one field must be provided" }, { status: 400 });
+  }
+
   const tag = await prisma.tag.update({
     where: { id: tagId, userId: user.id },
-    data: { name, color },
+    data,
   });
 
   return NextResponse.json(tag);

@@ -86,6 +86,8 @@ export async function PATCH(
       if (!existingCollection.shareSlug) {
         updateData.shareSlug = nanoid(10);
       }
+    } else {
+      updateData.shareSlug = null;
     }
   }
 

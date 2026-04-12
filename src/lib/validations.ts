@@ -32,8 +32,11 @@ export const deleteTagSchema = z.object({
 
 export const patchTagSchema = z.object({
   tagId: z.string().min(1, "Tag ID is required"),
-  name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long"),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format"),
+  name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long").optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format").optional(),
+}).refine((value) => value.name || value.color, {
+  message: "At least one of name or color is required",
+  path: ["name"],
 });
 
 export const createNoteSchema = z.object({

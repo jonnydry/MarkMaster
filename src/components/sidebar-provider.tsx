@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -53,17 +54,17 @@ export function useSidebar() {
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [expanded, setExpandedState] = useState(readStoredExpanded);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, String(expanded));
+    } catch {
+      /* ignore */
+    }
+  }, [expanded]);
+
   const setExpanded = useCallback(
     (value: boolean | ((prev: boolean) => boolean)) => {
-      setExpandedState((prev) => {
-        const next = typeof value === "function" ? value(prev) : value;
-        try {
-          localStorage.setItem(STORAGE_KEY, String(next));
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
+      setExpandedState(value);
     },
     []
   );

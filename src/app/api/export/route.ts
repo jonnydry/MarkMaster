@@ -3,6 +3,22 @@ import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exportQuerySchema } from "@/lib/validations";
 
+const EXPORT_LIMIT = 10_000;
+
+function escapeCsvField(value: string): string {
+  if (value.includes('"') || value.includes("\n") || value.includes("\r") || value.includes(",")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function sanitizeCsvField(value: string): string {
+  if (/^[=+\-@\t\r]/.test(value)) {
+    return `'${value}`;
+  }
+  return escapeCsvField(value);
+}
+
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
@@ -27,6 +43,7 @@ export async function GET(req: NextRequest) {
       notes: { select: { content: true } },
     },
     orderBy: { bookmarkedAt: "desc" },
+    take: EXPORT_LIMIT,
   });
 
   if (format === "csv") {
@@ -37,9 +54,9 @@ export async function GET(req: NextRequest) {
         const metrics = b.publicMetrics as Record<string, number> | null;
         const tags = b.tags.map((t) => t.tag.name).join("; ");
         const note = b.notes[0]?.content || "";
-        const text = b.tweetText.replace(/"/g, '""');
+        const text = sanitizeCsvField(b.tweetText);
         const url = `https://x.com/${b.authorUsername}/status/${b.tweetId}`;
-        return `"${b.tweetId}","${b.authorDisplayName}","@${b.authorUsername}","${text}",${metrics?.like_count || 0},${metrics?.retweet_count || 0},${metrics?.reply_count || 0},"${tags}","${note.replace(/"/g, '""')}","${b.tweetCreatedAt.toISOString()}","${b.bookmarkedAt.toISOString()}","${url}"`;
+        return `${escapeCsvField(b.tweetId)},${escapeCsvField(b.authorDisplayName)},${escapeCsvField("@" + b.authorUsername)},${text},${metrics?.like_count || 0},${metrics?.retweet_count || 0},${metrics?.reply_count || 0},${escapeCsvField(tags)},${sanitizeCsvField(note)},${escapeCsvField(b.tweetCreatedAt.toISOString())},${escapeCsvField(b.bookmarkedAt.toISOString())},${escapeCsvField(url)}`;
       })
       .join("\n");
 

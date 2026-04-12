@@ -70,6 +70,7 @@ export default function SettingsPage() {
   const [editTagColor, setEditTagColor] = useState("");
 
   const handleDeleteTag = async (tagId: string) => {
+    if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
     try {
       await sendJson("/api/tags", {
         method: "DELETE",
@@ -204,7 +205,9 @@ export default function SettingsPage() {
                           {PRESET_COLORS.map((c) => (
                             <button
                               key={c}
-                              className={`w-5 h-5 rounded-full ${
+                              aria-label={`Select color ${c}`}
+                              aria-pressed={editTagColor === c}
+                              className={`w-6 h-6 rounded-full transition-transform ${
                                 editTagColor === c
                                   ? "ring-2 ring-foreground ring-offset-1 ring-offset-background"
                                   : ""

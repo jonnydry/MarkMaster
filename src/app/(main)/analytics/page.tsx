@@ -5,27 +5,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Bookmark, Tag, FolderOpen, TrendingUp } from "lucide-react";
+import { Bookmark, Tag, FolderOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts";
-import type { PieLabelRenderProps } from "recharts";
 import type {
   AnalyticsData,
 } from "@/types";
@@ -43,7 +28,10 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
-const PIE_COLORS = ["#3b82f6", "#60a5fa", "#71717a"];
+const RechartsCharts = dynamic(
+  () => import("./recharts-charts").then((m) => m.RechartsCharts),
+  { ssr: false }
+);
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -180,149 +168,7 @@ export default function AnalyticsPage() {
                 </Card>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-6">
-                <Card className="p-5">
-                  <h2 className="font-semibold mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-primary" />
-                    Top Authors
-                  </h2>
-                  {analytics.topAuthors.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No data yet
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart
-                        data={analytics.topAuthors}
-                        layout="vertical"
-                        margin={{ left: 80 }}
-                      >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--border)"
-                        />
-                        <XAxis type="number" stroke="var(--muted-foreground)" />
-                        <YAxis
-                          type="category"
-                          dataKey="author"
-                          stroke="var(--muted-foreground)"
-                          tick={{ fontSize: 12 }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--popover)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "0.5rem",
-                          }}
-                        />
-                        <Bar
-                          dataKey="count"
-                          fill="var(--primary)"
-                          radius={[0, 4, 4, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </Card>
-
-                <Card className="p-5">
-                  <h2 className="font-semibold mb-4">Content Breakdown</h2>
-                  {analytics.mediaBreakdown.every((m) => m.count === 0) ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No data yet
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={analytics.mediaBreakdown.filter(
-                            (m) => m.count > 0
-                          )}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="count"
-                          nameKey="type"
-                          label={({ name, percent }: PieLabelRenderProps) =>
-                            `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
-                          }
-                        >
-                          {analytics.mediaBreakdown
-                            .filter((m) => m.count > 0)
-                            .map((_, i) => (
-                              <Cell
-                                key={i}
-                                fill={PIE_COLORS[i % PIE_COLORS.length]}
-                              />
-                            ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </Card>
-
-                <Card className="p-5 lg:col-span-2">
-                  <h2 className="font-semibold mb-4">Bookmarks Over Time</h2>
-                  {analytics.bookmarksByMonth.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No data yet
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={analytics.bookmarksByMonth}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--border)"
-                        />
-                        <XAxis
-                          dataKey="month"
-                          stroke="var(--muted-foreground)"
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis stroke="var(--muted-foreground)" />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--popover)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "0.5rem",
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="count"
-                          stroke="var(--primary)"
-                          strokeWidth={2}
-                          dot={{ fill: "var(--primary)", r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </Card>
-
-                {analytics.tagDistribution.length > 0 && (
-                  <Card className="p-5 lg:col-span-2">
-                    <h2 className="font-semibold mb-4">Tag Distribution</h2>
-                    <div className="flex flex-wrap gap-3">
-                      {analytics.tagDistribution.map((t) => (
-                        <div
-                          key={t.tag}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border"
-                        >
-                          <span className="text-sm font-medium text-foreground">
-                            {t.tag}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {t.count}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-              </div>
+              <RechartsCharts analytics={analytics} />
             </>
           )}
         </div>

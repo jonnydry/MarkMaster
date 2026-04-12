@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,10 @@ export function AddToCollectionDialog({
   const [creating, setCreating] = useState(false);
   const isBulk = bookmarkIds.length > 1;
 
+  useEffect(() => {
+    if (!open) setNewName("");
+  }, [open]);
+
   const handleCreate = async () => {
     if (!newName.trim() || bookmarkIds.length === 0) return;
     setCreating(true);
@@ -66,9 +70,13 @@ export function AddToCollectionDialog({
                 return (
                   <button
                     key={col.id}
-                    onClick={() => {
+onClick={async () => {
                       if (bookmarkIds.length === 0 || isIn || isManaged) return;
-                      void onAddToCollection(bookmarkIds, col.id);
+                      try {
+                        await onAddToCollection(bookmarkIds, col.id);
+                      } catch {
+                        // error handled by caller toast
+                      }
                     }}
                     disabled={isIn || isManaged}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
