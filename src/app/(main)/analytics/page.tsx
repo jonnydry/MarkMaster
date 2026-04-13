@@ -97,7 +97,7 @@ export default function AnalyticsPage() {
                   void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                 }}
               />
-              <h1 className="text-xl font-bold tracking-tight">Analytics</h1>
+              <h1 className="text-xl font-bold tracking-tight heading-font">Analytics</h1>
             </div>
             {session?.dbUser && (
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -128,14 +128,14 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <>
-              <div className="grid sm:grid-cols-3 gap-3">
-                <Card className="p-4">
+<div className="grid sm:grid-cols-3 gap-3">
+                <Card className="p-4 animate-fade-in stagger-1">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Bookmark className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">
+                      <p className="text-2xl font-bold heading-font">
                         {analytics.totalBookmarks.toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -144,24 +144,24 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-4">
+                <Card className="p-4 animate-fade-in stagger-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Tag className="w-5 h-5 text-primary" />
+                    <div className="w-9 h-9 rounded-lg bg-emerald/10 flex items-center justify-center">
+                      <Tag className="w-5 h-5 text-emerald" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{analytics.totalTags}</p>
+                      <p className="text-2xl font-bold heading-font">{analytics.totalTags}</p>
                       <p className="text-xs text-muted-foreground">Tags</p>
                     </div>
                   </div>
                 </Card>
-                <Card className="p-4">
+                <Card className="p-4 animate-fade-in stagger-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <FolderOpen className="w-5 h-5 text-primary" />
+                    <div className="w-9 h-9 rounded-lg bg-note/10 flex items-center justify-center">
+                      <FolderOpen className="w-5 h-5 text-note" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">
+                      <p className="text-2xl font-bold heading-font">
                         {analytics.totalCollections}
                       </p>
                       <p className="text-xs text-muted-foreground">

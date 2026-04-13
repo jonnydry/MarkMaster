@@ -97,7 +97,7 @@ export default function CollectionsPage() {
                 onCreateCollection={() => setCreateOpen(true)}
                 onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
-              <h1 className="text-xl font-bold tracking-tight">Collections</h1>
+              <h1 className="text-xl font-bold tracking-tight heading-font">Collections</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Button
@@ -144,10 +144,10 @@ export default function CollectionsPage() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {collections.map((col) => (
+              {collections.map((col, i) => (
                 <Card
                   key={col.id}
-                  className="p-4 hover:border-primary/30 transition-colors group"
+                  className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">

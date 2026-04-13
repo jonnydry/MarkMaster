@@ -31,6 +31,7 @@ interface BookmarkCardProps {
   onSelect?: (bookmarkId: string) => void;
   selectionMode?: boolean;
   onSelectionChange?: (bookmarkId: string, selected: boolean) => void;
+  className?: string;
 }
 
 function formatCount(n: number): string {
@@ -155,6 +156,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   onSelect,
   selectionMode = false,
   onSelectionChange,
+  className,
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(new Set());
   const metrics = bookmark.publicMetrics;
@@ -165,9 +167,9 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted/40 transition-colors cursor-pointer ${
+        className={`flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted/40 transition-all duration-150 cursor-pointer ${
           selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
-        }`}
+        }${className ? ` ${className}` : ""}`}
         role="button"
         tabIndex={0}
         onClick={() => {
@@ -241,9 +243,9 @@ export const BookmarkCard = memo(function BookmarkCard({
 
     return (
       <div
-        className={`group relative rounded-lg border border-border bg-card overflow-hidden hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer ${
-          selected ? "ring-2 ring-primary" : ""
-        }`}
+        className={`group relative rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer ${
+          selected ? "ring-2 ring-primary border-primary/40" : ""
+        }${className ? ` ${className}` : ""}`}
         role="button"
         tabIndex={0}
         onClick={() => {
@@ -351,9 +353,9 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group px-5 py-3 border-b border-border hover:bg-muted/20 transition-colors ${
+      className={`group px-5 py-3 border-b border-border hover:bg-muted/30 transition-all duration-150 ${
         selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
-      }`}
+      }${className ? ` ${className}` : ""}`}
       role="button"
       tabIndex={0}
       onClick={() => {

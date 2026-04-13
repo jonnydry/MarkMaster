@@ -134,7 +134,7 @@ export default function SettingsPage() {
                 onCreateCollection={() => setCreateOpen(true)}
                 onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
-              <h1 className="text-xl font-bold tracking-tight">Settings</h1>
+              <h1 className="text-xl font-bold tracking-tight heading-font">Settings</h1>
             </div>
             {session?.dbUser && (
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">

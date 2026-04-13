@@ -64,14 +64,12 @@ export function Sidebar({
         }`}
         title="MarkMaster"
       >
-        <div className="flex items-center gap-2 rounded-lg bg-primary/10 p-1.5">
-          <MarkMasterLogo width={28} height={28} className="shrink-0" priority />
-          {expanded && (
-            <span className="text-[15px] font-bold tracking-[-0.02em] text-sidebar-foreground">
-              MarkMaster
-            </span>
-          )}
-        </div>
+        <MarkMasterLogo width={28} height={28} className="shrink-0" priority />
+        {expanded && (
+          <span className="text-[15px] font-bold tracking-[-0.02em] text-sidebar-foreground heading-font">
+            MarkMaster
+          </span>
+        )}
       </Link>
 
       <nav className="flex flex-col gap-1">
@@ -83,11 +81,11 @@ export function Sidebar({
               key={href}
               href={href}
               title={label}
-              className={`flex items-center rounded-lg transition-colors ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              } ${expanded ? "h-9 gap-3 px-3" : "h-9 w-9 justify-center"}`}
+className={`flex items-center rounded-lg transition-all duration-150 ${
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                }${expanded ? " h-9 gap-3" : " h-9 w-9 justify-center"}`}
             >
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {expanded && <span className="text-sm font-medium">{label}</span>}

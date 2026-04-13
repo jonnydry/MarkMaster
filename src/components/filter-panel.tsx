@@ -45,7 +45,7 @@ export function FilterPanel({
   hasActiveFilters,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-2.5 px-5 py-2.5 bg-muted/30">
+    <div className="space-y-2.5 px-5 py-2.5 bg-muted/30 border-b border-border/60">
       <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Filters

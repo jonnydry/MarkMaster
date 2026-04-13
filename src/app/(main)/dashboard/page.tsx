@@ -307,7 +307,7 @@ function DashboardContent() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border shrink-0">
+        <header className="border-b border-border/70 bg-gradient-to-b from-card to-background shrink-0">
           <div className="flex items-center gap-3 px-5 py-3">
             <div className="md:hidden">
               <MobileSidebar
@@ -533,7 +533,7 @@ function DashboardContent() {
             </div>
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
-              {bookmarks.map((bookmark) => (
+              {bookmarks.map((bookmark, i) => (
                 <BookmarkCard
                   key={bookmark.id}
                   bookmark={bookmark}
@@ -562,12 +562,13 @@ function DashboardContent() {
                     setNoteDialogOpen(true);
                   }}
                   onDelete={actions.handleDeleteBookmark}
+                  className={i < 8 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : undefined}
                 />
               ))}
             </div>
           ) : (
             <div className="max-w-2xl mx-auto">
-              {bookmarks.map((bookmark) => (
+              {bookmarks.map((bookmark, i) => (
                 <BookmarkCard
                   key={bookmark.id}
                   bookmark={bookmark}
@@ -596,6 +597,7 @@ function DashboardContent() {
                     setNoteDialogOpen(true);
                   }}
                   onDelete={actions.handleDeleteBookmark}
+                  className={i < 8 ? `animate-fade-in stagger-${Math.min(i + 1, 5)}` : undefined}
                 />
               ))}
             </div>

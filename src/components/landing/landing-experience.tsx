@@ -38,14 +38,23 @@ const FEATURES = [
   },
 ] as const;
 
+const FEATURE_ICONS: Record<string, string> = {
+  Search: "🔍",
+  Tags: "🏷️",
+  Collections: "📁",
+  Notes: "📝",
+  Analytics: "📊",
+  Sync: "🔄",
+};
+
 export function LandingExperience() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
-      <header className="sticky top-0 z-50 border-b border-border bg-background">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
           <div className="flex items-center gap-3">
             <MarkMasterLogo width={36} height={36} className="shrink-0" priority />
-            <span className="text-[17px] font-bold tracking-[-0.02em]">
+            <span className="text-[17px] font-bold tracking-[-0.02em] heading-font">
               MarkMaster
             </span>
           </div>
@@ -61,29 +70,33 @@ export function LandingExperience() {
         </div>
       </header>
 
-      <section className="border-b border-border">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-8 py-16 sm:grid-cols-2 sm:px-12 sm:py-20">
-          <div className="flex flex-col justify-center gap-6">
+      <section className="relative border-b border-border overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-emerald/[0.03] pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/[0.04] rounded-full blur-[120px] pointer-events-none" />
+        <div className="relative mx-auto grid max-w-6xl grid-cols-1 gap-12 px-8 py-16 sm:grid-cols-2 sm:px-12 sm:py-24">
+          <div className="flex flex-col justify-center gap-6 animate-fade-in">
             <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary animate-fade-in stagger-1">
                 Your bookmark archive
               </p>
-              <h1 className="text-3xl sm:text-[2.75rem] font-extrabold leading-tight sm:leading-[1.06] tracking-tight sm:tracking-[-0.03em]">
+              <h1 className="text-3xl sm:text-[2.75rem] font-extrabold leading-tight sm:leading-[1.06] tracking-tight sm:tracking-[-0.03em] heading-font animate-fade-in stagger-2">
                 Every save,
                 <br />
-                impossible to lose.
+                <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent sm:bg-gradient-to-r sm:from-foreground sm:to-muted-foreground">
+                  impossible to lose.
+                </span>
               </h1>
-              <p className="text-base leading-relaxed text-muted-foreground">
+              <p className="text-base leading-relaxed text-muted-foreground animate-fade-in stagger-3">
                 MarkMaster keeps every post you save on X in a searchable,
                 taggable archive. Your reading history, organized. Forever.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 animate-fade-in stagger-4">
               <Link href="/login">
                 <Button
                   size="lg"
-                  className="h-11 gap-2 rounded-lg px-6 text-sm font-bold"
+                  className="h-11 gap-2 rounded-lg px-6 text-sm font-bold shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/25 transition-shadow"
                 >
                   Connect with X
                   <ArrowRight className="size-4" strokeWidth={2.5} />
@@ -95,9 +108,9 @@ export function LandingExperience() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary">
-              <MarkMasterLogo width={32} height={32} className="shrink-0" />
+          <div className="animate-fade-in-up stagger-3 overflow-hidden rounded-xl border border-border bg-card shadow-xl shadow-black/[0.04] dark:shadow-black/20">
+            <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary/80">
+              <MarkMasterLogo width={32} height={32} className="shrink-0" priority />
               <span className="text-sm font-semibold text-foreground">
                 MarkMaster
               </span>
@@ -109,11 +122,11 @@ export function LandingExperience() {
 
             <div>
               <div className="flex gap-4 border-b border-border px-5 py-4">
-<div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
-                 <div className="min-w-0 flex-1">
-                   <div className="mb-2 flex items-center gap-2">
-                     <span className="text-sm font-semibold">
-                       Lenny Rachitsky
+                <div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold">
+                      Lenny Rachitsky
                     </span>
                     <div className="flex size-4 items-center justify-center rounded-full bg-primary text-[6px] font-bold text-primary-foreground">
                       ✓
@@ -132,7 +145,7 @@ export function LandingExperience() {
                     {["copywriting", "product"].map((t) => (
                       <span
                         key={t}
-                        className="rounded-md px-2 py-0.5 text-xs bg-muted-foreground/10 text-muted-foreground"
+                        className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary font-medium"
                       >
                         {t}
                       </span>
@@ -147,8 +160,8 @@ export function LandingExperience() {
               </div>
 
               <div className="flex gap-4 border-b border-border px-5 py-4">
-<div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
-                 <div className="min-w-0 flex-1">
+                <div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
+                <div className="min-w-0 flex-1">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-sm font-semibold">
                       Packy McCormick
@@ -165,7 +178,7 @@ export function LandingExperience() {
                         A good market map is less about categorizing competitors and
                         more about exposing whitespace where new behavior is forming.
                       </p>
-                      <div className="rounded-md border-l-2 border-l-note px-3 py-2 bg-secondary">
+                      <div className="rounded-md border-l-2 border-l-note px-3 py-2 bg-secondary/60">
                         <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/60">
                           Note
                         </p>
@@ -180,7 +193,7 @@ export function LandingExperience() {
                     {["strategy", "positioning"].map((t) => (
                       <span
                         key={t}
-                        className="rounded-md px-2 py-0.5 text-xs bg-muted-foreground/10 text-muted-foreground"
+                        className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary font-medium"
                       >
                         {t}
                       </span>
@@ -212,13 +225,13 @@ export function LandingExperience() {
       </section>
 
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-8 py-16 sm:px-12 sm:py-20">
-          <div className="mb-10 flex items-end justify-between gap-8">
+        <div className="mx-auto max-w-6xl px-8 py-16 sm:px-12 sm:py-24">
+          <div className="mb-12 flex items-end justify-between gap-8">
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
                 What you get
               </p>
-              <h2 className="text-2xl sm:text-[1.75rem] font-extrabold tracking-[-0.02em]">
+              <h2 className="text-2xl sm:text-[1.75rem] font-extrabold tracking-[-0.02em] heading-font">
                 Everything a serious saver needs.
               </h2>
             </div>
@@ -229,16 +242,19 @@ export function LandingExperience() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ title, outcome, desc }) => (
+            {FEATURES.map(({ title, outcome, desc }, i) => (
               <div
                 key={title}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5"
+                className={`group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 animate-fade-in stagger-${i + 1}`}
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold">
-                    {title}
-                  </h3>
-                  <span className="rounded-md px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{FEATURE_ICONS[title]}</span>
+                    <h3 className="text-base font-bold heading-font">
+                      {title}
+                    </h3>
+                  </div>
+                  <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary">
                     {outcome}
                   </span>
                 </div>
@@ -255,7 +271,7 @@ export function LandingExperience() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2.5">
             <MarkMasterLogo width={28} height={28} className="shrink-0" />
-            <span className="text-sm font-semibold text-muted-foreground">
+            <span className="text-sm font-semibold text-muted-foreground heading-font">
               MarkMaster
             </span>
           </div>
