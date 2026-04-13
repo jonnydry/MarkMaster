@@ -3,8 +3,8 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkMasterLogo } from "@/components/markmaster-logo";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   AccessDenied:
@@ -26,7 +26,9 @@ function LoginContent() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm mx-auto px-6">
         <div className="text-center mb-8">
-          <Bookmark className="w-10 h-10 text-primary mx-auto mb-4" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <MarkMasterLogo width={48} height={48} priority />
+          </div>
           <h1 className="text-2xl font-bold mb-2">Welcome to MarkMaster</h1>
           <p className="text-muted-foreground">
             Sign in with your X account to get started
@@ -66,7 +68,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div role="status" aria-label="Loading" className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >

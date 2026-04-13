@@ -79,7 +79,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <div className="h-full pt-12 overflow-y-auto scrollbar-thin">
+        <div className="h-full min-h-0 pt-10 overflow-y-auto overscroll-contain scrollbar-thin">
           <Sidebar {...props} forceExpanded />
         </div>
       </div>

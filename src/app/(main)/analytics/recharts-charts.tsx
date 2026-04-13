@@ -30,8 +30,8 @@ const PIE_COLORS = [
 export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
   return (
     <div className="grid lg:grid-cols-2 gap-6">
-      <Card className="p-5">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
+      <Card className="p-4">
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-primary" />
           Top Authors
         </h2>
@@ -74,8 +74,8 @@ export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
         )}
       </Card>
 
-      <Card className="p-5">
-        <h2 className="font-semibold mb-4">Content Breakdown</h2>
+      <Card className="p-4">
+        <h2 className="font-semibold mb-3">Content Breakdown</h2>
         {analytics.mediaBreakdown.every((m) => m.count === 0) ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No data yet
@@ -113,8 +113,8 @@ export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
         )}
       </Card>
 
-      <Card className="p-5 lg:col-span-2">
-        <h2 className="font-semibold mb-4">Bookmarks Over Time</h2>
+      <Card className="p-4 lg:col-span-2">
+        <h2 className="font-semibold mb-3">Bookmarks Over Time</h2>
         {analytics.bookmarksByMonth.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No data yet
@@ -152,8 +152,8 @@ export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
       </Card>
 
       {analytics.tagDistribution.length > 0 && (
-        <Card className="p-5 lg:col-span-2">
-          <h2 className="font-semibold mb-4">Tag Distribution</h2>
+        <Card className="p-4 lg:col-span-2">
+          <h2 className="font-semibold mb-3">Tag Distribution</h2>
           <div className="flex flex-wrap gap-3">
             {analytics.tagDistribution.map((t) => (
               <div

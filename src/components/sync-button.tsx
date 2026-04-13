@@ -64,7 +64,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
   };
 
   return (
-    <div className="w-full shrink-0 rounded-xl border border-border/60 bg-card/35 p-3.5 backdrop-blur-md flex flex-col gap-3">
+    <div className="flex w-full shrink-0 flex-col gap-2.5 rounded-xl border border-border/60 bg-card p-3">
       <Button
         type="button"
         onClick={handleSync}

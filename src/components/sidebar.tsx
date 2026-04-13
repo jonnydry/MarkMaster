@@ -13,6 +13,7 @@ import {
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SyncButton } from "@/components/sync-button";
+import { MarkMasterLogo } from "@/components/markmaster-logo";
 
 interface SidebarProps {
   tags: TagWithCount[];
@@ -52,22 +53,19 @@ export function Sidebar({
 
   return (
     <aside
-      suppressHydrationWarning
-      className={`flex h-full shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar/70 py-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none dark:bg-sidebar/45 dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${
+      className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-sidebar-border/70 bg-sidebar py-3 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] transition-[width,padding] duration-300 ease-out motion-reduce:transition-none dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
       }`}
     >
       <Link
         href="/dashboard"
-        className={`group mb-6 flex items-center ${
+        className={`group mb-3 flex items-center ${
           expanded ? "h-10 gap-2.5 self-stretch rounded-xl px-2" : "h-10 w-10 justify-center"
         }`}
         title="MarkMaster"
       >
         <div className="flex items-center gap-2 rounded-lg bg-primary/10 p-1.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary">
-            <span className="text-xs font-bold text-primary-foreground">M</span>
-          </div>
+          <MarkMasterLogo width={28} height={28} className="shrink-0" priority />
           {expanded && (
             <span className="text-[15px] font-bold tracking-[-0.02em] text-sidebar-foreground">
               MarkMaster
@@ -89,7 +87,7 @@ export function Sidebar({
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              } ${expanded ? "h-9 gap-3 px-3" : "h-10 w-10 justify-center"}`}
+              } ${expanded ? "h-9 gap-3 px-3" : "h-9 w-9 justify-center"}`}
             >
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {expanded && <span className="text-sm font-medium">{label}</span>}
@@ -99,7 +97,8 @@ export function Sidebar({
       </nav>
 
       {expanded ? (
-        <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto scrollbar-thin">
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-y-contain scrollbar-thin">
+          <div className="space-y-4">
             <div>
               <div className="mb-2 flex items-center justify-between px-1">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -107,7 +106,9 @@ export function Sidebar({
                 </h3>
               </div>
               {tags.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">No tags yet</p>
+                <p className="px-1 text-xs text-muted-foreground">
+                  Tags appear as you add them to bookmarks
+                </p>
               ) : (
                 <div className="space-y-0.5">
                   {tags.slice(0, 8).map((tag) => (
@@ -115,7 +116,7 @@ export function Sidebar({
                       key={tag.id}
                       type="button"
                       onClick={() => onTagToggle(tag.id)}
-                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
                         selectedTags.includes(tag.id)
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
@@ -151,7 +152,9 @@ export function Sidebar({
                 </button>
               </div>
               {collections.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">No collections yet</p>
+                <p className="px-1 text-xs text-muted-foreground/70">
+                  Create a collection to start curating
+                </p>
               ) : (
                 <div className="space-y-0.5">
                   {collections.map((collection) => {
@@ -160,7 +163,7 @@ export function Sidebar({
                       <Link
                         key={collection.id}
                         href={`/collections/${collection.id}`}
-                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
                           isCollectionActive
                             ? "bg-sidebar-accent text-sidebar-accent-foreground"
                             : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
@@ -179,40 +182,45 @@ export function Sidebar({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="sticky bottom-0 z-[1] mt-4 space-y-2 border-t border-sidebar-border/50 bg-sidebar pt-3">
+            {showToggle && (
+              <button
+                type="button"
+                onClick={toggle}
+                aria-expanded={expanded}
+                aria-label="Collapse sidebar"
+                className="flex h-9 w-full shrink-0 items-center gap-3 px-3 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span className="text-xs">Collapse</span>
+              </button>
+            )}
+            <div className="w-full self-stretch">
+              <SyncButton
+                lastSyncAt={lastSyncAt ?? null}
+                onSyncComplete={onSyncComplete}
+                bookmarkCount={totalBookmarks}
+              />
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1" aria-hidden />
-      )}
-
-      {showToggle && (
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-          className={`mt-2 flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground ${
-            expanded ? "h-9 gap-3 px-3" : "mx-auto h-10 w-10 justify-center"
-          }`}
-        >
-          {expanded ? (
-            <>
-              <ChevronLeft className="h-4 w-4 shrink-0" />
-              <span className="text-xs">Collapse</span>
-            </>
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0" />
+        <>
+          <div className="min-h-0 flex-1" aria-hidden />
+          {showToggle && (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={expanded}
+              aria-label="Expand sidebar"
+              className="mx-auto mt-2 flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            </button>
           )}
-        </button>
-      )}
-
-      {expanded && (
-        <div className="mt-2 w-full shrink-0 self-stretch">
-          <SyncButton
-            lastSyncAt={lastSyncAt ?? null}
-            onSyncComplete={onSyncComplete}
-            bookmarkCount={totalBookmarks}
-          />
-        </div>
+        </>
       )}
     </aside>
   );

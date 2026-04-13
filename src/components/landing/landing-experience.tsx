@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkMasterLogo } from "@/components/markmaster-logo";
 
 const FEATURES = [
   {
@@ -43,11 +44,7 @@ export function LandingExperience() {
       <header className="sticky top-0 z-50 border-b border-border bg-background">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary">
-              <span className="text-base font-bold text-primary-foreground">
-                M
-              </span>
-            </div>
+            <MarkMasterLogo width={36} height={36} className="shrink-0" priority />
             <span className="text-[17px] font-bold tracking-[-0.02em]">
               MarkMaster
             </span>
@@ -71,7 +68,7 @@ export function LandingExperience() {
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
                 Your bookmark archive
               </p>
-              <h1 className="text-[2.75rem] font-extrabold leading-[1.06] tracking-[-0.03em]">
+              <h1 className="text-3xl sm:text-[2.75rem] font-extrabold leading-tight sm:leading-[1.06] tracking-tight sm:tracking-[-0.03em]">
                 Every save,
                 <br />
                 impossible to lose.
@@ -100,27 +97,23 @@ export function LandingExperience() {
 
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-xs font-bold text-primary-foreground">
-                  M
-                </span>
-              </div>
+              <MarkMasterLogo width={32} height={32} className="shrink-0" />
               <span className="text-sm font-semibold text-foreground">
                 MarkMaster
               </span>
               <div className="ml-auto flex gap-2">
-                <div className="h-7 w-20 rounded-lg bg-muted" />
+                <div className="h-7 w-20 rounded-lg bg-muted-foreground/10" />
                 <div className="h-7 w-20 rounded-lg bg-primary" />
               </div>
             </div>
 
             <div>
               <div className="flex gap-4 border-b border-border px-5 py-4">
-                <div className="size-10 shrink-0 rounded-full bg-secondary" />
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-sm font-semibold">
-                      Lenny Rachitsky
+<div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
+                 <div className="min-w-0 flex-1">
+                   <div className="mb-2 flex items-center gap-2">
+                     <span className="text-sm font-semibold">
+                       Lenny Rachitsky
                     </span>
                     <div className="flex size-4 items-center justify-center rounded-full bg-primary text-[6px] font-bold text-primary-foreground">
                       ✓
@@ -139,7 +132,7 @@ export function LandingExperience() {
                     {["copywriting", "product"].map((t) => (
                       <span
                         key={t}
-                        className="rounded-md px-2 py-0.5 text-[11px] bg-secondary text-muted-foreground"
+                        className="rounded-md px-2 py-0.5 text-xs bg-muted-foreground/10 text-muted-foreground"
                       >
                         {t}
                       </span>
@@ -154,8 +147,8 @@ export function LandingExperience() {
               </div>
 
               <div className="flex gap-4 border-b border-border px-5 py-4">
-                <div className="size-10 shrink-0 rounded-full bg-secondary" />
-                <div className="min-w-0 flex-1">
+<div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
+                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-sm font-semibold">
                       Packy McCormick
@@ -173,7 +166,7 @@ export function LandingExperience() {
                         more about exposing whitespace where new behavior is forming.
                       </p>
                       <div className="rounded-md border-l-2 border-l-note px-3 py-2 bg-secondary">
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">
+                        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/60">
                           Note
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -181,13 +174,13 @@ export function LandingExperience() {
                         </p>
                       </div>
                     </div>
-                    <div className="h-16 w-28 shrink-0 rounded-xl bg-muted" />
+                    <div className="h-16 w-28 shrink-0 rounded-xl bg-muted-foreground/10" />
                   </div>
                   <div className="flex gap-1.5">
                     {["strategy", "positioning"].map((t) => (
                       <span
                         key={t}
-                        className="rounded-md px-2 py-0.5 text-[11px] bg-secondary text-muted-foreground"
+                        className="rounded-md px-2 py-0.5 text-xs bg-muted-foreground/10 text-muted-foreground"
                       >
                         {t}
                       </span>
@@ -197,7 +190,7 @@ export function LandingExperience() {
               </div>
 
               <div className="flex gap-3 px-5 py-3">
-                <div className="size-8 shrink-0 rounded-full bg-secondary" />
+                <div className="size-8 shrink-0 rounded-full bg-muted-foreground/10" />
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-2">
                     <span className="text-xs font-semibold">
@@ -222,10 +215,10 @@ export function LandingExperience() {
         <div className="mx-auto max-w-6xl px-8 py-16 sm:px-12 sm:py-20">
           <div className="mb-10 flex items-end justify-between gap-8">
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 What you get
               </p>
-              <h2 className="text-[1.75rem] font-extrabold tracking-[-0.02em]">
+              <h2 className="text-2xl sm:text-[1.75rem] font-extrabold tracking-[-0.02em]">
                 Everything a serious saver needs.
               </h2>
             </div>
@@ -245,7 +238,7 @@ export function LandingExperience() {
                   <h3 className="text-base font-bold">
                     {title}
                   </h3>
-                  <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                  <span className="rounded-md px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">
                     {outcome}
                   </span>
                 </div>
@@ -261,11 +254,7 @@ export function LandingExperience() {
       <footer className="px-8 py-6 sm:px-12">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
-              <span className="text-xs font-bold text-primary-foreground">
-                M
-              </span>
-            </div>
+            <MarkMasterLogo width={28} height={28} className="shrink-0" />
             <span className="text-sm font-semibold text-muted-foreground">
               MarkMaster
             </span>

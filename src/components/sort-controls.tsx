@@ -1,5 +1,6 @@
 "use client";
 
+import { LayoutList, AlignJustify, Grid3x3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -9,6 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { SortField, ViewMode } from "@/types";
+
+const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] = [
+  { value: "feed", label: "Feed", icon: LayoutList },
+  { value: "compact", label: "Compact", icon: AlignJustify },
+  { value: "grid", label: "Grid", icon: Grid3x3 },
+];
 
 interface SortControlsProps {
   sortField: SortField;
@@ -42,20 +49,21 @@ export function SortControls({
         </SelectContent>
       </Select>
       <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-secondary">
-        {(["feed", "compact", "grid"] as ViewMode[]).map((mode) => (
+        {VIEW_MODES.map(({ value, label, icon: Icon }) => (
           <Button
-            key={mode}
-            variant={viewMode === mode ? "default" : "ghost"}
+            key={value}
+            variant={viewMode === value ? "default" : "ghost"}
             size="sm"
-            className={`h-7 px-2.5 text-xs ${
-              viewMode === mode
+            className={`h-8 px-2.5 text-xs ${
+              viewMode === value
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
-            title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} view`}
-            onClick={() => onViewModeChange(mode)}
+            title={`${label} view`}
+            onClick={() => onViewModeChange(value)}
           >
-            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            <Icon className="w-3.5 h-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">{label}</span>
           </Button>
         ))}
       </div>

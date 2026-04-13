@@ -167,7 +167,12 @@ export default function CollectionDetailPage({
   if (isPending) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="max-w-4xl mx-auto w-full px-6 space-y-4 animate-pulse">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+          <div className="h-20 bg-muted rounded" />
+        </div>
       </div>
     );
   }
@@ -189,7 +194,7 @@ export default function CollectionDetailPage({
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
+        <div className="max-w-4xl mx-auto px-5 h-12 flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -267,13 +272,13 @@ export default function CollectionDetailPage({
       </header>
 
       <main className="max-w-4xl mx-auto">
-        {collection.description && (
-          <p className="px-6 py-4 text-muted-foreground border-b border-border">
+{collection.description && (
+          <p className="px-5 py-2 text-muted-foreground">
             {collection.description}
           </p>
         )}
 
-        <div className="text-sm text-muted-foreground px-6 py-3 border-b border-border">
+        <div className="text-sm text-muted-foreground px-5 py-1.5">
           {sortedItems.length} bookmark
           {sortedItems.length !== 1 ? "s" : ""}
         </div>

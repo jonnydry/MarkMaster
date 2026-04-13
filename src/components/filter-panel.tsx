@@ -45,7 +45,7 @@ export function FilterPanel({
   hasActiveFilters,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-4 px-6 py-3 border-b border-border bg-card/50">
+    <div className="space-y-2.5 px-5 py-2.5 bg-muted/30">
       <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Filters
@@ -62,9 +62,9 @@ export function FilterPanel({
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <div>
-          <label className="text-xs text-muted-foreground mb-1.5 block">
+          <label className="text-xs text-muted-foreground mb-1 block">
             Content type
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -84,7 +84,7 @@ export function FilterPanel({
         </div>
 
         <div>
-          <label className="text-xs text-muted-foreground mb-1.5 block">
+          <label className="text-xs text-muted-foreground mb-1 block">
             Author
           </label>
           <Input
@@ -97,7 +97,7 @@ export function FilterPanel({
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">
+            <label className="text-xs text-muted-foreground mb-1 block">
               From
             </label>
             <Input
@@ -108,7 +108,7 @@ export function FilterPanel({
             />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">
+            <label className="text-xs text-muted-foreground mb-1 block">
               To
             </label>
             <Input
@@ -122,14 +122,14 @@ export function FilterPanel({
 
         {tags.length > 0 && (
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">
+            <label className="text-xs text-muted-foreground mb-1 block">
               Tags
             </label>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
                 <button
                   key={tag.id}
-                  className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                     selectedTags.includes(tag.id)
                       ? "bg-primary/10 text-primary"
                       : "bg-secondary text-muted-foreground hover:text-foreground"

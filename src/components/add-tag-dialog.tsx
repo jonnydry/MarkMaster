@@ -67,6 +67,7 @@ export function AddTagDialog({
               <label className="text-sm text-muted-foreground mb-2 block">
                 Existing tags
               </label>
+              <div className="max-h-40 overflow-y-auto">
               <div className="flex flex-wrap gap-1.5">
                 {existingTags.map((tag) => {
                   const isApplied = bookmarkTags.includes(tag.id);
@@ -89,6 +90,7 @@ export function AddTagDialog({
                   );
                 })}
               </div>
+            </div>
             </div>
           )}
           <div>

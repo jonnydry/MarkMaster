@@ -54,7 +54,7 @@ export function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search or type a command..."
-            className="border-0 p-0 h-auto text-sm focus:ring-0 focus:outline-none"
+            className="border-0 p-0 h-auto text-sm bg-transparent placeholder:text-muted-foreground/50 focus:ring-0 focus:outline-none"
             autoFocus
           />
           <kbd className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">

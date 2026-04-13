@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden md:block">
+      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -82,10 +82,10 @@ export default function AnalyticsPage() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="border-b border-border px-5 py-3 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <MobileSidebar
                 tags={tags}
                 collections={collections}
@@ -107,10 +107,14 @@ export default function AnalyticsPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 space-y-5">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="h-24 bg-muted rounded-lg animate-pulse" />
+                <div className="h-24 bg-muted rounded-lg animate-pulse" />
+                <div className="h-24 bg-muted rounded-lg animate-pulse" />
+              </div>
             </div>
           ) : isError || !analytics ? (
             <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
@@ -124,10 +128,10 @@ export default function AnalyticsPage() {
             </div>
           ) : (
             <>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <Card className="p-5">
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Card className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Bookmark className="w-5 h-5 text-primary" />
                     </div>
                     <div>
@@ -140,9 +144,9 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-5">
+                <Card className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Tag className="w-5 h-5 text-primary" />
                     </div>
                     <div>
@@ -151,9 +155,9 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-5">
+                <Card className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                       <FolderOpen className="w-5 h-5 text-primary" />
                     </div>
                     <div>

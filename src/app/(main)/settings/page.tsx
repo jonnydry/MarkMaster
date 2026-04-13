@@ -17,7 +17,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { Sidebar } from "@/components/sidebar";
 import { UserNav } from "@/components/user-nav";
@@ -107,7 +106,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden md:block">
+      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -123,10 +122,10 @@ export default function SettingsPage() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="border-b border-border px-5 py-3 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <MobileSidebar
                 tags={tags}
                 collections={collections}
@@ -145,7 +144,7 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 max-w-2xl space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 max-w-2xl space-y-4">
           {(tagsError || collectionsError) && (
             <Card className="p-5 border-destructive/30">
               <h2 className="font-semibold mb-2">Settings data could not be loaded</h2>
@@ -168,8 +167,8 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          <Card className="p-5">
-            <h2 className="font-semibold mb-4">Appearance</h2>
+          <Card className="p-4">
+            <h2 className="font-semibold mb-3">Appearance</h2>
             <div className="flex items-center justify-between">
               <div>
                 <Label>Theme</Label>
@@ -188,8 +187,8 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          <Card className="p-5">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
+          <Card className="p-4">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Tag className="w-4 h-4" />
               Manage Tags
             </h2>
@@ -273,8 +272,8 @@ export default function SettingsPage() {
             )}
           </Card>
 
-          <Card className="p-5">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
+          <Card className="p-4">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Download className="w-4 h-4" />
               Export
             </h2>
@@ -291,10 +290,8 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          <Separator />
-
           <Card className="p-5 border-destructive/30">
-            <h2 className="font-semibold mb-4 text-destructive">Danger Zone</h2>
+            <h2 className="font-semibold mb-3 text-destructive">Danger Zone</h2>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Sign out</p>

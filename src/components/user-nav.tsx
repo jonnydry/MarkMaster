@@ -9,7 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "@/components/providers";
+import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 
 interface UserNavProps {
@@ -21,20 +23,26 @@ export function UserNav({ user }: UserNavProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="outline-none flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 hover:bg-muted transition-colors">
-        <div className="flex flex-col items-end gap-px">
-          <span className="text-sm text-foreground leading-tight">
-            {user.displayName}
-          </span>
-          <span className="text-xs text-muted-foreground leading-tight">
-            X connected
-          </span>
-        </div>
-        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
-          <span className="text-xs font-bold text-primary-foreground">
+      <DropdownMenuTrigger
+        className={cn(
+          "outline-none inline-flex h-8 max-w-[11rem] items-center gap-2 rounded-lg bg-secondary pl-2 pr-1",
+          "text-left text-xs font-medium text-foreground transition-colors",
+          "hover:bg-secondary/80 dark:hover:bg-secondary/60",
+          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{user.displayName}</span>
+        <Avatar className="size-6 shrink-0">
+          {user.profileImageUrl ? (
+            <AvatarImage
+              src={user.profileImageUrl}
+              alt={`${user.displayName} profile picture`}
+            />
+          ) : null}
+          <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
             {user.displayName.charAt(0).toUpperCase()}
-          </span>
-        </div>
+          </AvatarFallback>
+        </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5">

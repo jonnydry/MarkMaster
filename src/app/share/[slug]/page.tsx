@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { Bookmark, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { MarkMasterLogo } from "@/components/markmaster-logo";
 
 const getPublicCollection = cache(async (slug: string) => {
   return prisma.collection.findFirst({
@@ -91,9 +92,7 @@ export default async function PublicSharePage({
       <header className="border-b border-border">
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Bookmark className="w-3.5 h-3.5 text-primary-foreground" />
-            </div>
+            <MarkMasterLogo width={28} height={28} className="shrink-0" />
             <span className="font-bold tracking-tight">MarkMaster</span>
           </Link>
           <Link href="/login">

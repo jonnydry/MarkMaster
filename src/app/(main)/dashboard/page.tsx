@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CheckSquare, Tag, FolderPlus, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal, Search } from "lucide-react";
+import { Search, CheckSquare, Tag, FolderPlus, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sidebar } from "@/components/sidebar";
@@ -293,7 +293,7 @@ function DashboardContent() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background max-w-[100vw]">
-      <div className="hidden md:block shrink-0">
+      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -306,9 +306,9 @@ function DashboardContent() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-border shrink-0">
-          <div className="flex items-center gap-3 px-6 py-4">
+          <div className="flex items-center gap-3 px-5 py-3">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -348,7 +348,7 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 px-6 pb-3">
+          <div className="flex flex-wrap items-center gap-1.5 px-5 pb-2">
             <button
               onClick={() => {
                 filters.setSelectedTags([]);
@@ -415,10 +415,10 @@ function DashboardContent() {
           </div>
 
           {(isFetching || filters.isSearchPending) && !isLoading && (
-            <p className="px-6 pb-2 text-xs text-muted-foreground">Updating results...</p>
+            <p className="px-5 pb-2 text-xs text-muted-foreground">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-2.5 border-t border-border bg-secondary/50">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-secondary/50">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-foreground">
                   {visibleSelectedBookmarkIds.length > 0
@@ -488,11 +488,11 @@ function DashboardContent() {
           />
         )}
 
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
           {isLoading ? (
             <div className="max-w-2xl mx-auto space-y-0">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="px-6 py-4 border-b border-border animate-pulse">
+                <div key={i} className="px-5 py-3 border-b border-border animate-pulse">
                   <div className="flex gap-4">
                     <div className="w-[44px] h-[44px] rounded-full bg-muted shrink-0" />
                     <div className="flex-1 space-y-2">
@@ -522,6 +522,7 @@ function DashboardContent() {
           ) : bookmarks.length === 0 ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
+                <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-lg font-medium mb-2">No bookmarks found</p>
                 <p className="text-sm text-muted-foreground">
                   {filters.search || filters.hasActiveFilters
@@ -531,7 +532,7 @@ function DashboardContent() {
               </div>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
               {bookmarks.map((bookmark) => (
                 <BookmarkCard
                   key={bookmark.id}
@@ -701,7 +702,7 @@ export default function DashboardPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center h-screen">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div role="status" aria-label="Loading" className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >

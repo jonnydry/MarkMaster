@@ -69,7 +69,7 @@ export default function CollectionsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden md:block">
+      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -85,10 +85,10 @@ export default function CollectionsPage() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border px-6 py-4 shrink-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="border-b border-border px-5 py-3 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <MobileSidebar
                 tags={tags}
                 collections={collections}
@@ -113,10 +113,12 @@ export default function CollectionsPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-36 bg-muted rounded-lg animate-pulse" />
+              ))}
             </div>
           ) : isError ? (
             <div className="flex flex-col items-center justify-center h-64 text-center gap-3">
@@ -141,13 +143,13 @@ export default function CollectionsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {collections.map((col) => (
                 <Card
                   key={col.id}
-                  className="p-5 hover:border-primary/30 transition-colors group"
+                  className="p-4 hover:border-primary/30 transition-colors group"
                 >
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FolderOpen className="w-5 h-5 text-primary" />
                       <Link
