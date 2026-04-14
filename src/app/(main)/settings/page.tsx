@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNav } from "@/components/user-nav";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";

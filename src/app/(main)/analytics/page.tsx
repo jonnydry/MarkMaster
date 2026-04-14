@@ -9,7 +9,7 @@ import { Bookmark, Tag, FolderOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNav } from "@/components/user-nav";
 import type {
   AnalyticsData,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar-dynamic";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 
 interface MobileSidebarProps {
@@ -79,7 +79,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <div className="h-full min-h-0 pt-10 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden pt-10">
           <Sidebar {...props} forceExpanded />
         </div>
       </div>

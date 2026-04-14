@@ -15,7 +15,7 @@ import { useSidebar } from "@/components/sidebar-provider";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 
-interface SidebarProps {
+export interface SidebarProps {
   tags: TagWithCount[];
   collections: CollectionWithCount[];
   selectedTags: string[];
@@ -96,98 +96,101 @@ export function Sidebar({
       </nav>
 
       {expanded ? (
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-y-contain scrollbar-thin">
-          <div className="space-y-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Tags
-                </h3>
-              </div>
-              {tags.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">
-                  Tags appear as you add them to bookmarks
-                </p>
-              ) : (
-                <div className="space-y-0.5">
-                  {tags.slice(0, 8).map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => onTagToggle(tag.id)}
-                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 ${
-                        selectedTags.includes(tag.id)
-                          ? "bg-primary/10 text-foreground font-medium"
-                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full transition-all ${
-                            selectedTags.includes(tag.id)
-                              ? "ring-2 ring-primary/30 scale-110"
-                              : ""
-                          }`}
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        <span className="truncate">{tag.name}</span>
-                      </span>
-                      <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                        {tag._count.bookmarks}
-                      </span>
-                    </button>
-                  ))}
+        <>
+          {/* Scroll only tags/collections; footer stays fixed so flex+sticky cannot inflate scroll height / overscroll. */}
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-y-contain scrollbar-thin">
+            <div className="space-y-4 pb-1">
+              <div>
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Tags
+                  </h3>
                 </div>
-              )}
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Collections
-                </h3>
-                <button
-                  type="button"
-                  onClick={onCreateCollection}
-                  className="flex h-5 w-5 items-center justify-center rounded-md text-sm leading-none text-muted-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
-                >
-                  +
-                </button>
-              </div>
-              {collections.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground/70">
-                  Create a collection to start curating
-                </p>
-              ) : (
-                <div className="space-y-0.5">
-                  {collections.map((collection) => {
-                    const isCollectionActive = pathname === `/collections/${collection.id}`;
-                    return (
-                      <Link
-                        key={collection.id}
-                        href={`/collections/${collection.id}`}
-                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
-                          isCollectionActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                {tags.length === 0 ? (
+                  <p className="px-1 text-xs text-muted-foreground">
+                    Tags appear as you add them to bookmarks
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {tags.slice(0, 8).map((tag) => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => onTagToggle(tag.id)}
+                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 ${
+                          selectedTags.includes(tag.id)
+                            ? "bg-primary/10 text-foreground font-medium"
                             : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                         }`}
                       >
                         <span className="flex min-w-0 items-center gap-2">
-                          <FolderOpen className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{collection.name}</span>
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full transition-all ${
+                              selectedTags.includes(tag.id)
+                                ? "ring-2 ring-primary/30 scale-110"
+                                : ""
+                            }`}
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span className="truncate">{tag.name}</span>
                         </span>
                         <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                          {collection._count.items}
+                          {tag._count.bookmarks}
                         </span>
-                      </Link>
-                    );
-                  })}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Collections
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={onCreateCollection}
+                    className="flex h-5 w-5 items-center justify-center rounded-md text-sm leading-none text-muted-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
+                  >
+                    +
+                  </button>
                 </div>
-              )}
+                {collections.length === 0 ? (
+                  <p className="px-1 text-xs text-muted-foreground/70">
+                    Create a collection to start curating
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {collections.map((collection) => {
+                      const isCollectionActive = pathname === `/collections/${collection.id}`;
+                      return (
+                        <Link
+                          key={collection.id}
+                          href={`/collections/${collection.id}`}
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                            isCollectionActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <FolderOpen className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{collection.name}</span>
+                          </span>
+                          <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                            {collection._count.items}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="sticky bottom-0 z-[1] mt-4 space-y-2 border-t border-sidebar-border/50 bg-sidebar pt-3">
+          <div className="mt-auto shrink-0 space-y-2 border-t border-sidebar-border/50 bg-sidebar pt-3">
             {showToggle && (
               <button
                 type="button"
@@ -208,7 +211,7 @@ export function Sidebar({
               />
             </div>
           </div>
-        </div>
+        </>
       ) : (
         <>
           <div className="min-h-0 flex-1" aria-hidden />

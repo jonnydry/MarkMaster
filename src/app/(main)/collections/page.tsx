@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";

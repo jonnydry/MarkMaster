@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { Search, CheckSquare, Tag, FolderPlus, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sidebar } from "@/components/sidebar";
+import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
