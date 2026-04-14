@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -52,9 +53,19 @@ export function useSidebar() {
 }
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [expanded, setExpandedState] = useState(readStoredExpanded);
+  // Fixed initial value so server HTML matches the client's first paint; then sync from localStorage.
+  const [expanded, setExpandedState] = useState(true);
+  const skipFirstPersist = useRef(true);
 
   useEffect(() => {
+    setExpandedState(readStoredExpanded());
+  }, []);
+
+  useEffect(() => {
+    if (skipFirstPersist.current) {
+      skipFirstPersist.current = false;
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, String(expanded));
     } catch {

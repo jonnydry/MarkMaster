@@ -57,12 +57,13 @@ export function Sidebar({
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
       }`}
     >
-      <Link
-        href="/dashboard"
-        className={`group mb-3 flex items-center ${
-          expanded ? "h-10 gap-2.5 self-stretch rounded-xl px-2" : "h-10 w-10 justify-center"
+      <button
+        type="button"
+        onClick={showToggle ? toggle : undefined}
+        className={`group mb-3 flex items-center rounded-xl transition-colors hover:bg-sidebar-accent ${
+          expanded ? "h-10 gap-2.5 self-stretch px-2" : "h-10 w-10 justify-center"
         }`}
-        title="MarkMaster"
+        title={expanded ? "Collapse sidebar" : "MarkMaster"}
       >
         <MarkMasterLogo width={28} height={28} className="shrink-0" priority />
         {expanded && (
@@ -70,7 +71,7 @@ export function Sidebar({
             MarkMaster
           </span>
         )}
-      </Link>
+      </button>
 
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
@@ -81,11 +82,11 @@ export function Sidebar({
               key={href}
               href={href}
               title={label}
-className={`flex items-center rounded-lg transition-all duration-150 ${
-                  isActive
-                    ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
-                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                }${expanded ? " h-9 gap-3" : " h-9 w-9 justify-center"}`}
+              className={`flex items-center rounded-lg transition-all duration-150 ${
+                isActive
+                  ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              }${expanded ? " h-9 gap-3" : " h-9 w-9 justify-center"}`}
             >
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {expanded && <span className="text-sm font-medium">{label}</span>}
@@ -114,15 +115,19 @@ className={`flex items-center rounded-lg transition-all duration-150 ${
                       key={tag.id}
                       type="button"
                       onClick={() => onTagToggle(tag.id)}
-                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                      className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 ${
                         selectedTags.includes(tag.id)
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-primary/10 text-foreground font-medium"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                       }`}
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <span
-                          className="h-2 w-2 shrink-0 rounded-full"
+                          className={`h-2 w-2 shrink-0 rounded-full transition-all ${
+                            selectedTags.includes(tag.id)
+                              ? "ring-2 ring-primary/30 scale-110"
+                              : ""
+                          }`}
                           style={{ backgroundColor: tag.color }}
                         />
                         <span className="truncate">{tag.name}</span>

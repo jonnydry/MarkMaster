@@ -11,6 +11,16 @@ import {
 const X_FOLDER_COLLECTION_SOURCE = "x-bookmark-folder";
 const X_FOLDER_COLLECTION_DESCRIPTION = "Synced from your X bookmark folder.";
 
+/** Max pages to fetch per sync run (0 = unlimited). Keep low to limit API spend. */
+const MAX_PAGES_PER_SYNC = 10;
+
+/** Delay in ms between API pages to stay under X rate limits (~180 req/15min). */
+const PAGE_THROTTLE_MS = 5_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export interface SyncResult {
   newBookmarks: number;
   updatedBookmarks: number;
@@ -18,6 +28,8 @@ export interface SyncResult {
   hitExisting: boolean;
   rateLimited: boolean;
   rateLimitResetsAt?: Date;
+  pagesFetched: number;
+  resumeToken?: string;
 }
 
 function buildBookmarkUpdateData(data: BookmarkData) {
@@ -143,7 +155,7 @@ async function syncFolderCollection(
   }
 }
 
-export async function syncBookmarks(userId: string): Promise<SyncResult> {
+export async function syncBookmarks(userId: string, resumeToken?: string): Promise<SyncResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { xId: true },
@@ -156,6 +168,7 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
     totalFetched: 0,
     hitExisting: false,
     rateLimited: false,
+    pagesFetched: 0,
   };
 
   const hiddenTweetIds = new Set(
@@ -178,7 +191,8 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
 
   const syncedTweetIds = new Set<string>();
 
-  let paginationToken: string | undefined;
+  let paginationToken: string | undefined = resumeToken;
+  let pagesFetched = resumeToken ? 0 : 0;
 
   try {
     do {
@@ -187,6 +201,9 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
         user.xId,
         paginationToken
       );
+
+      result.pagesFetched++;
+      pagesFetched++;
 
       const pageData: {
         tweetId: string;
@@ -279,111 +296,126 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
       }
 
       paginationToken = page.nextToken;
+
+      // If we've hit the page cap and there are more pages, save the resume token
+      if (MAX_PAGES_PER_SYNC > 0 && pagesFetched >= MAX_PAGES_PER_SYNC && paginationToken) {
+        result.resumeToken = paginationToken;
+        break;
+      }
+
+      // Throttle between pages to stay under rate limits
+      if (paginationToken && PAGE_THROTTLE_MS > 0) {
+        await sleep(PAGE_THROTTLE_MS);
+      }
     } while (paginationToken);
 
-    const { folders } = await fetchBookmarkFolders(
-      userId,
-      user.xId
-    );
-
-    for (const folder of folders) {
-      const page = await fetchBookmarksByFolder(
+    // Only sync folders if we're not resuming mid-way (folders are edge-cased
+    // for the initial full sync to avoid extra API calls during pagination)
+    if (!resumeToken) {
+      const { folders } = await fetchBookmarkFolders(
         userId,
-        user.xId,
-        folder.id
+        user.xId
       );
 
-      const folderTweetIds: string[] = [];
-      const seenFolderTweetIds = new Set<string>();
-      const folderNewBookmarks: { tweetId: string; data: BookmarkData }[] = [];
-      const folderUpdateBookmarks: { tweetId: string; data: BookmarkData }[] = [];
+      for (const folder of folders) {
+        const page = await fetchBookmarksByFolder(
+          userId,
+          user.xId,
+          folder.id
+        );
 
-      for (const bookmark of page.bookmarks) {
-        const tweetId = bookmark.tweet.id;
+        const folderTweetIds: string[] = [];
+        const seenFolderTweetIds = new Set<string>();
+        const folderNewBookmarks: { tweetId: string; data: BookmarkData }[] = [];
+        const folderUpdateBookmarks: { tweetId: string; data: BookmarkData }[] = [];
 
-        if (hiddenTweetIds.has(tweetId) || seenFolderTweetIds.has(tweetId)) {
-          continue;
-        }
+        for (const bookmark of page.bookmarks) {
+          const tweetId = bookmark.tweet.id;
 
-        seenFolderTweetIds.add(tweetId);
-        folderTweetIds.push(tweetId);
-
-        if (syncedTweetIds.has(tweetId) || existingTweetIds.has(tweetId)) {
-          if (!syncedTweetIds.has(tweetId) && existingTweetIds.has(tweetId)) {
-            folderUpdateBookmarks.push({ tweetId, data: bookmark });
+          if (hiddenTweetIds.has(tweetId) || seenFolderTweetIds.has(tweetId)) {
+            continue;
           }
-          continue;
+
+          seenFolderTweetIds.add(tweetId);
+          folderTweetIds.push(tweetId);
+
+          if (syncedTweetIds.has(tweetId) || existingTweetIds.has(tweetId)) {
+            if (!syncedTweetIds.has(tweetId) && existingTweetIds.has(tweetId)) {
+              folderUpdateBookmarks.push({ tweetId, data: bookmark });
+            }
+            continue;
+          }
+
+          syncedTweetIds.add(tweetId);
+
+          if (existingTweetIds.has(tweetId)) {
+            folderUpdateBookmarks.push({ tweetId, data: bookmark });
+          } else {
+            folderNewBookmarks.push({ tweetId, data: bookmark });
+            existingTweetIds.add(tweetId);
+          }
         }
 
-        syncedTweetIds.add(tweetId);
-
-        if (existingTweetIds.has(tweetId)) {
-          folderUpdateBookmarks.push({ tweetId, data: bookmark });
-        } else {
-          folderNewBookmarks.push({ tweetId, data: bookmark });
-          existingTweetIds.add(tweetId);
-        }
-      }
-
-      if (folderNewBookmarks.length > 0) {
-        await prisma.bookmark.createMany({
-          data: folderNewBookmarks.map((entry) => ({
-            userId,
-            tweetId: entry.data.tweet.id,
-            authorId: entry.data.author.id,
-            authorUsername: entry.data.author.username,
-            authorDisplayName: entry.data.author.name,
-            authorProfileImage: entry.data.author.profile_image_url || null,
-            authorVerified: entry.data.author.verified || false,
-            tweetText: entry.data.tweet.text,
-            publicMetrics: entry.data.tweet.public_metrics ?? Prisma.JsonNull,
-            media:
-              entry.data.media.length > 0
-                ? entry.data.media.map((m) => ({
-                    type: m.type,
-                    url: m.url || m.preview_image_url,
-                    preview_image_url: m.preview_image_url,
-                    width: m.width,
-                    height: m.height,
-                  }))
+        if (folderNewBookmarks.length > 0) {
+          await prisma.bookmark.createMany({
+            data: folderNewBookmarks.map((entry) => ({
+              userId,
+              tweetId: entry.data.tweet.id,
+              authorId: entry.data.author.id,
+              authorUsername: entry.data.author.username,
+              authorDisplayName: entry.data.author.name,
+              authorProfileImage: entry.data.author.profile_image_url || null,
+              authorVerified: entry.data.author.verified || false,
+              tweetText: entry.data.tweet.text,
+              publicMetrics: entry.data.tweet.public_metrics ?? Prisma.JsonNull,
+              media:
+                entry.data.media.length > 0
+                  ? entry.data.media.map((m) => ({
+                      type: m.type,
+                      url: m.url || m.preview_image_url,
+                      preview_image_url: m.preview_image_url,
+                      width: m.width,
+                      height: m.height,
+                    }))
+                  : Prisma.JsonNull,
+              urls: entry.data.tweet.entities?.urls ?? Prisma.JsonNull,
+              quotedTweet: entry.data.quotedTweet
+                ? {
+                    id: entry.data.quotedTweet.id,
+                    text: entry.data.quotedTweet.text,
+                    author: entry.data.quotedTweet.author
+                      ? {
+                          name: entry.data.quotedTweet.author.name,
+                          username: entry.data.quotedTweet.author.username,
+                          profile_image_url:
+                            entry.data.quotedTweet.author.profile_image_url,
+                        }
+                      : null,
+                  }
                 : Prisma.JsonNull,
-            urls: entry.data.tweet.entities?.urls ?? Prisma.JsonNull,
-            quotedTweet: entry.data.quotedTweet
-              ? {
-                  id: entry.data.quotedTweet.id,
-                  text: entry.data.quotedTweet.text,
-                  author: entry.data.quotedTweet.author
-                    ? {
-                        name: entry.data.quotedTweet.author.name,
-                        username: entry.data.quotedTweet.author.username,
-                        profile_image_url:
-                          entry.data.quotedTweet.author.profile_image_url,
-                      }
-                    : null,
-                }
-              : Prisma.JsonNull,
-            tweetCreatedAt: new Date(entry.data.tweet.created_at),
-            syncedAt: new Date(),
-          })),
-          skipDuplicates: true,
-        });
-        result.newBookmarks += folderNewBookmarks.length;
-        result.totalFetched += folderNewBookmarks.length;
-      }
-
-      const folderUpdateResults = await Promise.all(
-        folderUpdateBookmarks.map((entry) => {
-          const bookmarkData = buildBookmarkUpdateData(entry.data);
-          return prisma.bookmark.updateMany({
-            where: { userId, tweetId: entry.tweetId },
-            data: bookmarkData,
+              tweetCreatedAt: new Date(entry.data.tweet.created_at),
+              syncedAt: new Date(),
+            })),
+            skipDuplicates: true,
           });
-        })
-      );
-      result.updatedBookmarks += folderUpdateResults.reduce((sum, r) => sum + r.count, 0);
-      result.totalFetched += folderUpdateBookmarks.length;
+          result.newBookmarks += folderNewBookmarks.length;
+          result.totalFetched += folderNewBookmarks.length;
+        }
 
-      await syncFolderCollection(userId, folder, folderTweetIds);
+        const folderUpdateResults = await Promise.all(
+          folderUpdateBookmarks.map((entry) => {
+            const bookmarkData = buildBookmarkUpdateData(entry.data);
+            return prisma.bookmark.updateMany({
+              where: { userId, tweetId: entry.tweetId },
+              data: bookmarkData,
+            });
+          })
+        );
+        result.updatedBookmarks += folderUpdateResults.reduce((sum, r) => sum + r.count, 0);
+        result.totalFetched += folderUpdateBookmarks.length;
+
+        await syncFolderCollection(userId, folder, folderTweetIds);
+      }
     }
   } catch (error) {
     if (error instanceof RateLimitError) {
@@ -394,7 +426,14 @@ export async function syncBookmarks(userId: string): Promise<SyncResult> {
     }
   }
 
-  if (!result.rateLimited) {
+  // Only update lastSyncAt if we completed without rate-limiting and have no remaining pages
+  if (!result.rateLimited && !result.resumeToken) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastSyncAt: new Date() },
+    });
+  } else if (!result.rateLimited && result.resumeToken) {
+    // Partial sync completed — update lastSyncAt so the next sync knows we got something
     await prisma.user.update({
       where: { id: userId },
       data: { lastSyncAt: new Date() },

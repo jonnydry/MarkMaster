@@ -308,7 +308,7 @@ function DashboardContent() {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-border/70 bg-gradient-to-b from-card to-background shrink-0">
-          <div className="flex items-center gap-3 px-5 py-3">
+          <div className="flex items-center gap-2 px-5 py-2">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -321,20 +321,73 @@ function DashboardContent() {
                 onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
             </div>
-            <div className="relative flex-1 min-w-0 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
-              <Input
-                ref={searchInputRef}
-                value={filters.search}
-                onChange={(e) => filters.setSearch(e.target.value)}
-                placeholder="Search bookmarks, authors, notes..."
-                className="pl-10 pr-12 h-9 w-full text-sm bg-card border-border rounded-lg focus:ring-1 focus:ring-primary"
-              />
-              {!filters.search && (
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
-                  ⌘K
-                </kbd>
+
+            <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+              <button
+                onClick={() => {
+                  filters.setSelectedTags([]);
+                  filters.setMediaFilter("all");
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
+              >
+                All Bookmarks
+                <span className="text-xs opacity-70">{total.toLocaleString()}</span>
+              </button>
+              {filters.selectedTags.map((tagId) => {
+                const tag = tags.find((t) => t.id === tagId);
+                return tag ? (
+                  <button
+                    key={tagId}
+                    onClick={() => filters.toggleTag(tagId)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
+                  >
+                    #{tag.name}
+                    <span className="text-primary/60 hover:text-primary ml-0.5" aria-hidden>×</span>
+                  </button>
+                ) : null;
+              })}
+              {filters.mediaFilter !== "all" && (
+                <button
+                  onClick={() => filters.setMediaFilter("all")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
+                >
+                  {mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter}
+                  <span className="text-primary/60 hover:text-primary ml-0.5" aria-hidden>×</span>
+                </button>
               )}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  showFilters
+                    ? "bg-secondary text-foreground border-border"
+                    : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Filters</span>
+                {filters.hasActiveFilters && (
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (selectionMode) {
+                    clearSelection();
+                  } else {
+                    setSelectionMode(true);
+                  }
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  selectionMode
+                    ? "bg-secondary text-foreground border-border"
+                    : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                }`}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">
+                  {selectionMode ? "Done" : "Select"}
+                </span>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 shrink-0 ml-auto">
@@ -348,74 +401,8 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 px-5 pb-2">
-            <button
-              onClick={() => {
-                filters.setSelectedTags([]);
-                filters.setMediaFilter("all");
-              }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
-            >
-              All Bookmarks
-              <span className="text-xs opacity-70">{total.toLocaleString()}</span>
-            </button>
-            {filters.selectedTags.map((tagId) => {
-              const tag = tags.find((t) => t.id === tagId);
-              return tag ? (
-                <button
-                  key={tagId}
-                  onClick={() => filters.toggleTag(tagId)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted-foreground bg-secondary hover:text-foreground transition-colors border border-border"
-                >
-                  #{tag.name}
-                </button>
-              ) : null;
-            })}
-            {filters.mediaFilter !== "all" && (
-              <button
-                onClick={() => filters.setMediaFilter("all")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted-foreground bg-secondary hover:text-foreground transition-colors border border-border"
-              >
-                {mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter}
-              </button>
-            )}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                showFilters
-                  ? "bg-secondary text-foreground border-border"
-                  : "text-muted-foreground bg-secondary hover:text-foreground border-border"
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Filters</span>
-              {filters.hasActiveFilters && (
-                <span className="w-2 h-2 rounded-full bg-primary" />
-              )}
-            </button>
-            <button
-              onClick={() => {
-                if (selectionMode) {
-                  clearSelection();
-                } else {
-                  setSelectionMode(true);
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
-                selectionMode
-                  ? "bg-secondary text-foreground border-border"
-                  : "text-muted-foreground bg-secondary hover:text-foreground border-border"
-              }`}
-            >
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {selectionMode ? "Done" : "Select"}
-              </span>
-            </button>
-          </div>
-
           {(isFetching || filters.isSearchPending) && !isLoading && (
-            <p className="px-5 pb-2 text-xs text-muted-foreground">Updating results...</p>
+            <p className="px-5 pb-1.5 text-xs text-muted-foreground">Updating results...</p>
           )}
           {selectionMode && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-secondary/50">
@@ -489,19 +476,41 @@ function DashboardContent() {
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+          <div className="sticky top-0 z-10 px-5 pt-3 pb-2">
+            <div className="max-w-2xl mx-auto">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={searchInputRef}
+                  value={filters.search}
+                  onChange={(e) => filters.setSearch(e.target.value)}
+                  placeholder="Search bookmarks, authors, notes..."
+                  className="pl-10 pr-12 h-10 w-full text-sm bg-card/80 backdrop-blur-lg border-border rounded-xl shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+                {!filters.search && (
+                  <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
+                    ⌘K
+                  </kbd>
+                )}
+              </div>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="max-w-2xl mx-auto space-y-0">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="px-5 py-3 border-b border-border animate-pulse">
+                <div key={i} className="px-5 py-3 border-b border-border animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
                   <div className="flex gap-4">
-                    <div className="w-[44px] h-[44px] rounded-full bg-muted shrink-0" />
-                    <div className="flex-1 space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+                    <div className="flex-1 space-y-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="h-4 w-24 bg-muted rounded" />
-                        <div className="h-3 w-16 bg-muted rounded" />
+                        <div className="h-3.5 w-20 bg-muted rounded" />
+                        <div className="h-3 w-14 bg-muted rounded" />
                       </div>
-                      <div className="h-3 w-full bg-muted rounded" />
-                      <div className="h-3 w-3/4 bg-muted rounded" />
+                      <div className="space-y-1.5">
+                        <div className="h-3 w-full bg-muted rounded" />
+                        <div className="h-3 w-4/5 bg-muted rounded" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -521,9 +530,9 @@ function DashboardContent() {
             </div>
           ) : bookmarks.length === 0 ? (
             <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium mb-2">No bookmarks found</p>
+              <div className="text-center animate-fade-in">
+                <Bookmark className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
+                <p className="text-lg font-medium heading-font mb-2">No bookmarks found</p>
                 <p className="text-sm text-muted-foreground">
                   {filters.search || filters.hasActiveFilters
                     ? "Try adjusting your filters or search query"
@@ -604,26 +613,32 @@ function DashboardContent() {
           )}
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 py-4 border-t border-border">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={filters.page <= 1}
-                onClick={() => filters.setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {filters.page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={filters.page >= totalPages}
-                onClick={() => filters.setPage((p) => p + 1)}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+            <div className="flex flex-col items-center gap-3 py-4 border-t border-border">
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => filters.setPage((p) => p - 1)}
+                  disabled={filters.page <= 1}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {filters.page} <span className="text-muted-foreground/50">of</span> {totalPages}
+                </span>
+                <button
+                  onClick={() => filters.setPage((p) => p + 1)}
+                  disabled={filters.page >= totalPages}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="w-24 h-1 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary/40 rounded-full transition-all duration-300"
+                  style={{ width: `${((filters.page - 1) / Math.max(totalPages - 1, 1)) * 100}%` }}
+                />
+              </div>
             </div>
           )}
         </div>

@@ -113,6 +113,8 @@ export interface SyncRunSummary {
   rateLimited: boolean;
   rateLimitResetsAt: string | null;
   errorMessage: string | null;
+  pagesFetched: number;
+  resumeToken: string | null;
   startedAt: string;
   completedAt: string | null;
 }

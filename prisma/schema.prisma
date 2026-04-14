@@ -154,6 +154,8 @@ model SyncRun {
   rateLimited       Boolean       @default(false)
   rateLimitResetsAt DateTime?
   errorMessage      String?
+  pagesFetched      Int           @default(0)
+  resumeToken       String?
   startedAt         DateTime      @default(now())
   completedAt       DateTime?
 

@@ -18,11 +18,12 @@ interface SyncButtonProps {
 
 export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
-  const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<SyncStatusResponse>({
-    queryKey: ["sync-status"],
-    queryFn: () => fetchJson("/api/bookmarks/sync"),
-    refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
-  });
+  const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
+    useQuery<SyncStatusResponse>({
+      queryKey: ["sync-status"],
+      queryFn: () => fetchJson("/api/bookmarks/sync"),
+      refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
+    });
 
   const currentRun = syncStatus?.currentRun;
   const latestRun = syncStatus?.recentRuns[0] ?? null;
@@ -57,19 +58,25 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
       void refetchSyncStatus();
       onSyncComplete?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to sync bookmarks");
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Failed to sync bookmarks";
+      toast.error(message || "Failed to sync bookmarks");
     } finally {
       setSyncing(false);
     }
   };
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-2.5 rounded-xl border border-border/60 bg-card p-3">
+    <div className="flex w-full shrink-0 flex-col gap-1.5 px-1">
       <Button
         type="button"
         onClick={handleSync}
         disabled={isAnySyncRunning}
-        className="h-9 w-full gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        className="h-8 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
         <RefreshCw
           className={`h-3.5 w-3.5 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
@@ -77,15 +84,22 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
         {isAnySyncRunning ? "Syncing..." : "Sync"}
       </Button>
 
-      {statusCopy ? (
-        <div className="flex items-start gap-2">
+      {syncStatusError ? (
+        <div className="flex items-center gap-1.5 px-0.5">
+          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+          <span className="min-w-0 text-[11px] leading-snug text-destructive truncate">
+            Could not load sync status
+          </span>
+        </div>
+      ) : statusCopy ? (
+        <div className="flex items-center gap-1.5 px-0.5">
           <div
-            className={`mt-0.5 h-[5px] w-[5px] shrink-0 rounded-full ${statusCopy.dotClass}`}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusCopy.dotClass}`}
           />
-          <span className="min-w-0 text-xs leading-snug text-muted-foreground">
+          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground truncate">
             {statusCopy.label}
             {bookmarkCount !== undefined ? (
-              <span className="text-muted-foreground/80">
+              <span className="text-muted-foreground/60">
                 {" · "}
                 {bookmarkCount.toLocaleString()} bookmarks
               </span>
@@ -93,28 +107,26 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
           </span>
         </div>
       ) : (
-        <>
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-2 w-2 shrink-0 rounded-full ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
-            />
-            <span className="text-xs text-muted-foreground">
-              {lastSyncAt ? "Up to date" : "Not synced"}
-            </span>
-          </div>
+        <div className="flex items-center gap-1.5 px-0.5">
+          <div
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
+          />
+          <span className="text-[11px] text-muted-foreground">
+            {lastSyncAt ? "Up to date" : "Not synced"}
+          </span>
           {(lastSyncAt || bookmarkCount !== undefined) && (
-            <div className="text-xs text-muted-foreground/60">
+            <span className="text-[11px] text-muted-foreground/60">
               {[
                 lastSyncAt &&
-                  `Last sync ${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
+                  `${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
                 bookmarkCount !== undefined &&
                   `${bookmarkCount.toLocaleString()} bookmarks`,
               ]
                 .filter(Boolean)
                 .join(" · ")}
-            </div>
+            </span>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -127,10 +139,8 @@ function getSyncStatusCopy(
 ) {
   if (currentRun) {
     return {
-      dotClass: "bg-chart-2",
-      label: `Sync started ${formatDistanceToNow(new Date(currentRun.startedAt), {
-        addSuffix: true,
-      })}`,
+      dotClass: "bg-chart-2 animate-pulse",
+      label: `Syncing${currentRun.totalFetched > 0 ? ` · ${currentRun.totalFetched} fetched` : ""}...`,
     };
   }
 
@@ -143,23 +153,26 @@ function getSyncStatusCopy(
     if (latestRun.status === "FAILED") {
       return {
         dotClass: "bg-destructive",
-        label: `Last sync failed ${relative}`,
+        label: formatFailedSyncLabel(relative, latestRun.errorMessage),
       };
     }
 
     if (latestRun.status === "RATE_LIMITED") {
       return {
         dotClass: "bg-chart-2",
-        label: `Last sync ${relative}: ${latestRun.newBookmarks} new, rate limited`,
+        label: `Rate limited ${relative}${latestRun.resumeToken ? " · Sync again to continue" : ""}`,
       };
     }
 
+    const parts: string[] = [];
+    if (latestRun.newBookmarks > 0) parts.push(`${latestRun.newBookmarks} new`);
+    if (latestRun.updatedBookmarks > 0) parts.push(`${latestRun.updatedBookmarks} updated`);
+    const summary = parts.length > 0 ? parts.join(", ") : "Already up to date";
+    const resumeNote = latestRun.resumeToken ? " · More to sync" : "";
+
     return {
-      dotClass: "bg-primary",
-      label:
-        latestRun.newBookmarks === 0 && latestRun.updatedBookmarks === 0
-          ? `Already up to date ${relative}`
-          : `Last sync ${relative}: ${latestRun.newBookmarks} new, ${latestRun.updatedBookmarks} updated`,
+      dotClass: latestRun.resumeToken ? "bg-chart-2" : "bg-primary",
+      label: `${summary} ${relative}${resumeNote}`,
     };
   }
 
@@ -171,4 +184,14 @@ function getSyncStatusCopy(
   }
 
   return null;
+}
+
+function formatFailedSyncLabel(relative: string, errorMessage: string | null | undefined) {
+  const base = `Last sync failed ${relative}`;
+  const detail = errorMessage?.trim();
+  if (!detail) return base;
+  const maxLen = 72;
+  const shortened =
+    detail.length > maxLen ? `${detail.slice(0, maxLen - 1)}…` : detail;
+  return `${base} · ${shortened}`;
 }

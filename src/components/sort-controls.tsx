@@ -36,12 +36,12 @@ export function SortControls({
         value={sortField}
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
-        <SelectTrigger className="w-[120px] h-8 text-xs">
-          <SelectValue />
+        <SelectTrigger className="h-8 text-xs gap-1.5">
+          Sort
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="bookmarkedAt">Newest</SelectItem>
           <SelectItem value="tweetCreatedAt">Date Tweeted</SelectItem>
+          <SelectItem value="bookmarkedAt">Newest Saved</SelectItem>
           <SelectItem value="likes">Most Liked</SelectItem>
           <SelectItem value="retweets">Most Retweeted</SelectItem>
           <SelectItem value="replies">Most Replied</SelectItem>

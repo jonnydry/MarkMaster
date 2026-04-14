@@ -5,7 +5,7 @@ import type { SortField, SortDirection, MediaFilter } from "@/types";
 
 export function useBookmarkFilters() {
   const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<SortField>("bookmarkedAt");
+  const [sortField, setSortField] = useState<SortField>("tweetCreatedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [authorFilter, setAuthorFilter] = useState("");

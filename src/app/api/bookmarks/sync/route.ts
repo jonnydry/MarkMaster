@@ -16,6 +16,8 @@ const syncRunSelect = {
   rateLimited: true,
   rateLimitResetsAt: true,
   errorMessage: true,
+  pagesFetched: true,
+  resumeToken: true,
   startedAt: true,
   completedAt: true,
 } as const;
@@ -73,6 +75,19 @@ export async function POST() {
     return rateLimitResponse(rate.resetAt);
   }
 
+  // Check for a resume token from the most recent rate-limited/paused sync
+  const lastRun = await prisma.syncRun.findFirst({
+    where: {
+      userId: user.id,
+      status: { in: ["COMPLETED", "RATE_LIMITED"] },
+      resumeToken: { not: null },
+    },
+    orderBy: { startedAt: "desc" },
+    select: { resumeToken: true },
+  });
+
+  const resumeToken = lastRun?.resumeToken ?? undefined;
+
   const syncRun = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       UPDATE "SyncRun" SET status = 'FAILED', "completedAt" = NOW(), "errorMessage" = 'Superseded by new sync'
@@ -101,7 +116,19 @@ export async function POST() {
   const effectiveId = "created" in syncRun ? syncRun.created.id : "";
 
   try {
-    const result = await syncBookmarks(user.id);
+    const result = await syncBookmarks(user.id, resumeToken);
+
+    // If we resumed, clear the old resume token
+    if (resumeToken) {
+      await prisma.syncRun.updateMany({
+        where: {
+          userId: user.id,
+          resumeToken: { not: null },
+          status: { in: ["COMPLETED", "RATE_LIMITED"] },
+        },
+        data: { resumeToken: null },
+      });
+    }
 
     await prisma.syncRun.update({
       where: { id: effectiveId },
@@ -113,6 +140,8 @@ export async function POST() {
         hitExisting: result.hitExisting,
         rateLimited: result.rateLimited,
         rateLimitResetsAt: result.rateLimitResetsAt,
+        pagesFetched: result.pagesFetched,
+        resumeToken: result.resumeToken ?? null,
         completedAt: new Date(),
       },
     });
