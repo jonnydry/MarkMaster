@@ -10,10 +10,10 @@ import {
 async function requireCollection(
   collectionId: string,
   userId: string
-): Promise<{ id: string; externalSource: string | null } | null> {
+): Promise<{ id: string; type: string } | null> {
   return prisma.collection.findFirst({
     where: { id: collectionId, userId },
-    select: { id: true, externalSource: true },
+    select: { id: true, type: true },
   });
 }
 
@@ -32,9 +32,9 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (collection.externalSource) {
+  if (collection.type === "x_folder") {
     return NextResponse.json(
-      { error: "This collection is managed by sync and cannot be edited." },
+      { error: "This collection is synced from X and cannot be edited." },
       { status: 403 }
     );
   }
@@ -117,9 +117,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (collection.externalSource) {
+  if (collection.type === "x_folder") {
     return NextResponse.json(
-      { error: "This collection is managed by sync and cannot be edited." },
+      { error: "This collection is synced from X and cannot be edited." },
       { status: 403 }
     );
   }
@@ -160,9 +160,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (collection.externalSource) {
+  if (collection.type === "x_folder") {
     return NextResponse.json(
-      { error: "This collection is managed by sync and cannot be edited." },
+      { error: "This collection is synced from X and cannot be edited." },
       { status: 403 }
     );
   }

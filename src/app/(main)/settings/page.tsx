@@ -144,7 +144,8 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 max-w-2xl space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+          <div className="max-w-2xl mx-auto space-y-4">
           {(tagsError || collectionsError) && (
             <Card className="p-5 border-destructive/30">
               <h2 className="font-semibold mb-2">Settings data could not be loaded</h2>
@@ -310,6 +311,7 @@ export default function SettingsPage() {
               </Button>
             </div>
           </Card>
+          </div>
         </div>
       </div>
 

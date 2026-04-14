@@ -72,14 +72,17 @@ export interface BookmarkWithRelations {
   }>;
 }
 
+export type CollectionType = "x_folder" | "user_collection";
+
 export interface CollectionWithCount {
   id: string;
   name: string;
   description: string | null;
+  type: CollectionType;
   isPublic: boolean;
   shareSlug: string | null;
-   externalSource: string | null;
-   externalSourceId: string | null;
+  externalSource: string | null;
+  externalSourceId: string | null;
   createdAt: string;
   _count: { items: number };
 }

@@ -9,6 +9,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
@@ -146,7 +147,7 @@ export function Sidebar({
               <div>
                 <div className="mb-2 flex items-center justify-between px-1">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Collections
+                    My Collections
                   </h3>
                   <button
                     type="button"
@@ -156,37 +157,76 @@ export function Sidebar({
                     +
                   </button>
                 </div>
-                {collections.length === 0 ? (
+                {collections.filter((c) => c.type !== "x_folder").length === 0 &&
+                collections.filter((c) => c.type === "x_folder").length === 0 ? (
                   <p className="px-1 text-xs text-muted-foreground/70">
                     Create a collection to start curating
                   </p>
                 ) : (
                   <div className="space-y-0.5">
-                    {collections.map((collection) => {
-                      const isCollectionActive = pathname === `/collections/${collection.id}`;
-                      return (
-                        <Link
-                          key={collection.id}
-                          href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
-                            isCollectionActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                          }`}
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <FolderOpen className="h-4 w-4 shrink-0" />
-                            <span className="truncate">{collection.name}</span>
-                          </span>
-                          <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                            {collection._count.items}
-                          </span>
-                        </Link>
-                      );
-                    })}
+                    {collections
+                      .filter((c) => c.type !== "x_folder")
+                      .map((collection) => {
+                        const isCollectionActive = pathname === `/collections/${collection.id}`;
+                        return (
+                          <Link
+                            key={collection.id}
+                            href={`/collections/${collection.id}`}
+                            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                              isCollectionActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <Layers className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{collection.name}</span>
+                            </span>
+                            <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                              {collection._count.items}
+                            </span>
+                          </Link>
+                        );
+                      })}
                   </div>
                 )}
               </div>
+
+              {collections.filter((c) => c.type === "x_folder").length > 0 && (
+                <div>
+                  <div className="mb-2 px-1">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      X Folders
+                    </h3>
+                  </div>
+                  <div className="space-y-0.5">
+                    {collections
+                      .filter((c) => c.type === "x_folder")
+                      .map((collection) => {
+                        const isCollectionActive = pathname === `/collections/${collection.id}`;
+                        return (
+                          <Link
+                            key={collection.id}
+                            href={`/collections/${collection.id}`}
+                            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                              isCollectionActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <FolderOpen className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{collection.name}</span>
+                            </span>
+                            <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                              {collection._count.items}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

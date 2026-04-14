@@ -66,7 +66,7 @@ export function AddToCollectionDialog({
             <div className="space-y-1.5 max-h-60 overflow-y-auto">
               {collections.map((col) => {
                 const isIn = bookmarkCollections.includes(col.id);
-                const isManaged = col.externalSource === "x-bookmark-folder";
+                const isManaged = col.type === "x_folder";
                 return (
                   <button
                     key={col.id}

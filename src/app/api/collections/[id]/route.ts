@@ -59,7 +59,7 @@ export async function PATCH(
 
   const existingCollection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
-    select: { shareSlug: true, externalSource: true },
+    select: { shareSlug: true, type: true },
   });
 
   if (!existingCollection) {
@@ -67,11 +67,11 @@ export async function PATCH(
   }
 
   if (
-    existingCollection.externalSource &&
+    existingCollection.type === "x_folder" &&
     (parsed.data.name !== undefined || parsed.data.description !== undefined)
   ) {
     return NextResponse.json(
-      { error: "This collection is managed by sync and cannot be renamed." },
+      { error: "This collection is synced from X and cannot be renamed." },
       { status: 403 }
     );
   }
@@ -111,16 +111,16 @@ export async function DELETE(
 
   const collection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
-    select: { externalSource: true },
+    select: { type: true },
   });
 
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (collection.externalSource) {
+  if (collection.type === "x_folder") {
     return NextResponse.json(
-      { error: "This collection is managed by sync and cannot be deleted." },
+      { error: "This collection is synced from X and cannot be deleted." },
       { status: 403 }
     );
   }

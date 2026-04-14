@@ -88,11 +88,13 @@ async function syncFolderCollection(
     update: {
       name: folder.name,
       description: X_FOLDER_COLLECTION_DESCRIPTION,
+      type: "x_folder",
     },
     create: {
       userId,
       name: folder.name,
       description: X_FOLDER_COLLECTION_DESCRIPTION,
+      type: "x_folder",
       externalSource: X_FOLDER_COLLECTION_SOURCE,
       externalSourceId: folder.id,
     },

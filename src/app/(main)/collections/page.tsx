@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { FolderOpen, Plus, Globe, Lock, Trash2 } from "lucide-react";
+
+import { FolderOpen, Plus, Globe, Lock, Trash2, Layers, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,15 +50,17 @@ export default function CollectionsPage() {
 
   const { data: tags = [] } = useTagsQuery();
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Delete this collection? This cannot be undone.")) return;
+  const userCollections = collections.filter((c) => c.type !== "x_folder");
+  const xFolders = collections.filter((c) => c.type === "x_folder");
+
+  const handleCopyAsCollection = async (id: string) => {
     try {
-      await sendJson(`/api/collections/${id}`, { method: "DELETE" });
+      await sendJson(`/api/collections/${id}/copy`, { method: "POST" });
       await invalidateCollectionsQuery(queryClient);
-      toast.success("Collection deleted");
+      toast.success("Copied as a new collection");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not delete collection"
+        error instanceof Error ? error.message : "Could not copy as collection"
       );
     }
   };
@@ -130,9 +132,9 @@ export default function CollectionsPage() {
                 Retry
               </Button>
             </div>
-          ) : collections.length === 0 ? (
+) : collections.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
-              <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
+              <Layers className="w-12 h-12 text-muted-foreground mb-4" />
               <h2 className="text-lg font-medium mb-2">No collections yet</h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Create a collection to start curating your bookmarks
@@ -143,57 +145,118 @@ export default function CollectionsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {collections.map((col, i) => (
-                <Card
-                  key={col.id}
-                  className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="w-5 h-5 text-primary" />
-                      <Link
-                        href={`/collections/${col.id}`}
-                        className="font-semibold hover:text-primary transition-colors"
+            <div className="space-y-8">
+              {userCollections.length > 0 && (
+                <section>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    My Collections
+                  </h2>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {userCollections.map((col, i) => (
+                      <Card
+                        key={col.id}
+                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group cursor-pointer ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        onClick={() => router.push(`/collections/${col.id}`)}
                       >
-                        {col.name}
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {col.isPublic ? (
-                        <Globe className="w-4 h-4 text-success" />
-                      ) : (
-                        <Lock className="w-4 h-4 text-muted-foreground" />
-                      )}
-                       {col.externalSource !== "x-bookmark-folder" && (
-                         <Button
-                           variant="ghost"
-                           size="icon"
-                           className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive"
-                           onClick={() => handleDelete(col.id)}
-                         >
-                           <Trash2 className="w-3.5 h-3.5" />
-                         </Button>
-                       )}
-                     </div>
-                   </div>
-                   {col.externalSource === "x-bookmark-folder" && (
-                     <Badge variant="outline" className="text-primary border-primary/30 mb-2">Synced from X</Badge>
-                   )}
-                   {col.description && (
-                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                       {col.description}
-                     </p>
-                   )}
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {col._count.items} bookmark
-                      {col._count.items !== 1 ? "s" : ""}
-                    </span>
-                    <span>{new Date(col.createdAt).toLocaleDateString()}</span>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-5 h-5 text-primary" />
+                            <span className="font-semibold">{col.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {col.isPublic ? (
+                              <Globe className="w-4 h-4 text-success" />
+                            ) : (
+                              <Lock className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm("Delete this collection? This cannot be undone.")) {
+                                  void (async () => {
+                                    try {
+                                      await sendJson(`/api/collections/${col.id}`, { method: "DELETE" });
+                                      await invalidateCollectionsQuery(queryClient);
+                                      toast.success("Collection deleted");
+                                    } catch (error) {
+                                      toast.error(error instanceof Error ? error.message : "Could not delete collection");
+                                    }
+                                  })();
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        {col.description && (
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                            {col.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {col._count.items} bookmark{col._count.items !== 1 ? "s" : ""}
+                          </span>
+                          <span>{new Date(col.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
-                </Card>
-              ))}
+                </section>
+              )}
+
+              {xFolders.length > 0 && (
+                <section>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    X Folders
+                  </h2>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {xFolders.map((col, i) => (
+                      <Card
+                        key={col.id}
+                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group border-dashed cursor-pointer ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        onClick={() => router.push(`/collections/${col.id}`)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="w-5 h-5 text-muted-foreground" />
+                            <span className="font-semibold">{col.name}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1.5 h-7 text-xs"
+                            onClick={(e) => { e.stopPropagation(); void handleCopyAsCollection(col.id); }}
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copy
+                          </Button>
+                        </div>
+                        <Badge variant="outline" className="text-primary border-primary/30 mb-2">
+                          Synced from X
+                        </Badge>
+                        {col.description && (
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                            {col.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {col._count.items} bookmark{col._count.items !== 1 ? "s" : ""}
+                          </span>
+                          <span>{new Date(col.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useMemo, useDeferredValue } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { SortField, SortDirection, MediaFilter } from "@/types";
 
 export function useBookmarkFilters() {
-  const [search, setSearch] = useState("");
+  const [search, setSearchImmediate] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("tweetCreatedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
@@ -13,9 +14,28 @@ export function useBookmarkFilters() {
   const [dateTo, setDateTo] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const deferredSearch = useDeferredValue(search);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const resetPage = useCallback(() => setPage(1), []);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const setSearch = useCallback((v: string) => {
+    setSearchImmediate(v);
+    clearTimeout(debounceRef.current);
+    if (v === "") {
+      setDebouncedSearch("");
+    } else {
+      debounceRef.current = setTimeout(() => {
+        setDebouncedSearch(v);
+      }, 300);
+    }
+    resetPage();
+  }, [resetPage]);
 
   const toggleTag = useCallback((tagId: string) => {
     setSelectedTags((prev) =>
@@ -44,7 +64,7 @@ export function useBookmarkFilters() {
     return new URLSearchParams({
       page: page.toString(),
       limit: "20",
-      search: deferredSearch,
+      search: debouncedSearch,
       sortField,
       sortDirection,
       mediaFilter,
@@ -53,11 +73,11 @@ export function useBookmarkFilters() {
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
     }).toString();
-  }, [page, deferredSearch, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
+  }, [page, debouncedSearch, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
 
   return {
     search,
-    setSearch: useCallback((v: string) => { setSearch(v); resetPage(); }, [resetPage]),
+    setSearch,
     sortField,
     setSortField: useCallback((v: SortField) => { setSortField(v); resetPage(); }, [resetPage]),
     sortDirection,
@@ -78,6 +98,6 @@ export function useBookmarkFilters() {
     hasActiveFilters,
     clearFilters,
     queryString,
-    isSearchPending: search !== deferredSearch,
+    isSearchPending: search !== debouncedSearch,
   };
 }

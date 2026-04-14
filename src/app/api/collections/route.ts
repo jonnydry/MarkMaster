@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       name,
       description: description || null,
+      type: "user_collection",
       isPublic: isPublic || false,
       shareSlug: isPublic ? nanoid(10) : null,
     },

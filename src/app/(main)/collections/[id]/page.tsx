@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   Globe,
@@ -12,6 +13,9 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  Layers,
+  FolderOpen,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +24,12 @@ import { toast } from "sonner";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { invalidateCollectionQueries } from "@/lib/query-invalidation";
 import type { BookmarkWithRelations } from "@/types";
+import type { ShareContent } from "@/lib/share-content";
+
+const ShareDialog = dynamic(
+  () => import("@/components/share-dialog").then((m) => m.ShareDialog),
+  { ssr: false }
+);
 
 type CollectionItemRow = {
   id: string;
@@ -31,6 +41,7 @@ type CollectionDetail = {
   id: string;
   name: string;
   description: string | null;
+  type: string;
   isPublic: boolean;
   shareSlug: string | null;
   externalSource: string | null;
@@ -49,6 +60,8 @@ export default function CollectionDetailPage({
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState("");
   const [reordering, setReordering] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareContent, setShareContent] = useState<ShareContent | null>(null);
 
   const {
     data: collection,
@@ -71,7 +84,21 @@ export default function CollectionDetailPage({
   const sortedItems = collection
     ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
-  const isSyncedFromX = collection?.externalSource === "x-bookmark-folder";
+  const isSyncedFromX = collection?.type === "x_folder";
+  const isUserCollection = collection?.type === "user_collection";
+
+  const handleCopyAsCollection = async () => {
+    if (!collection) return;
+    try {
+      await sendJson(`/api/collections/${id}/copy`, { method: "POST" });
+      toast.success("Copied as a new collection");
+      router.push("/collections");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not copy as collection"
+      );
+    }
+  };
 
   const handleTogglePublic = async () => {
     if (!collection) return;
@@ -115,6 +142,22 @@ export default function CollectionDetailPage({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not remove bookmark"
+      );
+    }
+  };
+
+  const handleShareOnX = async () => {
+    if (!collection) return;
+    try {
+      const content = await fetchJson<ShareContent>(
+        `/api/collections/${id}/publish`,
+        { method: "POST" }
+      );
+      setShareContent(content);
+      setShareOpen(true);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not generate share content"
       );
     }
   };
@@ -202,7 +245,7 @@ export default function CollectionDetailPage({
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex-1 min-w-0">
+<div className="flex-1 min-w-0">
             {editingName ? (
               <input
                 autoFocus
@@ -213,7 +256,13 @@ export default function CollectionDetailPage({
                 className="text-lg font-semibold bg-transparent border-b border-primary outline-none w-full"
               />
             ) : (
-<h1
+              <div className="flex items-center gap-2">
+                {isSyncedFromX ? (
+                  <FolderOpen className="w-5 h-5 text-muted-foreground shrink-0" />
+                ) : (
+                  <Layers className="w-5 h-5 text-primary shrink-0" />
+                )}
+                <h1
                   className={`text-xl font-bold truncate transition-colors ${
                   isSyncedFromX
                     ? "cursor-default"
@@ -227,44 +276,65 @@ export default function CollectionDetailPage({
               >
                 {collection.name}
               </h1>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             {isSyncedFromX && (
-              <Badge variant="outline" className="text-primary border-primary/30">
-                Synced from X
+              <>
+                <Badge variant="outline" className="text-primary border-primary/30">
+                  Synced from X
+                </Badge>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyAsCollection}>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy as Collection
+                </Button>
+              </>
+            )}
+            {isUserCollection && (
+              <Badge variant="outline" className="gap-1.5">
+                {collection.isPublic ? (
+                  <Globe className="w-3 h-3 text-success" />
+                ) : (
+                  <Lock className="w-3 h-3" />
+                )}
+                {collection.isPublic ? "Public" : "Private"}
               </Badge>
             )}
-            <Badge variant="outline" className="gap-1.5">
-              {collection.isPublic ? (
-                <Globe className="w-3 h-3 text-success" />
-              ) : (
-                <Lock className="w-3 h-3" />
-              )}
-              {collection.isPublic ? "Public" : "Private"}
-            </Badge>
-            <Button variant="outline" size="sm" onClick={handleTogglePublic}>
-              {collection.isPublic ? "Make Private" : "Make Public"}
-            </Button>
-            {collection.isPublic && collection.shareSlug && (
+            {isUserCollection && (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handleCopyShareLink}
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy Link
+                <Button variant="outline" size="sm" onClick={handleTogglePublic}>
+                  {collection.isPublic ? "Make Private" : "Make Public"}
                 </Button>
-                <a
-                  href={`/share/${collection.shareSlug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                {collection.isPublic && collection.shareSlug && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleCopyShareLink}
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy Link
+                    </Button>
+                    <a
+                      href={`/share/${collection.shareSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </>
+                )}
+                {sortedItems.length > 0 &&
+                  collection.isPublic &&
+                  collection.shareSlug && (
+                  <Button variant="default" size="sm" className="gap-1.5" onClick={handleShareOnX}>
+                    <Share2 className="w-3.5 h-3.5" />
+                    Share on X
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -352,6 +422,12 @@ export default function CollectionDetailPage({
           </div>
         )}
       </main>
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        shareContent={shareContent}
+      />
     </div>
   );
 }

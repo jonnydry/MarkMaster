@@ -21,6 +21,7 @@ import type { BookmarkWithRelations, ViewMode } from "@/types";
 interface BookmarkCardProps {
   bookmark: BookmarkWithRelations;
   viewMode: ViewMode;
+  searchQuery?: string;
   onTagClick?: (tagId: string) => void;
   onAddTag?: (bookmarkId: string) => void;
   onAddToCollection?: (bookmarkId: string) => void;
@@ -40,10 +41,45 @@ function formatCount(n: number): string {
   return n.toString();
 }
 
-function highlightText(text: string): React.ReactNode {
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightMatch(text: string, regex: RegExp): React.ReactNode {
+  if (!text) return text;
+  // Capturing group in regex makes split interleave [text, match, text, ...].
+  const parts = text.split(regex);
+  const result: React.ReactNode[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 0) {
+      if (parts[i]) result.push(parts[i]);
+    } else {
+      result.push(
+        <mark key={`m-${i}`} className="bg-primary/20 text-foreground rounded px-0.5">
+          {parts[i]}
+        </mark>
+      );
+    }
+  }
+  if (result.length === 0) return text;
+  return result.length === 1 ? result[0] : result;
+}
+
+function highlightText(text: string, searchQuery?: string): React.ReactNode {
+  const searchRegex = searchQuery
+    ? new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")
+    : null;
+
   const parts = text.split(/((?:@|#)\w+|https?:\/\/\S+)/g);
   return parts.map((part, i) => {
     if (part.startsWith("@") || part.startsWith("#")) {
+      if (searchRegex) {
+        return (
+          <span key={i} className="text-primary font-medium">
+            {highlightMatch(part, searchRegex)}
+          </span>
+        );
+      }
       return (
         <span key={i} className="text-primary font-medium">
           {part}
@@ -62,6 +98,9 @@ function highlightText(text: string): React.ReactNode {
           {part}
         </a>
       );
+    }
+    if (searchRegex) {
+      return <span key={i}>{highlightMatch(part, searchRegex)}</span>;
     }
     return part;
   });
@@ -146,6 +185,7 @@ function SelectionToggle({
 export const BookmarkCard = memo(function BookmarkCard({
   bookmark,
   viewMode,
+  searchQuery,
   onTagClick,
   onAddTag,
   onAddToCollection,
@@ -162,7 +202,19 @@ export const BookmarkCard = memo(function BookmarkCard({
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
-  const highlightedText = useMemo(() => highlightText(bookmark.tweetText), [bookmark.tweetText]);
+  const highlightedText = useMemo(() => highlightText(bookmark.tweetText, searchQuery), [bookmark.tweetText, searchQuery]);
+  const highlightedAuthorName = useMemo(
+    () => searchQuery ? highlightMatch(bookmark.authorDisplayName, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.authorDisplayName,
+    [bookmark.authorDisplayName, searchQuery]
+  );
+  const highlightedUsername = useMemo(
+    () => searchQuery ? highlightMatch(bookmark.authorUsername, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.authorUsername,
+    [bookmark.authorUsername, searchQuery]
+  );
+  const highlightedNote = useMemo(
+    () => searchQuery && bookmark.notes[0] ? highlightMatch(bookmark.notes[0].content, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.notes[0]?.content,
+    [bookmark.notes, searchQuery]
+  );
 
   if (viewMode === "compact") {
     return (
@@ -189,13 +241,13 @@ export const BookmarkCard = memo(function BookmarkCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-foreground truncate">
-              {bookmark.authorDisplayName}
+              {highlightedAuthorName}
             </span>
             {bookmark.authorVerified && (
               <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" />
             )}
             <span className="text-muted-foreground truncate">
-              @{bookmark.authorUsername}
+              @{highlightedUsername}
             </span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -205,7 +257,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             </span>
           </div>
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
-            {bookmark.tweetText}
+            {searchQuery ? highlightText(bookmark.tweetText, searchQuery) : bookmark.tweetText}
           </p>
           {bookmark.tags.length > 0 && (
             <div className="flex gap-1 mt-1">
@@ -290,11 +342,11 @@ export const BookmarkCard = memo(function BookmarkCard({
               />
             )}
             <span className="text-xs font-medium text-muted-foreground truncate">
-              @{bookmark.authorUsername}
+              @{highlightedUsername}
             </span>
           </div>
           <p className="text-sm text-foreground line-clamp-3">
-            {bookmark.tweetText}
+            {searchQuery ? highlightText(bookmark.tweetText, searchQuery) : bookmark.tweetText}
           </p>
           {bookmark.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -390,13 +442,13 @@ width={40}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-semibold text-sm text-foreground truncate">
-                {bookmark.authorDisplayName}
+                {highlightedAuthorName}
               </span>
               {bookmark.authorVerified && (
                 <BadgeCheck className="w-[14px] h-[14px] text-primary shrink-0" />
               )}
               <span className="text-muted-foreground truncate">
-                @{bookmark.authorUsername}
+                @{highlightedUsername}
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground whitespace-nowrap">
@@ -505,7 +557,7 @@ width={40}
           {bookmark.notes.length > 0 && (
             <div className="mt-2 pl-3 py-2 pr-3 border-l-2 border-l-note rounded-r-md bg-muted/50">
               <p className="text-xs leading-snug text-muted-foreground">
-                {bookmark.notes[0].content}
+                {highlightedNote}
               </p>
             </div>
           )}

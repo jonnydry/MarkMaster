@@ -28,6 +28,11 @@ model User {
   syncRuns        SyncRun[]
 }
 
+enum CollectionType {
+  x_folder
+  user_collection
+}
+
 enum SyncRunStatus {
   RUNNING
   COMPLETED
@@ -87,16 +92,17 @@ model BookmarkTag {
 }
 
 model Collection {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   userId           String
   name             String
   description      String?
-  isPublic         Boolean  @default(false)
-  shareSlug        String?  @unique
+  type             CollectionType @default(user_collection)
+  isPublic         Boolean       @default(false)
+  shareSlug        String?       @unique
   externalSource   String?
   externalSourceId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CollectionItem[]
