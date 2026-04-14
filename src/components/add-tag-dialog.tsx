@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,12 +35,13 @@ export function AddTagDialog({
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const isBulk = bookmarkIds.length > 1;
 
-  useEffect(() => {
-    if (!open) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
       setName("");
       setColor(PRESET_COLORS[0]);
     }
-  }, [open]);
+    onOpenChange(nextOpen);
+  };
 
   const handleAdd = () => {
     if (!name.trim() || bookmarkIds.length === 0) return;
@@ -49,7 +50,7 @@ export function AddTagDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>

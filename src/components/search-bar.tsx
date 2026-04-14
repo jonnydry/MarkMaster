@@ -48,7 +48,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
 
     const defaultHint = !value && (
       <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
-        ⌘K
+        /
       </kbd>
     );
 
@@ -64,8 +64,10 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
         />
         {value ? (
           <button
+            type="button"
             onClick={() => onChange("")}
             className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
           >
             <X className="w-4 h-4" />
           </button>

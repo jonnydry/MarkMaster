@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -51,6 +52,15 @@ export function Sidebar({
   const { expanded: ctxExpanded, toggle } = useSidebar();
   const expanded = forceExpanded ? true : ctxExpanded;
   const showToggle = !forceExpanded;
+  const userCollections = useMemo(
+    () => collections.filter((collection) => collection.type !== "x_folder"),
+    [collections]
+  );
+  const xFolders = useMemo(
+    () => collections.filter((collection) => collection.type === "x_folder"),
+    [collections]
+  );
+  const hasCollections = userCollections.length > 0 || xFolders.length > 0;
 
   return (
     <aside
@@ -157,16 +167,13 @@ export function Sidebar({
                     +
                   </button>
                 </div>
-                {collections.filter((c) => c.type !== "x_folder").length === 0 &&
-                collections.filter((c) => c.type === "x_folder").length === 0 ? (
+                {!hasCollections ? (
                   <p className="px-1 text-xs text-muted-foreground/70">
                     Create a collection to start curating
                   </p>
                 ) : (
                   <div className="space-y-0.5">
-                    {collections
-                      .filter((c) => c.type !== "x_folder")
-                      .map((collection) => {
+                    {userCollections.map((collection) => {
                         const isCollectionActive = pathname === `/collections/${collection.id}`;
                         return (
                           <Link
@@ -187,12 +194,12 @@ export function Sidebar({
                             </span>
                           </Link>
                         );
-                      })}
+                    })}
                   </div>
                 )}
               </div>
 
-              {collections.filter((c) => c.type === "x_folder").length > 0 && (
+              {xFolders.length > 0 && (
                 <div>
                   <div className="mb-2 px-1">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -200,9 +207,7 @@ export function Sidebar({
                     </h3>
                   </div>
                   <div className="space-y-0.5">
-                    {collections
-                      .filter((c) => c.type === "x_folder")
-                      .map((collection) => {
+                    {xFolders.map((collection) => {
                         const isCollectionActive = pathname === `/collections/${collection.id}`;
                         return (
                           <Link
@@ -223,7 +228,7 @@ export function Sidebar({
                             </span>
                           </Link>
                         );
-                      })}
+                    })}
                   </div>
                 </div>
               )}

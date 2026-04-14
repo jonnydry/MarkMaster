@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Search, Image, Video, Link, FileText } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,21 +32,27 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    if (open) setQuery("");
-  }, [open]);
-
   const handleFilterSelect = useCallback((filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
     onFilterChange(filter);
     onOpenChange(false);
   }, [onFilterChange, onOpenChange]);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        setQuery("");
+      }
+      onOpenChange(nextOpen);
+    },
+    [onOpenChange]
+  );
 
   const filteredTags = tags.filter((tag) =>
     tag.name.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="p-0 gap-0 max-w-[560px] overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -135,6 +141,12 @@ export function CommandPalette({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {query !== "" && filteredTags.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No tags match <span className="font-medium text-foreground">{query}</span>.
             </div>
           )}
         </div>

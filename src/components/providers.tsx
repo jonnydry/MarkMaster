@@ -2,9 +2,19 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
-import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  createContext,
+  useContext,
+  useSyncExternalStore,
+} from "react";
 
 type Theme = "dark" | "light";
+
+const THEME_STORAGE_KEY = "markmaster-theme";
+const THEME_CHANGE_EVENT = "markmaster-theme-change";
 
 const ThemeContext = createContext<{
   theme: Theme;
@@ -22,23 +32,49 @@ function getServerTheme(): Theme {
   return "dark";
 }
 
-function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getServerTheme);
+function readStoredTheme(): Theme {
+  if (typeof window === "undefined") return getServerTheme();
 
-  useEffect(() => {
-    const stored = localStorage.getItem("markmaster-theme") as Theme | null;
-    const initial = stored || "dark";
-    setTheme(initial);
-  }, []);
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return getServerTheme();
+  }
+}
+
+function subscribeTheme(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  const handleChange = () => onStoreChange();
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(THEME_CHANGE_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(THEME_CHANGE_EVENT, handleChange);
+  };
+}
+
+function writeTheme(theme: Theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // ignore storage failures and still update the current document
+  }
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+}
+
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const theme = useSyncExternalStore(subscribeTheme, readStoredTheme, getServerTheme);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-    localStorage.setItem("markmaster-theme", theme);
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  }, []);
+    writeTheme(theme === "dark" ? "light" : "dark");
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

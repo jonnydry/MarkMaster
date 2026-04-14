@@ -196,12 +196,12 @@ export default function SettingsPage() {
             {tags.length === 0 ? (
               <p className="text-sm text-muted-foreground">No tags yet</p>
             ) : (
-              <div className="space-y-2">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center gap-3 py-2">
+                <div className="space-y-2">
+                  {tags.map((tag) => (
+                  <div key={tag.id} className="flex flex-wrap items-center gap-3 py-2">
                     {editingTag === tag.id ? (
                       <>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {PRESET_COLORS.map((c) => (
                             <button
                               key={c}
@@ -220,7 +220,7 @@ export default function SettingsPage() {
                         <Input
                           value={editTagName}
                           onChange={(e) => setEditTagName(e.target.value)}
-                          className="flex-1 h-8"
+                          className="h-8 min-w-[12rem] flex-1"
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleUpdateTag(tag.id)
                           }
@@ -261,6 +261,7 @@ export default function SettingsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-destructive"
+                          aria-label={`Delete tag ${tag.name}`}
                           onClick={() => handleDeleteTag(tag.id)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />

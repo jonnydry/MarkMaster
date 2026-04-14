@@ -22,8 +22,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ account, profile }) {
       if (!account || !profile) return false;
 
-      if (!account.access_token || !account.refresh_token) {
-        console.error("[auth] Missing access_token or refresh_token from provider");
+      if (!account.access_token) {
+        console.error("[auth] Missing access_token from provider");
         return false;
       }
 
@@ -45,30 +45,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         null;
 
       try {
-      await prisma.user.upsert({
-        where: { xId },
-        update: {
-          username,
-          displayName,
-          profileImageUrl,
-          accessToken: encrypt(account.access_token),
-          refreshToken: encrypt(account.refresh_token),
-          tokenExpiresAt: account.expires_at
-            ? new Date(account.expires_at * 1000)
-            : null,
-        },
-        create: {
-          xId,
-          username,
-          displayName,
-          profileImageUrl,
-          accessToken: encrypt(account.access_token),
-          refreshToken: encrypt(account.refresh_token),
-          tokenExpiresAt: account.expires_at
-            ? new Date(account.expires_at * 1000)
-            : null,
-        },
-      });
+        const existingUser = await prisma.user.findUnique({
+          where: { xId },
+          select: { id: true, refreshToken: true },
+        });
+
+        const refreshToken =
+          account.refresh_token
+            ? encrypt(account.refresh_token)
+            : existingUser?.refreshToken;
+
+        if (!refreshToken) {
+          console.error("[auth] Missing refresh_token for new sign-in");
+          return false;
+        }
+
+        const tokenExpiresAt = account.expires_at
+          ? new Date(account.expires_at * 1000)
+          : null;
+
+        if (existingUser) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              username,
+              displayName,
+              profileImageUrl,
+              accessToken: encrypt(account.access_token),
+              refreshToken,
+              tokenExpiresAt,
+            },
+          });
+        } else {
+          await prisma.user.create({
+            data: {
+              xId,
+              username,
+              displayName,
+              profileImageUrl,
+              accessToken: encrypt(account.access_token),
+              refreshToken,
+              tokenExpiresAt,
+            },
+          });
+        }
       } catch (e) {
         console.error("[auth] signIn prisma upsert failed:", e);
         return false;

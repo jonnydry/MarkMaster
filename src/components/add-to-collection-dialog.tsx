@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,9 +35,12 @@ export function AddToCollectionDialog({
   const [creating, setCreating] = useState(false);
   const isBulk = bookmarkIds.length > 1;
 
-  useEffect(() => {
-    if (!open) setNewName("");
-  }, [open]);
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setNewName("");
+    }
+    onOpenChange(nextOpen);
+  };
 
   const handleCreate = async () => {
     if (!newName.trim() || bookmarkIds.length === 0) return;
@@ -52,7 +55,7 @@ export function AddToCollectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>

@@ -12,6 +12,63 @@ const bookmarkInclude = {
   },
 } as const;
 
+function getDateStart(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function getNextDateStart(value: string) {
+  const next = getDateStart(value);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+function buildMediaFilterCondition(
+  mediaFilter: "all" | "images" | "video" | "links" | "text-only"
+) {
+  switch (mediaFilter) {
+    case "images":
+      return Prisma.sql`
+        b."media" IS NOT NULL
+        AND b."media" <> 'null'::jsonb
+        AND jsonb_path_exists(
+          b."media",
+          '$[*] ? (@.type == "photo")'
+        )
+      `;
+    case "video":
+      return Prisma.sql`
+        b."media" IS NOT NULL
+        AND b."media" <> 'null'::jsonb
+        AND jsonb_path_exists(
+          b."media",
+          '$[*] ? (@.type == "video" || @.type == "animated_gif")'
+        )
+      `;
+    case "links":
+      return Prisma.sql`
+        b."urls" IS NOT NULL
+        AND b."urls" <> 'null'::jsonb
+        AND jsonb_typeof(b."urls") = 'array'
+        AND jsonb_array_length(b."urls") > 0
+      `;
+    case "text-only":
+      return Prisma.sql`
+        (
+          b."media" IS NULL
+          OR b."media" = 'null'::jsonb
+          OR (jsonb_typeof(b."media") = 'array' AND jsonb_array_length(b."media") = 0)
+        )
+        AND (
+          b."urls" IS NULL
+          OR b."urls" = 'null'::jsonb
+          OR (jsonb_typeof(b."urls") = 'array' AND jsonb_array_length(b."urls") = 0)
+        )
+      `;
+    default:
+      return null;
+  }
+}
+
 function buildSlowPathWhereSql({
   userId,
   search,
@@ -65,11 +122,11 @@ function buildSlowPathWhereSql({
   }
 
   if (dateFrom) {
-    conditions.push(Prisma.sql`b."tweetCreatedAt" >= ${new Date(dateFrom)}`);
+    conditions.push(Prisma.sql`b."tweetCreatedAt" >= ${getDateStart(dateFrom)}`);
   }
 
   if (dateTo) {
-    conditions.push(Prisma.sql`b."tweetCreatedAt" <= ${new Date(dateTo)}`);
+    conditions.push(Prisma.sql`b."tweetCreatedAt" < ${getNextDateStart(dateTo)}`);
   }
 
   if (collectionId) {
@@ -82,15 +139,9 @@ function buildSlowPathWhereSql({
     `);
   }
 
-  if (mediaFilter === "video") {
-    conditions.push(Prisma.sql`
-      b."media" IS NOT NULL
-      AND b."media" <> 'null'::jsonb
-      AND jsonb_path_exists(
-        b."media",
-        '$[*] ? (@.type == "video" || @.type == "animated_gif")'
-      )
-    `);
+  const mediaCondition = buildMediaFilterCondition(mediaFilter);
+  if (mediaCondition) {
+    conditions.push(mediaCondition);
   }
 
   return Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
@@ -167,17 +218,15 @@ export async function GET(req: NextRequest) {
 
   if (dateFrom || dateTo) {
     where.tweetCreatedAt = {};
-    if (dateFrom) where.tweetCreatedAt.gte = new Date(dateFrom);
-    if (dateTo) where.tweetCreatedAt.lte = new Date(dateTo);
+    if (dateFrom) where.tweetCreatedAt.gte = getDateStart(dateFrom);
+    if (dateTo) where.tweetCreatedAt.lt = getNextDateStart(dateTo);
   }
 
   if (collectionId) {
     where.collectionItems = { some: { collectionId } };
   }
 
-  if (mediaFilter === "images" || mediaFilter === "video") {
-    where.media = { not: Prisma.JsonNull };
-  } else if (mediaFilter === "links") {
+  if (mediaFilter === "links") {
     where.urls = { not: Prisma.JsonNull };
   } else if (mediaFilter === "text-only") {
     where.media = { equals: Prisma.JsonNull };
@@ -189,7 +238,7 @@ export async function GET(req: NextRequest) {
     sortField === "retweets" ||
     sortField === "replies";
 
-  const needsInMemoryMedia = mediaFilter === "video";
+  const needsInMemoryMedia = mediaFilter === "images" || mediaFilter === "video";
 
   if (!needsInMemorySort && !needsInMemoryMedia) {
     let orderBy: Prisma.BookmarkOrderByWithRelationInput;

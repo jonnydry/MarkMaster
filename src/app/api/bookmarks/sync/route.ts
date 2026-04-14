@@ -123,7 +123,7 @@ export async function POST() {
       await prisma.syncRun.updateMany({
         where: {
           userId: user.id,
-          resumeToken: { not: null },
+          resumeToken,
           status: { in: ["COMPLETED", "RATE_LIMITED"] },
         },
         data: { resumeToken: null },

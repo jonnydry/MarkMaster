@@ -202,6 +202,23 @@ export const BookmarkCard = memo(function BookmarkCard({
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
+  const isInteractive = selectionMode || Boolean(onSelect);
+  const handleCardActivation = () => {
+    if (selectionMode) {
+      onSelectionChange?.(bookmark.id, !selected);
+      return;
+    }
+
+    onSelect?.(bookmark.id);
+  };
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!isInteractive) return;
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleCardActivation();
+    }
+  };
   const highlightedText = useMemo(() => highlightText(bookmark.tweetText, searchQuery), [bookmark.tweetText, searchQuery]);
   const highlightedAuthorName = useMemo(
     () => searchQuery ? highlightMatch(bookmark.authorDisplayName, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.authorDisplayName,
@@ -219,18 +236,15 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted/40 transition-all duration-150 cursor-pointer ${
+        className={`flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted/40 transition-all duration-150 ${
+          isInteractive ? "cursor-pointer" : ""
+        } ${
           selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
         }${className ? ` ${className}` : ""}`}
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          if (selectionMode) {
-            onSelectionChange?.(bookmark.id, !selected);
-          } else {
-            onSelect?.(bookmark.id);
-          }
-        }}
+        role={isInteractive ? "button" : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
+        onClick={isInteractive ? handleCardActivation : undefined}
+        onKeyDown={handleCardKeyDown}
       >
         {selectionMode && (
           <SelectionToggle
@@ -257,7 +271,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             </span>
           </div>
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
-            {searchQuery ? highlightText(bookmark.tweetText, searchQuery) : bookmark.tweetText}
+            {highlightedText}
           </p>
           {bookmark.tags.length > 0 && (
             <div className="flex gap-1 mt-1">
@@ -295,18 +309,15 @@ export const BookmarkCard = memo(function BookmarkCard({
 
     return (
       <div
-        className={`group relative rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer ${
+        className={`group relative rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ${
+          isInteractive ? "cursor-pointer" : ""
+        } ${
           selected ? "ring-2 ring-primary border-primary/40" : ""
         }${className ? ` ${className}` : ""}`}
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          if (selectionMode) {
-            onSelectionChange?.(bookmark.id, !selected);
-          } else {
-            onSelect?.(bookmark.id);
-          }
-        }}
+        role={isInteractive ? "button" : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
+        onClick={isInteractive ? handleCardActivation : undefined}
+        onKeyDown={handleCardKeyDown}
       >
         {selectionMode && (
           <div className="absolute top-2 right-2 z-10">
@@ -346,7 +357,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             </span>
           </div>
           <p className="text-sm text-foreground line-clamp-3">
-            {searchQuery ? highlightText(bookmark.tweetText, searchQuery) : bookmark.tweetText}
+            {highlightedText}
           </p>
           {bookmark.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -406,15 +417,14 @@ export const BookmarkCard = memo(function BookmarkCard({
   return (
     <div
       className={`group px-5 py-3 border-b border-border hover:bg-muted/30 transition-all duration-150 ${
+        isInteractive ? "cursor-pointer" : ""
+      } ${
         selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
       }${className ? ` ${className}` : ""}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => {
-        if (selectionMode) {
-          onSelectionChange?.(bookmark.id, !selected);
-        }
-      }}
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={isInteractive ? handleCardActivation : undefined}
+      onKeyDown={handleCardKeyDown}
     >
       <div className="flex gap-3">
         {selectionMode && (

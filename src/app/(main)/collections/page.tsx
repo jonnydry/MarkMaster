@@ -69,6 +69,16 @@ export default function CollectionsPage() {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
   };
 
+  const handleCollectionCardKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    collectionId: string
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      router.push(`/collections/${collectionId}`);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
@@ -156,8 +166,11 @@ export default function CollectionsPage() {
                     {userCollections.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group cursor-pointer ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        role="link"
+                        tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
+                        onKeyDown={(event) => handleCollectionCardKeyDown(event, col.id)}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -174,6 +187,7 @@ export default function CollectionsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive"
+                              aria-label={`Delete collection ${col.name}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (window.confirm("Delete this collection? This cannot be undone.")) {
@@ -220,8 +234,11 @@ export default function CollectionsPage() {
                     {xFolders.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group border-dashed cursor-pointer ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group border-dashed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        role="link"
+                        tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
+                        onKeyDown={(event) => handleCollectionCardKeyDown(event, col.id)}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">

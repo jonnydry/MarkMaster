@@ -163,6 +163,24 @@ function DashboardContent() {
     () => new Set(visibleSelectedBookmarkIds),
     [visibleSelectedBookmarkIds]
   );
+  const bookmarkById = useMemo(
+    () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
+    [bookmarks]
+  );
+  const tagDialogBookmarks = useMemo(() => {
+    const targetIds = selectedBookmarkIds.length > 0 ? visibleSelectedBookmarkIds : tagTargetIds;
+    return targetIds.flatMap((id) => {
+      const bookmark = bookmarkById.get(id);
+      return bookmark ? [bookmark] : [];
+    });
+  }, [bookmarkById, selectedBookmarkIds.length, tagTargetIds, visibleSelectedBookmarkIds]);
+  const collectionDialogBookmarks = useMemo(() => {
+    const targetIds = selectedBookmarkIds.length > 0 ? visibleSelectedBookmarkIds : collectionTargetIds;
+    return targetIds.flatMap((id) => {
+      const bookmark = bookmarkById.get(id);
+      return bookmark ? [bookmark] : [];
+    });
+  }, [bookmarkById, collectionTargetIds, selectedBookmarkIds.length, visibleSelectedBookmarkIds]);
 
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
@@ -649,15 +667,7 @@ function DashboardContent() {
         existingTags={tags}
         onAddTag={actions.handleAddTag}
         onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={getSharedTagIds(
-          selectedBookmarkIds.length > 0
-            ? visibleSelectedBookmarkIds
-                .map((id) => bookmarks.find((b) => b.id === id))
-                .filter(Boolean) as BookmarkWithRelations[]
-            : tagTargetIds
-                .map((id) => bookmarks.find((b) => b.id === id))
-                .filter(Boolean) as BookmarkWithRelations[]
-        )}
+        bookmarkTags={getSharedTagIds(tagDialogBookmarks)}
       />
 
       <AddNoteDialog
@@ -678,15 +688,7 @@ function DashboardContent() {
         }}
         bookmarkIds={collectionTargetIds}
         collections={collections}
-        bookmarkCollections={getSharedCollectionIds(
-          selectedBookmarkIds.length > 0
-            ? visibleSelectedBookmarkIds
-                .map((id) => bookmarks.find((b) => b.id === id))
-                .filter(Boolean) as BookmarkWithRelations[]
-            : collectionTargetIds
-                .map((id) => bookmarks.find((b) => b.id === id))
-                .filter(Boolean) as BookmarkWithRelations[]
-        )}
+        bookmarkCollections={getSharedCollectionIds(collectionDialogBookmarks)}
         onAddToCollection={actions.handleAddToCollection}
         onCreateCollection={createCollectionQuick}
       />

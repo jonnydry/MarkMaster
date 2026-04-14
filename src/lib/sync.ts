@@ -194,7 +194,7 @@ export async function syncBookmarks(userId: string, resumeToken?: string): Promi
   const syncedTweetIds = new Set<string>();
 
   let paginationToken: string | undefined = resumeToken;
-  let pagesFetched = resumeToken ? 0 : 0;
+  let pagesFetched = 0;
 
   try {
     do {
@@ -311,9 +311,9 @@ export async function syncBookmarks(userId: string, resumeToken?: string): Promi
       }
     } while (paginationToken);
 
-    // Only sync folders if we're not resuming mid-way (folders are edge-cased
-    // for the initial full sync to avoid extra API calls during pagination)
-    if (!resumeToken) {
+    // Folder-backed collections should refresh once bookmark pagination fully finishes,
+    // including after a resumed sync run.
+    if (!paginationToken && !result.resumeToken) {
       const { folders } = await fetchBookmarkFolders(
         userId,
         user.xId
@@ -423,6 +423,9 @@ export async function syncBookmarks(userId: string, resumeToken?: string): Promi
     if (error instanceof RateLimitError) {
       result.rateLimited = true;
       result.rateLimitResetsAt = error.rateLimit.resetAt;
+      if (paginationToken) {
+        result.resumeToken = paginationToken;
+      }
     } else {
       throw error;
     }

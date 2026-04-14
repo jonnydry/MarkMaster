@@ -14,7 +14,6 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import type { PieLabelRenderProps } from "recharts";
 import { Card } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 import type { AnalyticsData } from "@/types";
@@ -28,6 +27,8 @@ const PIE_COLORS = [
 ];
 
 export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
+  const mediaBreakdown = analytics.mediaBreakdown.filter((item) => item.count > 0);
+
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <Card className="p-4">
@@ -77,40 +78,51 @@ export function RechartsCharts({ analytics }: { analytics: AnalyticsData }) {
 
       <Card className="p-4">
         <h2 className="text-base font-semibold heading-font mb-3">Content Breakdown</h2>
-        {analytics.mediaBreakdown.every((m) => m.count === 0) ? (
+        {mediaBreakdown.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             No data yet
           </p>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={analytics.mediaBreakdown.filter(
-                  (m) => m.count > 0
-                )}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={5}
-                dataKey="count"
-                nameKey="type"
-                label={({ name, percent }: PieLabelRenderProps) =>
-                  `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
-                }
-              >
-                {analytics.mediaBreakdown
-                  .filter((m) => m.count > 0)
-                  .map((_, i) => (
+          <div className="space-y-4">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={mediaBreakdown}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="count"
+                  nameKey="type"
+                >
+                  {mediaBreakdown.map((_, i) => (
                     <Cell
                       key={i}
                       fill={PIE_COLORS[i % PIE_COLORS.length]}
                     />
                   ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+
+            <div className="flex flex-wrap gap-2">
+              {mediaBreakdown.map((item, index) => (
+                <div
+                  key={item.type}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                  />
+                  <span className="font-medium text-foreground">{item.type}</span>
+                  <span>{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </Card>
 

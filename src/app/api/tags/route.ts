@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createTagSchema, deleteTagSchema, patchTagSchema } from "@/lib/validations";
@@ -99,9 +100,13 @@ export async function DELETE(req: NextRequest) {
       },
     });
   } else {
-    await prisma.tag.delete({
+    const deleted = await prisma.tag.deleteMany({
       where: { id: tagId, userId: user.id },
     });
+
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: "Tag not found" }, { status: 404 });
+    }
   }
 
   return NextResponse.json({ success: true });
@@ -132,10 +137,36 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "At least one field must be provided" }, { status: 400 });
   }
 
-  const tag = await prisma.tag.update({
+  try {
+    const updated = await prisma.tag.updateMany({
+      where: { id: tagId, userId: user.id },
+      data,
+    });
+
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "Tag not found" }, { status: 404 });
+    }
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "A tag with that name already exists" },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
+
+  const tag = await prisma.tag.findFirst({
     where: { id: tagId, userId: user.id },
-    data,
   });
+
+  if (!tag) {
+    return NextResponse.json({ error: "Tag not found" }, { status: 404 });
+  }
 
   return NextResponse.json(tag);
 }

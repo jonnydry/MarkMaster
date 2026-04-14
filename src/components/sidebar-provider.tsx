@@ -4,14 +4,13 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
 const STORAGE_KEY = "markmaster-sidebar-expanded";
+const SIDEBAR_CHANGE_EVENT = "markmaster-sidebar-expanded-change";
 
 function readStoredExpanded(): boolean {
   if (typeof window === "undefined") return true;
@@ -21,6 +20,28 @@ function readStoredExpanded(): boolean {
     return raw === "true";
   } catch {
     return true;
+  }
+}
+
+function subscribeStoredExpanded(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  const handleChange = () => onStoreChange();
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(SIDEBAR_CHANGE_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(SIDEBAR_CHANGE_EVENT, handleChange);
+  };
+}
+
+function writeStoredExpanded(value: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(value));
+    window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -53,29 +74,17 @@ export function useSidebar() {
 }
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  // Fixed initial value so server HTML matches the client's first paint; then sync from localStorage.
-  const [expanded, setExpandedState] = useState(true);
-  const skipFirstPersist = useRef(true);
-
-  useEffect(() => {
-    setExpandedState(readStoredExpanded());
-  }, []);
-
-  useEffect(() => {
-    if (skipFirstPersist.current) {
-      skipFirstPersist.current = false;
-      return;
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, String(expanded));
-    } catch {
-      /* ignore */
-    }
-  }, [expanded]);
+  const expanded = useSyncExternalStore(
+    subscribeStoredExpanded,
+    readStoredExpanded,
+    () => true
+  );
 
   const setExpanded = useCallback(
     (value: boolean | ((prev: boolean) => boolean)) => {
-      setExpandedState(value);
+      writeStoredExpanded(
+        typeof value === "function" ? value(readStoredExpanded()) : value
+      );
     },
     []
   );

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { nanoid } from "nanoid";
 
 export async function POST(
   _req: NextRequest,

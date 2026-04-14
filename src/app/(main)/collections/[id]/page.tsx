@@ -67,6 +67,7 @@ export default function CollectionDetailPage({
     data: collection,
     isPending,
     isError,
+    refetch,
   } = useQuery({
     queryKey: ["collection", id],
     queryFn: async () => {
@@ -86,6 +87,12 @@ export default function CollectionDetailPage({
     : [];
   const isSyncedFromX = collection?.type === "x_folder";
   const isUserCollection = collection?.type === "user_collection";
+
+  const cancelEditingName = () => {
+    if (!collection) return;
+    setName(collection.name);
+    setEditingName(false);
+  };
 
   const handleCopyAsCollection = async () => {
     if (!collection) return;
@@ -163,7 +170,13 @@ export default function CollectionDetailPage({
   };
 
   const handleUpdateName = async () => {
-    if (!name.trim()) return;
+    if (!collection) return;
+
+    if (!name.trim()) {
+      cancelEditingName();
+      return;
+    }
+
     try {
       await sendJson(`/api/collections/${id}`, {
         method: "PATCH",
@@ -227,9 +240,14 @@ export default function CollectionDetailPage({
           This collection could not be loaded. It may have been deleted or you
           may not have access.
         </p>
-        <Button variant="outline" onClick={() => router.push("/collections")}>
-          Back to collections
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            Retry
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/collections")}>
+            Back to collections
+          </Button>
+        </div>
       </div>
     );
   }
@@ -252,7 +270,17 @@ export default function CollectionDetailPage({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={handleUpdateName}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleUpdateName(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleUpdateName();
+                  }
+
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelEditingName();
+                  }
+                }}
                 className="text-lg font-semibold bg-transparent border-b border-primary outline-none w-full"
               />
             ) : (
@@ -262,20 +290,21 @@ export default function CollectionDetailPage({
                 ) : (
                   <Layers className="w-5 h-5 text-primary shrink-0" />
                 )}
-                <h1
-                  className={`text-xl font-bold truncate transition-colors ${
-                  isSyncedFromX
-                    ? "cursor-default"
-                    : "cursor-pointer hover:text-primary"
-                }`}
-                onClick={() => {
-                  if (isSyncedFromX) return;
-                  setName(collection.name);
-                  setEditingName(true);
-                }}
-              >
-                {collection.name}
-              </h1>
+                {isSyncedFromX ? (
+                  <h1 className="text-xl font-bold truncate">{collection.name}</h1>
+                ) : (
+                  <button
+                    type="button"
+                    className="truncate text-left text-xl font-bold transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    onClick={() => {
+                      setName(collection.name);
+                      setEditingName(true);
+                    }}
+                    aria-label={`Edit collection name ${collection.name}`}
+                  >
+                    {collection.name}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -317,14 +346,16 @@ export default function CollectionDetailPage({
                       <Copy className="w-3.5 h-3.5" />
                       Copy Link
                     </Button>
-                    <a
-                      href={`/share/${collection.shareSlug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                     <a
+                       href={`/share/${collection.shareSlug}`}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+                       aria-label="Open public collection page"
+                       title="Open public collection page"
+                     >
+                       <ExternalLink className="w-3.5 h-3.5" />
+                     </a>
                   </>
                 )}
                 {sortedItems.length > 0 &&
