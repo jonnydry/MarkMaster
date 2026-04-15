@@ -41,8 +41,16 @@ function formatCount(n: number): string {
   return n.toString();
 }
 
+const MENTION_OR_URL_SPLITTER = /((?:@|#)\w+|https?:\/\/\S+)/g;
+const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
+
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return s.replace(REGEX_ESCAPE_RE, "\\$&");
+}
+
+function buildSearchRegex(searchQuery: string | undefined): RegExp | null {
+  if (!searchQuery) return null;
+  return new RegExp(`(${escapeRegExp(searchQuery)})`, "gi");
 }
 
 function highlightMatch(text: string, regex: RegExp): React.ReactNode {
@@ -66,11 +74,8 @@ function highlightMatch(text: string, regex: RegExp): React.ReactNode {
 }
 
 function highlightText(text: string, searchQuery?: string): React.ReactNode {
-  const searchRegex = searchQuery
-    ? new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")
-    : null;
-
-  const parts = text.split(/((?:@|#)\w+|https?:\/\/\S+)/g);
+  const searchRegex = buildSearchRegex(searchQuery);
+  const parts = text.split(MENTION_OR_URL_SPLITTER);
   return parts.map((part, i) => {
     if (part.startsWith("@") || part.startsWith("#")) {
       if (searchRegex) {
@@ -219,19 +224,24 @@ export const BookmarkCard = memo(function BookmarkCard({
       handleCardActivation();
     }
   };
-  const highlightedText = useMemo(() => highlightText(bookmark.tweetText, searchQuery), [bookmark.tweetText, searchQuery]);
-  const highlightedAuthorName = useMemo(
-    () => searchQuery ? highlightMatch(bookmark.authorDisplayName, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.authorDisplayName,
-    [bookmark.authorDisplayName, searchQuery]
+  const highlightedText = useMemo(
+    () => highlightText(bookmark.tweetText, searchQuery),
+    [bookmark.tweetText, searchQuery]
   );
-  const highlightedUsername = useMemo(
-    () => searchQuery ? highlightMatch(bookmark.authorUsername, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.authorUsername,
-    [bookmark.authorUsername, searchQuery]
-  );
-  const highlightedNote = useMemo(
-    () => searchQuery && bookmark.notes[0] ? highlightMatch(bookmark.notes[0].content, new RegExp(`(${escapeRegExp(searchQuery)})`, "gi")) : bookmark.notes[0]?.content,
-    [bookmark.notes, searchQuery]
-  );
+  const highlightedAuthorName = useMemo(() => {
+    const regex = buildSearchRegex(searchQuery);
+    return regex ? highlightMatch(bookmark.authorDisplayName, regex) : bookmark.authorDisplayName;
+  }, [bookmark.authorDisplayName, searchQuery]);
+  const highlightedUsername = useMemo(() => {
+    const regex = buildSearchRegex(searchQuery);
+    return regex ? highlightMatch(bookmark.authorUsername, regex) : bookmark.authorUsername;
+  }, [bookmark.authorUsername, searchQuery]);
+  const highlightedNote = useMemo(() => {
+    const note = bookmark.notes[0]?.content;
+    if (!note) return note;
+    const regex = buildSearchRegex(searchQuery);
+    return regex ? highlightMatch(note, regex) : note;
+  }, [bookmark.notes, searchQuery]);
 
   if (viewMode === "compact") {
     return (
@@ -258,7 +268,10 @@ export const BookmarkCard = memo(function BookmarkCard({
               {highlightedAuthorName}
             </span>
             {bookmark.authorVerified && (
-              <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+              <BadgeCheck
+                className="size-3.5 text-primary shrink-0"
+                aria-label="Verified account"
+              />
             )}
             <span className="text-muted-foreground truncate">
               @{highlightedUsername}
@@ -437,9 +450,9 @@ export const BookmarkCard = memo(function BookmarkCard({
           <Image
             src={bookmark.authorProfileImage}
             alt={`${bookmark.authorDisplayName} avatar`}
-width={40}
-                height={40}
-                className="w-10 h-10 rounded-full shrink-0"
+            width={40}
+            height={40}
+            className="w-10 h-10 rounded-full shrink-0"
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-secondary shrink-0 flex items-center justify-center">
@@ -455,7 +468,10 @@ width={40}
                 {highlightedAuthorName}
               </span>
               {bookmark.authorVerified && (
-                <BadgeCheck className="w-[14px] h-[14px] text-primary shrink-0" />
+                <BadgeCheck
+                  className="size-3.5 text-primary shrink-0"
+                  aria-label="Verified account"
+                />
               )}
               <span className="text-muted-foreground truncate">
                 @{highlightedUsername}
@@ -524,25 +540,37 @@ width={40}
               {mediaItems.slice(0, 4).map((m, i) => {
                 const url = m.url || m.preview_image_url;
                 if (!url || imageError.has(url)) return null;
+                const isLastTile = i === 3;
+                const extraCount = mediaItems.length - 4;
+                const showOverlay = isLastTile && extraCount > 0;
                 return (
-                  <Image
-                    key={i}
-                    src={url}
-                    alt={`Media ${i + 1} from @${bookmark.authorUsername}`}
-                    width={m.width || 1200}
-                    height={m.height || 900}
-                    sizes={
-                      mediaItems.length === 1
-                        ? "(max-width: 768px) 100vw, 672px"
-                        : "(max-width: 768px) 50vw, 336px"
-                    }
-                    className={`w-full object-cover ${
-                      mediaItems.length === 1 ? "max-h-80" : "aspect-square"
-                    }`}
-                    onError={() =>
-                      setImageError((prev) => new Set(prev).add(url))
-                    }
-                  />
+                  <div key={i} className="relative">
+                    <Image
+                      src={url}
+                      alt={`Media ${i + 1} from @${bookmark.authorUsername}`}
+                      width={m.width || 1200}
+                      height={m.height || 900}
+                      sizes={
+                        mediaItems.length === 1
+                          ? "(max-width: 768px) 100vw, 672px"
+                          : "(max-width: 768px) 50vw, 336px"
+                      }
+                      className={`w-full object-cover ${
+                        mediaItems.length === 1 ? "max-h-80" : "aspect-square"
+                      }`}
+                      onError={() =>
+                        setImageError((prev) => new Set(prev).add(url))
+                      }
+                    />
+                    {showOverlay && (
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white"
+                      >
+                        +{extraCount}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -585,27 +613,30 @@ width={40}
           )}
 
           {metrics && (
-            <div className="flex items-center gap-3 mt-2 text-muted-foreground">
+            <div
+              className="flex items-center gap-3 mt-2 text-muted-foreground"
+              aria-label="Tweet engagement"
+            >
               <span
                 className="flex items-center gap-1 text-xs"
-                title={`${metrics.reply_count} replies`}
+                aria-label={`${metrics.reply_count} replies`}
               >
-                <MessageCircle className="w-[13px] h-[13px]" />
-                {formatCount(metrics.reply_count)}
+                <MessageCircle className="size-3.5" aria-hidden />
+                <span aria-hidden>{formatCount(metrics.reply_count)}</span>
               </span>
               <span
                 className="flex items-center gap-1 text-xs"
-                title={`${metrics.retweet_count} retweets`}
+                aria-label={`${metrics.retweet_count} retweets`}
               >
-                <Repeat2 className="w-[13px] h-[13px]" />
-                {formatCount(metrics.retweet_count)}
+                <Repeat2 className="size-3.5" aria-hidden />
+                <span aria-hidden>{formatCount(metrics.retweet_count)}</span>
               </span>
               <span
                 className="flex items-center gap-1 text-xs"
-                title={`${metrics.like_count} likes`}
+                aria-label={`${metrics.like_count} likes`}
               >
-                <Heart className="w-[13px] h-[13px]" />
-                {formatCount(metrics.like_count)}
+                <Heart className="size-3.5" aria-hidden />
+                <span aria-hidden>{formatCount(metrics.like_count)}</span>
               </span>
             </div>
           )}

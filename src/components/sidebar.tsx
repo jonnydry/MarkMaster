@@ -64,7 +64,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-sidebar-border/70 bg-sidebar py-3 shadow-[inset_-1px_0_0_rgba(255,255,255,0.05)] transition-[width,padding] duration-300 ease-out motion-reduce:transition-none dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${
+      className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-sidebar-border/70 bg-sidebar py-3 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none ${
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
       }`}
     >
@@ -122,34 +122,37 @@ export function Sidebar({
                     Tags appear as you add them to bookmarks
                   </p>
                 ) : (
-                  <div className="space-y-0.5">
-                    {tags.slice(0, 8).map((tag) => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => onTagToggle(tag.id)}
-                        className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 ${
-                          selectedTags.includes(tag.id)
-                            ? "bg-primary/10 text-foreground font-medium"
-                            : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                        }`}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            className={`h-2 w-2 shrink-0 rounded-full transition-all ${
-                              selectedTags.includes(tag.id)
-                                ? "ring-2 ring-primary/30 scale-110"
-                                : ""
-                            }`}
-                            style={{ backgroundColor: tag.color }}
-                          />
-                          <span className="truncate">{tag.name}</span>
-                        </span>
-                        <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                          {tag._count.bookmarks}
-                        </span>
-                      </button>
-                    ))}
+                  <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain scrollbar-thin pr-0.5">
+                    {tags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => onTagToggle(tag.id)}
+                          aria-pressed={isSelected}
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                            isSelected
+                              ? "bg-primary/10 text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              aria-hidden
+                              className={`h-2 w-2 shrink-0 rounded-full transition-transform ${
+                                isSelected ? "ring-2 ring-primary/30 scale-110" : ""
+                              }`}
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span className="truncate">{tag.name}</span>
+                          </span>
+                          <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                            {tag._count.bookmarks}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -162,9 +165,10 @@ export function Sidebar({
                   <button
                     type="button"
                     onClick={onCreateCollection}
-                    className="flex h-5 w-5 items-center justify-center rounded-md text-sm leading-none text-muted-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
+                    aria-label="Create collection"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-base leading-none text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
-                    +
+                    <span aria-hidden>+</span>
                   </button>
                 </div>
                 {!hasCollections ? (

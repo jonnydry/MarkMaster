@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef, useMemo } from "react";
+import { useState, useEffect, Suspense, useRef, useMemo, useCallback } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -21,6 +21,7 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { getStaggerClass } from "@/lib/stagger";
 import type {
   ViewMode,
   BookmarkWithRelations,
@@ -201,37 +202,37 @@ function DashboardContent() {
 
   const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedBookmarkIds([]);
     setSelectionMode(false);
-  };
+  }, []);
 
-  const toggleBookmarkSelection = (bookmarkId: string, selected: boolean) => {
+  const toggleBookmarkSelection = useCallback((bookmarkId: string, selected: boolean) => {
     setSelectedBookmarkIds((current) => {
       if (selected) {
         return current.includes(bookmarkId) ? current : [...current, bookmarkId];
       }
       return current.filter((id) => id !== bookmarkId);
     });
-  };
+  }, []);
 
-  const selectVisibleBookmarks = () => {
+  const selectVisibleBookmarks = useCallback(() => {
     setSelectedBookmarkIds(bookmarks.map((bookmark) => bookmark.id));
-  };
+  }, [bookmarks]);
 
-  const openBulkTagDialog = () => {
+  const openBulkTagDialog = useCallback(() => {
     if (visibleSelectedBookmarkIds.length === 0) return;
     setTagTargetIds(visibleSelectedBookmarkIds);
     setTagDialogOpen(true);
-  };
+  }, [visibleSelectedBookmarkIds]);
 
-  const openBulkCollectionDialog = () => {
+  const openBulkCollectionDialog = useCallback(() => {
     if (visibleSelectedBookmarkIds.length === 0) return;
     setCollectionTargetIds(visibleSelectedBookmarkIds);
     setCollectionDialogOpen(true);
-  };
+  }, [visibleSelectedBookmarkIds]);
 
-  const handleBulkHide = async () => {
+  const handleBulkHide = useCallback(async () => {
     if (visibleSelectedBookmarkIds.length === 0) return;
     const confirmed = window.confirm(
       `Hide ${visibleSelectedBookmarkIds.length} bookmark${visibleSelectedBookmarkIds.length === 1 ? "" : "s"} from MarkMaster?`
@@ -239,7 +240,32 @@ function DashboardContent() {
     if (!confirmed) return;
 
     await actions.handleDeleteBookmark(visibleSelectedBookmarkIds);
-  };
+  }, [actions, visibleSelectedBookmarkIds]);
+
+  const handleBookmarkAddTag = useCallback((id: string) => {
+    setActiveBookmarkId(id);
+    setTagTargetIds([id]);
+    setTagDialogOpen(true);
+  }, []);
+
+  const handleBookmarkAddToCollection = useCallback((id: string) => {
+    setActiveBookmarkId(id);
+    setCollectionTargetIds([id]);
+    setCollectionDialogOpen(true);
+  }, []);
+
+  const handleBookmarkAddNote = useCallback((id: string) => {
+    setActiveBookmarkId(id);
+    setNoteDialogOpen(true);
+  }, []);
+
+  const handleSyncComplete = useCallback(() => {
+    void invalidateLibraryQueries(queryClient);
+  }, [queryClient]);
+
+  const handleCreateCollectionOpen = useCallback(() => {
+    setCreateCollectionOpen(true);
+  }, []);
 
   useKeyboardShortcuts({
     activeBookmarkId: selectionMode ? null : activeBookmarkId,
@@ -317,10 +343,10 @@ function DashboardContent() {
           collections={collections}
           selectedTags={filters.selectedTags}
           onTagToggle={filters.toggleTag}
-          onCreateCollection={() => setCreateCollectionOpen(true)}
+          onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
           totalBookmarks={total}
-          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+          onSyncComplete={handleSyncComplete}
         />
       </div>
 
@@ -333,10 +359,10 @@ function DashboardContent() {
                 collections={collections}
                 selectedTags={filters.selectedTags}
                 onTagToggle={filters.toggleTag}
-                onCreateCollection={() => setCreateCollectionOpen(true)}
+                onCreateCollection={handleCreateCollectionOpen}
                 lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
                 totalBookmarks={total}
-                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                onSyncComplete={handleSyncComplete}
               />
             </div>
 
@@ -346,10 +372,11 @@ function DashboardContent() {
                   filters.setSelectedTags([]);
                   filters.setMediaFilter("all");
                 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
+                aria-label={`Show all bookmarks (${total.toLocaleString()})`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 All Bookmarks
-                <span className="text-xs opacity-70">{total.toLocaleString()}</span>
+                <span className="text-xs opacity-70" aria-hidden>{total.toLocaleString()}</span>
               </button>
               {filters.selectedTags.map((tagId) => {
                 const tag = tags.find((t) => t.id === tagId);
@@ -374,20 +401,25 @@ function DashboardContent() {
                 </button>
               )}
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                type="button"
+                onClick={() => setShowFilters((v) => !v)}
+                aria-expanded={showFilters}
+                aria-controls="dashboard-filter-panel"
+                aria-label={showFilters ? "Hide filters" : "Show filters"}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   showFilters
                     ? "bg-secondary text-foreground border-border"
                     : "text-muted-foreground bg-secondary hover:text-foreground border-border"
                 }`}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <SlidersHorizontal className="size-3.5" aria-hidden />
                 <span className="hidden sm:inline">Filters</span>
                 {filters.hasActiveFilters && (
-                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
                 )}
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (selectionMode) {
                     clearSelection();
@@ -395,13 +427,15 @@ function DashboardContent() {
                     setSelectionMode(true);
                   }
                 }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                aria-pressed={selectionMode}
+                aria-label={selectionMode ? "Exit selection mode" : "Enter selection mode"}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   selectionMode
                     ? "bg-secondary text-foreground border-border"
                     : "text-muted-foreground bg-secondary hover:text-foreground border-border"
                 }`}
               >
-                <CheckSquare className="w-3.5 h-3.5" />
+                <CheckSquare className="size-3.5" aria-hidden />
                 <span className="hidden sm:inline">
                   {selectionMode ? "Done" : "Select"}
                 </span>
@@ -423,7 +457,7 @@ function DashboardContent() {
             <p className="px-5 pb-1.5 text-xs text-muted-foreground">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-secondary/50">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-secondary/50 animate-slide-down-fade">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-foreground">
                   {visibleSelectedBookmarkIds.length > 0
@@ -476,21 +510,23 @@ function DashboardContent() {
         </header>
 
         {showFilters && (
-          <FilterPanel
-            mediaFilter={filters.mediaFilter}
-            onMediaFilterChange={filters.setMediaFilter}
-            authorFilter={filters.authorFilter}
-            onAuthorFilterChange={filters.setAuthorFilter}
-            dateFrom={filters.dateFrom}
-            dateTo={filters.dateTo}
-            onDateFromChange={filters.setDateFrom}
-            onDateToChange={filters.setDateTo}
-            selectedTags={filters.selectedTags}
-            onTagToggle={filters.toggleTag}
-            tags={tags}
-            onClearAll={filters.clearFilters}
-            hasActiveFilters={filters.hasActiveFilters}
-          />
+          <div id="dashboard-filter-panel" className="animate-slide-down-fade">
+            <FilterPanel
+              mediaFilter={filters.mediaFilter}
+              onMediaFilterChange={filters.setMediaFilter}
+              authorFilter={filters.authorFilter}
+              onAuthorFilterChange={filters.setAuthorFilter}
+              dateFrom={filters.dateFrom}
+              dateTo={filters.dateTo}
+              onDateFromChange={filters.setDateFrom}
+              onDateToChange={filters.setDateTo}
+              selectedTags={filters.selectedTags}
+              onTagToggle={filters.toggleTag}
+              tags={tags}
+              onClearAll={filters.clearFilters}
+              hasActiveFilters={filters.hasActiveFilters}
+            />
+          </div>
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
@@ -506,24 +542,30 @@ function DashboardContent() {
           </div>
 
           {isLoading ? (
-            <div className="max-w-2xl mx-auto space-y-0">
+            <div
+              className="max-w-2xl mx-auto space-y-0"
+              role="status"
+              aria-live="polite"
+              aria-label="Loading bookmarks"
+            >
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="px-5 py-3 border-b border-border animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
+                <div key={i} className={`px-5 py-3 border-b border-border ${getStaggerClass(i, "animate-fade-in") ?? ""}`}>
                   <div className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+                    <div className="w-10 h-10 rounded-full skeleton-shimmer shrink-0" />
                     <div className="flex-1 space-y-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="h-3.5 w-20 bg-muted rounded" />
-                        <div className="h-3 w-14 bg-muted rounded" />
+                        <div className="h-3.5 w-20 rounded skeleton-shimmer" />
+                        <div className="h-3 w-14 rounded skeleton-shimmer" />
                       </div>
                       <div className="space-y-1.5">
-                        <div className="h-3 w-full bg-muted rounded" />
-                        <div className="h-3 w-4/5 bg-muted rounded" />
+                        <div className="h-3 w-full rounded skeleton-shimmer" />
+                        <div className="h-3 w-4/5 rounded skeleton-shimmer" />
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
+              <span className="sr-only">Loading bookmarks</span>
             </div>
           ) : isError ? (
             <div className="flex items-center justify-center h-64 px-6">
@@ -550,7 +592,7 @@ function DashboardContent() {
               </div>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
               {bookmarks.map((bookmark, i) => (
                 <BookmarkCard
                   key={bookmark.id}
@@ -566,22 +608,11 @@ function DashboardContent() {
                   selectionMode={selectionMode}
                   onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
-                  onAddTag={(id) => {
-                    setActiveBookmarkId(id);
-                    setTagTargetIds([id]);
-                    setTagDialogOpen(true);
-                  }}
-                  onAddToCollection={(id) => {
-                    setActiveBookmarkId(id);
-                    setCollectionTargetIds([id]);
-                    setCollectionDialogOpen(true);
-                  }}
-                  onAddNote={(id) => {
-                    setActiveBookmarkId(id);
-                    setNoteDialogOpen(true);
-                  }}
+                  onAddTag={handleBookmarkAddTag}
+                  onAddToCollection={handleBookmarkAddToCollection}
+                  onAddNote={handleBookmarkAddNote}
                   onDelete={actions.handleDeleteBookmark}
-                  className={i < 8 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : undefined}
+                  className={getStaggerClass(i, "animate-fade-in-up")}
                 />
               ))}
             </div>
@@ -602,22 +633,11 @@ function DashboardContent() {
                   selectionMode={selectionMode}
                   onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
-                  onAddTag={(id) => {
-                    setActiveBookmarkId(id);
-                    setTagTargetIds([id]);
-                    setTagDialogOpen(true);
-                  }}
-                  onAddToCollection={(id) => {
-                    setActiveBookmarkId(id);
-                    setCollectionTargetIds([id]);
-                    setCollectionDialogOpen(true);
-                  }}
-                  onAddNote={(id) => {
-                    setActiveBookmarkId(id);
-                    setNoteDialogOpen(true);
-                  }}
+                  onAddTag={handleBookmarkAddTag}
+                  onAddToCollection={handleBookmarkAddToCollection}
+                  onAddNote={handleBookmarkAddNote}
                   onDelete={actions.handleDeleteBookmark}
-                  className={i < 8 ? `animate-fade-in stagger-${Math.min(i + 1, 5)}` : undefined}
+                  className={getStaggerClass(i, "animate-fade-in")}
                 />
               ))}
             </div>
@@ -625,23 +645,28 @@ function DashboardContent() {
 
           {totalPages > 1 && (
             <div className="flex flex-col items-center gap-3 py-4 border-t border-border">
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm" role="navigation" aria-label="Pagination">
                 <button
+                  type="button"
                   onClick={() => filters.setPage((p) => p - 1)}
                   disabled={filters.page <= 1}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  aria-label="Previous page"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="size-4" aria-hidden />
                 </button>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {filters.page} <span className="text-muted-foreground/50">of</span> {totalPages}
+                <span className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+                  <span className="sr-only">Page </span>
+                  {filters.page} <span className="text-muted-foreground/50" aria-hidden>of</span> <span className="sr-only">of</span> {totalPages}
                 </span>
                 <button
+                  type="button"
                   onClick={() => filters.setPage((p) => p + 1)}
                   disabled={filters.page >= totalPages}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  aria-label="Next page"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="size-4" aria-hidden />
                 </button>
               </div>
               <div className="w-24 h-1 rounded-full bg-muted overflow-hidden">

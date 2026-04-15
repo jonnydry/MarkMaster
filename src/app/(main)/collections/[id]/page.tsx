@@ -281,29 +281,33 @@ export default function CollectionDetailPage({
                     cancelEditingName();
                   }
                 }}
-                className="text-lg font-semibold bg-transparent border-b border-primary outline-none w-full"
+                className="text-2xl font-bold heading-font bg-transparent border-b border-primary outline-none w-full tracking-tight"
               />
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 {isSyncedFromX ? (
-                  <FolderOpen className="w-5 h-5 text-muted-foreground shrink-0" />
+                  <FolderOpen className="w-6 h-6 text-muted-foreground shrink-0" aria-hidden />
                 ) : (
-                  <Layers className="w-5 h-5 text-primary shrink-0" />
+                  <Layers className="w-6 h-6 text-primary shrink-0" aria-hidden />
                 )}
                 {isSyncedFromX ? (
-                  <h1 className="text-xl font-bold truncate">{collection.name}</h1>
-                ) : (
-                  <button
-                    type="button"
-                    className="truncate text-left text-xl font-bold transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    onClick={() => {
-                      setName(collection.name);
-                      setEditingName(true);
-                    }}
-                    aria-label={`Edit collection name ${collection.name}`}
-                  >
+                  <h1 className="truncate text-2xl font-bold heading-font tracking-tight">
                     {collection.name}
-                  </button>
+                  </h1>
+                ) : (
+                  <h1 className="min-w-0 truncate text-2xl font-bold heading-font tracking-tight">
+                    <button
+                      type="button"
+                      className="max-w-full truncate rounded-md text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      onClick={() => {
+                        setName(collection.name);
+                        setEditingName(true);
+                      }}
+                      aria-label={`Edit collection name ${collection.name}`}
+                    >
+                      {collection.name}
+                    </button>
+                  </h1>
                 )}
               </div>
             )}

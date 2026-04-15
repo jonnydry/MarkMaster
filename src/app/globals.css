@@ -168,6 +168,22 @@
   }
 }
 
+@keyframes shimmer {
+  0% { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+
+@keyframes slide-down-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -206,4 +222,32 @@
   .stagger-3 { animation-delay: 150ms; }
   .stagger-4 { animation-delay: 200ms; }
   .stagger-5 { animation-delay: 250ms; }
+  .skeleton-shimmer {
+    position: relative;
+    background-color: var(--muted);
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--foreground) 6%, transparent) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    background-position: -150% 0;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer {
+      animation: none;
+      background-image: none;
+    }
+  }
+  .animate-slide-down-fade {
+    animation: slide-down-fade 0.25s ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-slide-down-fade {
+      animation: none;
+    }
+  }
 }

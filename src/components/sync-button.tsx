@@ -23,6 +23,8 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
       queryKey: ["sync-status"],
       queryFn: () => fetchJson("/api/bookmarks/sync"),
       refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
     });
 
   const currentRun = syncStatus?.currentRun;

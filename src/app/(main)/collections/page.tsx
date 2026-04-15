@@ -20,6 +20,7 @@ import {
   invalidateCollectionsQuery,
   invalidateLibraryQueries,
 } from "@/lib/query-invalidation";
+import { getStaggerClass } from "@/lib/stagger";
 import { toast } from "sonner";
 import type { DbUser } from "@/lib/auth";
 
@@ -166,7 +167,7 @@ export default function CollectionsPage() {
                     {userCollections.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        className={`group p-4 cursor-pointer ring-border hover:ring-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
                         role="link"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
@@ -234,7 +235,7 @@ export default function CollectionsPage() {
                     {xFolders.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`p-4 hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group border-dashed cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${i < 6 ? `animate-fade-in-up stagger-${Math.min(i + 1, 5)}` : ""}`}
+                        className={`group p-4 cursor-pointer ring-border hover:ring-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
                         role="link"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
