@@ -73,12 +73,12 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
   };
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-1.5 px-1">
+    <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-xl border border-hairline-soft bg-surface-2 p-2 shadow-sm">
       <Button
         type="button"
         onClick={handleSync}
         disabled={isAnySyncRunning}
-        className="h-8 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        className="h-8 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
       >
         <RefreshCw
           className={`h-3.5 w-3.5 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}

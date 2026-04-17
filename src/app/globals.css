@@ -18,6 +18,13 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-3: var(--surface-3);
+  --color-surface-2: var(--surface-2);
+  --color-surface-1: var(--surface-1);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-hairline-soft: var(--hairline-soft);
+  --color-accent-soft: var(--accent-soft);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -90,6 +97,17 @@
   --sidebar-accent-foreground: #3b82f6;
   --sidebar-border: #e0dbd4;
   --sidebar-ring: #3b82f6;
+  --surface-1: #ffffff;
+  --surface-2: #f4efe7;
+  --surface-3: #ede7de;
+  --surface-elevated: #fffcf7;
+  --hairline-soft: rgba(26, 24, 20, 0.08);
+  --hairline-strong: rgba(26, 24, 20, 0.12);
+  --accent-soft: rgba(59, 130, 246, 0.1);
+  --page-shell-depth-top: #fbfaf7;
+  --page-shell-depth-bottom: #f3f1ec;
+  --page-shell-ambient: rgba(59, 130, 246, 0.08);
+  --page-shell-highlight: rgba(255, 255, 255, 0.4);
   --success: #22c55e;
 }
 
@@ -127,6 +145,17 @@
   --sidebar-accent-foreground: #5b9cf6;
   --sidebar-border: #262626;
   --sidebar-ring: #3b82f6;
+  --surface-1: #161616;
+  --surface-2: #1a1a1a;
+  --surface-3: #1f2023;
+  --surface-elevated: #222428;
+  --hairline-soft: rgba(255, 255, 255, 0.05);
+  --hairline-strong: rgba(255, 255, 255, 0.08);
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --page-shell-depth-top: #121418;
+  --page-shell-depth-bottom: #0f1012;
+  --page-shell-ambient: rgba(59, 130, 246, 0.09);
+  --page-shell-highlight: rgba(255, 255, 255, 0.035);
   --success: #4ade80;
 }
 
@@ -213,6 +242,28 @@
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: oklch(0.4 0 0);
+  }
+  .app-shell-bg {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        120% 52% at 82% -6%,
+        var(--page-shell-ambient) 0%,
+        rgba(59, 130, 246, 0.045) 24%,
+        rgba(59, 130, 246, 0.014) 40%,
+        rgba(59, 130, 246, 0) 64%
+      ),
+      radial-gradient(
+        72% 28% at 76% 0%,
+        var(--page-shell-highlight) 0%,
+        rgba(255, 255, 255, 0) 58%
+      ),
+      linear-gradient(
+        180deg,
+        var(--page-shell-depth-top) 0%,
+        var(--background) 44%,
+        var(--page-shell-depth-bottom) 100%
+      );
   }
   .heading-font {
     font-family: var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;

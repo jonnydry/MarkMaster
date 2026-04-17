@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Globe,
   Lock,
-  Trash2,
   ChevronUp,
   ChevronDown,
   Copy,
@@ -82,9 +81,18 @@ export default function CollectionDetailPage({
     },
   });
 
-  const sortedItems = collection
-    ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder)
-    : [];
+  const sortedItems = useMemo(
+    () =>
+      collection ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder) : [],
+    [collection]
+  );
+  const aboveFoldMediaBookmarkId = useMemo(() => {
+    const row = sortedItems.find((item) => {
+      const m = item.bookmark.media?.[0];
+      return Boolean(m?.url || m?.preview_image_url);
+    });
+    return row?.bookmark.id ?? null;
+  }, [sortedItems]);
   const isSyncedFromX = collection?.type === "x_folder";
   const isUserCollection = collection?.type === "user_collection";
 
@@ -222,7 +230,7 @@ export default function CollectionDetailPage({
 
   if (isPending) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="app-shell-bg flex h-screen items-center justify-center">
         <div className="max-w-4xl mx-auto w-full px-6 space-y-4 animate-pulse">
           <div className="h-8 bg-muted rounded w-48" />
           <div className="h-20 bg-muted rounded" />
@@ -235,7 +243,7 @@ export default function CollectionDetailPage({
 
   if (isError || !collection) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6">
+      <div className="app-shell-bg min-h-screen flex flex-col items-center justify-center gap-4 px-6">
         <p className="text-muted-foreground text-center">
           This collection could not be loaded. It may have been deleted or you
           may not have access.
@@ -253,79 +261,93 @@ export default function CollectionDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
-        <div className="max-w-4xl mx-auto px-5 h-12 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/collections")}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-<div className="flex-1 min-w-0">
-            {editingName ? (
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={handleUpdateName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleUpdateName();
-                  }
+    <div className="app-shell-bg min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-hairline-strong bg-background/70 backdrop-blur-sm supports-[backdrop-filter]:bg-background/65">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              className="mt-0.5 border-hairline-soft bg-surface-1 shadow-sm"
+              onClick={() => router.push("/collections")}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
 
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    cancelEditingName();
-                  }
-                }}
-                className="text-2xl font-bold heading-font bg-transparent border-b border-primary outline-none w-full tracking-tight"
-              />
-            ) : (
-              <div className="flex items-center gap-2.5">
-                {isSyncedFromX ? (
-                  <FolderOpen className="w-6 h-6 text-muted-foreground shrink-0" aria-hidden />
-                ) : (
-                  <Layers className="w-6 h-6 text-primary shrink-0" aria-hidden />
-                )}
-                {isSyncedFromX ? (
-                  <h1 className="truncate text-2xl font-bold heading-font tracking-tight">
-                    {collection.name}
-                  </h1>
-                ) : (
-                  <h1 className="min-w-0 truncate text-2xl font-bold heading-font tracking-tight">
-                    <button
-                      type="button"
-                      className="max-w-full truncate rounded-md text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                      onClick={() => {
-                        setName(collection.name);
-                        setEditingName(true);
-                      }}
-                      aria-label={`Edit collection name ${collection.name}`}
-                    >
+            <div className="min-w-0 flex-1">
+              {editingName ? (
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={handleUpdateName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleUpdateName();
+                    }
+
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditingName();
+                    }
+                  }}
+                  className="w-full border-b border-primary bg-transparent pb-1 text-2xl font-bold tracking-tight heading-font outline-none sm:text-3xl"
+                />
+              ) : (
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {isSyncedFromX ? (
+                    <FolderOpen className="w-6 h-6 text-muted-foreground shrink-0" aria-hidden />
+                  ) : (
+                    <Layers className="w-6 h-6 text-primary shrink-0" aria-hidden />
+                  )}
+                  {isSyncedFromX ? (
+                    <h1 className="truncate text-2xl font-bold tracking-tight heading-font sm:text-3xl">
                       {collection.name}
-                    </button>
-                  </h1>
-                )}
-              </div>
-            )}
+                    </h1>
+                  ) : (
+                    <h1 className="min-w-0 truncate text-2xl font-bold tracking-tight heading-font sm:text-3xl">
+                      <button
+                        type="button"
+                        className="max-w-full truncate rounded-md text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                        onClick={() => {
+                          setName(collection.name);
+                          setEditingName(true);
+                        }}
+                        aria-label={`Edit collection name ${collection.name}`}
+                      >
+                        {collection.name}
+                      </button>
+                    </h1>
+                  )}
+                </div>
+              )}
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                {sortedItems.length} bookmark{sortedItems.length !== 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+
+          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
             {isSyncedFromX && (
               <>
-                <Badge variant="outline" className="text-primary border-primary/30">
+                <Badge variant="outline" className="gap-1.5 border-primary/25 bg-accent-soft text-primary">
                   Synced from X
                 </Badge>
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyAsCollection}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-hairline-soft bg-surface-1 shadow-sm"
+                  onClick={handleCopyAsCollection}
+                >
                   <Copy className="w-3.5 h-3.5" />
                   Copy as Collection
                 </Button>
               </>
             )}
             {isUserCollection && (
-              <Badge variant="outline" className="gap-1.5">
+              <Badge variant="outline" className="gap-1.5 border-hairline-soft bg-surface-2/80">
                 {collection.isPublic ? (
                   <Globe className="w-3 h-3 text-success" />
                 ) : (
@@ -336,7 +358,12 @@ export default function CollectionDetailPage({
             )}
             {isUserCollection && (
               <>
-                <Button variant="outline" size="sm" onClick={handleTogglePublic}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-hairline-soft bg-surface-1 shadow-sm"
+                  onClick={handleTogglePublic}
+                >
                   {collection.isPublic ? "Make Private" : "Make Public"}
                 </Button>
                 {collection.isPublic && collection.shareSlug && (
@@ -344,28 +371,31 @@ export default function CollectionDetailPage({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5"
+                      className="gap-1.5 border-hairline-soft bg-surface-1 shadow-sm"
                       onClick={handleCopyShareLink}
                     >
                       <Copy className="w-3.5 h-3.5" />
                       Copy Link
                     </Button>
-                     <a
-                       href={`/share/${collection.shareSlug}`}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="inline-flex items-center justify-center size-8 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
-                       aria-label="Open public collection page"
-                       title="Open public collection page"
-                     >
-                       <ExternalLink className="w-3.5 h-3.5" />
-                     </a>
+                    <a
+                      href={`/share/${collection.shareSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex size-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 shadow-sm transition-colors hover:bg-surface-2"
+                      aria-label="Open public collection page"
+                      title="Open public collection page"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </>
                 )}
-                {sortedItems.length > 0 &&
-                  collection.isPublic &&
-                  collection.shareSlug && (
-                  <Button variant="default" size="sm" className="gap-1.5" onClick={handleShareOnX}>
+                {sortedItems.length > 0 && collection.isPublic && collection.shareSlug && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="gap-1.5 shadow-sm"
+                    onClick={handleShareOnX}
+                  >
                     <Share2 className="w-3.5 h-3.5" />
                     Share on X
                   </Button>
@@ -376,37 +406,48 @@ export default function CollectionDetailPage({
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto">
-{collection.description && (
-          <p className="px-5 py-2 text-muted-foreground">
-            {collection.description}
-          </p>
+      <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-5">
+        {collection.description && (
+          <div className="border-b border-hairline-soft py-4">
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+              {collection.description}
+            </p>
+          </div>
         )}
 
-        <div className="text-sm text-muted-foreground px-5 py-1.5">
-          {sortedItems.length} bookmark
-          {sortedItems.length !== 1 ? "s" : ""}
-        </div>
-
         {sortedItems.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="py-20 text-center">
+            <div className="mx-auto max-w-md rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 shadow-sm">
+            {isSyncedFromX ? (
+              <FolderOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
+            ) : (
+              <Layers className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
+            )}
             <p className="text-muted-foreground">
               No bookmarks in this collection yet.
               <br />
               Add bookmarks from the dashboard.
             </p>
+            {!isSyncedFromX && (
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
+                  Go to dashboard
+                </Button>
+              </div>
+            )}
+            </div>
           </div>
         ) : (
           <div>
             {sortedItems.map((item, index) => (
-              <div key={item.id} className="flex group">
+              <div key={item.id} className="group flex gap-2 sm:gap-3">
                 {!isSyncedFromX && (
-                  <div className="flex flex-col items-center justify-center px-1 gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity border-r border-transparent sm:border-transparent">
+                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 sm:px-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
+                      size="icon-sm"
+                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground sm:h-7 sm:w-7"
                       disabled={reordering || index === 0}
                       onClick={() => moveItem(index, -1)}
                       aria-label="Move bookmark up"
@@ -416,8 +457,8 @@ export default function CollectionDetailPage({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
+                      size="icon-sm"
+                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground sm:h-7 sm:w-7"
                       disabled={reordering || index === sortedItems.length - 1}
                       onClick={() => moveItem(index, 1)}
                       aria-label="Move bookmark down"
@@ -430,6 +471,7 @@ export default function CollectionDetailPage({
                   <BookmarkCard
                     bookmark={item.bookmark}
                     viewMode="feed"
+                    priorityMedia={item.bookmark.id === aboveFoldMediaBookmarkId}
                     onDelete={
                       isSyncedFromX
                         ? undefined
@@ -440,18 +482,6 @@ export default function CollectionDetailPage({
                     }
                   />
                 </div>
-                {!isSyncedFromX && (
-                  <div className="flex items-start pt-4 pr-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleRemoveItem(item.bookmark.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
               </div>
             ))}
           </div>

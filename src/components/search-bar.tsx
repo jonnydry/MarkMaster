@@ -47,7 +47,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     }, []);
 
     const defaultHint = !value && (
-      <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded border border-border">
+      <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm">
         /
       </kbd>
     );
@@ -60,7 +60,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`pl-10 pr-10 h-10 w-full text-sm bg-card/80 backdrop-blur-lg border-border rounded-xl shadow-sm focus:shadow-md focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${inputClassName}`}
+          className={`h-10 w-full rounded-xl border-hairline-strong bg-surface-1 pl-10 pr-10 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/25 focus:shadow-md ${inputClassName}`}
         />
         {value ? (
           <button

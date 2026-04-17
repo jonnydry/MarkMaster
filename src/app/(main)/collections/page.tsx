@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MobileSidebar } from "@/components/mobile-sidebar";
+import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNav } from "@/components/user-nav";
 import { useSession } from "next-auth/react";
@@ -53,6 +54,14 @@ export default function CollectionsPage() {
 
   const userCollections = collections.filter((c) => c.type !== "x_folder");
   const xFolders = collections.filter((c) => c.type === "x_folder");
+  const collectionsSummary =
+    !isLoading &&
+    !isError &&
+    collections.length > 0
+      ? `${userCollections.length} personal ${
+          userCollections.length === 1 ? "collection" : "collections"
+        }${xFolders.length > 0 ? ` · ${xFolders.length} X ${xFolders.length === 1 ? "folder" : "folders"}` : ""}`
+      : undefined;
 
   const handleCopyAsCollection = async (id: string) => {
     try {
@@ -81,7 +90,7 @@ export default function CollectionsPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="app-shell-bg flex h-screen overflow-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -99,9 +108,11 @@ export default function CollectionsPage() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border px-5 py-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <PageHeader
+          title="Collections"
+          description={collectionsSummary}
+          leading={
+            <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
                 collections={collections}
@@ -110,23 +121,20 @@ export default function CollectionsPage() {
                 onCreateCollection={() => setCreateOpen(true)}
                 onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
               />
-              <h1 className="text-xl font-bold tracking-tight heading-font">Collections</h1>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <Button
-                size="sm"
-                onClick={() => setCreateOpen(true)}
-                className="gap-2"
-              >
+          }
+          actions={
+            <>
+              <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-2">
                 <Plus className="w-4 h-4" />
                 New
               </Button>
-              {session?.dbUser && <UserNav user={session.dbUser} />}
-            </div>
-          </div>
-        </header>
+              {session?.dbUser ? <UserNav user={session.dbUser} /> : null}
+            </>
+          }
+        />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
           {isLoading ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -144,16 +152,18 @@ export default function CollectionsPage() {
               </Button>
             </div>
 ) : collections.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Layers className="w-12 h-12 text-muted-foreground mb-4" />
-              <h2 className="text-lg font-medium mb-2">No collections yet</h2>
-              <p className="text-sm text-muted-foreground mb-4">
+            <div className="flex h-72 flex-col items-center justify-center text-center">
+              <div className="rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 shadow-sm sm:px-8">
+              <Layers className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h2 className="mb-2 text-lg font-medium">No collections yet</h2>
+              <p className="mb-4 text-sm text-muted-foreground">
                 Create a collection to start curating your bookmarks
               </p>
               <Button onClick={() => setCreateOpen(true)} className="gap-2">
                 <Plus className="w-4 h-4" />
                 Create your first collection
               </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-8">
@@ -167,7 +177,7 @@ export default function CollectionsPage() {
                     {userCollections.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`group p-4 cursor-pointer ring-border hover:ring-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
+                        className={`group cursor-pointer border-hairline-soft bg-surface-1 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
                         role="link"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
@@ -235,7 +245,7 @@ export default function CollectionsPage() {
                     {xFolders.map((col, i) => (
                       <Card
                         key={col.id}
-                        className={`group p-4 cursor-pointer ring-border hover:ring-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
+                        className={`group cursor-pointer border-hairline-soft bg-surface-1 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
                         role="link"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}

@@ -64,14 +64,14 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-sidebar-border/70 bg-sidebar py-3 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none ${
+      className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-hairline-strong bg-gradient-to-b from-sidebar to-surface-1 py-3 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none ${
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
       }`}
     >
       <button
         type="button"
         onClick={showToggle ? toggle : undefined}
-        className={`group mb-3 flex items-center rounded-xl transition-colors hover:bg-sidebar-accent ${
+        className={`group mb-3 flex items-center rounded-xl border border-transparent transition-colors hover:border-hairline-soft hover:bg-sidebar-accent ${
           expanded ? "h-10 gap-2.5 self-stretch px-2" : "h-10 w-10 justify-center"
         }`}
         title={expanded ? "Collapse sidebar" : "MarkMaster"}
@@ -93,7 +93,7 @@ export function Sidebar({
               key={href}
               href={href}
               title={label}
-              className={`flex items-center rounded-lg transition-all duration-150 ${
+              className={`flex items-center rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                 isActive
                   ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -239,7 +239,7 @@ export function Sidebar({
             </div>
           </div>
 
-          <div className="mt-auto shrink-0 space-y-2 border-t border-sidebar-border/50 bg-sidebar pt-3">
+          <div className="mt-auto shrink-0 space-y-2 border-t border-hairline-strong bg-gradient-to-t from-surface-1 via-surface-1 to-transparent pt-3">
             {showToggle && (
               <button
                 type="button"

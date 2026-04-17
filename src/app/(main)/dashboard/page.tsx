@@ -13,6 +13,7 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkCard } from "@/components/bookmark-card";
+import { PageHeader } from "@/components/page-header";
 import { UserNav } from "@/components/user-nav";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
@@ -168,6 +169,13 @@ function DashboardContent() {
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
   );
+  const aboveFoldMediaBookmarkId = useMemo(() => {
+    const first = bookmarks.find((b) => {
+      const m = b.media?.[0];
+      return Boolean(m?.url || m?.preview_image_url);
+    });
+    return first?.id ?? null;
+  }, [bookmarks]);
   const tagDialogBookmarks = useMemo(() => {
     const targetIds = selectedBookmarkIds.length > 0 ? visibleSelectedBookmarkIds : tagTargetIds;
     return targetIds.flatMap((id) => {
@@ -336,7 +344,7 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background max-w-[100vw]">
+    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -351,8 +359,8 @@ function DashboardContent() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border/70 bg-gradient-to-b from-card to-background shrink-0">
-          <div className="flex items-center gap-2 px-5 py-2">
+        <PageHeader bodyClassName="px-0 py-0">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 sm:px-5">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -366,7 +374,7 @@ function DashboardContent() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+            <div className="order-3 flex min-w-0 w-full flex-wrap items-center gap-1.5 sm:order-none sm:flex-1 sm:w-auto">
               <button
                 onClick={() => {
                   filters.setSelectedTags([]);
@@ -376,7 +384,7 @@ function DashboardContent() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 All Bookmarks
-                <span className="text-xs opacity-70" aria-hidden>{total.toLocaleString()}</span>
+                <span className="hidden text-xs opacity-70 sm:inline" aria-hidden>{total.toLocaleString()}</span>
               </button>
               {filters.selectedTags.map((tagId) => {
                 const tag = tags.find((t) => t.id === tagId);
@@ -442,7 +450,7 @@ function DashboardContent() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <div className="order-2 ml-auto flex w-full items-center gap-2 sm:order-none sm:ml-0 sm:w-auto shrink-0">
               <SortControls
                 sortField={filters.sortField}
                 viewMode={viewMode}
@@ -454,10 +462,10 @@ function DashboardContent() {
           </div>
 
           {(isFetching || filters.isSearchPending) && !isLoading && (
-            <p className="px-5 pb-1.5 text-xs text-muted-foreground">Updating results...</p>
+            <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 bg-secondary/50 animate-slide-down-fade">
+            <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 bg-secondary/50 px-4 py-2 sm:px-5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-foreground">
                   {visibleSelectedBookmarkIds.length > 0
@@ -507,7 +515,7 @@ function DashboardContent() {
               </div>
             </div>
           )}
-        </header>
+        </PageHeader>
 
         {showFilters && (
           <div id="dashboard-filter-panel" className="animate-slide-down-fade">
@@ -530,7 +538,7 @@ function DashboardContent() {
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
-          <div className="sticky top-0 z-10 px-5 pt-3 pb-2">
+          <div className="sticky top-0 z-10 bg-background/70 px-4 pt-3 pb-2 backdrop-blur-sm sm:px-5">
             <div className="max-w-2xl mx-auto">
               <SearchBar
                 ref={searchInputRef}
@@ -549,7 +557,7 @@ function DashboardContent() {
               aria-label="Loading bookmarks"
             >
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={`px-5 py-3 border-b border-border ${getStaggerClass(i, "animate-fade-in") ?? ""}`}>
+                <div key={i} className={`border-b border-border px-4 py-3 sm:px-5 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}>
                   <div className="flex gap-4">
                     <div className="w-10 h-10 rounded-full skeleton-shimmer shrink-0" />
                     <div className="flex-1 space-y-2.5">
@@ -580,15 +588,22 @@ function DashboardContent() {
               </div>
             </div>
           ) : bookmarks.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center animate-fade-in">
-                <Bookmark className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-                <p className="text-lg font-medium heading-font mb-2">No bookmarks found</p>
-                <p className="text-sm text-muted-foreground">
+            <div className="flex h-72 items-center justify-center px-4 sm:px-6">
+              <div className="animate-fade-in rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 text-center shadow-sm sm:px-8">
+                <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
+                <p className="mb-2 text-lg font-medium heading-font">No bookmarks found</p>
+                <p className="mx-auto max-w-md text-sm text-muted-foreground">
                   {filters.search || filters.hasActiveFilters
                     ? "Try adjusting your filters or search query"
                     : "Use Sync in the sidebar (menu on mobile) to fetch your bookmarks from X"}
                 </p>
+                {(filters.search || filters.hasActiveFilters) && (
+                  <div className="mt-4 flex justify-center">
+                    <Button variant="outline" size="sm" onClick={filters.clearFilters}>
+                      Clear filters
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ) : viewMode === "grid" ? (
@@ -599,6 +614,7 @@ function DashboardContent() {
                   bookmark={bookmark}
                   viewMode={viewMode}
                   searchQuery={filters.search || undefined}
+                  priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
                   selected={
                     selectionMode
                       ? selectedBookmarkIdSet.has(bookmark.id)
@@ -624,6 +640,7 @@ function DashboardContent() {
                   bookmark={bookmark}
                   viewMode={viewMode}
                   searchQuery={filters.search || undefined}
+                  priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
                   selected={
                     selectionMode
                       ? selectedBookmarkIdSet.has(bookmark.id)
@@ -651,7 +668,7 @@ function DashboardContent() {
                   onClick={() => filters.setPage((p) => p - 1)}
                   disabled={filters.page <= 1}
                   aria-label="Previous page"
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <ChevronLeft className="size-4" aria-hidden />
                 </button>
@@ -664,7 +681,7 @@ function DashboardContent() {
                   onClick={() => filters.setPage((p) => p + 1)}
                   disabled={filters.page >= totalPages}
                   aria-label="Next page"
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <ChevronRight className="size-4" aria-hidden />
                 </button>

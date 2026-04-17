@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
+import { auth } from "@/lib/auth";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,11 +27,13 @@ export const metadata: Metadata = {
     "Search, tag, annotate, and curate your X bookmarks with a local synced archive.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
@@ -45,7 +48,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers>
+        <Providers session={session}>
           {children}
           <Toaster />
         </Providers>

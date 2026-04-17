@@ -30,12 +30,12 @@ export function SortControls({
   onViewModeChange,
 }: SortControlsProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full items-center gap-2 sm:w-auto">
       <Select
         value={sortField}
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
-        <SelectTrigger className="h-8 text-xs gap-1.5">
+        <SelectTrigger className="h-8 min-w-[92px] flex-1 gap-1.5 rounded-xl border-hairline-strong bg-surface-1 text-xs shadow-sm sm:flex-none">
           Sort
         </SelectTrigger>
         <SelectContent>
@@ -47,7 +47,7 @@ export function SortControls({
           <SelectItem value="authorUsername">Author</SelectItem>
         </SelectContent>
       </Select>
-      <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-secondary">
+      <div className="flex flex-1 items-center gap-0.5 rounded-xl border border-hairline-soft bg-surface-2 p-0.5 shadow-sm sm:flex-none">
         {VIEW_MODES.map(({ value, label, icon: Icon }) => (
           <Button
             key={value}
@@ -55,7 +55,7 @@ export function SortControls({
             size="sm"
             className={`h-8 px-2.5 text-xs ${
               viewMode === value
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
             title={`${label} view`}

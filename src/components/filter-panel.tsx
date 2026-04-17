@@ -45,26 +45,26 @@ export function FilterPanel({
   hasActiveFilters,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-2.5 px-5 py-2.5 bg-muted/30 border-b border-border/60">
+    <div className="space-y-3 border-b border-hairline-soft bg-gradient-to-b from-surface-1 to-surface-2 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
       <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Filters
-          </h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Filters
+        </h3>
         {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onClearAll}
-            className="h-6 text-xs text-muted-foreground hover:text-foreground gap-1"
+            className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="w-3 h-3" /> Clear all
           </Button>
         )}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
+          <label className="mb-1 block text-xs text-muted-foreground">
             Content type
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -73,7 +73,7 @@ export function FilterPanel({
                 key={value}
                 variant={mediaFilter === value ? "default" : "outline"}
                 size="sm"
-                className="h-7 text-xs gap-1.5"
+                className="h-7 gap-1.5 text-xs"
                 onClick={() => onMediaFilterChange(value)}
               >
                 <Icon className="w-3 h-3" />
@@ -84,45 +84,45 @@ export function FilterPanel({
         </div>
 
         <div>
-          <label className="text-xs text-muted-foreground mb-1 block">
+          <label className="mb-1 block text-xs text-muted-foreground">
             Author
           </label>
           <Input
             value={authorFilter}
             onChange={(e) => onAuthorFilterChange(e.target.value)}
             placeholder="Filter by username..."
-            className="h-8 text-sm"
+            className="h-8 border-hairline-soft bg-surface-2 text-sm"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
+            <label className="mb-1 block text-xs text-muted-foreground">
               From
             </label>
             <Input
               type="date"
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
-              className="h-8 text-sm"
+              className="h-8 border-hairline-soft bg-surface-2 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
+            <label className="mb-1 block text-xs text-muted-foreground">
               To
             </label>
             <Input
               type="date"
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
-              className="h-8 text-sm"
+              className="h-8 border-hairline-soft bg-surface-2 text-sm"
             />
           </div>
         </div>
 
         {tags.length > 0 && (
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
+            <label className="mb-1 block text-xs text-muted-foreground">
               Tags
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -131,8 +131,8 @@ export function FilterPanel({
                   key={tag.id}
                   className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                     selectedTags.includes(tag.id)
-                      ? "bg-primary/10 text-primary"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                      ? "bg-accent-soft text-primary"
+                      : "bg-surface-2 text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}
                   aria-pressed={selectedTags.includes(tag.id)}

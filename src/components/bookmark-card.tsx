@@ -33,6 +33,8 @@ interface BookmarkCardProps {
   selectionMode?: boolean;
   onSelectionChange?: (bookmarkId: string, selected: boolean) => void;
   className?: string;
+  /** First above-the-fold card with media: set so the hero image is not lazy-loaded (LCP). */
+  priorityMedia?: boolean;
 }
 
 function formatCount(n: number): string {
@@ -124,7 +126,7 @@ function TagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="px-2 py-0.5 rounded-md text-xs font-medium text-muted-foreground bg-secondary hover:text-foreground transition-colors"
+      className="rounded-lg border border-hairline-soft bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
     >
       {name}
     </button>
@@ -147,12 +149,17 @@ function ActionButton({
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="icon-sm"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      className={`h-8 px-2 text-xs gap-1.5 ${active ? "text-primary" : "text-muted-foreground"}`}
+      aria-label={label}
+      className={`rounded-lg border border-transparent ${
+        active
+          ? "bg-accent-soft text-primary"
+          : "text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground"
+      }`}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
       <Icon className="w-3.5 h-3.5" />
@@ -202,6 +209,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   selectionMode = false,
   onSelectionChange,
   className,
+  priorityMedia = false,
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(new Set());
   const metrics = bookmark.publicMetrics;
@@ -246,10 +254,10 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 px-4 py-2.5 border-b border-border hover:bg-muted/40 transition-all duration-150 ${
+        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-all duration-150 hover:bg-surface-1 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
-          selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
+          selected ? "border-l-2 border-l-primary bg-primary/[0.06]" : ""
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -287,7 +295,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             {highlightedText}
           </p>
           {bookmark.tags.length > 0 && (
-            <div className="flex gap-1 mt-1">
+            <div className="mt-1.5 flex gap-1">
               {bookmark.tags.map(({ tag }) => (
                 <TagPill
                   key={tag.id}
@@ -322,7 +330,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
     return (
       <div
-        className={`group relative rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ${
+        className={`group relative overflow-hidden rounded-xl border border-hairline-soft bg-surface-1 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md ${
           isInteractive ? "cursor-pointer" : ""
         } ${
           selected ? "ring-2 ring-primary border-primary/40" : ""
@@ -348,6 +356,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               fill
               sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
               className="object-cover"
+              priority={priorityMedia}
               onError={() => {
                 setImageError((prev) => new Set(prev).add(firstMediaUrl));
               }}
@@ -383,7 +392,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               ))}
             </div>
           )}
-          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border">
+          <div className="mt-2 flex items-center gap-1 border-t border-hairline-soft pt-2">
             {onAddTag && (
               <Button
                 variant="ghost"
@@ -429,10 +438,10 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group px-5 py-3 border-b border-border hover:bg-muted/30 transition-all duration-150 ${
+      className={`group border-b border-hairline-soft px-5 py-3.5 transition-all duration-150 hover:bg-surface-1/70 ${
         isInteractive ? "cursor-pointer" : ""
       } ${
-        selected ? "bg-primary/5 border-l-2 border-l-primary" : ""
+        selected ? "border-l-2 border-l-primary bg-primary/[0.06]" : ""
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -462,8 +471,8 @@ export const BookmarkCard = memo(function BookmarkCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="flex min-w-0 items-center gap-2">
               <span className="font-semibold text-sm text-foreground truncate">
                 {highlightedAuthorName}
               </span>
@@ -483,7 +492,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 })}
               </span>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex self-start shrink-0 items-center gap-1 rounded-xl border border-hairline-soft bg-surface-1 p-1 shadow-sm opacity-100 transition-all sm:self-auto sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
               {onAddTag && (
                 <ActionButton
                   icon={Tag}
@@ -527,13 +536,13 @@ export const BookmarkCard = memo(function BookmarkCard({
             </div>
           </div>
 
-          <div className="mt-1.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+          <div className="mt-2 text-[15px] leading-7 text-foreground whitespace-pre-wrap">
             {highlightedText}
           </div>
 
           {mediaItems && mediaItems.length > 0 && (
             <div
-              className={`mt-2.5 rounded-lg overflow-hidden border border-border ${
+              className={`mt-3 overflow-hidden rounded-xl border border-hairline-soft bg-surface-1 ${
                 mediaItems.length === 1 ? "" : "grid grid-cols-2 gap-0.5"
               }`}
             >
@@ -558,6 +567,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                       className={`w-full object-cover ${
                         mediaItems.length === 1 ? "max-h-80" : "aspect-square"
                       }`}
+                      priority={priorityMedia && i === 0}
                       onError={() =>
                         setImageError((prev) => new Set(prev).add(url))
                       }
@@ -577,8 +587,8 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.quotedTweet && (
-            <div className="mt-2.5 border border-border rounded-lg p-2.5">
-              <div className="flex items-center gap-1.5 mb-1">
+            <div className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3">
+              <div className="mb-1 flex items-center gap-1.5">
                 <span className="font-medium text-sm text-foreground">
                   {bookmark.quotedTweet.author?.name}
                 </span>
@@ -593,7 +603,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.notes.length > 0 && (
-            <div className="mt-2 pl-3 py-2 pr-3 border-l-2 border-l-note rounded-r-md bg-muted/50">
+            <div className="mt-3 rounded-r-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
               <p className="text-xs leading-snug text-muted-foreground">
                 {highlightedNote}
               </p>
@@ -601,7 +611,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {bookmark.tags.map(({ tag }) => (
                 <TagPill
                   key={tag.id}
@@ -614,7 +624,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
           {metrics && (
             <div
-              className="flex items-center gap-3 mt-2 text-muted-foreground"
+              className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground"
               aria-label="Tweet engagement"
             >
               <span
