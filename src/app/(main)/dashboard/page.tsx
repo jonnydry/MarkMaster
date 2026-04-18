@@ -348,8 +348,17 @@ function DashboardContent() {
     images: "Images",
     video: "Video",
     links: "Links",
-    "text-only": "Text only",
+    "text-only": "Text",
   };
+  const primaryFilterLabel =
+    filters.mediaFilter === "all"
+      ? "All Bookmarks"
+      : mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter;
+  const hasSupplementalFilters =
+    filters.selectedTags.length > 0 ||
+    filters.authorFilter !== "" ||
+    filters.dateFrom !== "" ||
+    filters.dateTo !== "";
 
   return (
     <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
@@ -396,10 +405,10 @@ function DashboardContent() {
                   filters.setSelectedTags([]);
                   filters.setMediaFilter("all");
                 }}
-                aria-label={`Show all bookmarks (${total.toLocaleString()})`}
+                aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
                 className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                All Bookmarks
+                {primaryFilterLabel}
                 <span className="hidden text-xs opacity-70 sm:inline" aria-hidden>{total.toLocaleString()}</span>
               </button>
               {filters.selectedTags.map((tagId) => {
@@ -415,15 +424,6 @@ function DashboardContent() {
                   </button>
                 ) : null;
               })}
-              {filters.mediaFilter !== "all" && (
-                <button
-                  onClick={() => filters.setMediaFilter("all")}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
-                >
-                  {mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter}
-                  <span className="text-primary/60 hover:text-primary ml-0.5" aria-hidden>×</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setShowFilters((v) => !v)}
@@ -438,7 +438,7 @@ function DashboardContent() {
               >
                 <SlidersHorizontal className="size-4" aria-hidden />
                 <span className="hidden sm:inline">Filters</span>
-                {filters.hasActiveFilters && (
+                {hasSupplementalFilters && (
                   <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
                 )}
               </button>
