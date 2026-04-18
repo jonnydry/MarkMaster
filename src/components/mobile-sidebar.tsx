@@ -100,7 +100,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
         ref={triggerRef}
         variant="ghost"
         size="icon"
-        className="md:hidden h-8 w-8"
+        className="md:hidden size-10"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >

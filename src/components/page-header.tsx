@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = ComponentProps<"header"> & {
@@ -10,6 +11,8 @@ type PageHeaderProps = ComponentProps<"header"> & {
   titleClassName?: string;
   descriptionClassName?: string;
   sticky?: boolean;
+  /** Omit frosted chrome (e.g. when wrapped by a parent that already applies it). */
+  chromeless?: boolean;
 };
 
 export function PageHeader({
@@ -23,11 +26,15 @@ export function PageHeader({
   titleClassName,
   descriptionClassName,
   sticky = false,
+  chromeless = false,
   ...props
 }: PageHeaderProps) {
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
-    "shrink-0 border-b border-hairline-strong bg-background/70 backdrop-blur-sm supports-[backdrop-filter]:bg-background/65",
+    "shrink-0",
+    chromeless
+      ? "border-b-0 bg-transparent"
+      : cn("border-b border-hairline-strong", appChromeFrostedClassName),
     sticky && "sticky top-0 z-10",
     className
   );
@@ -36,7 +43,7 @@ export function PageHeader({
     <header className={mergedHeaderClassName} {...props}>
       <div className={cn("px-4 py-3 sm:px-5", bodyClassName)}>
         {hasHeaderRow ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               {leading ? <div className="shrink-0">{leading}</div> : null}
               <div className="min-w-0">

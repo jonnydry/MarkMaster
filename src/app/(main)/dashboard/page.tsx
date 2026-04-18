@@ -14,6 +14,7 @@ import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { PageHeader } from "@/components/page-header";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
@@ -23,6 +24,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { getStaggerClass } from "@/lib/stagger";
+import { cn } from "@/lib/utils";
 import type {
   ViewMode,
   BookmarkWithRelations,
@@ -152,7 +154,7 @@ function DashboardContent() {
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
-  const { setSelectedTags, setPage, setMediaFilter } = filters;
+  const { setSelectedTags, setPage, setMediaFilter, setAuthorFilter } = filters;
   const visibleBookmarkIdSet = useMemo(
     () => new Set(bookmarks.map((bookmark) => bookmark.id)),
     [bookmarks]
@@ -193,8 +195,10 @@ function DashboardContent() {
 
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
+  const authorFromUrl = searchParams.get("author");
   const tagFromUrlRef = useRef<string | null>(null);
   const tagsFromUrlRef = useRef<string | null>(null);
+  const authorFromUrlRef = useRef<string | null>(null);
   useEffect(() => {
     if (tagsFromUrl && tagsFromUrl !== tagsFromUrlRef.current) {
       const next = tagsFromUrl.split(",").filter(Boolean);
@@ -204,9 +208,13 @@ function DashboardContent() {
       setSelectedTags([tagFromUrl]);
       setPage(1);
     }
+    if (authorFromUrl !== authorFromUrlRef.current) {
+      setAuthorFilter(authorFromUrl ? authorFromUrl.replace(/^@/, "") : "");
+    }
     tagFromUrlRef.current = tagFromUrl;
     tagsFromUrlRef.current = tagsFromUrl;
-  }, [tagFromUrl, tagsFromUrl, setPage, setSelectedTags]);
+    authorFromUrlRef.current = authorFromUrl;
+  }, [tagFromUrl, tagsFromUrl, authorFromUrl, setPage, setSelectedTags, setAuthorFilter]);
 
   const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
 
@@ -344,7 +352,7 @@ function DashboardContent() {
   };
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-hidden">
+    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -358,9 +366,17 @@ function DashboardContent() {
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <PageHeader bodyClassName="px-0 py-0">
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2 sm:px-5">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+          <div className="sticky top-0 z-20 isolate">
+            <div
+              className={cn(
+                "border-b border-hairline-strong",
+                appChromeFrostedClassName
+              )}
+            >
+            <PageHeader chromeless bodyClassName="px-0 py-0">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-5">
             <div className="md:hidden">
               <MobileSidebar
                 tags={tags}
@@ -381,7 +397,7 @@ function DashboardContent() {
                   filters.setMediaFilter("all");
                 }}
                 aria-label={`Show all bookmarks (${total.toLocaleString()})`}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 All Bookmarks
                 <span className="hidden text-xs opacity-70 sm:inline" aria-hidden>{total.toLocaleString()}</span>
@@ -414,13 +430,13 @@ function DashboardContent() {
                 aria-expanded={showFilters}
                 aria-controls="dashboard-filter-panel"
                 aria-label={showFilters ? "Hide filters" : "Show filters"}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   showFilters
                     ? "bg-secondary text-foreground border-border"
                     : "text-muted-foreground bg-secondary hover:text-foreground border-border"
                 }`}
               >
-                <SlidersHorizontal className="size-3.5" aria-hidden />
+                <SlidersHorizontal className="size-4" aria-hidden />
                 <span className="hidden sm:inline">Filters</span>
                 {filters.hasActiveFilters && (
                   <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
@@ -437,13 +453,13 @@ function DashboardContent() {
                 }}
                 aria-pressed={selectionMode}
                 aria-label={selectionMode ? "Exit selection mode" : "Enter selection mode"}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   selectionMode
                     ? "bg-secondary text-foreground border-border"
                     : "text-muted-foreground bg-secondary hover:text-foreground border-border"
                 }`}
               >
-                <CheckSquare className="size-3.5" aria-hidden />
+                <CheckSquare className="size-4" aria-hidden />
                 <span className="hidden sm:inline">
                   {selectionMode ? "Done" : "Select"}
                 </span>
@@ -465,18 +481,28 @@ function DashboardContent() {
             <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 bg-secondary/50 px-4 py-2 sm:px-5">
+            <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 bg-secondary/50 px-4 py-2.5 sm:px-5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-foreground">
                   {visibleSelectedBookmarkIds.length > 0
                     ? `${visibleSelectedBookmarkIds.length} selected`
                     : "Select bookmarks to apply bulk actions"}
                 </span>
-                <Button variant="outline" size="sm" onClick={selectVisibleBookmarks}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-3 text-sm"
+                  onClick={selectVisibleBookmarks}
+                >
                   Select page
                 </Button>
                 {visibleSelectedBookmarkIds.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 px-3 text-sm"
+                    onClick={clearSelection}
+                  >
                     Clear
                   </Button>
                 )}
@@ -485,67 +511,74 @@ function DashboardContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="h-10 gap-1.5 px-3 text-sm"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={openBulkTagDialog}
                 >
-                  <Tag className="w-3.5 h-3.5" />
+                  <Tag className="size-4" />
                   Tag
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="h-10 gap-1.5 px-3 text-sm"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={openBulkCollectionDialog}
                 >
-                  <FolderPlus className="w-3.5 h-3.5" />
+                  <FolderPlus className="size-4" />
                   Add to Collection
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 text-destructive hover:text-destructive"
+                  className="h-10 gap-1.5 px-3 text-sm text-destructive hover:text-destructive"
                   disabled={visibleSelectedBookmarkIds.length === 0}
                   onClick={() => void handleBulkHide()}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="size-4" />
                   Hide
                 </Button>
               </div>
             </div>
           )}
-        </PageHeader>
+            </PageHeader>
 
-        {showFilters && (
-          <div id="dashboard-filter-panel" className="animate-slide-down-fade">
-            <FilterPanel
-              mediaFilter={filters.mediaFilter}
-              onMediaFilterChange={filters.setMediaFilter}
-              authorFilter={filters.authorFilter}
-              onAuthorFilterChange={filters.setAuthorFilter}
-              dateFrom={filters.dateFrom}
-              dateTo={filters.dateTo}
-              onDateFromChange={filters.setDateFrom}
-              onDateToChange={filters.setDateTo}
-              selectedTags={filters.selectedTags}
-              onTagToggle={filters.toggleTag}
-              tags={tags}
-              onClearAll={filters.clearFilters}
-              hasActiveFilters={filters.hasActiveFilters}
-            />
-          </div>
-        )}
+            {showFilters && (
+              <div id="dashboard-filter-panel" className="animate-slide-down-fade">
+                <FilterPanel
+                  mediaFilter={filters.mediaFilter}
+                  onMediaFilterChange={filters.setMediaFilter}
+                  authorFilter={filters.authorFilter}
+                  onAuthorFilterChange={filters.setAuthorFilter}
+                  dateFrom={filters.dateFrom}
+                  dateTo={filters.dateTo}
+                  onDateFromChange={filters.setDateFrom}
+                  onDateToChange={filters.setDateTo}
+                  selectedTags={filters.selectedTags}
+                  onTagToggle={filters.toggleTag}
+                  tags={tags}
+                  onClearAll={filters.clearFilters}
+                  hasActiveFilters={filters.hasActiveFilters}
+                />
+              </div>
+            )}
+            </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
-          <div className="sticky top-0 z-10 bg-background/70 px-4 pt-3 pb-2 backdrop-blur-sm sm:px-5">
-            <div className="max-w-2xl mx-auto">
-              <SearchBar
-                ref={searchInputRef}
-                value={filters.search}
-                onChange={filters.setSearch}
-                placeholder="Search bookmarks, authors, notes..."
-              />
+            <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
+              <div
+                className={cn(
+                  "relative z-10 mx-auto max-w-2xl overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  appChromeFrostedClassName
+                )}
+              >
+                <SearchBar
+                  ref={searchInputRef}
+                  glass
+                  value={filters.search}
+                  onChange={filters.setSearch}
+                  placeholder="Search bookmarks, authors, notes..."
+                />
+              </div>
             </div>
           </div>
 

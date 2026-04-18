@@ -35,7 +35,10 @@ export function SortControls({
         value={sortField}
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
-        <SelectTrigger className="h-8 min-w-[92px] flex-1 gap-1.5 rounded-xl border-hairline-strong bg-surface-1 text-xs shadow-sm sm:flex-none">
+        <SelectTrigger
+          size="lg"
+          className="min-w-[100px] flex-1 gap-1.5 rounded-xl border-hairline-strong bg-surface-1 shadow-sm sm:flex-none"
+        >
           Sort
         </SelectTrigger>
         <SelectContent>
@@ -47,13 +50,13 @@ export function SortControls({
           <SelectItem value="authorUsername">Author</SelectItem>
         </SelectContent>
       </Select>
-      <div className="flex flex-1 items-center gap-0.5 rounded-xl border border-hairline-soft bg-surface-2 p-0.5 shadow-sm sm:flex-none">
+      <div className="flex flex-1 items-center gap-0.5 rounded-xl border border-hairline-soft bg-surface-2 p-1 shadow-sm sm:flex-none">
         {VIEW_MODES.map(({ value, label, icon: Icon }) => (
           <Button
             key={value}
             variant={viewMode === value ? "default" : "ghost"}
             size="sm"
-            className={`h-8 px-2.5 text-xs ${
+            className={`h-10 px-2.5 text-sm ${
               viewMode === value
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -61,7 +64,7 @@ export function SortControls({
             title={`${label} view`}
             onClick={() => onViewModeChange(value)}
           >
-            <Icon className="w-3.5 h-3.5 sm:mr-1.5" />
+            <Icon className="size-4 sm:mr-1.5" />
             <span className="hidden sm:inline">{label}</span>
           </Button>
         ))}

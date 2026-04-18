@@ -78,10 +78,10 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
         type="button"
         onClick={handleSync}
         disabled={isAnySyncRunning}
-        className="h-8 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+        className="h-10 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
       >
         <RefreshCw
-          className={`h-3.5 w-3.5 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
+          className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
         />
         {isAnySyncRunning ? "Syncing..." : "Sync"}
       </Button>

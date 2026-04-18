@@ -9,9 +9,32 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [authorRows, monthRows, tags, collections, mediaCountsRows] = await Promise.all([
-    prisma.$queryRaw<{ author: string; count: bigint }[]>`
-      SELECT "authorUsername" as author, COUNT(*)::bigint as count
+  const [
+    authorRows,
+    monthRows,
+    dayRows,
+    tags,
+    collections,
+    mediaCountsRows,
+    untaggedRows,
+    notedRows,
+    velocityRows,
+  ] = await Promise.all([
+    prisma.$queryRaw<
+      {
+        author: string;
+        displayName: string | null;
+        profileImage: string | null;
+        verified: boolean;
+        count: bigint;
+      }[]
+    >`
+      SELECT
+        "authorUsername" AS author,
+        MAX("authorDisplayName") AS "displayName",
+        MAX("authorProfileImage") AS "profileImage",
+        BOOL_OR("authorVerified") AS verified,
+        COUNT(*)::bigint AS count
       FROM "Bookmark"
       WHERE "userId" = ${user.id}
       GROUP BY "authorUsername"
@@ -24,6 +47,14 @@ export async function GET() {
       WHERE "userId" = ${user.id}
       GROUP BY month
       ORDER BY month ASC
+    `,
+    prisma.$queryRaw<{ day: string; count: bigint }[]>`
+      SELECT to_char("bookmarkedAt", 'YYYY-MM-DD') as day, COUNT(*)::bigint as count
+      FROM "Bookmark"
+      WHERE "userId" = ${user.id}
+        AND "bookmarkedAt" >= NOW() - INTERVAL '180 days'
+      GROUP BY day
+      ORDER BY day ASC
     `,
     prisma.tag.findMany({
       where: { userId: user.id },
@@ -67,9 +98,34 @@ export async function GET() {
         WHERE "userId" = ${user.id}
       ) bookmark_stats
     `,
+    prisma.$queryRaw<{ untaggedCount: bigint; oldestAt: Date | null }[]>`
+      SELECT
+        COUNT(*)::bigint AS "untaggedCount",
+        MIN("bookmarkedAt") AS "oldestAt"
+      FROM "Bookmark" b
+      WHERE b."userId" = ${user.id}
+        AND NOT EXISTS (
+          SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b.id
+        )
+    `,
+    prisma.$queryRaw<{ notedCount: bigint }[]>`
+      SELECT COUNT(DISTINCT n."bookmarkId")::bigint AS "notedCount"
+      FROM "Note" n
+      WHERE n."userId" = ${user.id}
+    `,
+    prisma.$queryRaw<{ last30d: bigint; previous30d: bigint }[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE "bookmarkedAt" >= NOW() - INTERVAL '30 days')::bigint AS "last30d",
+        COUNT(*) FILTER (
+          WHERE "bookmarkedAt" >= NOW() - INTERVAL '60 days'
+            AND "bookmarkedAt" < NOW() - INTERVAL '30 days'
+        )::bigint AS "previous30d"
+      FROM "Bookmark"
+      WHERE "userId" = ${user.id}
+    `,
   ]);
 
-  const mediaCounts = mediaCountsRows[0] || {
+  const mediaCounts = mediaCountsRows[0] ?? {
     totalBookmarks: BigInt(0),
     mediaOnly: BigInt(0),
     mediaAndLinks: BigInt(0),
@@ -80,7 +136,10 @@ export async function GET() {
   const totalBookmarks = Number(mediaCounts.totalBookmarks);
 
   const topAuthors = authorRows.map((r) => ({
-    author: `@${r.author}`,
+    author: r.author,
+    displayName: r.displayName,
+    profileImage: r.profileImage,
+    verified: Boolean(r.verified),
     count: Number(r.count),
   }));
 
@@ -89,14 +148,24 @@ export async function GET() {
     count: Number(r.count),
   }));
 
+  const bookmarksByDay = dayRows.map((r) => ({
+    day: r.day,
+    count: Number(r.count),
+  }));
+
   const tagDistribution = tags
     .map((t) => ({
+      id: t.id,
       tag: t.name,
       color: t.color,
       count: t._count.bookmarks,
     }))
     .filter((t) => t.count > 0)
     .sort((a, b) => b.count - a.count);
+
+  const untagged = untaggedRows[0] ?? { untaggedCount: BigInt(0), oldestAt: null };
+  const noted = notedRows[0] ?? { notedCount: BigInt(0) };
+  const velocity = velocityRows[0] ?? { last30d: BigInt(0), previous30d: BigInt(0) };
 
   return NextResponse.json({
     topAuthors,
@@ -109,8 +178,14 @@ export async function GET() {
     }),
     tagDistribution,
     bookmarksByMonth,
+    bookmarksByDay,
     totalBookmarks,
     totalTags: tags.length,
     totalCollections: collections,
+    untaggedCount: Number(untagged.untaggedCount),
+    untaggedOldestAt: untagged.oldestAt ? untagged.oldestAt.toISOString() : null,
+    notedCount: Number(noted.notedCount),
+    last30dCount: Number(velocity.last30d),
+    previous30dCount: Number(velocity.previous30d),
   });
 }

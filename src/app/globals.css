@@ -81,13 +81,13 @@
   --border: #e0dbd4;
   --input: #e0dbd4;
   --ring: #3b82f6;
-  --note: #d4922a;
+  --note: #c8792a;
   --emerald: #0d9488;
   --chart-1: #3b82f6;
   --chart-2: #0d9488;
-  --chart-3: #d4922a;
-  --chart-4: #8b5cf6;
-  --chart-5: #ef4444;
+  --chart-3: #c8792a;
+  --chart-4: #6366f1;
+  --chart-5: #e11d74;
   --radius: 0.5rem;
   --sidebar: #f7f6f3;
   --sidebar-foreground: #1a1814;
@@ -130,13 +130,13 @@
   --border: #262626;
   --input: #1e1e1e;
   --ring: #3b82f6;
-  --note: #d4922a;
+  --note: #e0a258;
   --emerald: #14b8a6;
-  --chart-1: #3b82f6;
-  --chart-2: #14b8a6;
-  --chart-3: #e6a84d;
-  --chart-4: #a78bfa;
-  --chart-5: #f87171;
+  --chart-1: #60a5fa;
+  --chart-2: #2dd4bf;
+  --chart-3: #e0a258;
+  --chart-4: #a5b4fc;
+  --chart-5: #f472b6;
   --sidebar: #131313;
   --sidebar-foreground: #c8c0b4;
   --sidebar-primary: #3b82f6;
@@ -273,6 +273,21 @@
   .stagger-3 { animation-delay: 150ms; }
   .stagger-4 { animation-delay: 200ms; }
   .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+  .card-lift {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms ease-out;
+  }
+  .card-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 30px -12px rgba(26, 24, 20, 0.16);
+    border-color: var(--hairline-strong);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-lift { transition: none; }
+    .card-lift:hover { transform: none; }
+  }
   .skeleton-shimmer {
     position: relative;
     background-color: var(--muted);
