@@ -95,13 +95,25 @@ export interface TagWithCount {
 }
 
 export interface AnalyticsData {
-  topAuthors: Array<{ author: string; count: number }>;
+  topAuthors: Array<{
+    author: string;
+    displayName: string | null;
+    profileImage: string | null;
+    verified: boolean;
+    count: number;
+  }>;
   mediaBreakdown: Array<{ type: string; count: number }>;
-  tagDistribution: Array<{ tag: string; color: string; count: number }>;
+  tagDistribution: Array<{ id: string; tag: string; color: string; count: number }>;
   bookmarksByMonth: Array<{ month: string; count: number }>;
+  bookmarksByDay: Array<{ day: string; count: number }>;
   totalBookmarks: number;
   totalTags: number;
   totalCollections: number;
+  untaggedCount: number;
+  untaggedOldestAt: string | null;
+  notedCount: number;
+  last30dCount: number;
+  previous30dCount: number;
 }
 
 export type SyncRunStatus = "RUNNING" | "COMPLETED" | "RATE_LIMITED" | "FAILED";

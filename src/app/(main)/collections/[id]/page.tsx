@@ -22,6 +22,8 @@ import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { invalidateCollectionQueries } from "@/lib/query-invalidation";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 import type { ShareContent } from "@/lib/share-content";
 
@@ -262,16 +264,21 @@ export default function CollectionDetailPage({
 
   return (
     <div className="app-shell-bg min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-hairline-strong bg-background/70 backdrop-blur-sm supports-[backdrop-filter]:bg-background/65">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-start lg:justify-between">
+      <header
+        className={cn(
+          "sticky top-0 z-10 border-b border-hairline-strong",
+          appChromeFrostedClassName
+        )}
+      >
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <Button
               variant="outline"
               size="icon"
-              className="mt-0.5 border-hairline-soft bg-surface-1 shadow-sm"
+              className="size-10 shrink-0 border-hairline-soft bg-surface-1 shadow-sm"
               onClick={() => router.push("/collections")}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="size-4" />
             </Button>
 
             <div className="min-w-0 flex-1">
@@ -338,10 +345,10 @@ export default function CollectionDetailPage({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 border-hairline-soft bg-surface-1 shadow-sm"
+                  className="h-10 gap-1.5 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
                   onClick={handleCopyAsCollection}
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="size-4" />
                   Copy as Collection
                 </Button>
               </>
@@ -361,7 +368,7 @@ export default function CollectionDetailPage({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-hairline-soft bg-surface-1 shadow-sm"
+                  className="h-10 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
                   onClick={handleTogglePublic}
                 >
                   {collection.isPublic ? "Make Private" : "Make Public"}
@@ -371,21 +378,21 @@ export default function CollectionDetailPage({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 border-hairline-soft bg-surface-1 shadow-sm"
+                      className="h-10 gap-1.5 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
                       onClick={handleCopyShareLink}
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="size-4" />
                       Copy Link
                     </Button>
                     <a
                       href={`/share/${collection.shareSlug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex size-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 shadow-sm transition-colors hover:bg-surface-2"
+                      className="inline-flex size-10 items-center justify-center rounded-xl border border-hairline-soft bg-surface-1 shadow-sm transition-colors hover:bg-surface-2"
                       aria-label="Open public collection page"
                       title="Open public collection page"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="size-4" />
                     </a>
                   </>
                 )}
@@ -393,10 +400,10 @@ export default function CollectionDetailPage({
                   <Button
                     variant="default"
                     size="sm"
-                    className="gap-1.5 shadow-sm"
+                    className="h-10 gap-1.5 px-3 text-sm shadow-sm"
                     onClick={handleShareOnX}
                   >
-                    <Share2 className="w-3.5 h-3.5" />
+                    <Share2 className="size-4" />
                     Share on X
                   </Button>
                 )}

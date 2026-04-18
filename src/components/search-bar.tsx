@@ -3,6 +3,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
   value: string;
@@ -10,6 +11,8 @@ interface SearchBarProps {
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  /** Transparent field: use inside a frosted wrapper so there is only one visual surface. */
+  glass?: boolean;
   hint?: React.ReactNode;
 }
 
@@ -21,6 +24,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
       placeholder = "Search...",
       className = "",
       inputClassName = "",
+      glass = false,
       hint,
     },
     forwardedRef
@@ -53,14 +57,20 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     );
 
     return (
-      <div className={`relative w-full ${className}`}>
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+      <div className={cn("relative w-full", className)}>
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={inputRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`h-10 w-full rounded-xl border-hairline-strong bg-surface-1 pl-10 pr-10 text-sm shadow-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/25 focus:shadow-md ${inputClassName}`}
+          className={cn(
+            "h-10 w-full pl-10 pr-10 text-sm transition-all",
+            glass
+              ? "rounded-2xl border-0 bg-transparent shadow-none focus:border-transparent focus:shadow-none focus:ring-2 focus:ring-primary/25 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-transparent"
+              : "rounded-xl border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
+            inputClassName
+          )}
         />
         {value ? (
           <button

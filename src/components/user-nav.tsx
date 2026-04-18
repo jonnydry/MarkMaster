@@ -25,19 +25,19 @@ export function UserNav({ user }: UserNavProps) {
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "outline-none inline-flex h-8 items-center gap-1.5 rounded-full transition-colors",
+          "outline-none inline-flex items-center gap-1.5 rounded-full p-0.5 transition-colors",
           "hover:bg-secondary/80 dark:hover:bg-secondary/60",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         )}
       >
-        <Avatar className="size-7 shrink-0">
+        <Avatar size="xl" className="shrink-0">
           {user.profileImageUrl ? (
             <AvatarImage
               src={user.profileImageUrl}
               alt={`${user.displayName} profile picture`}
             />
           ) : null}
-          <AvatarFallback className="bg-primary text-[10px] font-bold text-primary-foreground">
+          <AvatarFallback className="bg-primary text-sm font-bold text-primary-foreground">
             {user.displayName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>

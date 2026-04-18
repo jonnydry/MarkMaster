@@ -114,7 +114,7 @@ export default function SettingsPage() {
         : "Please try again.";
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-hidden">
+    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -131,29 +131,31 @@ export default function SettingsPage() {
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <PageHeader
-          title="Settings"
-          description="Appearance, tags, exports, and account controls"
-          leading={
-            <div className="md:hidden">
-              <MobileSidebar
-                tags={tags}
-                collections={collections}
-                selectedTags={[]}
-                onTagToggle={goToTagOnDashboard}
-                onCreateCollection={() => setCreateOpen(true)}
-                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
-              />
-            </div>
-          }
-          actions={
-            session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : undefined
-          }
-        />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+          <PageHeader
+            sticky
+            title="Settings"
+            description="Appearance, tags, exports, and account controls"
+            leading={
+              <div className="md:hidden">
+                <MobileSidebar
+                  tags={tags}
+                  collections={collections}
+                  selectedTags={[]}
+                  onTagToggle={goToTagOnDashboard}
+                  onCreateCollection={() => setCreateOpen(true)}
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                />
+              </div>
+            }
+            actions={
+              session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : undefined
+            }
+          />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-          <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <div className="p-4 sm:p-5">
+            <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div className="space-y-5">
               {hasSettingsError && (
                 <Card className="border-destructive/30 bg-surface-1 p-5 shadow-sm">
@@ -355,6 +357,7 @@ export default function SettingsPage() {
                 </div>
               )}
             </Card>
+            </div>
           </div>
         </div>
       </div>

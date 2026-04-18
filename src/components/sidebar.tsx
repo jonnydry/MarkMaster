@@ -1,17 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Bookmark,
-  FolderOpen,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Layers,
-} from "lucide-react";
+import { Bookmark, FolderOpen, BarChart3, Settings, Layers } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
@@ -21,6 +13,15 @@ import { MarkMasterLogo } from "@/components/markmaster-logo";
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
 const X_FOLDER_PREVIEW_LIMIT = 8;
+
+function isSidebarInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      "a, button, input, select, textarea, label, [role='button'], [role='menuitem'], [role='link'], [data-sidebar-no-toggle]"
+    )
+  );
+}
 
 export interface SidebarProps {
   tags: TagWithCount[];
@@ -82,23 +83,40 @@ export function Sidebar({
     : xFolders.slice(0, X_FOLDER_PREVIEW_LIMIT);
   const hiddenFolderCount = xFolders.length - visibleFolders.length;
 
+  const handleAsideBackgroundClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if (!showToggle) return;
+      if (isSidebarInteractiveTarget(event.target)) return;
+      toggle();
+    },
+    [showToggle, toggle]
+  );
+
   return (
     <aside
+      onClick={showToggle ? handleAsideBackgroundClick : undefined}
+      aria-label={
+        showToggle
+          ? "Sidebar navigation. Click an empty area to show or hide the sidebar."
+          : undefined
+      }
       className={`flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-hairline-strong bg-gradient-to-b from-sidebar to-surface-1 py-3 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none ${
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
-      }`}
+      } ${showToggle ? "cursor-col-resize" : ""}`}
     >
       <button
         type="button"
         onClick={showToggle ? toggle : undefined}
-        className={`group mb-3 flex items-center rounded-xl border border-transparent transition-colors hover:border-hairline-soft hover:bg-sidebar-accent ${
-          expanded ? "h-10 gap-2.5 self-stretch px-2" : "h-10 w-10 justify-center"
+        className={`group mb-3 flex cursor-pointer items-center rounded-xl border border-transparent transition-colors hover:border-hairline-soft hover:bg-sidebar-accent ${
+          expanded
+            ? "min-h-12 gap-3 self-stretch px-2 py-1"
+            : "size-12 justify-center"
         }`}
-        title={expanded ? "Collapse sidebar" : "MarkMaster"}
+        title={expanded ? "MarkMaster — hide sidebar" : "MarkMaster — show sidebar"}
       >
-        <MarkMasterLogo width={28} height={28} className="shrink-0" priority />
+        <MarkMasterLogo width={40} height={40} className="shrink-0" priority />
         {expanded && (
-          <span className="text-[15px] font-bold tracking-[-0.02em] text-sidebar-foreground heading-font">
+          <span className="text-lg font-bold tracking-[-0.02em] text-sidebar-foreground heading-font">
             MarkMaster
           </span>
         )}
@@ -117,10 +135,12 @@ export function Sidebar({
                 isActive
                   ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }${expanded ? " h-9 gap-3" : " h-9 w-9 justify-center"}`}
+              }${expanded ? " h-10 gap-3" : " h-10 w-10 justify-center"}`}
             >
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {expanded && <span className="text-sm font-medium">{label}</span>}
+              <Icon className="size-5 shrink-0" />
+              {expanded && (
+                <span className="text-[15px] font-medium leading-none">{label}</span>
+              )}
             </Link>
           );
         })}
@@ -309,19 +329,7 @@ export function Sidebar({
           </div>
 
           <div className="mt-auto shrink-0 space-y-2 border-t border-hairline-strong bg-gradient-to-t from-surface-1 via-surface-1 to-transparent pt-3">
-            {showToggle && (
-              <button
-                type="button"
-                onClick={toggle}
-                aria-expanded={expanded}
-                aria-label="Collapse sidebar"
-                className="flex h-9 w-full shrink-0 items-center gap-3 px-3 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                <span className="text-xs">Collapse</span>
-              </button>
-            )}
-            <div className="w-full self-stretch">
+            <div className="w-full self-stretch" data-sidebar-no-toggle>
               <SyncButton
                 lastSyncAt={lastSyncAt ?? null}
                 onSyncComplete={onSyncComplete}
@@ -331,20 +339,7 @@ export function Sidebar({
           </div>
         </>
       ) : (
-        <>
-          <div className="min-h-0 flex-1" aria-hidden />
-          {showToggle && (
-            <button
-              type="button"
-              onClick={toggle}
-              aria-expanded={expanded}
-              aria-label="Expand sidebar"
-              className="mx-auto mt-2 flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ChevronRight className="h-4 w-4 shrink-0" />
-            </button>
-          )}
-        </>
+        <div className="min-h-0 flex-1" aria-hidden />
       )}
     </aside>
   );

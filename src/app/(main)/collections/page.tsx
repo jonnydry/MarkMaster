@@ -90,7 +90,7 @@ export default function CollectionsPage() {
   };
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-hidden">
+    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -107,34 +107,40 @@ export default function CollectionsPage() {
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <PageHeader
-          title="Collections"
-          description={collectionsSummary}
-          leading={
-            <div className="md:hidden">
-              <MobileSidebar
-                tags={tags}
-                collections={collections}
-                selectedTags={[]}
-                onTagToggle={goToTagOnDashboard}
-                onCreateCollection={() => setCreateOpen(true)}
-                onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
-              />
-            </div>
-          }
-          actions={
-            <>
-              <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                New
-              </Button>
-              {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
-            </>
-          }
-        />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+          <PageHeader
+            sticky
+            title="Collections"
+            description={collectionsSummary}
+            leading={
+              <div className="md:hidden">
+                <MobileSidebar
+                  tags={tags}
+                  collections={collections}
+                  selectedTags={[]}
+                  onTagToggle={goToTagOnDashboard}
+                  onCreateCollection={() => setCreateOpen(true)}
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                />
+              </div>
+            }
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => setCreateOpen(true)}
+                  className="h-10 gap-2 px-3 text-sm"
+                >
+                  <Plus className="size-4" />
+                  New
+                </Button>
+                {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
+              </>
+            }
+          />
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div className="p-4 sm:p-5">
           {isLoading ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -287,6 +293,7 @@ export default function CollectionsPage() {
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
 
