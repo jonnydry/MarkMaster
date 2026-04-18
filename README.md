@@ -8,6 +8,7 @@ Search, tag, annotate, and curate your X bookmarks. Built for power users who ac
 - **Sort & filter** by date, engagement metrics, content type, author, and tags
 - **Custom tags** with color coding
 - **Collections** — curate themed bookmark lists with manual ordering
+- **Orbit AI scan** — use Grok to preview auto-tagging and collection sorting for bookmarks still in Orbit
 - **Share collections** via public links
 - **Analytics** — see who you bookmark most, content breakdown, and trends
 - **Export** to JSON or CSV with all metadata
@@ -50,10 +51,20 @@ AUTH_TWITTER_ID="your-x-oauth2-client-id"
 AUTH_TWITTER_SECRET="your-x-oauth2-client-secret"
 NEXTAUTH_URL="http://localhost:3000"
 ENCRYPTION_KEY="openssl rand -hex 32"
+
+# Optional: Grok-powered Orbit scan
+XAI_API_KEY="your-xai-api-key"
+XAI_ORBIT_MODEL="grok-4.20-reasoning"
+XAI_API_BASE_URL="https://api.x.ai/v1"
 ```
 
 `ENCRYPTION_KEY` must be a 64-character hex string. If an older deployment was
 using a shorter or non-hex key, rotate it before starting this version.
+
+`XAI_API_KEY` is only required if you want the Orbit scan flow to call Grok.
+By default MarkMaster uses `grok-4.20-reasoning` through xAI's Responses API.
+You can override the model or point at a regional xAI endpoint with
+`XAI_ORBIT_MODEL` and `XAI_API_BASE_URL`.
 
 ### 3. Set up the database
 

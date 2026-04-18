@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const booleanQueryFlagSchema = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
 const bookmarkIdsSchema = z
   .array(z.string().min(1, "Bookmark ID is required"))
   .min(1, "At least one bookmark is required");
@@ -89,6 +94,7 @@ export const bookmarksQuerySchema = z.object({
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   collectionId: z.string().optional(),
+  unaffiliated: booleanQueryFlagSchema,
 });
 
 export const exportQuerySchema = z.object({

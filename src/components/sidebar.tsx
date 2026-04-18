@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, FolderOpen, BarChart3, Settings, Layers } from "lucide-react";
+import { Bookmark, FolderOpen, BarChart3, Settings, Layers, Orbit } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
@@ -38,6 +38,7 @@ export interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
+  { href: "/orbit", icon: Orbit, label: "Orbit" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },

@@ -78,6 +78,7 @@ function buildSlowPathWhereSql({
   dateTo,
   collectionId,
   mediaFilter,
+  unaffiliated,
 }: {
   userId: string;
   search: string;
@@ -87,6 +88,7 @@ function buildSlowPathWhereSql({
   dateTo?: string;
   collectionId?: string;
   mediaFilter: "all" | "images" | "video" | "links" | "text-only";
+  unaffiliated: boolean;
 }) {
   const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
 
@@ -135,6 +137,23 @@ function buildSlowPathWhereSql({
         SELECT 1
         FROM "CollectionItem" ci
         WHERE ci."bookmarkId" = b."id" AND ci."collectionId" = ${collectionId}
+      )
+    `);
+  }
+
+  if (unaffiliated) {
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "BookmarkTag" bt
+        WHERE bt."bookmarkId" = b."id"
+      )
+    `);
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "CollectionItem" ci
+        WHERE ci."bookmarkId" = b."id"
       )
     `);
   }
@@ -193,11 +212,13 @@ export async function GET(req: NextRequest) {
     dateFrom,
     dateTo,
     collectionId,
+    unaffiliated,
   } = parsed.data;
 
   const tagIds = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
+  const relationFilters: Prisma.BookmarkWhereInput[] = [];
 
   if (search) {
     where.OR = [
@@ -213,7 +234,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (tagIds.length > 0) {
-    where.tags = { some: { tagId: { in: tagIds } } };
+    relationFilters.push({ tags: { some: { tagId: { in: tagIds } } } });
   }
 
   if (dateFrom || dateTo) {
@@ -223,7 +244,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (collectionId) {
-    where.collectionItems = { some: { collectionId } };
+    relationFilters.push({ collectionItems: { some: { collectionId } } });
+  }
+
+  if (unaffiliated) {
+    relationFilters.push({ tags: { none: {} } });
+    relationFilters.push({ collectionItems: { none: {} } });
+  }
+
+  if (relationFilters.length > 0) {
+    where.AND = relationFilters;
   }
 
   if (mediaFilter === "links") {
@@ -281,6 +311,7 @@ export async function GET(req: NextRequest) {
     dateTo,
     collectionId,
     mediaFilter,
+    unaffiliated,
   });
   const orderSql = getSlowPathOrderSql(sortField);
   const directionSql = Prisma.raw(sortDirection.toUpperCase());

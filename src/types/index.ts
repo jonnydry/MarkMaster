@@ -138,3 +138,89 @@ export interface SyncStatusResponse {
   currentRun: SyncRunSummary | null;
   recentRuns: SyncRunSummary[];
 }
+
+export type OrbitScanConfidence = "high" | "medium" | "low";
+
+export interface OrbitTagSuggestion {
+  name: string;
+  color: string;
+  reason: string;
+  reuseExisting: boolean;
+}
+
+export interface OrbitCollectionSuggestion {
+  name: string;
+  description: string;
+  reason: string;
+  reuseExisting: boolean;
+}
+
+export interface OrbitBookmarkSuggestion {
+  bookmarkId: string;
+  confidence: OrbitScanConfidence;
+  reasoning: string;
+  tags: OrbitTagSuggestion[];
+  collection: OrbitCollectionSuggestion | null;
+}
+
+export interface OrbitScanOverview {
+  summary: string;
+  taggingStrategy: string;
+  collectionStrategy: string;
+}
+
+export interface OrbitScanPlan {
+  overview: OrbitScanOverview;
+  suggestions: OrbitBookmarkSuggestion[];
+}
+
+export interface OrbitScanSummary {
+  bookmarkCount: number;
+  bookmarksWithTags: number;
+  bookmarksWithCollections: number;
+  tagAssignments: number;
+  uniqueTags: number;
+  collectionBuckets: number;
+  reusedExistingTags: number;
+  reusedExistingCollections: number;
+  newCollectionBuckets: number;
+}
+
+export interface OrbitTagRollup {
+  name: string;
+  color: string;
+  count: number;
+  reuseExisting: boolean;
+}
+
+export interface OrbitCollectionRollup {
+  name: string;
+  description: string;
+  count: number;
+  reuseExisting: boolean;
+  bookmarkIds: string[];
+}
+
+export interface OrbitScanResponsePayload {
+  model: string;
+  scannedAt: string;
+  privacy: {
+    storeDisabled: boolean;
+    zeroDataRetention: boolean | null;
+  };
+  plan: OrbitScanPlan;
+  summary: OrbitScanSummary;
+  tagRollups: OrbitTagRollup[];
+  collectionRollups: OrbitCollectionRollup[];
+}
+
+export interface OrbitApplyResult {
+  bookmarkCount: number;
+  createdTags: number;
+  reusedTags: number;
+  tagAssignments: number;
+  createdCollections: number;
+  reusedCollections: number;
+  collectionAssignments: number;
+  skippedNewCollectionSingletons: number;
+}

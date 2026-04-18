@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 
-type PageHeaderProps = ComponentProps<"header"> & {
+type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   title?: ReactNode;
   description?: ReactNode;
   leading?: ReactNode;
