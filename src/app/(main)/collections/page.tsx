@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
-import { UserNav } from "@/components/user-nav";
+import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
@@ -129,7 +129,7 @@ export default function CollectionsPage() {
                 <Plus className="w-4 h-4" />
                 New
               </Button>
-              {session?.dbUser ? <UserNav user={session.dbUser} /> : null}
+              {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
             </>
           }
         />

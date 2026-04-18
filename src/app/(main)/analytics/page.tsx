@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
-import { UserNav } from "@/components/user-nav";
+import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import type {
   AnalyticsData,
 } from "@/types";
@@ -128,7 +128,9 @@ export default function AnalyticsPage() {
               />
             </div>
           }
-          actions={session?.dbUser ? <UserNav user={session.dbUser} /> : undefined}
+          actions={
+            session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : undefined
+          }
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">

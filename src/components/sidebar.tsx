@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,8 +14,13 @@ import {
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
+import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+
+const TAG_PREVIEW_LIMIT = 12;
+const COLLECTION_PREVIEW_LIMIT = 10;
+const X_FOLDER_PREVIEW_LIMIT = 8;
 
 export interface SidebarProps {
   tags: TagWithCount[];
@@ -61,6 +66,21 @@ export function Sidebar({
     [collections]
   );
   const hasCollections = userCollections.length > 0 || xFolders.length > 0;
+
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showAllCollections, setShowAllCollections] = useState(false);
+  const [showAllFolders, setShowAllFolders] = useState(false);
+
+  const visibleTags = showAllTags ? tags : tags.slice(0, TAG_PREVIEW_LIMIT);
+  const hiddenTagCount = tags.length - visibleTags.length;
+  const visibleCollections = showAllCollections
+    ? userCollections
+    : userCollections.slice(0, COLLECTION_PREVIEW_LIMIT);
+  const hiddenCollectionCount = userCollections.length - visibleCollections.length;
+  const visibleFolders = showAllFolders
+    ? xFolders
+    : xFolders.slice(0, X_FOLDER_PREVIEW_LIMIT);
+  const hiddenFolderCount = xFolders.length - visibleFolders.length;
 
   return (
     <aside
@@ -108,22 +128,17 @@ export function Sidebar({
 
       {expanded ? (
         <>
-          {/* Scroll only tags/collections; footer stays fixed so flex+sticky cannot inflate scroll height / overscroll. */}
+          {/* Outer scroll handles overflow; sections are collapsible and individually truncated via "Show all". */}
           <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-y-contain scrollbar-thin">
-            <div className="space-y-4 pb-1">
-              <div>
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Tags
-                  </h3>
-                </div>
+            <div className="space-y-3 pb-1">
+              <SidebarSection id="tags" title="Tags" count={tags.length}>
                 {tags.length === 0 ? (
-                  <p className="px-1 text-xs text-muted-foreground">
+                  <p className="px-1 pb-1 text-xs text-muted-foreground">
                     Tags appear as you add them to bookmarks
                   </p>
                 ) : (
-                  <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain scrollbar-thin pr-0.5">
-                    {tags.map((tag) => {
+                  <div className="space-y-0.5">
+                    {visibleTags.map((tag) => {
                       const isSelected = selectedTags.includes(tag.id);
                       return (
                         <button
@@ -153,88 +168,142 @@ export function Sidebar({
                         </button>
                       );
                     })}
+                    {(hiddenTagCount > 0 || showAllTags) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllTags((v) => !v)}
+                        className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        <span>
+                          {showAllTags ? "Show less" : `Show all ${tags.length}`}
+                        </span>
+                        {!showAllTags && hiddenTagCount > 0 && (
+                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                            +{hiddenTagCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
-              </div>
+              </SidebarSection>
 
-              <div>
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    My Collections
-                  </h3>
+              <SidebarSection
+                id="collections"
+                title="My Collections"
+                count={userCollections.length}
+                action={
                   <button
                     type="button"
                     onClick={onCreateCollection}
                     aria-label="Create collection"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-base leading-none text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-base leading-none text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                   >
                     <span aria-hidden>+</span>
                   </button>
-                </div>
+                }
+              >
                 {!hasCollections ? (
-                  <p className="px-1 text-xs text-muted-foreground/70">
+                  <p className="px-1 pb-1 text-xs text-muted-foreground/70">
                     Create a collection to start curating
                   </p>
                 ) : (
                   <div className="space-y-0.5">
-                    {userCollections.map((collection) => {
-                        const isCollectionActive = pathname === `/collections/${collection.id}`;
-                        return (
-                          <Link
-                            key={collection.id}
-                            href={`/collections/${collection.id}`}
-                            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
-                              isCollectionActive
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                            }`}
-                          >
-                            <span className="flex min-w-0 items-center gap-2">
-                              <Layers className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{collection.name}</span>
-                            </span>
-                            <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                              {collection._count.items}
-                            </span>
-                          </Link>
-                        );
+                    {visibleCollections.map((collection) => {
+                      const isCollectionActive =
+                        pathname === `/collections/${collection.id}`;
+                      return (
+                        <Link
+                          key={collection.id}
+                          href={`/collections/${collection.id}`}
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                            isCollectionActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Layers className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{collection.name}</span>
+                          </span>
+                          <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                            {collection._count.items}
+                          </span>
+                        </Link>
+                      );
                     })}
+                    {(hiddenCollectionCount > 0 || showAllCollections) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCollections((v) => !v)}
+                        className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        <span>
+                          {showAllCollections
+                            ? "Show less"
+                            : `Show all ${userCollections.length}`}
+                        </span>
+                        {!showAllCollections && hiddenCollectionCount > 0 && (
+                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                            +{hiddenCollectionCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
-              </div>
+              </SidebarSection>
 
               {xFolders.length > 0 && (
-                <div>
-                  <div className="mb-2 px-1">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      X Folders
-                    </h3>
-                  </div>
+                <SidebarSection
+                  id="x-folders"
+                  title="X Folders"
+                  count={xFolders.length}
+                >
                   <div className="space-y-0.5">
-                    {xFolders.map((collection) => {
-                        const isCollectionActive = pathname === `/collections/${collection.id}`;
-                        return (
-                          <Link
-                            key={collection.id}
-                            href={`/collections/${collection.id}`}
-                            className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
-                              isCollectionActive
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                            }`}
-                          >
-                            <span className="flex min-w-0 items-center gap-2">
-                              <FolderOpen className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{collection.name}</span>
-                            </span>
-                            <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
-                              {collection._count.items}
-                            </span>
-                          </Link>
-                        );
+                    {visibleFolders.map((collection) => {
+                      const isCollectionActive =
+                        pathname === `/collections/${collection.id}`;
+                      return (
+                        <Link
+                          key={collection.id}
+                          href={`/collections/${collection.id}`}
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                            isCollectionActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <FolderOpen className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{collection.name}</span>
+                          </span>
+                          <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                            {collection._count.items}
+                          </span>
+                        </Link>
+                      );
                     })}
+                    {(hiddenFolderCount > 0 || showAllFolders) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllFolders((v) => !v)}
+                        className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        <span>
+                          {showAllFolders
+                            ? "Show less"
+                            : `Show all ${xFolders.length}`}
+                        </span>
+                        {!showAllFolders && hiddenFolderCount > 0 && (
+                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                            +{hiddenFolderCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </div>
-                </div>
+                </SidebarSection>
               )}
             </div>
           </div>

@@ -26,16 +26,14 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   const hasHeaderRow = title || description || leading || actions;
+  const mergedHeaderClassName = cn(
+    "shrink-0 border-b border-hairline-strong bg-background/70 backdrop-blur-sm supports-[backdrop-filter]:bg-background/65",
+    sticky && "sticky top-0 z-10",
+    className
+  );
 
   return (
-    <header
-      className={cn(
-        "shrink-0 border-b border-hairline-strong bg-background/70 backdrop-blur-sm supports-[backdrop-filter]:bg-background/65",
-        sticky && "sticky top-0 z-10",
-        className
-      )}
-      {...props}
-    >
+    <header className={mergedHeaderClassName} {...props}>
       <div className={cn("px-4 py-3 sm:px-5", bodyClassName)}>
         {hasHeaderRow ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

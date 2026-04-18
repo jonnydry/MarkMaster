@@ -14,7 +14,7 @@ import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { PageHeader } from "@/components/page-header";
-import { UserNav } from "@/components/user-nav";
+import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
@@ -457,7 +457,7 @@ function DashboardContent() {
                 onSortFieldChange={filters.setSortField}
                 onViewModeChange={setViewMode}
               />
-              {dbUser && <UserNav user={dbUser} />}
+              {dbUser && <UserNavDynamic user={dbUser} />}
             </div>
           </div>
 
