@@ -31,7 +31,6 @@ import {
   invalidateTagsQuery,
 } from "@/lib/query-invalidation";
 import { toast } from "sonner";
-import type { DbUser } from "@/lib/auth";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -43,9 +42,7 @@ const CreateCollectionDialog = dynamic(
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
   const { createCollection } = useCreateCollection();
@@ -53,6 +50,7 @@ export default function SettingsPage() {
 
   const {
     data: tags = [],
+    isLoading: tagsLoading,
     isError: tagsError,
     error: tagsErrorValue,
     refetch: refetchTags,
@@ -60,6 +58,7 @@ export default function SettingsPage() {
 
   const {
     data: collections = [],
+    isLoading: collectionsLoading,
     isError: collectionsError,
     error: collectionsErrorValue,
     refetch: refetchCollections,
@@ -114,7 +113,7 @@ export default function SettingsPage() {
         : "Please try again.";
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -260,12 +259,16 @@ export default function SettingsPage() {
               </Card>
             </div>
 
-            <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-primary" />
-                <h2 className="font-semibold heading-font">Manage Tags</h2>
-              </div>
-              {tags.length === 0 ? (
+              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-primary" />
+                  <h2 className="font-semibold heading-font">Manage Tags</h2>
+                </div>
+                {tagsLoading ? (
+                  <div className="rounded-2xl border border-hairline-soft bg-surface-2 px-4 py-10 text-center">
+                    <div className="mx-auto h-6 w-24 rounded bg-muted animate-pulse" />
+                  </div>
+                ) : tags.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-hairline-soft bg-surface-2 px-4 py-10 text-center">
                   <Tag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
                   <p className="text-sm font-medium text-foreground">No tags yet</p>
@@ -307,6 +310,7 @@ export default function SettingsPage() {
                             onKeyDown={(e) =>
                               e.key === "Enter" && handleUpdateTag(tag.id)
                             }
+                            onBlur={() => setEditingTag(null)}
                           />
                             <Button size="sm" className="shadow-sm" onClick={() => handleUpdateTag(tag.id)}>
                               Save
@@ -327,7 +331,7 @@ export default function SettingsPage() {
                           />
                           <span className="flex-1 text-sm font-medium">{tag.name}</span>
                           <span className="rounded-full border border-hairline-soft bg-surface-1 px-2 py-0.5 text-xs text-muted-foreground shadow-sm">
-                            {tag._count.bookmarks}
+                            {tag._count?.bookmarks ?? 0}
                           </span>
                           <Button
                             variant="ghost"

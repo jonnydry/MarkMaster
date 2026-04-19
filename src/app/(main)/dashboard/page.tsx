@@ -30,7 +30,6 @@ import type {
   BookmarkWithRelations,
   MediaFilter,
 } from "@/types";
-import type { DbUser } from "@/lib/auth";
 
 type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -112,9 +111,7 @@ function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
 function DashboardContent() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
 
   const filters = useBookmarkFilters();
   const actions = useBookmarkActions();
@@ -361,7 +358,7 @@ function DashboardContent() {
     filters.dateTo !== "";
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -749,7 +746,7 @@ function DashboardContent() {
         open={noteDialogOpen}
         onOpenChange={setNoteDialogOpen}
         bookmarkId={activeBookmarkId}
-        existingNote={activeBookmark?.notes[0]?.content}
+        existingNote={activeBookmark ? activeBookmark.notes[0]?.content : undefined}
         onSave={actions.handleAddNote}
       />
 

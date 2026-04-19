@@ -91,7 +91,7 @@ export function useBookmarkFilters() {
     dateTo,
     setDateTo: useCallback((v: string) => { setDateTo(v); resetPage(); }, [resetPage]),
     selectedTags,
-    setSelectedTags,
+    setSelectedTags: useCallback((v: string[]) => { setSelectedTags(v); resetPage(); }, [resetPage]),
     page,
     setPage,
     toggleTag,

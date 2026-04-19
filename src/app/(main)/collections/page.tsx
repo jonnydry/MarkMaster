@@ -23,7 +23,6 @@ import {
 } from "@/lib/query-invalidation";
 import { getStaggerClass } from "@/lib/stagger";
 import { toast } from "sonner";
-import type { DbUser } from "@/lib/auth";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -35,9 +34,7 @@ const CreateCollectionDialog = dynamic(
 
 export default function CollectionsPage() {
   const router = useRouter();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
@@ -90,7 +87,7 @@ export default function CollectionsPage() {
   };
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -184,7 +181,7 @@ export default function CollectionsPage() {
                       <Card
                         key={col.id}
                         className={`group cursor-pointer border-hairline-soft bg-surface-1 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
-                        role="link"
+                        role="button"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
                         onKeyDown={(event) => handleCollectionCardKeyDown(event, col.id)}
@@ -231,7 +228,7 @@ export default function CollectionsPage() {
                         )}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>
-                            {col._count.items} bookmark{col._count.items !== 1 ? "s" : ""}
+                            {col._count?.items ?? 0} bookmark{(col._count?.items ?? 0) !== 1 ? "s" : ""}
                           </span>
                           <span>{new Date(col.createdAt).toLocaleDateString()}</span>
                         </div>
@@ -252,7 +249,7 @@ export default function CollectionsPage() {
                       <Card
                         key={col.id}
                         className={`group cursor-pointer border-hairline-soft bg-surface-1 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${getStaggerClass(i, "animate-fade-in-up") ?? ""}`}
-                        role="link"
+                        role="button"
                         tabIndex={0}
                         onClick={() => router.push(`/collections/${col.id}`)}
                         onKeyDown={(event) => handleCollectionCardKeyDown(event, col.id)}
@@ -282,7 +279,7 @@ export default function CollectionsPage() {
                         )}
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <span>
-                            {col._count.items} bookmark{col._count.items !== 1 ? "s" : ""}
+                            {col._count?.items ?? 0} bookmark{(col._count?.items ?? 0) !== 1 ? "s" : ""}
                           </span>
                           <span>{new Date(col.createdAt).toLocaleDateString()}</span>
                         </div>

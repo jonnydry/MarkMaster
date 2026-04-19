@@ -207,15 +207,16 @@ export default function CollectionDetailPage({
     const toIndex = fromIndex + direction;
     if (toIndex < 0 || toIndex >= sortedItems.length) return;
 
-    const next = [...sortedItems];
-    [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-    const payload = next.map((it, i) => ({
-      bookmarkId: it.bookmark.id,
-      sortOrder: i,
-    }));
-
+    const prevItems = sortedItems;
     setReordering(true);
     try {
+      const next = [...sortedItems];
+      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+      const payload = next.map((it, i) => ({
+        bookmarkId: it.bookmark.id,
+        sortOrder: i,
+      }));
+
       await sendJson(`/api/collections/${id}/items`, {
         method: "PATCH",
         body: { items: payload },
@@ -244,11 +245,13 @@ export default function CollectionDetailPage({
   }
 
   if (isError || !collection) {
+    const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
     return (
       <div className="app-shell-bg min-h-screen flex flex-col items-center justify-center gap-4 px-6">
         <p className="text-muted-foreground text-center">
-          This collection could not be loaded. It may have been deleted or you
-          may not have access.
+          {isNotFound
+            ? "This collection does not exist or has been deleted."
+            : "This collection could not be loaded. It may have been deleted or you may not have access."}
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => refetch()}>
@@ -318,7 +321,7 @@ export default function CollectionDetailPage({
                         type="button"
                         className="max-w-full truncate rounded-md text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                         onClick={() => {
-                          setName(collection.name);
+                          setName(collection.name ?? "");
                           setEditingName(true);
                         }}
                         aria-label={`Edit collection name ${collection.name}`}

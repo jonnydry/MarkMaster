@@ -21,11 +21,6 @@ import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import type { AnalyticsData } from "@/types";
-import type { DbUser } from "@/lib/auth";
-import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
-import { fetchJson } from "@/lib/fetch-json";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type { TimeRange } from "./time-range";
 
 export type { TimeRange };
@@ -65,9 +60,7 @@ const RANGE_OPTIONS: Array<{ value: TimeRange; label: string }> = [
 export default function AnalyticsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
@@ -79,8 +72,8 @@ export default function AnalyticsPage() {
     error,
     refetch,
   } = useQuery<AnalyticsData>({
-    queryKey: ["analytics"],
-    queryFn: () => fetchJson("/api/analytics"),
+    queryKey: ["analytics", range],
+    queryFn: () => fetchJson(`/api/analytics?range=${range}`),
   });
 
   const { data: tags = [] } = useTagsQuery();
@@ -111,7 +104,7 @@ export default function AnalyticsPage() {
   }, [analytics]);
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
