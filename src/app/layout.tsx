@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   title: "MarkMaster — X Bookmark Manager",
   description:
     "Search, tag, annotate, and curate your X bookmarks with a local synced archive.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default async function RootLayout({

@@ -52,6 +52,7 @@ import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { fetchJson, sendJson, type JsonValue } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { getStaggerClass } from "@/lib/stagger";
+import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-grok";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 import type {
@@ -251,6 +252,8 @@ export default function OrbitPage() {
         : bookmarks.map((bookmark) => bookmark.id),
     [bookmarks, visibleSelectedBookmarkIds]
   );
+  const grokScanExceedsLimit =
+    grokTargetBookmarkIds.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN;
   const selectedBookmarkIdSet = useMemo(
     () => new Set(visibleSelectedBookmarkIds),
     [visibleSelectedBookmarkIds]
@@ -420,7 +423,7 @@ export default function OrbitPage() {
   }, []);
 
   const handleGrokScan = useCallback(async () => {
-    if (grokTargetBookmarkIds.length === 0) return;
+    if (grokTargetBookmarkIds.length === 0 || grokScanExceedsLimit) return;
 
     setGrokScanning(true);
     try {
@@ -444,7 +447,7 @@ export default function OrbitPage() {
     } finally {
       setGrokScanning(false);
     }
-  }, [grokTargetBookmarkIds]);
+  }, [grokScanExceedsLimit, grokTargetBookmarkIds]);
 
   const handleApplyGrokPlan = useCallback(async () => {
     if (!grokScanResult) return;
@@ -580,11 +583,20 @@ export default function OrbitPage() {
                           Analyze {grokScopeLabel} and preview auto-tagging plus
                           collection sorting before anything is applied.
                         </p>
+                        {grokScanExceedsLimit && (
+                          <p className="mt-2 text-xs text-amber-200/90">
+                            Grok scans at most {ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN}{" "}
+                            bookmarks per run. Clear the selection or narrow it to{" "}
+                            {ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} or fewer.
+                          </p>
+                        )}
                       </div>
                       <Button
                         size="lg"
                         className="h-10 gap-2 bg-white text-slate-950 shadow-sm hover:bg-white/90"
-                        disabled={grokTargetBookmarkIds.length === 0}
+                        disabled={
+                          grokTargetBookmarkIds.length === 0 || grokScanExceedsLimit
+                        }
                         onClick={handleOpenGrokDialog}
                       >
                         <Sparkles className="size-4" />
@@ -1370,7 +1382,13 @@ export default function OrbitPage() {
 
           <div className="flex flex-col gap-3 border-t border-hairline-soft bg-muted/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              {grokScanResult ? (
+              {grokScanExceedsLimit ? (
+                <>
+                  Too many bookmarks selected ({grokTargetBookmarkIds.length} /{" "}
+                  {ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} max). Reduce the selection to
+                  scan.
+                </>
+              ) : grokScanResult ? (
                 hasGrokSuggestions ? (
                   <>Review the plan, then apply it when it looks right.</>
                 ) : (
@@ -1392,7 +1410,12 @@ export default function OrbitPage() {
                 variant={grokScanResult ? "outline" : "default"}
                 className="gap-2"
                 onClick={handleGrokScan}
-                disabled={grokScanning || grokApplying || grokTargetBookmarkIds.length === 0}
+                disabled={
+                  grokScanning ||
+                  grokApplying ||
+                  grokTargetBookmarkIds.length === 0 ||
+                  grokScanExceedsLimit
+                }
               >
                 {grokScanning ? (
                   <Loader2 className="size-4 animate-spin" />

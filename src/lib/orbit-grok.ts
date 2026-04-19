@@ -11,7 +11,9 @@ import type {
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
 const DEFAULT_XAI_MODEL = "grok-4.20-reasoning";
-const MAX_BOOKMARKS_PER_SCAN = 24;
+
+/** Upper bound for bookmarks sent to xAI per Orbit scan (prompt size + API limits). */
+export const ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN = 24;
 const MAX_TEXT_LENGTH = 1_200;
 const MAX_NOTE_LENGTH = 400;
 const MAX_URLS_PER_BOOKMARK = 3;
@@ -106,7 +108,10 @@ export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
     bookmarkIds: z
       .array(z.string().trim().min(1, "Bookmark ID is required"))
       .min(1, "Select at least one bookmark to scan")
-      .max(MAX_BOOKMARKS_PER_SCAN, `Scan up to ${MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`),
+      .max(
+        ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+        `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`
+      ),
   }),
   z.object({
     mode: z.literal("apply"),
@@ -334,20 +339,47 @@ function buildPromptPayload(args: {
 }) {
   return {
     goal:
-      "Analyze these MarkMaster Orbit bookmarks and propose high-signal tags plus optional collection homes.",
-    rules: [
-      "Return JSON that matches the provided schema exactly.",
-      "Reuse existing tag names whenever they are a close match.",
-      "Reuse existing collection names whenever they are a close match.",
-      "Suggest at most 3 tags per bookmark.",
-      "Suggest at most 1 collection per bookmark.",
-      "Only suggest a collection when it is a clearly useful home, not a one-off bucket.",
-      "Prefer specific names over generic labels like General or Misc.",
-      "Use only the provided color palette for new tags.",
-      "Keep reasons short and practical.",
-      "When a bookmark has no confident suggestion, return an empty tags array and null collection.",
+      "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
+
+    signalPriority: [
+      "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
+      "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
+      "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
     ],
+
+    taggingRules: [
+      "Reuse an existingTag exactly (case-insensitive name match) whenever it clearly fits. Set reuseExisting=true and keep that tag's exact color.",
+      "Otherwise create a new tag: a short, reusable topic or content-type label, 1-3 words, Title Case (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
+      "For new tags pick a color from the palette. Use the SAME color for semantically related new tags when reasonable.",
+      "Max 3 tags per bookmark. No near-duplicates (e.g. don't pair 'LLM' and 'LLMs', or 'AI' and 'Artificial Intelligence').",
+      "Prefer topic or content-type tags over stylistic or sentiment tags.",
+      "Never use generic labels: General, Misc, Other, Interesting, Saved, Bookmark, Thread (unless Thread is a content type used on purpose).",
+    ],
+
+    collectionRules: [
+      "A collection is a durable, themed home for multiple related bookmarks — not a tag alias.",
+      "Reuse an existingCollection (reuseExisting=true) for any bookmark that clearly belongs there, even if it's the only one in this batch.",
+      "Only propose a NEW collection (reuseExisting=false) when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
+      "Collection name: 2-4 words, Title Case, specific (not 'Interesting Posts', 'Saved Stuff').",
+      "Collection description: one short sentence describing what belongs here.",
+      "It is expected and correct that many bookmarks have collection=null. Only suggest when the fit is obvious.",
+    ],
+
+    confidenceRubric: {
+      high: "Content explicitly signals a specific topic; an obvious reusable tag applies.",
+      medium: "Topic is inferable but not explicit; tags are reasonable defaults.",
+      low: "Content is vague, personal, or off-topic for any clean tag. Return empty tags and null collection.",
+    },
+
+    outputContract: [
+      "For every bookmark id in `bookmarks`, return exactly one suggestion with the same id.",
+      "Never invent bookmark ids that were not provided.",
+      "If uncertain, return { confidence: 'low', reasoning: '<short>', tags: [], collection: null } instead of guessing.",
+      "Keep `reason` and `reasoning` strings short and practical (under 180 characters).",
+    ],
+
     palette: PRESET_COLORS,
+
     existingTags: args.existingTags.map((tag) => ({
       name: tag.name,
       color: tag.color,
@@ -356,25 +388,72 @@ function buildPromptPayload(args: {
       name: collection.name,
       description: collection.description,
     })),
+
+    example: {
+      bookmark: {
+        id: "example-1",
+        author: {
+          username: "ai_researcher",
+          displayName: "AI Researcher",
+          verified: true,
+        },
+        tweetText:
+          "New paper: scaling laws for evaluation benchmarks on reasoning tasks. arxiv link below.",
+        urls: [
+          {
+            displayUrl: "arxiv.org/abs/2410.00001",
+            expandedUrl: "https://arxiv.org/abs/2410.00001",
+            title: "Scaling laws for evaluation benchmarks",
+            description: null,
+          },
+        ],
+        mediaTypes: [],
+      },
+      expectedSuggestion: {
+        bookmarkId: "example-1",
+        confidence: "high",
+        reasoning: "Explicit AI research paper with arxiv link.",
+        tags: [
+          {
+            name: "AI",
+            color: "#1d9bf0",
+            reason: "AI research topic",
+            reuseExisting: false,
+          },
+          {
+            name: "Paper",
+            color: "#a855f7",
+            reason: "Academic paper format",
+            reuseExisting: false,
+          },
+        ],
+        collection: {
+          name: "AI Papers",
+          description: "Academic papers and preprints on AI and ML.",
+          reason: "Durable home for research papers.",
+          reuseExisting: false,
+        },
+      },
+    },
+
     bookmarks: args.bookmarks.map(buildBookmarkPayload),
   };
 }
 
 function buildOrbitSystemPrompt() {
   return [
-    "You are organizing a bookmark inbox for MarkMaster's Orbit feature.",
-    "Orbit contains bookmarks that are not yet meaningfully organized.",
-    "Your job is to suggest concise tags and optional collection homes based on bookmark content.",
-    "You must favor reusable organizational labels over novelty.",
-    "If an existing tag or collection already fits, reuse it exactly.",
-    "If a new collection would only contain one bookmark and is not obviously evergreen, prefer leaving collection as null.",
-    "Use only the allowed hex colors for new tags.",
-    "Never hallucinate bookmark ids.",
-    "Return strict JSON only.",
+    "You are MarkMaster's Orbit librarian.",
+    "Orbit is an inbox of bookmarked X posts that have no tags and are not in any user collection.",
+    "Your job: for each bookmark, propose up to 3 concise tags and, only when it clearly fits, a single collection home — so the user can retrieve these posts later by topic.",
+    "Optimize for reuse and recall, not novelty: always prefer an existing tag or collection when it fits.",
+    "Never invent bookmark ids. Return exactly one suggestion per provided id.",
+    "When content is ambiguous, return confidence 'low' with empty tags and null collection instead of guessing.",
+    "Use only hex colors from the provided palette for new tags. Return strict JSON matching the provided schema.",
   ].join(" ");
 }
 
-function extractOutputText(payload: unknown) {
+/** Parses xAI Responses API JSON bodies (message / output_text shape). Exported for tests. */
+export function extractXaiResponsesOutputText(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
 
   const output = (payload as { output?: unknown[] }).output;
@@ -606,9 +685,9 @@ export async function scanOrbitBookmarksWithXai(args: {
     throw new OrbitGrokError("Select at least one bookmark to scan.", 400);
   }
 
-  if (args.bookmarks.length > MAX_BOOKMARKS_PER_SCAN) {
+  if (args.bookmarks.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
     throw new OrbitGrokError(
-      `Scan up to ${MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
+      `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
       400
     );
   }
@@ -691,7 +770,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   }
 
   const payload = await response.json().catch(() => null);
-  const rawText = extractOutputText(payload);
+  const rawText = extractXaiResponsesOutputText(payload);
 
   if (!rawText) {
     throw new OrbitGrokError("xAI returned an empty Orbit scan.", 502);

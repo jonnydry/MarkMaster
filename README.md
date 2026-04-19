@@ -62,9 +62,12 @@ XAI_API_BASE_URL="https://api.x.ai/v1"
 using a shorter or non-hex key, rotate it before starting this version.
 
 `XAI_API_KEY` is only required if you want the Orbit scan flow to call Grok.
+Create a key in the [xAI Console](https://console.x.ai/team/default/api-keys)
+and add account credits ([xAI quickstart](https://docs.x.ai/docs/quickstart)).
 By default MarkMaster uses `grok-4.20-reasoning` through xAI's Responses API.
 You can override the model or point at a regional xAI endpoint with
-`XAI_ORBIT_MODEL` and `XAI_API_BASE_URL`.
+`XAI_ORBIT_MODEL` and `XAI_API_BASE_URL`. After editing `.env`, restart the dev
+server; `npm run env:check` reports whether optional `XAI_API_KEY` is set.
 
 ### 3. Set up the database
 

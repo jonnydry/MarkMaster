@@ -83,10 +83,10 @@ export function OrbitalAuthExperience({
 
                   <div className="space-y-3">
                     <p className="max-w-[700px] text-[11px] uppercase tracking-[0.18em] text-[#e8ecf28a] sm:text-[13px] sm:leading-4">
-                      MarkMaster: An orbital view of your X bookmarks
+                      Bring your saved posts into orbit
                     </p>
                     <h1 className="heading-font max-w-[700px] text-[3.25rem] leading-[0.98] font-semibold tracking-[-0.06em] text-[#f4f1ea] sm:text-[4.15rem] lg:text-[4.875rem] lg:leading-[5rem]">
-                      Bring your saved posts into orbit.
+                      MarkMaster: an orbital view of your X bookmarks.
                     </h1>
                     <p className="max-w-[620px] text-lg leading-8 font-light text-[#eaeef4b8] sm:text-xl lg:text-[22px] lg:leading-[34px]">
                       MarkMaster gives your X bookmarks an off-world home they

@@ -20,6 +20,10 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { useCreateCollection } from "@/hooks/use-create-collection";
+import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import { fetchJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
 

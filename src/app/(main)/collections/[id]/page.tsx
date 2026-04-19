@@ -68,6 +68,7 @@ export default function CollectionDetailPage({
     data: collection,
     isPending,
     isError,
+    error,
     refetch,
   } = useQuery({
     queryKey: ["collection", id],

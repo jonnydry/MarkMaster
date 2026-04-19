@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
+  extractXaiResponsesOutputText,
   normalizeOrbitScanPlan,
   orbitScanPlanSchema,
 } from "@/lib/orbit-grok";
@@ -156,5 +157,33 @@ describe("buildOrbitScanSummary", () => {
         bookmarkIds: ["b1", "b2"],
       },
     ]);
+  });
+});
+
+describe("extractXaiResponsesOutputText", () => {
+  it("reads output_text from xAI Responses API message blocks", () => {
+    const payload = {
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: '{"overview":{"summary":"ok"}}' }],
+        },
+      ],
+    };
+    expect(extractXaiResponsesOutputText(payload)).toBe(
+      '{"overview":{"summary":"ok"}}'
+    );
+  });
+
+  it("returns null when no output_text is present", () => {
+    expect(extractXaiResponsesOutputText(null)).toBeNull();
+    expect(extractXaiResponsesOutputText(undefined)).toBeNull();
+    expect(extractXaiResponsesOutputText({})).toBeNull();
+    expect(extractXaiResponsesOutputText({ output: [] })).toBeNull();
+    expect(
+      extractXaiResponsesOutputText({
+        output: [{ type: "message", content: [{ type: "other", text: "x" }] }],
+      })
+    ).toBeNull();
   });
 });
