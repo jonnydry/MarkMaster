@@ -351,11 +351,6 @@ function DashboardContent() {
     filters.mediaFilter === "all"
       ? "All Bookmarks"
       : mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter;
-  const hasSupplementalFilters =
-    filters.selectedTags.length > 0 ||
-    filters.authorFilter !== "" ||
-    filters.dateFrom !== "" ||
-    filters.dateTo !== "";
 
   return (
     <div className="app-shell-bg flex h-screen overflow-x-hidden">
@@ -435,7 +430,7 @@ function DashboardContent() {
               >
                 <SlidersHorizontal className="size-4" aria-hidden />
                 <span className="hidden sm:inline">Filters</span>
-                {hasSupplementalFilters && (
+                {filters.hasActiveFilters && (
                   <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
                 )}
               </button>

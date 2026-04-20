@@ -310,7 +310,18 @@ export default function SettingsPage() {
                             onKeyDown={(e) =>
                               e.key === "Enter" && handleUpdateTag(tag.id)
                             }
-                            onBlur={() => setEditingTag(null)}
+                            onBlur={(e) => {
+                              const nextFocus = e.relatedTarget as Node | null;
+                              if (
+                                nextFocus &&
+                                e.currentTarget.parentElement?.contains(
+                                  nextFocus
+                                )
+                              ) {
+                                return;
+                              }
+                              setEditingTag(null);
+                            }}
                           />
                             <Button size="sm" className="shadow-sm" onClick={() => handleUpdateTag(tag.id)}>
                               Save

@@ -214,6 +214,24 @@ export interface OrbitScanResponsePayload {
   collectionRollups: OrbitCollectionRollup[];
 }
 
+export type OrbitDecisionKind = "collection" | "tag";
+
+export interface OrbitDecision {
+  kind: OrbitDecisionKind;
+  label: string;
+  color?: string;
+  reuseExisting: boolean;
+  confidence: OrbitScanConfidence;
+}
+
+export interface OrbitBookmarkDecision {
+  bookmarkId: string;
+  confidence: OrbitScanConfidence;
+  reasoning: string;
+  primary: OrbitDecision | null;
+  alternative: OrbitDecision | null;
+}
+
 export interface OrbitApplyResult {
   bookmarkCount: number;
   createdTags: number;
@@ -223,4 +241,64 @@ export interface OrbitApplyResult {
   reusedCollections: number;
   collectionAssignments: number;
   skippedNewCollectionSingletons: number;
+}
+
+export type OrbitGraphCollectionVariant = "user_collection" | "x_folder";
+
+export type OrbitGraphNode =
+  | { kind: "core"; id: "orbit-index"; totalBookmarks: number; looseBookmarks: number }
+  | {
+      kind: "tag";
+      id: string;
+      name: string;
+      color: string;
+      count: number;
+    }
+  | {
+      kind: "collection";
+      id: string;
+      name: string;
+      variant: OrbitGraphCollectionVariant;
+      count: number;
+    }
+  | {
+      kind: "bookmark";
+      id: string;
+      title: string;
+      authorUsername: string;
+      authorDisplayName: string;
+      affiliated: boolean;
+      recent: boolean;
+    }
+  | {
+      kind: "overflow";
+      id: string;
+      anchorId: string;
+      anchorKind: "tag" | "collection" | "core";
+      remaining: number;
+    };
+
+export type OrbitGraphEdge =
+  | { kind: "bookmark-tag"; bookmarkId: string; tagId: string }
+  | { kind: "bookmark-collection"; bookmarkId: string; collectionId: string }
+  | { kind: "loose"; bookmarkId: string }
+  | { kind: "overflow"; overflowId: string; anchorId: string };
+
+export interface OrbitGraphStats {
+  totalBookmarks: number;
+  affiliatedBookmarks: number;
+  looseBookmarks: number;
+  renderedBookmarks: number;
+  truncatedBookmarks: number;
+  tagCount: number;
+  userCollectionCount: number;
+  xFolderCount: number;
+}
+
+export interface OrbitGraphPayload {
+  nodes: OrbitGraphNode[];
+  edges: OrbitGraphEdge[];
+  stats: OrbitGraphStats;
+  generatedAt: string;
+  nodeCap: number;
 }
