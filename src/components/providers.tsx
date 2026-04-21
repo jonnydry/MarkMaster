@@ -7,6 +7,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   createContext,
   useContext,
   useSyncExternalStore,
@@ -77,8 +78,10 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
     writeTheme(theme === "dark" ? "light" : "dark");
   }, [theme]);
 
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

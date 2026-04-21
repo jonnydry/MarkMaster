@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "markmaster-sidebar-sections";
 const CHANGE_EVENT = "markmaster-sidebar-sections-change";
@@ -77,5 +77,5 @@ export function useSidebarSection(id: string, defaultOpen = true) {
 
   const toggle = useCallback(() => setOpen((v) => !v), [setOpen]);
 
-  return { open, setOpen, toggle };
+  return useMemo(() => ({ open, setOpen, toggle }), [open, setOpen, toggle]);
 }

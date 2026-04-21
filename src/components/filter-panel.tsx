@@ -45,7 +45,11 @@ export function FilterPanel({
   hasActiveFilters,
 }: FilterPanelProps) {
   return (
-    <div className="space-y-3 border-b border-hairline-soft bg-gradient-to-b from-surface-1 to-surface-2 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+    <div
+      role="region"
+      aria-label="Filters"
+      className="space-y-3 border-b border-hairline-soft bg-surface-1 px-5 py-3"
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Filters
@@ -64,10 +68,10 @@ export function FilterPanel({
 
       <div className="space-y-3">
         <div>
-          <label className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="filter-media" className="mb-1 block text-xs text-muted-foreground">
             Content type
           </label>
-          <div className="flex flex-wrap gap-1.5">
+          <div id="filter-media" className="flex flex-wrap gap-1.5">
             {MEDIA_OPTIONS.map(({ value, label, icon: Icon }) => (
               <Button
                 key={value}
@@ -84,54 +88,57 @@ export function FilterPanel({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="filter-author" className="mb-1 block text-xs text-muted-foreground">
             Author
           </label>
           <Input
+            id="filter-author"
             value={authorFilter}
             onChange={(e) => onAuthorFilterChange(e.target.value)}
             placeholder="Filter by username..."
-            className="h-8 border-hairline-soft bg-surface-2 text-sm"
+            className="h-9 border-hairline-soft bg-surface-2 text-sm"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-date-from" className="mb-1 block text-xs text-muted-foreground">
               From
             </label>
             <Input
+              id="filter-date-from"
               type="date"
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
-              className="h-8 border-hairline-soft bg-surface-2 text-sm"
+              className="h-9 border-hairline-soft bg-surface-2 text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-date-to" className="mb-1 block text-xs text-muted-foreground">
               To
             </label>
             <Input
+              id="filter-date-to"
               type="date"
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
-              className="h-8 border-hairline-soft bg-surface-2 text-sm"
+              className="h-9 border-hairline-soft bg-surface-2 text-sm"
             />
           </div>
         </div>
 
         {tags.length > 0 && (
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-tags" className="mb-1 block text-xs text-muted-foreground">
               Tags
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div id="filter-tags" className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
                 <button
                   key={tag.id}
                   className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                     selectedTags.includes(tag.id)
-                      ? "bg-accent-soft text-primary"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-surface-2 text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}

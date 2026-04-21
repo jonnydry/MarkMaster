@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -24,29 +25,34 @@ export function ShareDialog({
   shareContent,
 }: ShareDialogProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   if (!shareContent) return null;
 
   const isSmallCollection = shareContent.itemCount <= 10;
 
-  const copyToClipboard = async (text: string, field: string) => {
+  const copyToClipboard = useCallback(async (text: string, field: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopiedField(null), 2000);
     } catch {
       // fallback
     }
-  };
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share &quot;{shareContent.collectionName}&quot;</DialogTitle>
+          <DialogDescription>
+            Copy a public link or compose a post for X.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-5" aria-live="polite">
           {/* Share link */}
           <div>
             <h3 className="text-sm font-medium mb-2">Public Link</h3>
@@ -82,16 +88,16 @@ export function ShareDialog({
               {shareContent.summaryTweet}
             </div>
             <div className="flex items-center gap-2">
-              <a
-                href={shareContent.xIntentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="default" size="sm" className="gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5" />
+              <Button asChild variant="default" size="sm" className="gap-1.5">
+                <a
+                  href={shareContent.xIntentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                   Open X Compose
-                </Button>
-              </a>
+                </a>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

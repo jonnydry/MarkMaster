@@ -182,8 +182,13 @@ export default async function PublicSharePage({
                           }) => (
                             <span
                               key={tag.id}
-                              className="px-2 py-0.5 rounded-md bg-secondary text-xs font-medium text-muted-foreground"
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary text-xs font-medium text-muted-foreground"
                             >
+                              <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: tag.color }}
+                                aria-hidden="true"
+                              />
                               {tag.name}
                             </span>
                           )

@@ -8,3 +8,5 @@ export const PRESET_COLORS = [
   "#06b6d4",
   "#71717a",
 ];
+
+export const TWITTER_PROVIDER_ID = "twitter";

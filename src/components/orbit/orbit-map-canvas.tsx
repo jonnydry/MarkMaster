@@ -5,31 +5,29 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import {
   forceCenter,
   forceCollide,
   forceLink,
   forceManyBody,
-  forceRadial,
   forceSimulation,
   type Simulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
 
+import { Minus, Plus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   OrbitGraphEdge,
   OrbitGraphNode,
   OrbitGraphPayload,
 } from "@/types";
-
-export type OrbitMapPreset = "orbit" | "recent" | "category";
 
 export interface OrbitMapSelection {
   kind: "tag" | "collection" | "bookmark" | "core" | "overflow";
@@ -49,7 +47,6 @@ export interface OrbitMapCanvasHandle {
 
 interface OrbitMapCanvasProps {
   data: OrbitGraphPayload;
-  preset: OrbitMapPreset;
   selection: OrbitMapSelection | null;
   onSelectionChange: (selection: OrbitMapSelection | null) => void;
   onHoverChange?: (selection: OrbitMapSelection | null) => void;
@@ -61,8 +58,6 @@ interface OrbitMapCanvasProps {
 type NodeDatum = SimulationNodeDatum & {
   node: OrbitGraphNode;
   radius: number;
-  pinned?: boolean;
-  anchorAngle?: number;
   assignAnimation?: {
     startedAt: number;
     durationMs: number;
@@ -70,8 +65,6 @@ type NodeDatum = SimulationNodeDatum & {
     startY: number;
     targetX: number;
     targetY: number;
-    controlX: number;
-    controlY: number;
   };
 };
 
@@ -81,24 +74,61 @@ type LinkDatum = SimulationLinkDatum<NodeDatum> & {
 };
 
 const DPR_CAP = 2;
-const MIN_ZOOM = 0.35;
-const MAX_ZOOM = 2.75;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 4;
+const BG_COLOR = "#0b0f1a";
+// Obsidian-style muted palette.
+const COLOR_ANCHOR_TAG = "#9ca3af";
+const COLOR_ANCHOR_COLLECTION = "#60a5fa";
+const COLOR_ANCHOR_X_FOLDER = "#38bdf8";
+const COLOR_BOOKMARK = "#cbd5f5";
+const COLOR_BOOKMARK_LOOSE = "#fbbf24";
+const COLOR_LINK = "rgba(148, 163, 184, ";
+
+function isAnchorKind(kind: OrbitGraphNode["kind"]): boolean {
+  return kind === "tag" || kind === "collection" || kind === "core";
+}
 
 function getNodeRadius(node: OrbitGraphNode): number {
   switch (node.kind) {
     case "core":
-      return 58;
+      // Rendered, but small — Obsidian-style graphs have no hub pill.
+      return 5;
     case "tag":
-      return 28 + Math.min(Math.sqrt(node.count) * 3.2, 26);
+      return 6 + Math.min(Math.sqrt(node.count) * 1.9, 14);
     case "collection":
-      return 30 + Math.min(Math.sqrt(node.count) * 3.4, 30);
+      return 7 + Math.min(Math.sqrt(node.count) * 2.1, 16);
     case "bookmark":
-      return node.recent ? 5.2 : 4.2;
+      return node.recent ? 3.2 : 2.8;
     case "overflow":
-      return 14;
+      return 4;
     default:
       node satisfies never;
-      return 6;
+      return 3;
+  }
+}
+
+function getAnchorColor(node: OrbitGraphNode): string {
+  if (node.kind === "tag") return node.color;
+  if (node.kind === "collection") {
+    return node.variant === "x_folder"
+      ? COLOR_ANCHOR_X_FOLDER
+      : COLOR_ANCHOR_COLLECTION;
+  }
+  if (node.kind === "core") return COLOR_ANCHOR_TAG;
+  return COLOR_ANCHOR_TAG;
+}
+
+function getAnchorLabel(node: OrbitGraphNode): string | null {
+  switch (node.kind) {
+    case "tag":
+      return node.name;
+    case "collection":
+      return node.name;
+    case "core":
+      return "Orbit";
+    default:
+      return null;
   }
 }
 
@@ -128,29 +158,6 @@ function sameSelection(
   return a.kind === b.kind && a.id === b.id;
 }
 
-function mixColor(hex: string, mix: number) {
-  const cleaned = hex.replace("#", "");
-  if (cleaned.length !== 6) return hex;
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  const blend = (c: number) => Math.round(c * (1 - mix) + 255 * mix);
-  return `rgb(${blend(r)}, ${blend(g)}, ${blend(b)})`;
-}
-
-function withAlpha(hex: string, alpha: number) {
-  const cleaned = hex.replace("#", "");
-  if (cleaned.length !== 6) return hex;
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
 function normalizeLinkEndpoint(
   value: NodeDatum | string | number | undefined
 ): NodeDatum | null {
@@ -159,13 +166,26 @@ function normalizeLinkEndpoint(
   return null;
 }
 
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const cleaned = hex.replace("#", "");
+  if (cleaned.length !== 6) return [148, 163, 184];
+  return [
+    parseInt(cleaned.slice(0, 2), 16),
+    parseInt(cleaned.slice(2, 4), 16),
+    parseInt(cleaned.slice(4, 6), 16),
+  ];
+}
+
 export const OrbitMapCanvas = forwardRef<
   OrbitMapCanvasHandle,
   OrbitMapCanvasProps
 >(function OrbitMapCanvas(
   {
     data,
-    preset,
     selection,
     onSelectionChange,
     onHoverChange,
@@ -181,27 +201,89 @@ export const OrbitMapCanvas = forwardRef<
   const nodesRef = useRef<NodeDatum[]>([]);
   const linksRef = useRef<LinkDatum[]>([]);
   const nodesByIdRef = useRef<Map<string, NodeDatum>>(new Map());
+  // Adjacency map: node id -> set of 1-hop neighbor ids. Used for the
+  // Obsidian-style dim-the-rest highlight.
+  const adjacencyRef = useRef<Map<string, Set<string>>>(new Map());
 
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [isDragging, setIsDragging] = useState(false);
   const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
   const hoverRef = useRef<NodeDatum | null>(null);
   const selectionRef = useRef<OrbitMapSelection | null>(selection);
-  const presetRef = useRef<OrbitMapPreset>(preset);
   const focusRef = useRef<OrbitMapFocus | null>(focus ?? null);
   const isDraggingRef = useRef<{ x: number; y: number; moved: boolean } | null>(
     null
   );
-  const visibleRef = useRef<boolean>(true);
   const rafRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
+  const needsRenderRef = useRef(true);
+  const touchRef = useRef<{
+    ids: number[];
+    startX: number;
+    startY: number;
+    startViewX: number;
+    startViewY: number;
+    startZoom: number;
+    startDist: number;
+    moved: boolean;
+  } | null>(null);
+
+  // Filter the raw graph to just nodes we want to render. Overflow markers
+  // disappear — the rail surfaces the truncation count instead.
+  const renderableData = useMemo(() => {
+    const allowedNodeIds = new Set<string>();
+    const nodes = data.nodes.filter((node) => {
+      if (node.kind === "overflow") return false;
+      allowedNodeIds.add(node.id);
+      return true;
+    });
+    const edges = data.edges.filter((edge) => {
+      if (edge.kind === "overflow") return false;
+      if (edge.kind === "loose") {
+        return allowedNodeIds.has(edge.bookmarkId);
+      }
+      if (edge.kind === "bookmark-tag") {
+        return (
+          allowedNodeIds.has(edge.bookmarkId) && allowedNodeIds.has(edge.tagId)
+        );
+      }
+      if (edge.kind === "bookmark-collection") {
+        return (
+          allowedNodeIds.has(edge.bookmarkId) &&
+          allowedNodeIds.has(edge.collectionId)
+        );
+      }
+      return false;
+    });
+    return { nodes, edges };
+  }, [data]);
+
+  const applyCursor = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (isDraggingRef.current?.moved) {
+      container.style.cursor = "grabbing";
+      return;
+    }
+    const hovered = hoverRef.current;
+    if (hovered) {
+      const kind = hovered.node.kind;
+      if (
+        kind === "bookmark" ||
+        kind === "tag" ||
+        kind === "collection" ||
+        kind === "core"
+      ) {
+        container.style.cursor = "pointer";
+        return;
+      }
+    }
+    container.style.cursor = "grab";
+  }, []);
 
   useEffect(() => {
     selectionRef.current = selection;
   }, [selection]);
-
-  useEffect(() => {
-    presetRef.current = preset;
-  }, [preset]);
 
   useEffect(() => {
     focusRef.current = focus ?? null;
@@ -211,7 +293,7 @@ export const OrbitMapCanvas = forwardRef<
   useEffect(() => {
     const prevById = nodesByIdRef.current;
 
-    const nextNodes: NodeDatum[] = data.nodes.map((node) => {
+    const nextNodes: NodeDatum[] = renderableData.nodes.map((node) => {
       const existing = prevById.get(node.id);
       const radius = getNodeRadius(node);
       return {
@@ -230,7 +312,17 @@ export const OrbitMapCanvas = forwardRef<
     const nextById = new Map(nextNodes.map((node) => [node.node.id, node]));
     nodesByIdRef.current = nextById;
 
-    const nextLinks: LinkDatum[] = data.edges.flatMap((edge) => {
+    const adjacency = new Map<string, Set<string>>();
+    const pushAdj = (a: string, b: string) => {
+      let bucket = adjacency.get(a);
+      if (!bucket) {
+        bucket = new Set();
+        adjacency.set(a, bucket);
+      }
+      bucket.add(b);
+    };
+
+    const nextLinks: LinkDatum[] = renderableData.edges.flatMap((edge) => {
       let sourceId: string | null = null;
       let targetId: string | null = null;
 
@@ -248,9 +340,7 @@ export const OrbitMapCanvas = forwardRef<
           targetId = "orbit-index";
           break;
         case "overflow":
-          sourceId = edge.overflowId;
-          targetId = edge.anchorId;
-          break;
+          return [];
         default:
           edge satisfies never;
       }
@@ -259,6 +349,9 @@ export const OrbitMapCanvas = forwardRef<
       const source = nextById.get(sourceId);
       const target = nextById.get(targetId);
       if (!source || !target) return [];
+
+      pushAdj(sourceId, targetId);
+      pushAdj(targetId, sourceId);
 
       return [
         {
@@ -272,54 +365,17 @@ export const OrbitMapCanvas = forwardRef<
 
     nodesRef.current = nextNodes;
     linksRef.current = nextLinks;
+    adjacencyRef.current = adjacency;
 
-    // Seed initial positions for anchors (core, tags, collections) using a
-    // radial layout so the first paint looks orbital before the simulation
-    // settles.
-    const ringAnchors: NodeDatum[] = [];
-    for (const node of nextNodes) {
-      if (node.node.kind === "core") {
-        if (node.x === undefined || node.y === undefined) {
-          node.x = 0;
-          node.y = 0;
-        }
-        continue;
-      }
-      if (node.node.kind === "tag" || node.node.kind === "collection") {
-        ringAnchors.push(node);
-      }
-    }
-    const anchorCount = ringAnchors.length;
-    ringAnchors.forEach((anchor, anchorIndex) => {
-      const anchorNode = anchor.node;
-      if (anchorNode.kind !== "tag" && anchorNode.kind !== "collection") {
-        return;
-      }
-      const angle =
-        anchor.anchorAngle ??
-        (anchorCount > 0 ? (anchorIndex / anchorCount) * Math.PI * 2 : 0);
-      anchor.anchorAngle = angle;
-      if (anchor.x === undefined || anchor.y === undefined) {
-        let ring: number;
-        if (anchorNode.kind === "tag") {
-          ring = 240;
-        } else if (anchorNode.variant === "x_folder") {
-          ring = 380;
-        } else {
-          ring = 320;
-        }
-        anchor.x = Math.cos(angle) * ring;
-        anchor.y = Math.sin(angle) * ring;
-      }
-    });
-
+    // Obsidian-like layout: no radial rings, no pinned hub. Light center
+    // force + repulsion + collision keeps the graph legible.
     if (simulationRef.current) {
       simulationRef.current.stop();
     }
 
     const simulation = forceSimulation<NodeDatum, LinkDatum>(nextNodes)
-      .alphaDecay(0.02)
-      .velocityDecay(0.32)
+      .alphaDecay(0.025)
+      .velocityDecay(0.38)
       .force(
         "link",
         forceLink<NodeDatum, LinkDatum>(nextLinks)
@@ -327,29 +383,25 @@ export const OrbitMapCanvas = forwardRef<
           .distance((link) => {
             switch (link.kind) {
               case "bookmark-tag":
-                return 80;
+                return 60;
               case "bookmark-collection":
-                return 95;
+                return 68;
               case "loose":
-                return 260;
-              case "overflow":
-                return 32;
+                return 140;
               default:
-                return 100;
+                return 80;
             }
           })
           .strength((link) => {
             switch (link.kind) {
               case "bookmark-tag":
-                return 0.55;
+                return 0.6;
               case "bookmark-collection":
-                return 0.5;
+                return 0.55;
               case "loose":
-                return 0.015;
-              case "overflow":
-                return 0.7;
+                return 0.04;
               default:
-                return 0.1;
+                return 0.2;
             }
           })
       )
@@ -358,65 +410,35 @@ export const OrbitMapCanvas = forwardRef<
         forceManyBody<NodeDatum>().strength((node) => {
           switch (node.node.kind) {
             case "core":
-              return -900;
+              return -180;
             case "tag":
             case "collection":
-              return -480;
-            case "overflow":
-              return -120;
+              return -260;
             default:
-              return -28;
+              return -35;
           }
         })
       )
       .force(
         "collide",
-        forceCollide<NodeDatum>().radius((node) => node.radius + 4).strength(0.85)
+        forceCollide<NodeDatum>()
+          .radius((node) => node.radius + 3)
+          .strength(0.8)
       )
-      .force("center", forceCenter(0, 0).strength(0.04))
-      .force(
-        "radial",
-        forceRadial<NodeDatum>(
-          (node) => {
-            switch (node.node.kind) {
-              case "core":
-                return 0;
-              case "tag":
-                return 260;
-              case "collection":
-                return node.node.variant === "x_folder" ? 400 : 330;
-              case "bookmark":
-                return node.node.affiliated ? 180 : 520;
-              case "overflow":
-                return 40;
-              default:
-                return 300;
-            }
-          },
-          0,
-          0
-        ).strength((node) => {
-          switch (node.node.kind) {
-            case "core":
-              return 1;
-            case "tag":
-            case "collection":
-              return 0.35;
-            case "bookmark":
-              return node.node.affiliated ? 0.04 : 0.12;
-            case "overflow":
-              return 0.9;
-            default:
-              return 0.05;
-          }
-        })
-      );
+      .force("center", forceCenter(0, 0).strength(0.06))
+    .on("tick", () => {
+      needsRenderRef.current = true;
+    });
 
-    // Pin the core to the origin so the rest of the graph truly "orbits".
-    const core = nextById.get("orbit-index");
-    if (core) {
-      core.fx = 0;
-      core.fy = 0;
+    // Seed unseeded nodes in a loose disc so the first paint doesn't show a
+    // violent explosion.
+    for (const node of nextNodes) {
+      if (node.x === undefined || node.y === undefined) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 120 + Math.random() * 200;
+        node.x = Math.cos(angle) * radius;
+        node.y = Math.sin(angle) * radius;
+      }
     }
 
     simulationRef.current = simulation;
@@ -425,7 +447,7 @@ export const OrbitMapCanvas = forwardRef<
     return () => {
       simulation.stop();
     };
-  }, [data]);
+  }, [renderableData]);
 
   // --- resize observer ---
   useEffect(() => {
@@ -449,9 +471,10 @@ export const OrbitMapCanvas = forwardRef<
   // --- visibility pause to conserve CPU ---
   useEffect(() => {
     const handleVisibility = () => {
-      visibleRef.current = !document.hidden;
       if (!document.hidden && simulationRef.current) {
-        simulationRef.current.alpha(Math.max(simulationRef.current.alpha(), 0.08)).restart();
+        simulationRef.current
+          .alpha(Math.max(simulationRef.current.alpha(), 0.08))
+          .restart();
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
@@ -472,29 +495,40 @@ export const OrbitMapCanvas = forwardRef<
     canvas.style.width = `${size.width}px`;
     canvas.style.height = `${size.height}px`;
 
+    const hasActiveAnimation = () => {
+      return nodesRef.current.some((n) => n.assignAnimation !== undefined);
+    };
+
+    const hasActiveSimulation = () => {
+      const sim = simulationRef.current;
+      return sim ? sim.alpha() > 0.01 : false;
+    };
+
+    const hasFocusPulse = () => {
+      return focusRef.current !== null;
+    };
+
     const render = () => {
       const nodes = nodesRef.current;
       const links = linksRef.current;
+      const adjacency = adjacencyRef.current;
       const now = performance.now();
 
-      // Animate "rocket arc" assignments.
+      // Animate simple straight-line assignments.
+      let animating = false;
       for (const node of nodes) {
         const animation = node.assignAnimation;
         if (!animation) continue;
+        animating = true;
         const t = Math.min(
           (now - animation.startedAt) / animation.durationMs,
           1
         );
         const eased = easeInOutCubic(t);
-        const oneMinus = 1 - eased;
         const x =
-          oneMinus * oneMinus * animation.startX +
-          2 * oneMinus * eased * animation.controlX +
-          eased * eased * animation.targetX;
+          animation.startX + (animation.targetX - animation.startX) * eased;
         const y =
-          oneMinus * oneMinus * animation.startY +
-          2 * oneMinus * eased * animation.controlY +
-          eased * eased * animation.targetY;
+          animation.startY + (animation.targetY - animation.startY) * eased;
         node.fx = x;
         node.fy = y;
         node.x = x;
@@ -504,7 +538,7 @@ export const OrbitMapCanvas = forwardRef<
           node.fy = undefined;
           node.assignAnimation = undefined;
           if (simulationRef.current) {
-            simulationRef.current.alpha(0.25).restart();
+            simulationRef.current.alpha(0.2).restart();
           }
         }
       }
@@ -512,69 +546,34 @@ export const OrbitMapCanvas = forwardRef<
       ctx.save();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Background.
-      const gradient = ctx.createRadialGradient(
-        size.width / 2,
-        size.height / 2,
-        0,
-        size.width / 2,
-        size.height / 2,
-        Math.max(size.width, size.height) / 1.2
-      );
-      gradient.addColorStop(0, "rgba(20, 32, 62, 0.9)");
-      gradient.addColorStop(0.5, "rgba(10, 15, 29, 0.98)");
-      gradient.addColorStop(1, "rgba(5, 8, 18, 1)");
-      ctx.fillStyle = gradient;
+      // Solid background — no gradient rings.
+      ctx.fillStyle = BG_COLOR;
       ctx.fillRect(0, 0, size.width, size.height);
 
       const view = viewRef.current;
       ctx.translate(size.width / 2 + view.x, size.height / 2 + view.y);
       ctx.scale(view.zoom, view.zoom);
 
-      // Decorative orbit rings around core.
-      ctx.lineWidth = 1 / view.zoom;
-      ctx.strokeStyle = "rgba(148, 197, 255, 0.08)";
-      for (const radius of [200, 320, 440, 560]) {
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
       const selectionNow = selectionRef.current;
       const hoverNow = hoverRef.current;
 
-      // Collect bookmark ids affiliated with the focused anchor (if any) so
-      // we can brighten them while fading everyone else.
-      let focusAnchorId: string | null = null;
-      if (selectionNow?.kind === "tag" || selectionNow?.kind === "collection") {
-        focusAnchorId = selectionNow.id;
-      } else if (
-        hoverNow &&
-        (hoverNow.node.kind === "tag" || hoverNow.node.kind === "collection")
-      ) {
-        focusAnchorId = hoverNow.node.id;
-      }
+      // Determine which node is "active" for highlight. Selection wins; hover
+      // is the fallback so you can explore without committing.
+      let activeId: string | null = null;
+      if (selectionNow) activeId = selectionNow.id;
+      else if (hoverNow) activeId = hoverNow.node.id;
 
-      const highlightedBookmarkIds = new Set<string>();
-      if (focusAnchorId) {
-        for (const link of links) {
-          const source = normalizeLinkEndpoint(link.source);
-          const target = normalizeLinkEndpoint(link.target);
-          if (!source || !target) continue;
-          if (
-            (source.node.id === focusAnchorId &&
-              target.node.kind === "bookmark") ||
-            (target.node.id === focusAnchorId &&
-              source.node.kind === "bookmark")
-          ) {
-            const bookmarkNode =
-              source.node.kind === "bookmark" ? source : target;
-            highlightedBookmarkIds.add(bookmarkNode.node.id);
-          }
-        }
-      }
+      const neighbors = activeId ? adjacency.get(activeId) ?? null : null;
+      const isDimmed = (id: string): boolean => {
+        if (!activeId) return false;
+        if (id === activeId) return false;
+        if (neighbors && neighbors.has(id)) return false;
+        return true;
+      };
 
-      // Draw links.
+      // --- draw links ---
+      const linkRgb = COLOR_LINK;
+      ctx.lineWidth = 0.6 / view.zoom;
       for (const link of links) {
         const source = normalizeLinkEndpoint(link.source);
         const target = normalizeLinkEndpoint(link.target);
@@ -582,342 +581,131 @@ export const OrbitMapCanvas = forwardRef<
         if (source.x === undefined || source.y === undefined) continue;
         if (target.x === undefined || target.y === undefined) continue;
 
-        let alpha = 0.1;
-        let color = "rgba(148, 197, 255, 1)";
+        const touchesActive =
+          activeId !== null &&
+          (source.node.id === activeId || target.node.id === activeId);
 
-        switch (link.kind) {
-          case "bookmark-tag": {
-            const tagNode = target.node.kind === "tag" ? target.node : source.node;
-            if (tagNode.kind === "tag") {
-              color = tagNode.color;
-            }
-            alpha = 0.16;
-            break;
-          }
-          case "bookmark-collection":
-            color = "rgba(96, 165, 250, 1)";
-            alpha = 0.18;
-            break;
-          case "loose":
-            color = "rgba(148, 197, 255, 1)";
-            alpha = 0.05;
-            break;
-          case "overflow":
-            color = "rgba(148, 197, 255, 1)";
-            alpha = 0.15;
-            break;
+        let alpha = 0.18;
+        if (activeId) {
+          alpha = touchesActive ? 0.6 : 0.06;
         }
+        ctx.strokeStyle = `${linkRgb}${alpha})`;
+        ctx.lineWidth = (touchesActive ? 1 : 0.6) / view.zoom;
 
-        if (focusAnchorId) {
-          const touchesFocus =
-            source.node.id === focusAnchorId ||
-            target.node.id === focusAnchorId;
-          alpha = touchesFocus ? Math.max(alpha, 0.55) : alpha * 0.25;
-        }
-
-        const [r, g, b] = color.startsWith("#")
-          ? [
-              parseInt(color.slice(1, 3), 16),
-              parseInt(color.slice(3, 5), 16),
-              parseInt(color.slice(5, 7), 16),
-            ]
-          : (color.match(/\d+/g) ?? ["148", "197", "255"]).map((value) =>
-              Number(value)
-            );
-
-        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        ctx.lineWidth = (link.kind === "overflow" ? 1.4 : 1) / view.zoom;
-
-        // Gently curve the line so the whole field reads as orbital arcs.
-        const midX = (source.x + target.x) / 2;
-        const midY = (source.y + target.y) / 2;
-        const dx = target.x - source.x;
-        const dy = target.y - source.y;
-        const curvature = 0.08;
-        const controlX = midX + -dy * curvature;
-        const controlY = midY + dx * curvature;
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
-        ctx.quadraticCurveTo(controlX, controlY, target.x, target.y);
+        ctx.lineTo(target.x, target.y);
         ctx.stroke();
       }
 
-      // Draw bookmark + overflow nodes first so anchors sit on top.
+      // --- draw bookmarks first so anchors sit on top ---
       for (const datum of nodes) {
+        if (datum.node.kind !== "bookmark") continue;
         if (datum.x === undefined || datum.y === undefined) continue;
-        if (datum.node.kind !== "bookmark" && datum.node.kind !== "overflow") {
-          continue;
-        }
 
-        const isHovered = hoverNow === datum;
-        const isSelected = sameSelection(
-          selectionNow,
-          getNodeIdentity(datum.node)
-        );
-        const fade =
-          focusAnchorId && !highlightedBookmarkIds.has(datum.node.id) && !isSelected
-            ? 0.25
-            : 1;
+        const dimmed = isDimmed(datum.node.id);
+        const isActive = activeId === datum.node.id;
+        const loose = !datum.node.affiliated;
+        const [r, g, b] = hexToRgb(loose ? COLOR_BOOKMARK_LOOSE : COLOR_BOOKMARK);
+        const alpha = dimmed ? 0.18 : isActive ? 1 : 0.85;
 
-        if (datum.node.kind === "bookmark") {
-          const glow = datum.node.recent || !datum.node.affiliated;
-          const baseColor = datum.node.affiliated
-            ? "148, 197, 255"
-            : "125, 211, 252";
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.arc(datum.x, datum.y, datum.radius, 0, Math.PI * 2);
+        ctx.fill();
 
-          if (glow) {
-            ctx.beginPath();
-            ctx.fillStyle = `rgba(${baseColor}, ${0.12 * fade})`;
-            ctx.arc(datum.x, datum.y, datum.radius + 4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
+        if (isActive) {
           ctx.beginPath();
-          ctx.fillStyle = `rgba(${baseColor}, ${(isSelected || isHovered ? 0.95 : 0.75) * fade})`;
-          ctx.arc(datum.x, datum.y, datum.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          if (!datum.node.affiliated) {
-            ctx.beginPath();
-            ctx.strokeStyle = `rgba(96, 165, 250, ${0.85 * fade})`;
-            ctx.lineWidth = 1 / view.zoom;
-            ctx.arc(datum.x, datum.y, datum.radius + 1.6, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-
-          if (isSelected) {
-            ctx.beginPath();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-            ctx.lineWidth = 1.6 / view.zoom;
-            ctx.arc(datum.x, datum.y, datum.radius + 4, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-        } else {
-          const remaining = datum.node.kind === "overflow" ? datum.node.remaining : 0;
-          ctx.beginPath();
-          ctx.fillStyle = `rgba(148, 197, 255, ${0.12 * fade})`;
-          ctx.arc(datum.x, datum.y, datum.radius + 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.fillStyle = `rgba(148, 197, 255, ${0.25 * fade})`;
-          ctx.arc(datum.x, datum.y, datum.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = `rgba(226, 240, 255, ${0.95 * fade})`;
-          ctx.font = `${11 / view.zoom}px 'IBM Plex Mono', ui-monospace, monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            remaining > 99 ? "99+" : `+${remaining}`,
-            datum.x,
-            datum.y
-          );
-        }
-      }
-
-      // Draw anchor cards (core, tags, collections).
-      for (const datum of nodes) {
-        if (datum.x === undefined || datum.y === undefined) continue;
-        if (
-          datum.node.kind !== "core" &&
-          datum.node.kind !== "tag" &&
-          datum.node.kind !== "collection"
-        ) {
-          continue;
-        }
-
-        const isHovered = hoverNow === datum;
-        const isSelected = sameSelection(
-          selectionNow,
-          getNodeIdentity(datum.node)
-        );
-        const emphasized = isHovered || isSelected;
-
-        if (datum.node.kind === "core") {
-          ctx.beginPath();
-          const coreGradient = ctx.createRadialGradient(
-            datum.x,
-            datum.y,
-            0,
-            datum.x,
-            datum.y,
-            datum.radius + 40
-          );
-          coreGradient.addColorStop(0, "rgba(96, 165, 250, 0.55)");
-          coreGradient.addColorStop(0.6, "rgba(37, 99, 235, 0.12)");
-          coreGradient.addColorStop(1, "rgba(37, 99, 235, 0)");
-          ctx.fillStyle = coreGradient;
-          ctx.arc(datum.x, datum.y, datum.radius + 40, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.beginPath();
-          ctx.fillStyle = "rgba(17, 27, 51, 0.92)";
-          ctx.strokeStyle = emphasized
-            ? "rgba(191, 219, 254, 0.95)"
-            : "rgba(96, 165, 250, 0.65)";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
           ctx.lineWidth = 1.4 / view.zoom;
-          ctx.arc(datum.x, datum.y, datum.radius, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.arc(datum.x, datum.y, datum.radius + 2.4, 0, Math.PI * 2);
           ctx.stroke();
-
-          ctx.fillStyle = "rgba(226, 240, 255, 0.72)";
-          ctx.font = `${10 / view.zoom}px 'IBM Plex Mono', ui-monospace, monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("CORE GRAPH", datum.x, datum.y - 8);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
-          ctx.font = `600 ${15 / view.zoom}px 'Sora', system-ui, sans-serif`;
-          ctx.fillText("Orbit index", datum.x, datum.y + 10);
-          continue;
         }
-
-        // Pill anchor for tags / collections.
-        const eyebrow =
-          datum.node.kind === "tag"
-            ? "TAG CLUSTER"
-            : datum.node.variant === "x_folder"
-              ? "X FOLDER"
-              : "COLLECTION";
-        const label =
-          datum.node.kind === "tag" ? datum.node.name : datum.node.name;
-        const accent =
-          datum.node.kind === "tag"
-            ? datum.node.color
-            : datum.node.variant === "x_folder"
-              ? "#38bdf8"
-              : "#60a5fa";
-
-        ctx.font = `600 ${13 / view.zoom}px 'Sora', system-ui, sans-serif`;
-        const labelWidth = ctx.measureText(label).width;
-        const paddingX = 14 / view.zoom;
-        const paddingY = 10 / view.zoom;
-        const width = Math.max(labelWidth + paddingX * 2, 120 / view.zoom);
-        const height = 44 / view.zoom;
-        const x = datum.x - width / 2;
-        const y = datum.y - height / 2;
-        const radius = 14 / view.zoom;
-
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.arcTo(x + width, y, x + width, y + height, radius);
-        ctx.arcTo(x + width, y + height, x, y + height, radius);
-        ctx.arcTo(x, y + height, x, y, radius);
-        ctx.arcTo(x, y, x + width, y, radius);
-        ctx.closePath();
-
-        ctx.fillStyle = emphasized
-          ? "rgba(26, 38, 66, 0.96)"
-          : "rgba(18, 26, 48, 0.9)";
-        ctx.fill();
-        ctx.lineWidth = 1.2 / view.zoom;
-        ctx.strokeStyle = emphasized
-          ? mixColor(accent, 0.25)
-          : withAlpha(accent, 0.45);
-        ctx.stroke();
-
-        ctx.fillStyle = "rgba(226, 240, 255, 0.55)";
-        ctx.font = `${9 / view.zoom}px 'IBM Plex Mono', ui-monospace, monospace`;
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(eyebrow, x + paddingX, y + paddingY + 1);
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-        ctx.font = `600 ${13 / view.zoom}px 'Sora', system-ui, sans-serif`;
-        ctx.textBaseline = "alphabetic";
-        ctx.fillText(label, x + paddingX, y + height - paddingY);
-
-        // Small accent dot.
-        ctx.beginPath();
-        ctx.fillStyle = accent;
-        ctx.arc(
-          x + width - paddingX,
-          y + paddingY + 1,
-          3 / view.zoom,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
       }
 
-      // Focus pulse: when a bookmark has a predicted destination, pulse the
-      // anchor and draw a dotted arc from the bookmark to that anchor. Drives
-      // the "suggestions pulse in the map" journey state.
+      // --- draw anchors (core, tags, collections) as dots with labels ---
+      const labelFont = `${11 / view.zoom}px 'Inter', ui-sans-serif, system-ui, sans-serif`;
+      for (const datum of nodes) {
+        if (!isAnchorKind(datum.node.kind)) continue;
+        if (datum.x === undefined || datum.y === undefined) continue;
+
+        const dimmed = isDimmed(datum.node.id);
+        const isActive = activeId === datum.node.id;
+        const accent = getAnchorColor(datum.node);
+        const [r, g, b] = accent.startsWith("#")
+          ? hexToRgb(accent)
+          : [148, 163, 184];
+        const alpha = dimmed ? 0.22 : 1;
+
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.arc(datum.x, datum.y, datum.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (isActive) {
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+          ctx.lineWidth = 1.4 / view.zoom;
+          ctx.arc(datum.x, datum.y, datum.radius + 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        const label = getAnchorLabel(datum.node);
+        if (!label) continue;
+
+        ctx.font = labelFont;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        const labelAlpha = dimmed ? 0.25 : isActive ? 1 : 0.78;
+        ctx.fillStyle = `rgba(226, 232, 240, ${labelAlpha})`;
+        ctx.fillText(label, datum.x, datum.y + datum.radius + 4 / view.zoom);
+      }
+
+      // --- focus pulse on a predicted anchor (arrival target) ---
       const focusNow = focusRef.current;
       if (focusNow) {
-        const bookmark = nodesByIdRef.current.get(focusNow.bookmarkId);
         const anchor = nodesByIdRef.current.get(focusNow.predictedAnchorId);
-
-        if (
-          anchor &&
-          anchor.x !== undefined &&
-          anchor.y !== undefined
-        ) {
+        if (anchor && anchor.x !== undefined && anchor.y !== undefined) {
           const phase = (now / 900) % 1;
-          const pulseRadius = anchor.radius + 8 + phase * 28;
-          const pulseAlpha = 0.55 * (1 - phase);
-
+          const pulseRadius = anchor.radius + 6 + phase * 22;
+          const pulseAlpha = 0.4 * (1 - phase);
           ctx.beginPath();
-          ctx.strokeStyle = `rgba(191, 219, 254, ${pulseAlpha})`;
-          ctx.lineWidth = 2 / view.zoom;
+          ctx.strokeStyle = `rgba(147, 197, 253, ${pulseAlpha})`;
+          ctx.lineWidth = 1.4 / view.zoom;
           ctx.arc(anchor.x, anchor.y, pulseRadius, 0, Math.PI * 2);
           ctx.stroke();
-
-          ctx.beginPath();
-          ctx.strokeStyle = "rgba(147, 197, 253, 0.85)";
-          ctx.lineWidth = 1.8 / view.zoom;
-          ctx.arc(anchor.x, anchor.y, anchor.radius + 6, 0, Math.PI * 2);
-          ctx.stroke();
-
-          if (
-            bookmark &&
-            bookmark.x !== undefined &&
-            bookmark.y !== undefined
-          ) {
-            const dx = anchor.x - bookmark.x;
-            const dy = anchor.y - bookmark.y;
-            const midX = (bookmark.x + anchor.x) / 2;
-            const midY = (bookmark.y + anchor.y) / 2;
-            const controlX = midX + -dy * 0.25;
-            const controlY = midY + dx * 0.25;
-
-            ctx.save();
-            ctx.setLineDash([4 / view.zoom, 4 / view.zoom]);
-            ctx.strokeStyle = "rgba(147, 197, 253, 0.7)";
-            ctx.lineWidth = 1.4 / view.zoom;
-            ctx.beginPath();
-            ctx.moveTo(bookmark.x, bookmark.y);
-            ctx.quadraticCurveTo(controlX, controlY, anchor.x, anchor.y);
-            ctx.stroke();
-            ctx.restore();
-
-            // Travelling highlight along the arc — reads as a small orbiting
-            // spark.
-            const t = phase;
-            const oneMinus = 1 - t;
-            const travelX =
-              oneMinus * oneMinus * bookmark.x +
-              2 * oneMinus * t * controlX +
-              t * t * anchor.x;
-            const travelY =
-              oneMinus * oneMinus * bookmark.y +
-              2 * oneMinus * t * controlY +
-              t * t * anchor.y;
-
-            ctx.beginPath();
-            ctx.fillStyle = "rgba(191, 219, 254, 0.95)";
-            ctx.arc(travelX, travelY, 2.6 / view.zoom, 0, Math.PI * 2);
-            ctx.fill();
-          }
         }
       }
 
       ctx.restore();
-      rafRef.current = requestAnimationFrame(render);
+
+      // Decide whether we need another frame immediately or can back off.
+      const needsImmediate =
+        needsRenderRef.current ||
+        animating ||
+        hasActiveSimulation() ||
+        hasFocusPulse() ||
+        isDraggingRef.current !== null ||
+        touchRef.current !== null;
+
+      needsRenderRef.current = false;
+
+      if (needsImmediate) {
+        rafRef.current = requestAnimationFrame(render);
+      } else {
+        timeoutRef.current = window.setTimeout(() => {
+          rafRef.current = requestAnimationFrame(render);
+        }, 120);
+      }
     };
 
     rafRef.current = requestAnimationFrame(render);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
+      }
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
       }
     };
   }, [size.height, size.width]);
@@ -934,17 +722,14 @@ export const OrbitMapCanvas = forwardRef<
       const localY =
         (clientY - rect.top - rect.height / 2 - view.y) / view.zoom;
 
-      // Iterate in reverse so anchors (drawn last) get priority.
+      // Iterate in reverse so anchors (drawn last) win ties.
       const nodes = nodesRef.current;
       for (let i = nodes.length - 1; i >= 0; i -= 1) {
         const node = nodes[i];
         if (node.x === undefined || node.y === undefined) continue;
         const dx = localX - node.x;
         const dy = localY - node.y;
-        const hitRadius =
-          node.node.kind === "tag" || node.node.kind === "collection"
-            ? Math.max(node.radius, 36)
-            : node.radius + 2;
+        const hitRadius = Math.max(node.radius + 4, isAnchorKind(node.node.kind) ? 10 : 4);
         if (dx * dx + dy * dy <= hitRadius * hitRadius) {
           return node;
         }
@@ -954,15 +739,22 @@ export const OrbitMapCanvas = forwardRef<
     []
   );
 
-  const handleMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    isDraggingRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      moved: false,
-    };
-    setIsDragging(true);
-  }, []);
+  const handleMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      containerRef.current?.focus({ preventScroll: true });
+      isDraggingRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+      };
+      setIsDragging(true);
+      needsRenderRef.current = true;
+      applyCursor();
+    },
+    [applyCursor]
+  );
 
   const handleMouseMove = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -970,12 +762,16 @@ export const OrbitMapCanvas = forwardRef<
       if (drag) {
         const dx = event.clientX - drag.x;
         const dy = event.clientY - drag.y;
-        if (Math.abs(dx) + Math.abs(dy) > 3) {
+        if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 3) {
           drag.moved = true;
+          applyCursor();
+        }
+        if (drag.moved) {
           viewRef.current.x += dx;
           viewRef.current.y += dy;
           drag.x = event.clientX;
           drag.y = event.clientY;
+          needsRenderRef.current = true;
         }
         return;
       }
@@ -983,12 +779,14 @@ export const OrbitMapCanvas = forwardRef<
       const hovered = findNodeAt(event.clientX, event.clientY);
       if (hovered !== hoverRef.current) {
         hoverRef.current = hovered;
+        needsRenderRef.current = true;
+        applyCursor();
         if (onHoverChange) {
           onHoverChange(hovered ? getNodeIdentity(hovered.node) : null);
         }
       }
     },
-    [findNodeAt, onHoverChange]
+    [applyCursor, findNodeAt, onHoverChange]
   );
 
   const handleMouseUp = useCallback(
@@ -996,6 +794,7 @@ export const OrbitMapCanvas = forwardRef<
       const drag = isDraggingRef.current;
       isDraggingRef.current = null;
       setIsDragging(false);
+      needsRenderRef.current = true;
       if (drag && !drag.moved) {
         const hit = findNodeAt(event.clientX, event.clientY);
         if (hit) {
@@ -1004,21 +803,25 @@ export const OrbitMapCanvas = forwardRef<
           onSelectionChange(null);
         }
       }
+      applyCursor();
     },
-    [findNodeAt, onSelectionChange]
+    [applyCursor, findNodeAt, onSelectionChange]
   );
 
   const handleMouseLeave = useCallback(() => {
     isDraggingRef.current = null;
     setIsDragging(false);
+    needsRenderRef.current = true;
     if (hoverRef.current) {
       hoverRef.current = null;
       onHoverChange?.(null);
     }
-  }, [onHoverChange]);
+    applyCursor();
+  }, [applyCursor, onHoverChange]);
 
   const handleDoubleClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
+      needsRenderRef.current = true;
       const hit = findNodeAt(event.clientX, event.clientY);
       if (hit && hit.node.kind === "bookmark" && onOpenBookmark) {
         onOpenBookmark(hit.node.id);
@@ -1027,26 +830,178 @@ export const OrbitMapCanvas = forwardRef<
     [findNodeAt, onOpenBookmark]
   );
 
-  const handleWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
+  // --- touch handlers ---
+  const handleTouchStart = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const container = containerRef.current;
+      if (!container) return;
+      container.focus({ preventScroll: true });
+
+      const touches = event.touches;
+      if (touches.length === 1) {
+        const t = touches[0];
+        touchRef.current = {
+          ids: [t.identifier],
+          startX: t.clientX,
+          startY: t.clientY,
+          startViewX: viewRef.current.x,
+          startViewY: viewRef.current.y,
+          startZoom: viewRef.current.zoom,
+          startDist: 0,
+          moved: false,
+        };
+      } else if (touches.length === 2) {
+        const t1 = touches[0];
+        const t2 = touches[1];
+        const dist = Math.hypot(
+          t2.clientX - t1.clientX,
+          t2.clientY - t1.clientY
+        );
+        touchRef.current = {
+          ids: [t1.identifier, t2.identifier],
+          startX: (t1.clientX + t2.clientX) / 2,
+          startY: (t1.clientY + t2.clientY) / 2,
+          startViewX: viewRef.current.x,
+          startViewY: viewRef.current.y,
+          startZoom: viewRef.current.zoom,
+          startDist: dist,
+          moved: false,
+        };
+      }
+    },
+    []
+  );
+
+  const handleTouchMove = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      if (!touchRef.current) return;
+      event.preventDefault();
+
+      const touches = event.touches;
+      const state = touchRef.current;
+
+      if (touches.length === 1 && state.ids.length === 1) {
+        const t = touches[0];
+        const dx = t.clientX - state.startX;
+        const dy = t.clientY - state.startY;
+        if (!state.moved && Math.abs(dx) + Math.abs(dy) > 6) {
+          state.moved = true;
+        }
+        viewRef.current.x = state.startViewX + dx;
+        viewRef.current.y = state.startViewY + dy;
+        needsRenderRef.current = true;
+      } else if (touches.length === 2 && state.ids.length === 2) {
+        const t1 = touches[0];
+        const t2 = touches[1];
+        const dist = Math.hypot(
+          t2.clientX - t1.clientX,
+          t2.clientY - t1.clientY
+        );
+        const midX = (t1.clientX + t2.clientX) / 2;
+        const midY = (t1.clientY + t2.clientY) / 2;
+
+        if (!state.moved && Math.abs(dist - state.startDist) > 6) {
+          state.moved = true;
+        }
+
+        if (state.startDist > 0) {
+          const container = containerRef.current;
+          const rect = container?.getBoundingClientRect();
+          const rectCenterX = rect ? rect.left + rect.width / 2 : 0;
+          const rectCenterY = rect ? rect.top + rect.height / 2 : 0;
+
+          const nextZoom = Math.min(
+            MAX_ZOOM,
+            Math.max(MIN_ZOOM, state.startZoom * (dist / state.startDist))
+          );
+
+          const worldX = (midX - rectCenterX - state.startViewX) / state.startZoom;
+          const worldY = (midY - rectCenterY - state.startViewY) / state.startZoom;
+
+          viewRef.current.zoom = nextZoom;
+          viewRef.current.x = midX - rectCenterX - worldX * nextZoom;
+          viewRef.current.y = midY - rectCenterY - worldY * nextZoom;
+          needsRenderRef.current = true;
+        }
+      }
+    },
+    []
+  );
+
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const state = touchRef.current;
+      if (!state) return;
+      needsRenderRef.current = true;
+
+      const remaining = event.touches;
+      // If we transitioned from 2 fingers to 1, reset state to avoid jumps.
+      if (remaining.length === 1 && state.ids.length === 2) {
+        const t = remaining[0];
+        touchRef.current = {
+          ids: [t.identifier],
+          startX: t.clientX,
+          startY: t.clientY,
+          startViewX: viewRef.current.x,
+          startViewY: viewRef.current.y,
+          startZoom: viewRef.current.zoom,
+          startDist: 0,
+          moved: false,
+        };
+        return;
+      }
+
+      if (remaining.length === 0) {
+        if (!state.moved) {
+          // Treat as a tap.
+          const lastTouch = event.changedTouches[0];
+          if (lastTouch) {
+            const hit = findNodeAt(lastTouch.clientX, lastTouch.clientY);
+            if (hit) {
+              onSelectionChange(getNodeIdentity(hit.node));
+            } else {
+              onSelectionChange(null);
+            }
+          }
+        }
+        touchRef.current = null;
+      }
+    },
+    [findNodeAt, onSelectionChange]
+  );
+
+  // Native wheel listener with `{ passive: false }` so we can actually
+  // `preventDefault()` zoom gestures and stop the outer scroll container.
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const view = viewRef.current;
-    const delta = -event.deltaY * 0.0015;
-    const nextZoom = Math.min(
-      MAX_ZOOM,
-      Math.max(MIN_ZOOM, view.zoom * (1 + delta))
-    );
 
-    const cursorX = event.clientX - rect.left - rect.width / 2;
-    const cursorY = event.clientY - rect.top - rect.height / 2;
-    const worldX = (cursorX - view.x) / view.zoom;
-    const worldY = (cursorY - view.y) / view.zoom;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const view = viewRef.current;
+      const deltaScale = event.ctrlKey ? 0.01 : 0.0015;
+      const delta = -event.deltaY * deltaScale;
+      const nextZoom = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, view.zoom * (1 + delta))
+      );
 
-    view.zoom = nextZoom;
-    view.x = cursorX - worldX * nextZoom;
-    view.y = cursorY - worldY * nextZoom;
+      const cursorX = event.clientX - rect.left - rect.width / 2;
+      const cursorY = event.clientY - rect.top - rect.height / 2;
+      const worldX = (cursorX - view.x) / view.zoom;
+      const worldY = (cursorY - view.y) / view.zoom;
+
+      view.zoom = nextZoom;
+      view.x = cursorX - worldX * nextZoom;
+      view.y = cursorY - worldY * nextZoom;
+      needsRenderRef.current = true;
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+    };
   }, []);
 
   // --- keyboard panning/zoom ---
@@ -1059,28 +1014,34 @@ export const OrbitMapCanvas = forwardRef<
       switch (event.key) {
         case "ArrowLeft":
           view.x += panStep;
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowRight":
           view.x -= panStep;
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowUp":
           view.y += panStep;
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowDown":
           view.y -= panStep;
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "+":
         case "=":
           view.zoom = Math.min(MAX_ZOOM, view.zoom * 1.1);
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "-":
         case "_":
           view.zoom = Math.max(MIN_ZOOM, view.zoom / 1.1);
+          needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "Escape":
@@ -1092,27 +1053,22 @@ export const OrbitMapCanvas = forwardRef<
     return () => window.removeEventListener("keydown", onKey);
   }, [onSelectionChange]);
 
-  // --- preset camera ---
-  useEffect(() => {
+  const handleZoomIn = useCallback(() => {
     const view = viewRef.current;
-    switch (preset) {
-      case "orbit":
-        view.x = 0;
-        view.y = 0;
-        view.zoom = 1;
-        break;
-      case "recent":
-        view.x = 0;
-        view.y = size.height * 0.18;
-        view.zoom = 1.25;
-        break;
-      case "category":
-        view.x = 0;
-        view.y = 0;
-        view.zoom = 0.7;
-        break;
-    }
-  }, [preset, size.height]);
+    view.zoom = Math.min(MAX_ZOOM, view.zoom * 1.25);
+    needsRenderRef.current = true;
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const view = viewRef.current;
+    view.zoom = Math.max(MIN_ZOOM, view.zoom / 1.25);
+    needsRenderRef.current = true;
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    viewRef.current = { x: 0, y: 0, zoom: 1 };
+    needsRenderRef.current = true;
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -1140,26 +1096,17 @@ export const OrbitMapCanvas = forwardRef<
           return;
         }
 
-        const dx = anchor.x - bookmark.x;
-        const dy = anchor.y - bookmark.y;
-        const midX = (bookmark.x + anchor.x) / 2;
-        const midY = (bookmark.y + anchor.y) / 2;
-        const controlX = midX + -dy * 0.35;
-        const controlY = midY + dx * 0.35;
-
         bookmark.assignAnimation = {
           startedAt: performance.now(),
-          durationMs: 650,
+          durationMs: 520,
           startX: bookmark.x,
           startY: bookmark.y,
           targetX: anchor.x,
           targetY: anchor.y,
-          controlX,
-          controlY,
         };
 
         await new Promise<void>((resolve) => {
-          setTimeout(resolve, 680);
+          setTimeout(resolve, 540);
         });
       },
     }),
@@ -1172,19 +1119,54 @@ export const OrbitMapCanvas = forwardRef<
       role="application"
       aria-label="Orbit map"
       tabIndex={0}
+      data-dragging={isDragging ? "true" : undefined}
       className={cn(
-        "relative h-full w-full select-none overflow-hidden rounded-[28px] border border-white/10 bg-[#070b1a] outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-        isDragging ? "cursor-grabbing" : "cursor-grab",
+        "relative h-full w-full select-none overflow-hidden rounded-[28px] border border-white/10 outline-none touch-none overscroll-contain focus-visible:ring-2 focus-visible:ring-primary/60",
         className
       )}
+      style={{ cursor: "grab", backgroundColor: BG_COLOR }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
       onDoubleClick={handleDoubleClick}
-      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
+
+      {/* Zoom controls */}
+      <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col gap-1.5">
+        <div className="pointer-events-auto inline-flex flex-col overflow-hidden rounded-xl border border-white/10 bg-black/60 shadow-lg backdrop-blur-sm">
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={handleZoomIn}
+            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <Plus className="size-4" />
+          </button>
+          <span className="h-px w-full bg-white/10" />
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={handleZoomOut}
+            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <Minus className="size-4" />
+          </button>
+          <span className="h-px w-full bg-white/10" />
+          <button
+            type="button"
+            aria-label="Reset view"
+            onClick={handleResetView}
+            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <RotateCcw className="size-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 });

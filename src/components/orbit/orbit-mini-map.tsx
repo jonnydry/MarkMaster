@@ -8,7 +8,6 @@ import {
   OrbitMapCanvas,
   type OrbitMapCanvasHandle,
   type OrbitMapFocus,
-  type OrbitMapPreset,
   type OrbitMapSelection,
 } from "@/components/orbit/orbit-map-canvas";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,6 @@ import type { OrbitDecision, OrbitGraphPayload } from "@/types";
 interface OrbitMiniMapProps {
   graph: OrbitGraphPayload | null | undefined;
   loading: boolean;
-  preset?: OrbitMapPreset;
   focusedBookmarkId: string | null;
   primaryDecision: OrbitDecision | null;
   onSelectBookmark?: (bookmarkId: string) => void;
@@ -27,7 +25,6 @@ interface OrbitMiniMapProps {
 export function OrbitMiniMap({
   graph,
   loading,
-  preset = "orbit",
   focusedBookmarkId,
   primaryDecision,
   onSelectBookmark,
@@ -108,7 +105,6 @@ export function OrbitMiniMap({
           <OrbitMapCanvas
             ref={canvasRef}
             data={graph}
-            preset={preset}
             selection={
               focusedBookmarkId
                 ? { kind: "bookmark", id: focusedBookmarkId }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -68,6 +68,11 @@ export default function AnalyticsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
+
+  const rangeControl = useMemo(
+    () => <RangeControl value={range} onChange={setRange} />,
+    [range]
+  );
 
   const {
     data: analytics,
@@ -200,7 +205,7 @@ export default function AnalyticsPage() {
                   <TimelineCard
                     analytics={analytics}
                     range={range}
-                    rangeControl={<RangeControl value={range} onChange={setRange} />}
+                    rangeControl={rangeControl}
                   />
                 </>
               )}
@@ -363,7 +368,7 @@ function AnnotationCard({
   );
 }
 
-function RangeControl({
+const RangeControl = React.memo(function RangeControl({
   value,
   onChange,
 }: {
@@ -397,7 +402,7 @@ function RangeControl({
       })}
     </div>
   );
-}
+});
 
 function LoadingSkeleton() {
   return (

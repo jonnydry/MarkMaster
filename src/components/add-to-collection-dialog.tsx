@@ -4,12 +4,13 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, Plus, Check } from "lucide-react";
+import { FolderOpen, Plus, Check, Loader2 } from "lucide-react";
 import type { CollectionWithCount } from "@/types";
 
 interface AddToCollectionDialogProps {
@@ -33,11 +34,13 @@ export function AddToCollectionDialog({
 }: AddToCollectionDialogProps) {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [pendingCollectionId, setPendingCollectionId] = useState<string | null>(null);
   const isBulk = bookmarkIds.length > 1;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setNewName("");
+      setPendingCollectionId(null);
     }
     onOpenChange(nextOpen);
   };
@@ -63,6 +66,11 @@ export function AddToCollectionDialog({
               ? `Add ${bookmarkIds.length} bookmarks to a collection`
               : "Add to Collection"}
           </DialogTitle>
+          <DialogDescription>
+            {isBulk
+              ? "Choose an existing collection or create a new one."
+              : "Choose an existing collection or create a new one for this bookmark."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {collections.length > 0 && (
@@ -70,19 +78,26 @@ export function AddToCollectionDialog({
               {collections.map((col) => {
                 const isIn = bookmarkCollections.includes(col.id);
                 const isManaged = col.type === "x_folder";
+                const isPending = pendingCollectionId === col.id;
                 return (
                   <button
                     key={col.id}
-onClick={async () => {
+                    type="button"
+                    aria-pressed={isIn}
+                    aria-disabled={isIn || isManaged || isPending}
+                    onClick={async () => {
                       if (bookmarkIds.length === 0 || isIn || isManaged) return;
+                      setPendingCollectionId(col.id);
                       try {
                         await onAddToCollection(bookmarkIds, col.id);
                       } catch {
                         // error handled by caller toast
+                      } finally {
+                        setPendingCollectionId(null);
                       }
                     }}
-                    disabled={isIn || isManaged}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                    disabled={isIn || isManaged || isPending}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left disabled:opacity-60 ${
                       isIn
                         ? "bg-primary/10 text-primary"
                         : isManaged
@@ -100,7 +115,11 @@ onClick={async () => {
                     <span className="ml-auto text-xs text-muted-foreground">
                       {col._count.items}
                     </span>
-                    {isIn && <Check className="w-4 h-4 text-primary shrink-0" />}
+                    {isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    ) : isIn ? (
+                      <Check className="w-4 h-4 text-primary shrink-0" />
+                    ) : null}
                   </button>
                 );
               })}

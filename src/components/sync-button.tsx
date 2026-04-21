@@ -34,6 +34,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
   const statusCopy = getSyncStatusCopy(currentRun, latestRun, lastSyncAt);
 
   const handleSync = async () => {
+    if (isAnySyncRunning) return;
     setSyncing(true);
     try {
       const data = await sendJson<{
@@ -77,7 +78,7 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
       <Button
         type="button"
         onClick={handleSync}
-        disabled={isAnySyncRunning}
+        aria-busy={isAnySyncRunning}
         className="h-10 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
       >
         <RefreshCw
@@ -87,14 +88,14 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
       </Button>
 
       {syncStatusError ? (
-        <div className="flex items-center gap-1.5 px-0.5">
+        <div className="flex items-center gap-1.5 px-0.5" aria-live="polite">
           <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
           <span className="min-w-0 text-[11px] leading-snug text-destructive truncate">
             Could not load sync status
           </span>
         </div>
       ) : statusCopy ? (
-        <div className="flex items-center gap-1.5 px-0.5">
+        <div className="flex items-center gap-1.5 px-0.5" aria-live="polite">
           <div
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusCopy.dotClass}`}
           />
@@ -109,9 +110,9 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
           </span>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 px-0.5">
+        <div className="flex items-center gap-1.5 px-0.5" aria-live="polite">
           <div
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-emerald" : "bg-muted-foreground/40"}`}
           />
           <span className="text-[11px] text-muted-foreground">
             {lastSyncAt ? "Up to date" : "Not synced"}
@@ -139,9 +140,9 @@ function getSyncStatusCopy(
   latestRun: SyncRunSummary | null | undefined,
   lastSyncAt: Date | null
 ) {
-  if (currentRun) {
+    if (currentRun) {
     return {
-      dotClass: "bg-chart-2 animate-pulse",
+      dotClass: "bg-primary animate-pulse",
       label: `Syncing${currentRun.totalFetched > 0 ? ` · ${currentRun.totalFetched} fetched` : ""}...`,
     };
   }
@@ -161,7 +162,7 @@ function getSyncStatusCopy(
 
     if (latestRun.status === "RATE_LIMITED") {
       return {
-        dotClass: "bg-chart-2",
+        dotClass: "bg-destructive",
         label: `Rate limited ${relative}${latestRun.resumeToken ? " · Sync again to continue" : ""}`,
       };
     }
@@ -173,14 +174,14 @@ function getSyncStatusCopy(
     const resumeNote = latestRun.resumeToken ? " · More to sync" : "";
 
     return {
-      dotClass: latestRun.resumeToken ? "bg-chart-2" : "bg-primary",
+      dotClass: latestRun.resumeToken ? "bg-note" : "bg-emerald",
       label: `${summary} ${relative}${resumeNote}`,
     };
   }
 
   if (lastSyncAt) {
     return {
-      dotClass: "bg-primary",
+      dotClass: "bg-emerald",
       label: formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true }),
     };
   }

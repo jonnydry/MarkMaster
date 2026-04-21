@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -54,6 +55,9 @@ export function CreateCollectionDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>New Collection</DialogTitle>
+          <DialogDescription>
+            Create a themed home for related bookmarks.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -91,7 +95,7 @@ export function CreateCollectionDialog({
               Cancel
             </Button>
             <Button
-              onClick={() => void handleCreate()}
+              onClick={handleCreate}
               disabled={!name.trim() || submitting}
             >
               {submitting ? "Creating…" : "Create"}

@@ -1,16 +1,21 @@
 "use client";
 
+import { useMemo } from "react";
+import Link from "next/link";
 import {
   Crosshair,
   ExternalLink,
   Folder,
   FolderOpen,
+  LayoutGrid,
   Orbit as OrbitIcon,
   Sparkles,
   Tag as TagIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas";
 import type {
   BookmarkWithRelations,
@@ -43,6 +48,45 @@ function pluralize(count: number, singular: string, plural?: string) {
   return `${count.toLocaleString()} ${count === 1 ? singular : plural ?? `${singular}s`}`;
 }
 
+function getConnectedBookmarkNodes(
+  data: OrbitGraphPayload,
+  node: OrbitGraphNode
+): OrbitGraphNode[] {
+  const ids = new Set<string>();
+  for (const edge of data.edges) {
+    switch (edge.kind) {
+      case "bookmark-tag":
+        if (node.kind === "tag" && edge.tagId === node.id) {
+          ids.add(edge.bookmarkId);
+        } else if (node.kind === "bookmark" && edge.bookmarkId === node.id) {
+          ids.add(edge.tagId);
+        }
+        break;
+      case "bookmark-collection":
+        if (
+          node.kind === "collection" &&
+          edge.collectionId === node.id
+        ) {
+          ids.add(edge.bookmarkId);
+        } else if (
+          node.kind === "bookmark" &&
+          edge.bookmarkId === node.id
+        ) {
+          ids.add(edge.collectionId);
+        }
+        break;
+      case "loose":
+        if (node.kind === "core" && edge.bookmarkId) {
+          ids.add(edge.bookmarkId);
+        } else if (node.kind === "bookmark" && edge.bookmarkId === node.id) {
+          ids.add("orbit-index");
+        }
+        break;
+    }
+  }
+  return data.nodes.filter((n) => ids.has(n.id));
+}
+
 export function OrbitMapRail({
   data,
   selection,
@@ -57,19 +101,21 @@ export function OrbitMapRail({
 }: OrbitMapRailProps) {
   const activeSelection = selection ?? hoverSelection;
   const activeNode = findNode(data, activeSelection);
+  const connected = useMemo(
+    () => (activeNode ? getConnectedBookmarkNodes(data, activeNode) : []),
+    [activeNode, data]
+  );
 
   return (
-    <aside className="flex w-full flex-col gap-4 lg:w-[320px] lg:shrink-0 xl:w-[340px]">
+    <aside className="flex w-full flex-col gap-3 lg:w-[300px] lg:shrink-0 xl:w-[320px]">
       <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
-          Selected cluster
-        </p>
         <SelectedClusterBody
           node={activeNode}
           stats={data.stats}
           focusedBookmark={focusedBookmark}
           focusedBookmarkLoading={focusedBookmarkLoading}
           hasExplicitSelection={Boolean(selection)}
+          connected={connected}
           onAssign={onAssign}
           onAddTag={onAddTag}
           onAddToCollection={onAddToCollection}
@@ -78,43 +124,31 @@ export function OrbitMapRail({
         />
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
-          Map motion
-        </p>
-        <p className="mt-2 text-sm font-medium text-white">
-          Let the structure move, not the camera.
-        </p>
-        <p className="mt-2 text-sm text-white/65">
-          Stable category anchors, slow drift on loose nodes, and short inward
-          arcs on assignment keep the map readable during motion.
-        </p>
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm">
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 shadow-sm backdrop-blur-sm">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
           Legend
         </p>
-        <ul className="mt-3 space-y-2.5 text-sm text-white/75">
+        <ul className="mt-3 space-y-2">
           <li className="flex items-center gap-3">
-            <span className="size-2.5 rounded-full bg-sky-400 ring-1 ring-sky-300/70 shadow-[0_0_10px_rgba(56,189,248,0.55)]" />
-            <span>Loose or high-attention bookmarks</span>
+            <span className="inline-block size-2.5 rounded-full bg-amber-300" />
+            <span>Loose bookmark</span>
           </li>
           <li className="flex items-center gap-3">
-            <span className="size-2 rounded-full bg-white/60" />
-            <span>Assigned bookmarks inside stable groups</span>
+            <span className="inline-block size-2.5 rounded-full bg-slate-200" />
+            <span>Assigned bookmark</span>
           </li>
           <li className="flex items-center gap-3">
-            <span className="h-px w-6 bg-gradient-to-r from-transparent via-sky-300/60 to-transparent" />
-            <span>Relationship pull between clusters</span>
+            <span className="inline-block size-3 rounded-full bg-blue-400" />
+            <span>Tag or collection</span>
           </li>
           <li className="flex items-center gap-3">
-            <span className="inline-flex h-5 items-center rounded-md border border-white/15 bg-white/5 px-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/70">
-              +N
-            </span>
-            <span>More bookmarks hidden for performance</span>
+            <span className="h-px w-5 bg-slate-400/50" />
+            <span>Relationship</span>
           </li>
         </ul>
+        <p className="mt-3 text-xs text-white/50">
+          Scroll to zoom · drag to pan · click to focus · Esc to clear
+        </p>
       </section>
     </aside>
   );
@@ -126,6 +160,7 @@ interface SelectedClusterBodyProps {
   focusedBookmark: BookmarkWithRelations | null;
   focusedBookmarkLoading: boolean;
   hasExplicitSelection: boolean;
+  connected: OrbitGraphNode[];
   onAssign: () => void;
   onAddTag: () => void;
   onAddToCollection: () => void;
@@ -139,6 +174,7 @@ function SelectedClusterBody({
   focusedBookmark,
   focusedBookmarkLoading,
   hasExplicitSelection,
+  connected,
   onAssign,
   onAddTag,
   onAddToCollection,
@@ -147,13 +183,11 @@ function SelectedClusterBody({
 }: SelectedClusterBodyProps) {
   if (!node) {
     return (
-      <div className="mt-2 space-y-3">
-        <p className="text-sm font-medium text-white">
-          Hover a cluster to inspect it.
-        </p>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-white">Select a node</p>
         <p className="text-sm text-white/65">
-          Click a tag, collection, or bookmark to lock it into the rail and
-          unlock the assign / tag / collect actions.
+          Click a tag, collection, or bookmark on the graph to see details and
+          move it into a home.
         </p>
       </div>
     );
@@ -161,14 +195,14 @@ function SelectedClusterBody({
 
   if (node.kind === "core") {
     return (
-      <div className="mt-2 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
             <OrbitIcon className="size-4" />
           </span>
           <div>
             <p className="text-sm font-medium text-white">Orbit index</p>
-            <p className="text-xs text-white/60">Core graph anchor</p>
+            <p className="text-xs text-white/60">Central anchor for loose bookmarks</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -181,17 +215,20 @@ function SelectedClusterBody({
             value={stats.looseBookmarks.toLocaleString()}
           />
         </div>
-        <p className="text-sm text-white/65">
-          Loose bookmarks drift on the outer orbit until you pull them into a
-          tag cluster or collection.
-        </p>
+        {connected.length > 0 && (
+          <ConnectedList
+            title="Loose bookmarks"
+            nodes={connected}
+            onOpenBookmark={onOpenBookmark}
+          />
+        )}
       </div>
     );
   }
 
   if (node.kind === "tag") {
     return (
-      <div className="mt-2 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span
             className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl"
@@ -204,16 +241,15 @@ function SelectedClusterBody({
           </span>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
-              Tag cluster
+              Tag
             </p>
             <p className="truncate text-sm font-semibold text-white">
               {node.name}
             </p>
           </div>
         </div>
-        <p className="text-sm text-white/70">
-          {pluralize(node.count, "bookmark")} anchored to this tag. Assign loose
-          bookmarks nearby or pull them inward with a single tap.
+        <p className="text-sm text-white/65">
+          {pluralize(node.count, "bookmark")}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -235,7 +271,21 @@ function SelectedClusterBody({
             <TagIcon className="size-4" />
             Tag
           </Button>
+          <Link
+            href={`/dashboard?tag=${encodeURIComponent(node.id)}`}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
+          >
+            <LayoutGrid className="size-3.5" />
+            Dashboard
+          </Link>
         </div>
+        {connected.length > 0 && (
+          <ConnectedList
+            title="Connected bookmarks"
+            nodes={connected}
+            onOpenBookmark={onOpenBookmark}
+          />
+        )}
       </div>
     );
   }
@@ -243,7 +293,7 @@ function SelectedClusterBody({
   if (node.kind === "collection") {
     const Icon = node.variant === "x_folder" ? FolderOpen : Folder;
     return (
-      <div className="mt-2 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
             <Icon className="size-4" />
@@ -257,9 +307,8 @@ function SelectedClusterBody({
             </p>
           </div>
         </div>
-        <p className="text-sm text-white/70">
-          {pluralize(node.count, "bookmark")} live here. Use Collect to move a
-          selected bookmark into this home along a gentle inward arc.
+        <p className="text-sm text-white/65">
+          {pluralize(node.count, "bookmark")}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -286,14 +335,36 @@ function SelectedClusterBody({
             <Folder className="size-4" />
             Collect
           </Button>
+          {node.variant !== "x_folder" && (
+            <Link
+              href={`/dashboard?collection=${encodeURIComponent(node.id)}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
+            >
+              <LayoutGrid className="size-3.5" />
+              Dashboard
+            </Link>
+          )}
         </div>
+        {connected.length > 0 && (
+          <ConnectedList
+            title="Connected bookmarks"
+            nodes={connected}
+            onOpenBookmark={onOpenBookmark}
+          />
+        )}
       </div>
     );
   }
 
   if (node.kind === "bookmark") {
+    const tagConnections = connected.filter((n) => n.kind === "tag");
+    const collectionConnections = connected.filter(
+      (n) => n.kind === "collection"
+    );
+    const isLoose = tagConnections.length === 0 && collectionConnections.length === 0;
+
     return (
-      <div className="mt-2 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-200">
             <Sparkles className="size-4" />
@@ -309,7 +380,7 @@ function SelectedClusterBody({
         </div>
         <p className="text-sm text-white/70">
           {focusedBookmarkLoading && !focusedBookmark
-            ? "Loading bookmark details…"
+            ? "Loading…"
             : focusedBookmark?.tweetText ?? node.title}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -344,6 +415,52 @@ function SelectedClusterBody({
             Open
           </Button>
         </div>
+        {isLoose && (
+          <p className="text-xs text-amber-300/80">Not yet tagged or collected</p>
+        )}
+        {tagConnections.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+              Tags
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {tagConnections.map((t) =>
+                t.kind === "tag" ? (
+                  <span
+                    key={t.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80"
+                  >
+                    <span
+                      className="inline-block size-2 rounded-full"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    {t.name}
+                  </span>
+                ) : null
+              )}
+            </div>
+          </div>
+        )}
+        {collectionConnections.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+              Collections
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {collectionConnections.map((c) =>
+                c.kind === "collection" ? (
+                  <span
+                    key={c.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80"
+                  >
+                    <Folder className="size-3 text-sky-300" />
+                    {c.name}
+                  </span>
+                ) : null
+              )}
+            </div>
+          </div>
+        )}
         {hasExplicitSelection && (
           <button
             type="button"
@@ -358,20 +475,56 @@ function SelectedClusterBody({
   }
 
   if (node.kind === "overflow") {
-    return (
-      <div className="mt-2 space-y-3">
-        <p className="text-sm font-medium text-white">
-          {node.remaining.toLocaleString()} more bookmarks
-        </p>
-        <p className="text-sm text-white/65">
-          We cap the visible graph for performance. Open the Orbit queue or a
-          specific collection to explore the rest.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return null;
+}
+
+function ConnectedList({
+  title,
+  nodes,
+  onOpenBookmark,
+}: {
+  title: string;
+  nodes: OrbitGraphNode[];
+  onOpenBookmark: (bookmarkId: string) => void;
+}) {
+  const bookmarks = nodes.filter((n) => n.kind === "bookmark");
+  if (bookmarks.length === 0) return null;
+
+  return (
+    <div className="space-y-2 pt-1">
+      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+        {title} · {bookmarks.length}
+      </p>
+      <ScrollArea className="h-40 rounded-xl border border-white/8 bg-white/[0.03]">
+        <ul className="space-y-0.5 p-2">
+          {bookmarks.slice(0, 50).map((b) =>
+            b.kind === "bookmark" ? (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenBookmark(b.id)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-white/75 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <span
+                    className={cn(
+                      "inline-block size-1.5 shrink-0 rounded-full",
+                      b.affiliated ? "bg-slate-200" : "bg-amber-300"
+                    )}
+                  />
+                  <span className="min-w-0 truncate">
+                    @{b.authorUsername}
+                  </span>
+                </button>
+              </li>
+            ) : null
+          )}
+        </ul>
+      </ScrollArea>
+    </div>
+  );
 }
 
 function RailMetric({ label, value }: { label: string; value: string }) {
@@ -386,3 +539,5 @@ function RailMetric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+

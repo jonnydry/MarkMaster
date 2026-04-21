@@ -13,6 +13,7 @@ import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
   OrbitApplyResult,
   OrbitBookmarkDecision,
+  OrbitScanPlan,
   OrbitScanResponsePayload,
 } from "@/types";
 
@@ -159,6 +160,16 @@ export function useOrbitScan(): OrbitScanHandle {
     async (opts?: { createCollections?: boolean }) => {
       if (!plan) return null;
 
+      const activeSuggestions = plan.plan.suggestions.filter(
+        (suggestion) => !dismissed.has(suggestion.bookmarkId)
+      );
+      if (activeSuggestions.length === 0) return null;
+
+      const filteredPlan: OrbitScanPlan = {
+        overview: plan.plan.overview,
+        suggestions: activeSuggestions,
+      };
+
       setApplyingBatch(true);
       setError(null);
 
@@ -170,7 +181,7 @@ export function useOrbitScan(): OrbitScanHandle {
             body: {
               mode: "apply",
               createCollections: opts?.createCollections ?? true,
-              plan: JSON.parse(JSON.stringify(plan.plan)) as JsonValue,
+              plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
             },
           }
         );
@@ -191,7 +202,7 @@ export function useOrbitScan(): OrbitScanHandle {
         setApplyingBatch(false);
       }
     },
-    [plan, queryClient]
+    [plan, dismissed, queryClient]
   );
 
   const dismiss = useCallback((bookmarkId: string) => {

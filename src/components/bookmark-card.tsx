@@ -122,6 +122,7 @@ function TagPill({
 }) {
   return (
     <button
+      type="button"
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -162,8 +163,7 @@ function ActionButton({
       }`}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
-      <Icon className="w-3.5 h-3.5" />
-      <span className="sr-only">{label}</span>
+      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
     </Button>
   );
 }
@@ -183,6 +183,7 @@ function SelectionToggle({
         onToggle();
       }}
       aria-pressed={selected}
+      aria-label="Select bookmark"
       className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         selected
           ? "bg-primary border-primary text-primary-foreground"
@@ -211,7 +212,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   className,
   priorityMedia = false,
 }: BookmarkCardProps) {
-  const [imageError, setImageError] = useState<Set<string>>(new Set());
+  const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
@@ -261,6 +262,12 @@ export const BookmarkCard = memo(function BookmarkCard({
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
+        aria-pressed={isInteractive ? selected : undefined}
+        aria-label={
+          isInteractive
+            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            : undefined
+        }
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
@@ -337,6 +344,12 @@ export const BookmarkCard = memo(function BookmarkCard({
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
+        aria-pressed={isInteractive ? selected : undefined}
+        aria-label={
+          isInteractive
+            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            : undefined
+        }
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
@@ -445,6 +458,12 @@ export const BookmarkCard = memo(function BookmarkCard({
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
+      aria-pressed={isInteractive ? selected : undefined}
+      aria-label={
+        isInteractive
+          ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+          : undefined
+      }
       onClick={isInteractive ? handleCardActivation : undefined}
       onKeyDown={handleCardKeyDown}
     >
@@ -464,7 +483,11 @@ export const BookmarkCard = memo(function BookmarkCard({
             className="w-10 h-10 rounded-full shrink-0"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-secondary shrink-0 flex items-center justify-center">
+          <div
+            className="w-10 h-10 rounded-full bg-secondary shrink-0 flex items-center justify-center"
+            role="img"
+            aria-label={`${bookmark.authorDisplayName} avatar`}
+          >
             <span className="text-sm font-semibold text-muted-foreground">
               {bookmark.authorDisplayName.charAt(0).toUpperCase()}
             </span>
@@ -587,7 +610,10 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.quotedTweet && (
-            <div className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3">
+            <div
+              aria-label="Quoted tweet"
+              className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3"
+            >
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="font-medium text-sm text-foreground">
                   {bookmark.quotedTweet.author?.name}
@@ -603,7 +629,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.notes.length > 0 && (
-            <div className="mt-3 rounded-r-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
+            <div className="mt-3 rounded-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
               <p className="text-xs leading-snug text-muted-foreground">
                 {highlightedNote}
               </p>
@@ -623,32 +649,23 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {metrics && (
-            <div
-              className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground"
-              aria-label="Tweet engagement"
-            >
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.reply_count} replies`}
-              >
-                <MessageCircle className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.reply_count)}</span>
-              </span>
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.retweet_count} retweets`}
-              >
-                <Repeat2 className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.retweet_count)}</span>
-              </span>
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.like_count} likes`}
-              >
-                <Heart className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.like_count)}</span>
-              </span>
-            </div>
+            <dl className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Replies</dt>
+                <MessageCircle className="size-3.5" aria-hidden="true" />
+                <dd>{formatCount(metrics.reply_count)}</dd>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Retweets</dt>
+                <Repeat2 className="size-3.5" aria-hidden="true" />
+                <dd>{formatCount(metrics.retweet_count)}</dd>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Likes</dt>
+                <Heart className="size-3.5" aria-hidden="true" />
+                <dd>{formatCount(metrics.like_count)}</dd>
+              </div>
+            </dl>
           )}
         </div>
       </div>

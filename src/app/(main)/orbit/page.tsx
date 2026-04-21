@@ -19,12 +19,15 @@ import {
   AlignJustify,
   ChevronLeft,
   ChevronRight,
+  Folder,
   Grid3x3,
   LayoutList,
   Loader2,
   Map as MapIcon,
   Orbit as OrbitIcon,
   Sparkles,
+  TagIcon,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -189,6 +192,10 @@ export default function OrbitPage() {
   const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
   const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [mapOpen, setMapOpen] = useState(false);
   const pageHeaderWrapperRef = useRef<HTMLDivElement>(null);
   const [pageHeaderHeight, setPageHeaderHeight] = useState(0);
@@ -419,6 +426,51 @@ export default function OrbitPage() {
     [scan]
   );
 
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((prev) => {
+      if (prev) {
+        setSelectedBookmarkIds(new Set());
+      }
+      return !prev;
+    });
+  }, []);
+
+  const handleSelectionChange = useCallback(
+    (bookmarkId: string, selected: boolean) => {
+      setSelectedBookmarkIds((prev) => {
+        const next = new Set(prev);
+        if (selected) {
+          next.add(bookmarkId);
+        } else {
+          next.delete(bookmarkId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const handleBulkAddTag = useCallback(() => {
+    if (selectedBookmarkIds.size === 0) return;
+    setTagTargetIds(Array.from(selectedBookmarkIds));
+    setTagDialogOpen(true);
+  }, [selectedBookmarkIds]);
+
+  const handleBulkAddToCollection = useCallback(() => {
+    if (selectedBookmarkIds.size === 0) return;
+    setCollectionTargetIds(Array.from(selectedBookmarkIds));
+    setCollectionDialogOpen(true);
+  }, [selectedBookmarkIds]);
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = Array.from(selectedBookmarkIds);
+    if (ids.length === 0) return;
+    // Fire deletes in parallel; each shows its own toast via useBookmarkActions.
+    void Promise.all(ids.map((id) => actions.handleDeleteBookmark(id)));
+    setSelectedBookmarkIds(new Set());
+    setSelectionMode(false);
+  }, [actions, selectedBookmarkIds]);
+
   const handleApplyAll = useCallback(async () => {
     try {
       const applied = await scan.applyEntirePlan();
@@ -485,7 +537,7 @@ export default function OrbitPage() {
   })();
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -608,7 +660,46 @@ export default function OrbitPage() {
                 onChangeView={handleOrbitViewChange}
                 viewMode={viewMode}
                 onChangeViewMode={setViewMode}
+                selectionMode={selectionMode}
+                onToggleSelectionMode={toggleSelectionMode}
               />
+
+              {selectionMode && selectedBookmarkIds.size > 0 && (
+                <div className="sticky top-[calc(var(--header-height)+8px)] z-[8] flex flex-wrap items-center gap-2 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))] px-4 py-2.5 shadow-xl backdrop-blur-md sm:px-5">
+                  <span className="text-xs font-medium text-white/80">
+                    {selectedBookmarkIds.size} selected
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={handleBulkAddTag}
+                    >
+                      <TagIcon className="size-3.5" />
+                      Tag
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      onClick={handleBulkAddToCollection}
+                    >
+                      <Folder className="size-3.5" />
+                      Collect
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1.5 text-white/70 hover:text-red-300"
+                      onClick={handleBulkDelete}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div
                 className={cn(
@@ -658,9 +749,14 @@ export default function OrbitPage() {
                       bookmark={bookmark}
                       viewMode={viewMode}
                       decision={scan.getDecision(bookmark.id)}
-                      selected={resolvedActiveBookmarkId === bookmark.id}
-                      selectionMode={false}
-                      applying={scan.applyingBookmarkId === bookmark.id}
+                      selected={
+                        selectionMode
+                          ? selectedBookmarkIds.has(bookmark.id)
+                          : resolvedActiveBookmarkId === bookmark.id
+                      }
+                      selectionMode={selectionMode}
+                      onSelectionChange={handleSelectionChange}
+                      applying={scan.applyingBookmarkId === bookmark.id || scan.applyingBatch}
                       searchQuery={search || undefined}
                       priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
                       onSelect={setActiveBookmarkId}
@@ -746,6 +842,8 @@ interface QueueHeaderProps {
   viewMode: ViewMode;
   onChangeView: (view: OrbitView) => void;
   onChangeViewMode: (mode: ViewMode) => void;
+  selectionMode: boolean;
+  onToggleSelectionMode: () => void;
 }
 
 function QueueHeader({
@@ -754,6 +852,8 @@ function QueueHeader({
   viewMode,
   onChangeView,
   onChangeViewMode,
+  selectionMode,
+  onToggleSelectionMode,
 }: QueueHeaderProps) {
   return (
     <section
@@ -826,6 +926,20 @@ function QueueHeader({
               </span>
             </button>
           </div>
+
+          <button
+            type="button"
+            aria-pressed={selectionMode}
+            onClick={onToggleSelectionMode}
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors",
+              selectionMode
+                ? "bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            )}
+          >
+            {selectionMode ? "Done" : "Select"}
+          </button>
 
           <div className="ml-auto flex items-center gap-0.5 rounded-xl border border-hairline-soft bg-surface-2 p-1 shadow-sm">
             {VIEW_MODE_OPTIONS.map(({ value, label, icon: Icon }) => (

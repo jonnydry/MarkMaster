@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 
 const SIGNAL_CHIPS = [
   "Find the signal",
@@ -34,13 +35,9 @@ const FEATURE_ROWS = [
   },
 ] as const;
 
-type OrbitalAuthExperienceProps = {
-  errorMessage?: string | null;
-};
-
 function XBrandIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="size-5 fill-current">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5 fill-current">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   );
@@ -48,10 +45,12 @@ function XBrandIcon() {
 
 export function OrbitalAuthExperience({
   errorMessage,
-}: OrbitalAuthExperienceProps) {
+}: {
+  errorMessage?: string | null;
+}) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#121315] text-[#f4f1ea] selection:bg-primary/30">
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="dark relative min-h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute left-[-140px] top-[140px] size-[520px] rounded-full blur-[18px]"
           style={{
@@ -68,7 +67,7 @@ export function OrbitalAuthExperience({
         />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1440px] items-center px-4 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-12">
+      <main className="relative mx-auto flex min-h-screen w-full max-w-[1440px] items-center px-4 py-6 sm:px-8 sm:py-8 lg:px-12 lg:py-12">
         <div className="grid w-full grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-9 xl:grid-cols-[minmax(0,1fr)_460px]">
           <section className="flex min-w-0 items-center lg:pr-4 xl:pr-10">
             <div className="w-full max-w-[700px]">
@@ -82,13 +81,13 @@ export function OrbitalAuthExperience({
                   />
 
                   <div className="space-y-3">
-                    <p className="max-w-[700px] text-[11px] uppercase tracking-[0.18em] text-[#e8ecf28a] sm:text-[13px] sm:leading-4">
+                    <p className="max-w-[700px] text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:text-[13px] sm:leading-4">
                       Bring your saved posts into orbit
                     </p>
-                    <h1 className="heading-font max-w-[700px] text-[3.25rem] leading-[0.98] font-semibold tracking-[-0.06em] text-[#f4f1ea] sm:text-[4.15rem] lg:text-[4.875rem] lg:leading-[5rem]">
+                    <h1 className="heading-font max-w-[700px] text-[3.25rem] leading-[0.98] font-semibold tracking-[-0.06em] text-foreground sm:text-[4.15rem] lg:text-[4.875rem] lg:leading-[5rem]">
                       MarkMaster: an orbital view of your X bookmarks.
                     </h1>
-                    <p className="max-w-[620px] text-lg leading-8 font-light text-[#eaeef4b8] sm:text-xl lg:text-[22px] lg:leading-[34px]">
+                    <p className="max-w-[620px] text-lg leading-8 font-light text-muted-foreground sm:text-xl lg:text-[22px] lg:leading-[34px]">
                       MarkMaster gives your X bookmarks an off-world home they
                       deserve, so the good ideas stay visible, searchable, and
                       easy to return to.
@@ -98,7 +97,7 @@ export function OrbitalAuthExperience({
                   {errorMessage && (
                     <div
                       role="alert"
-                      className="max-w-[620px] rounded-[20px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm leading-6 text-[#ffd4d4]"
+                      className="max-w-[620px] rounded-[20px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm leading-6 text-destructive"
                     >
                       {errorMessage}
                     </div>
@@ -108,7 +107,7 @@ export function OrbitalAuthExperience({
                     {SIGNAL_CHIPS.map((chip) => (
                       <div
                         key={chip}
-                        className="rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-[11px] text-[15px] leading-5 text-[#ecf0f5b8]"
+                        className="rounded-full border border-foreground/10 bg-foreground/5 px-4 py-[11px] text-[15px] leading-5 text-muted-foreground"
                       >
                         {chip}
                       </div>
@@ -119,17 +118,17 @@ export function OrbitalAuthExperience({
                 <div className="flex flex-col items-start gap-[18px]">
                   <Button
                     size="lg"
-                    className="h-14 rounded-full border-0 bg-[#4a7bff] px-6 text-base font-semibold text-[#f7f9fc] shadow-[0_14px_32px_rgba(74,123,255,0.28)] hover:bg-[#5b87ff]"
+                    className="h-14 rounded-full border-0 bg-primary px-6 text-base font-semibold text-primary-foreground shadow-[0_14px_32px_rgba(74,123,255,0.28)] hover:bg-primary/90"
                     onClick={() =>
-                      signIn("twitter", { callbackUrl: "/dashboard" })
+                      signIn(TWITTER_PROVIDER_ID, { callbackUrl: "/dashboard" })
                     }
                   >
                     <XBrandIcon />
                     Sign in with X
                   </Button>
 
-                  <p className="flex max-w-[520px] items-start gap-3 text-sm leading-5 text-[#eaeef49e]">
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#7ad6aae6]" />
+                  <p className="flex max-w-[520px] items-start gap-3 text-sm leading-5 text-muted-foreground">
+                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald" />
                     Read-only bookmark access. No posting permissions, no feed
                     clutter.
                   </p>
@@ -139,20 +138,20 @@ export function OrbitalAuthExperience({
           </section>
 
           <aside
-            className="hidden overflow-hidden rounded-[34px] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-[10px] lg:flex lg:flex-col"
+            className="hidden overflow-hidden rounded-[34px] border border-foreground/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-[10px] lg:flex lg:flex-col"
             style={{
               background:
                 "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)",
             }}
           >
-            <div className="border-b border-white/[0.06] px-[30px] py-[30px]">
-              <p className="text-[13px] uppercase tracking-[0.16em] text-[#ecf0f56b]">
+            <div className="border-b border-foreground/10 px-[30px] py-[30px]">
+              <p className="text-[13px] uppercase tracking-[0.16em] text-muted-foreground/60">
                 Why orbit works
               </p>
-              <h2 className="heading-font mt-[14px] max-w-[300px] text-[32px] leading-10 font-semibold text-[#f4f1ea]">
+              <h2 className="heading-font mt-[14px] max-w-[300px] text-[32px] leading-10 font-semibold text-foreground">
                 Your saves enter a working orbit.
               </h2>
-              <p className="mt-[14px] max-w-[340px] text-[15px] leading-6 text-[#ecf0f59e]">
+              <p className="mt-[14px] max-w-[340px] text-[15px] leading-6 text-muted-foreground/80">
                 Built for people who save too much to leave good ideas drifting
                 in the timeline.
               </p>
@@ -162,23 +161,23 @@ export function OrbitalAuthExperience({
               {FEATURE_ROWS.map((feature) => (
                 <div
                   key={feature.step}
-                  className="flex items-start gap-[18px] border-t border-white/[0.05] py-5"
+                  className="flex items-start gap-[18px] border-t border-foreground/10 py-5"
                 >
                   <div
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${
                       feature.emphasized
-                        ? "bg-[#4a7bff29] text-[#bfd0ff]"
-                        : "bg-white/[0.05] text-[#ecf0f5b3]"
+                        ? "bg-primary/20 text-primary/80"
+                        : "bg-foreground/5 text-muted-foreground"
                     }`}
                   >
                     {feature.step}
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="heading-font text-[18px] leading-[22px] font-semibold text-[#f4f1ea]">
+                    <h3 className="heading-font text-[18px] leading-[22px] font-semibold text-foreground">
                       {feature.title}
                     </h3>
-                    <p className="max-w-[300px] text-[15px] leading-6 text-[#ecf0f59e]">
+                    <p className="max-w-[300px] text-[15px] leading-6 text-muted-foreground/80">
                       {feature.description}
                     </p>
                   </div>
@@ -187,7 +186,7 @@ export function OrbitalAuthExperience({
             </div>
           </aside>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

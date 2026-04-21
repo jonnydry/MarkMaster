@@ -194,10 +194,23 @@ export function OrbitTriageCard({
               </div>
             </>
           ) : (
-            <p className="text-xs leading-snug text-white/60">
-              {decision.reasoning ||
-                "Grok was not confident — keep in Orbit or sort manually."}
-            </p>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs leading-snug text-white/60">
+                {decision.reasoning ||
+                  "Grok was not confident — keep in Orbit or sort manually."}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1.5 text-white/70 hover:bg-white/5 hover:text-white"
+                  disabled={applying}
+                  onClick={() => onKeepInOrbit?.(bookmark.id)}
+                >
+                  Keep in Orbit
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       )}
