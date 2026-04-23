@@ -21,6 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
+import {
+  bookmarkCollectionCardCellClassName,
+  bookmarkCollectionRowSyncedClassName,
+  bookmarkCollectionRowWithReorderClassName,
+  bookmarkFeedMaxWidthClassName,
+} from "@/lib/bookmark-feed-layout";
 import { invalidateCollectionQueries } from "@/lib/query-invalidation";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
@@ -208,7 +214,6 @@ export default function CollectionDetailPage({
     const toIndex = fromIndex + direction;
     if (toIndex < 0 || toIndex >= sortedItems.length) return;
 
-    const prevItems = sortedItems;
     setReordering(true);
     try {
       const next = [...sortedItems];
@@ -429,7 +434,12 @@ export default function CollectionDetailPage({
       <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-5">
         {collection.description && (
           <div className="border-b border-hairline-soft py-4">
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            <p
+              className={cn(
+                "mx-auto text-sm leading-6 text-muted-foreground",
+                bookmarkFeedMaxWidthClassName
+              )}
+            >
               {collection.description}
             </p>
           </div>
@@ -460,7 +470,15 @@ export default function CollectionDetailPage({
         ) : (
           <div>
             {sortedItems.map((item, index) => (
-              <div key={item.id} className="group flex gap-2 sm:gap-3">
+              <div
+                key={item.id}
+                className={cn(
+                  "group flex gap-2 sm:gap-3",
+                  isSyncedFromX
+                    ? bookmarkCollectionRowSyncedClassName
+                    : bookmarkCollectionRowWithReorderClassName
+                )}
+              >
                 {!isSyncedFromX && (
                   <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 sm:px-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                     <Button
@@ -487,7 +505,11 @@ export default function CollectionDetailPage({
                     </Button>
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
+                <div
+                  className={
+                    isSyncedFromX ? "min-w-0 flex-1" : bookmarkCollectionCardCellClassName
+                  }
+                >
                   <BookmarkCard
                     bookmark={item.bookmark}
                     viewMode="feed"

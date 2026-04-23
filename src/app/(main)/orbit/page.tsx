@@ -46,6 +46,10 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import {
+  bookmarkFeedColumnClassName,
+  bookmarkFeedMaxWidthClassName,
+} from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-grok";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
@@ -267,14 +271,44 @@ export default function OrbitPage() {
     () => bookmarks.map((b) => b.id),
     [bookmarks]
   );
-  const scanTargetCount = Math.min(
-    visibleBookmarkIds.length,
-    ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN
-  );
-  const scanTargetIds = useMemo(
+  const defaultScanTargetIds = useMemo(
     () => visibleBookmarkIds.slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
     [visibleBookmarkIds]
   );
+  const selectedScanTargetIds = useMemo(
+    () =>
+      Array.from(selectedBookmarkIds)
+        .filter((bookmarkId) => bookmarkById.has(bookmarkId))
+        .slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
+    [bookmarkById, selectedBookmarkIds]
+  );
+  const scanningSelection = selectionMode && selectedScanTargetIds.length > 0;
+  const scanTargetIds = scanningSelection
+    ? selectedScanTargetIds
+    : defaultScanTargetIds;
+  const scanTargetCount = scanTargetIds.length;
+  const queueBatchCount = defaultScanTargetIds.length;
+  const hasSelectionOverflow = selectedBookmarkIds.size > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN;
+  const scanHelperText = scanningSelection
+    ? hasSelectionOverflow
+      ? `Grok will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
+      : `Grok will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
+    : queueBatchCount > 0
+      ? `Grok suggests tags and destinations for ${queueBatchCount} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"}. Review each suggestion or apply the whole pass at once.`
+      : "Orbit is clear.";
+  const scanButtonLabel = scan.plan
+    ? scan.scanning
+      ? "Refreshing…"
+      : scanningSelection
+        ? "Refresh selection"
+        : "Refresh queue"
+    : scan.scanning
+      ? scanningSelection
+        ? "Categorizing selection…"
+        : "Categorizing queue…"
+      : scanningSelection
+        ? "Auto-categorize selection"
+        : "Auto-categorize queue";
 
   const resolvedActiveBookmarkId =
     activeBookmarkId && bookmarkById.has(activeBookmarkId)
@@ -379,8 +413,9 @@ export default function OrbitPage() {
     try {
       const result = await scan.scanNow(scanTargetIds);
       if (result) {
+        const scopeLabel = scanningSelection ? "selected" : "Orbit";
         toast.success(
-          `Grok scanned ${result.plan.suggestions.length} bookmark${
+          `Grok categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
             result.plan.suggestions.length === 1 ? "" : "s"
           }`
         );
@@ -388,7 +423,7 @@ export default function OrbitPage() {
     } catch {
       // Error state is surfaced via scan.error effect.
     }
-  }, [scan, scanTargetIds]);
+  }, [scan, scanTargetIds, scanningSelection]);
 
   const handleApplyPrimary = useCallback(
     async (bookmarkId: string) => {
@@ -588,7 +623,7 @@ export default function OrbitPage() {
                 aria-hidden
               />
               <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 max-w-3xl">
+                <div className={cn("min-w-0", bookmarkFeedMaxWidthClassName)}>
                   <p
                     className="text-[11px] font-medium uppercase tracking-[0.28em] text-sky-200/80"
                     style={MONO_STYLE}
@@ -598,10 +633,12 @@ export default function OrbitPage() {
                   <h1 className="mt-3 text-3xl font-semibold leading-[1.08] tracking-tight text-white sm:text-4xl lg:text-[2.75rem]">
                     Orbit makes the next move obvious.
                   </h1>
-                  <p className="mt-3 max-w-2xl text-sm text-white/70 sm:text-base">
-                    Scan the queue and Grok surfaces a primary landing path plus
-                    a single alternative for every bookmark — you stay in charge
-                    of every tap.
+                  <p className="mt-3 text-sm text-white/70 sm:text-base">
+                    Auto-categorize the queue with Grok, then review and apply
+                    the full pass in one step.
+                  </p>
+                  <p className="mt-2 text-xs text-white/55 sm:text-sm">
+                    {scanHelperText}
                   </p>
                 </div>
 
@@ -617,13 +654,7 @@ export default function OrbitPage() {
                     ) : (
                       <Sparkles className="size-4" />
                     )}
-                    {scan.plan
-                      ? scan.scanning
-                        ? "Rescanning…"
-                        : "Rescan with Grok"
-                      : scan.scanning
-                        ? "Scanning Orbit…"
-                        : `Scan ${scanTargetCount} with Grok`}
+                    {scanButtonLabel}
                   </Button>
 
                   <Link
@@ -646,6 +677,7 @@ export default function OrbitPage() {
               planSummary={planSummary}
               focus={focusStripFocus}
               scanTargetCount={scanTargetCount}
+              scanningSelection={scanningSelection}
               stickyTopOffset={pageHeaderHeight}
               onScan={handleScan}
               onRescan={handleScan}
@@ -653,7 +685,7 @@ export default function OrbitPage() {
               onOpenMap={handleOpenMap}
             />
 
-            <section className="mx-auto flex w-full max-w-2xl flex-col gap-3">
+            <section className={cn(bookmarkFeedColumnClassName, "flex flex-col gap-3")}>
               <QueueHeader
                 orbitView={orbitView}
                 total={total}
@@ -670,6 +702,20 @@ export default function OrbitPage() {
                     {selectedBookmarkIds.size} selected
                   </span>
                   <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 border-sky-400/20 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15"
+                      onClick={handleScan}
+                      disabled={scan.scanning || scanTargetIds.length === 0}
+                    >
+                      {scan.scanning ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3.5" />
+                      )}
+                      Auto-categorize selection
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -703,7 +749,7 @@ export default function OrbitPage() {
 
               <div
                 className={cn(
-                  "relative overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  "relative w-full overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
                   appChromeFrostedClassName
                 )}
               >
@@ -874,6 +920,10 @@ function QueueHeader({
             {orbitView === "recent"
               ? "Freshest bookmarks still in orbit"
               : "All unaffiliated bookmarks"}
+          </p>
+          <p className="mt-1 text-xs text-white/55">
+            Auto-categorize the queue by default, or switch to Select for a
+            smaller review batch.
           </p>
         </div>
 

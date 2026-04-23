@@ -27,6 +27,7 @@ export interface OrbitFocusStripProps {
     predictedAnchorAvailable: boolean;
   } | null;
   scanTargetCount: number;
+  scanningSelection: boolean;
   onScan: () => void;
   onRescan: () => void;
   onApplyAll: () => void;
@@ -67,6 +68,7 @@ export function OrbitFocusStrip({
   planSummary,
   focus,
   scanTargetCount,
+  scanningSelection,
   onScan,
   onRescan,
   onApplyAll,
@@ -94,6 +96,7 @@ export function OrbitFocusStrip({
           applying={applying}
           planSummary={planSummary}
           scanTargetCount={scanTargetCount}
+          scanningSelection={scanningSelection}
           onScan={onScan}
           onRescan={onRescan}
           onApplyAll={onApplyAll}
@@ -128,6 +131,7 @@ interface ScanSlotProps {
   applying: boolean;
   planSummary: { scanned: number; remaining: number } | null;
   scanTargetCount: number;
+  scanningSelection: boolean;
   onScan: () => void;
   onRescan: () => void;
   onApplyAll: () => void;
@@ -138,6 +142,7 @@ function ScanSlot({
   applying,
   planSummary,
   scanTargetCount,
+  scanningSelection,
   onScan,
   onRescan,
   onApplyAll,
@@ -154,9 +159,9 @@ function ScanSlot({
           </p>
           <p className="mt-0.5 truncate text-sm text-white/80">
             {scanTargetCount > 0
-              ? `${scanTargetCount} bookmark${
+              ? `${scanTargetCount} ${scanningSelection ? "selected " : ""}bookmark${
                   scanTargetCount === 1 ? "" : "s"
-                } in the queue`
+                }${scanningSelection ? "" : " in the queue"}`
               : "Queue is clear"}
           </p>
         </div>
@@ -171,7 +176,11 @@ function ScanSlot({
           ) : (
             <Sparkles className="size-3.5" />
           )}
-          {scanning ? "Scanning…" : "Scan with Grok"}
+          {scanning
+            ? "Categorizing…"
+            : scanningSelection
+              ? "Auto-categorize selection"
+              : "Auto-categorize queue"}
         </Button>
       </div>
     );
@@ -211,7 +220,7 @@ function ScanSlot({
           ) : (
             <Sparkles className="size-3.5" />
           )}
-          Rescan
+          Refresh
         </Button>
         <Button
           size="sm"
@@ -224,7 +233,7 @@ function ScanSlot({
           ) : (
             <Sparkles className="size-3.5" />
           )}
-          Apply all
+          Apply all reviewed suggestions
         </Button>
       </div>
     </div>

@@ -28,6 +28,7 @@ import type {
   BookmarkWithRelations,
   MediaFilter,
 } from "@/types";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { DashboardEmptyState } from "./dashboard-empty-state";
@@ -521,7 +522,8 @@ function DashboardContent() {
             <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
               <div
                 className={cn(
-                  "relative z-10 mx-auto max-w-2xl overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  "relative z-10 overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  bookmarkFeedColumnClassName,
                   appChromeFrostedClassName
                 )}
               >
@@ -539,16 +541,20 @@ function DashboardContent() {
           {isLoading ? (
             <DashboardSkeleton viewMode={viewMode} />
           ) : isError ? (
-            <DashboardErrorState
-              message={error instanceof Error ? error.message : undefined}
-              onRetry={() => refetch()}
-            />
+            <div className={bookmarkFeedColumnClassName}>
+              <DashboardErrorState
+                message={error instanceof Error ? error.message : undefined}
+                onRetry={() => refetch()}
+              />
+            </div>
           ) : bookmarks.length === 0 ? (
-            <DashboardEmptyState
-              search={filters.search}
-              hasActiveFilters={filters.hasActiveFilters}
-              onClearFilters={filters.clearFilters}
-            />
+            <div className={bookmarkFeedColumnClassName}>
+              <DashboardEmptyState
+                search={filters.search}
+                hasActiveFilters={filters.hasActiveFilters}
+                onClearFilters={filters.clearFilters}
+              />
+            </div>
           ) : (
             <BookmarkList
               bookmarks={bookmarks}
@@ -568,11 +574,13 @@ function DashboardContent() {
             />
           )}
 
-          <PaginationBar
-            page={filters.page}
-            totalPages={totalPages}
-            onPageChange={filters.setPage}
-          />
+          <div className={bookmarkFeedColumnClassName}>
+            <PaginationBar
+              page={filters.page}
+              totalPages={totalPages}
+              onPageChange={filters.setPage}
+            />
+          </div>
         </div>
       </div>
 

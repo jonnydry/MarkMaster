@@ -1,4 +1,5 @@
 import { BookmarkCard } from "@/components/bookmark-card";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
 
@@ -16,7 +17,7 @@ interface BookmarkListProps {
   onAddTag: (id: string) => void;
   onAddToCollection: (id: string) => void;
   onAddNote: (id: string) => void;
-  onDelete: (ids: string[]) => void;
+  onDelete: (bookmarkIds: string | string[]) => void;
 }
 
 export function BookmarkList({
@@ -57,7 +58,7 @@ export function BookmarkList({
             onAddTag={onAddTag}
             onAddToCollection={onAddToCollection}
             onAddNote={onAddNote}
-            onDelete={onDelete}
+            onDelete={(id) => onDelete(id)}
             className={getStaggerClass(i, "animate-fade-in-up")}
           />
         ))}
@@ -66,7 +67,7 @@ export function BookmarkList({
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className={bookmarkFeedColumnClassName}>
       {bookmarks.map((bookmark, i) => (
         <BookmarkCard
           key={bookmark.id}
@@ -86,7 +87,7 @@ export function BookmarkList({
           onAddTag={onAddTag}
           onAddToCollection={onAddToCollection}
           onAddNote={onAddNote}
-          onDelete={onDelete}
+          onDelete={(id) => onDelete(id)}
           className={getStaggerClass(i, "animate-fade-in")}
         />
       ))}

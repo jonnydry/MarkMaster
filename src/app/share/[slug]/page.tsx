@@ -8,6 +8,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { cn } from "@/lib/utils";
 
 const getPublicCollection = cache(async (slug: string) => {
   return prisma.collection.findFirst({
@@ -90,7 +92,12 @@ export default async function PublicSharePage({
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div
+          className={cn(
+            bookmarkFeedColumnClassName,
+            "flex h-14 items-center justify-between px-6"
+          )}
+        >
           <Link href="/" className="flex items-center gap-2">
             <MarkMasterLogo width={28} height={28} className="shrink-0" />
             <span className="font-bold tracking-tight">MarkMaster</span>
@@ -103,7 +110,7 @@ export default async function PublicSharePage({
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8">
+      <main className={cn(bookmarkFeedColumnClassName, "px-6 py-8")}>
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             {collection.user.profileImageUrl && (
@@ -213,7 +220,7 @@ export default async function PublicSharePage({
       </main>
 
       <footer className="border-t border-border py-8 px-6 mt-12">
-        <div className="max-w-3xl mx-auto text-center">
+        <div className={cn(bookmarkFeedColumnClassName, "text-center")}>
           <p className="text-sm text-muted-foreground mb-4">
             Curated with MarkMaster
           </p>

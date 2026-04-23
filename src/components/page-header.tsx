@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
@@ -60,7 +61,8 @@ export function PageHeader({
                 {description ? (
                   <p
                     className={cn(
-                      "mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm",
+                      "mt-1 text-xs text-muted-foreground sm:text-sm",
+                      bookmarkFeedMaxWidthClassName,
                       descriptionClassName
                     )}
                   >

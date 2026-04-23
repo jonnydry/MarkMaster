@@ -16,6 +16,7 @@ import {
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -584,8 +585,8 @@ export const BookmarkCard = memo(function BookmarkCard({
                       height={m.height || 900}
                       sizes={
                         mediaItems.length === 1
-                          ? "(max-width: 768px) 100vw, 672px"
-                          : "(max-width: 768px) 50vw, 336px"
+                          ? `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`
+                          : `(max-width: 768px) 50vw, ${Math.round(BOOKMARK_FEED_MAX_WIDTH_PX / 2)}px`
                       }
                       className={`w-full object-cover ${
                         mediaItems.length === 1 ? "max-h-80" : "aspect-square"

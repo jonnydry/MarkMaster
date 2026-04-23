@@ -1,4 +1,6 @@
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { getStaggerClass } from "@/lib/stagger";
+import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";
 
 interface DashboardSkeletonProps {
@@ -31,7 +33,12 @@ export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-0" role="status" aria-live="polite" aria-label="Loading bookmarks">
+    <div
+      className={cn(bookmarkFeedColumnClassName, "space-y-0")}
+      role="status"
+      aria-live="polite"
+      aria-label="Loading bookmarks"
+    >
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
