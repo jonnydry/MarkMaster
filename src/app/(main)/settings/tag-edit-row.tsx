@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useEffect } from "react";
+import React, { useRef, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRESET_COLORS } from "@/lib/constants";
@@ -51,11 +51,6 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setName(initialName);
-    setColor(initialColor);
-  }, [initialName, initialColor]);
 
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {

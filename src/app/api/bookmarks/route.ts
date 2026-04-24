@@ -77,6 +77,7 @@ function buildSlowPathWhereSql({
   dateFrom,
   dateTo,
   collectionId,
+  bookmarkId,
   mediaFilter,
   unaffiliated,
 }: {
@@ -87,6 +88,7 @@ function buildSlowPathWhereSql({
   dateFrom?: string;
   dateTo?: string;
   collectionId?: string;
+  bookmarkId?: string;
   mediaFilter: "all" | "images" | "video" | "links" | "text-only";
   unaffiliated: boolean;
 }) {
@@ -129,6 +131,10 @@ function buildSlowPathWhereSql({
 
   if (dateTo) {
     conditions.push(Prisma.sql`b."tweetCreatedAt" < ${getNextDateStart(dateTo)}`);
+  }
+
+  if (bookmarkId) {
+    conditions.push(Prisma.sql`b."id" = ${bookmarkId}`);
   }
 
   if (collectionId) {
@@ -211,6 +217,7 @@ export async function GET(req: NextRequest) {
     tagFilter,
     dateFrom,
     dateTo,
+    bookmarkId,
     collectionId,
     unaffiliated,
   } = parsed.data;
@@ -241,6 +248,10 @@ export async function GET(req: NextRequest) {
     where.tweetCreatedAt = {};
     if (dateFrom) where.tweetCreatedAt.gte = getDateStart(dateFrom);
     if (dateTo) where.tweetCreatedAt.lt = getNextDateStart(dateTo);
+  }
+
+  if (bookmarkId) {
+    where.id = bookmarkId;
   }
 
   if (collectionId) {
@@ -310,6 +321,7 @@ export async function GET(req: NextRequest) {
     dateFrom,
     dateTo,
     collectionId,
+    bookmarkId,
     mediaFilter,
     unaffiliated,
   });

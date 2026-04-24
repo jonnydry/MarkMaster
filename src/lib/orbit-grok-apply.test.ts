@@ -219,6 +219,69 @@ describe("applyOrbitScanPlan", () => {
     expect(createManyArgs?.data).toEqual([{ bookmarkId: "b1", tagId: "t-existing" }]);
   });
 
+  it("assigns tags whose normalized names contain colons", async () => {
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+
+    const mockTx = {
+      tag: {
+        create: vi.fn().mockResolvedValue({
+          id: "t-http-caching",
+          name: "HTTP: Caching",
+          color: "#22c55e",
+        }),
+      },
+      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      collection: { create: vi.fn() },
+      collectionItem: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
+      fn(mockTx as never)
+    );
+
+    const plan = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "s",
+        taggingStrategy: "t",
+        collectionStrategy: "c",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "r",
+          tags: [
+            {
+              name: "HTTP: Caching",
+              color: "#22c55e",
+              reason: "topic",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const result = await applyOrbitScanPlan({
+      userId: "u1",
+      plan,
+      createCollections: true,
+    });
+
+    expect(result.tagAssignments).toBe(1);
+
+    const createManyArgs = vi.mocked(mockTx.bookmarkTag.createMany).mock.calls[0]?.[0];
+    expect(createManyArgs?.data).toEqual([
+      { bookmarkId: "b1", tagId: "t-http-caching" },
+    ]);
+  });
+
   it("appends a single bookmark to an existing collection instead of skipping it", async () => {
     vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);

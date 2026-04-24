@@ -68,10 +68,6 @@ export function CommandPalette({
   }, [query, tags, filteredTags]);
 
   useEffect(() => {
-    setFocusedIndex(-1);
-  }, [query]);
-
-  useEffect(() => {
     if (focusedIndex >= 0) {
       const el = document.getElementById(`cmd-item-${focusedIndex}`);
       el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -95,6 +91,14 @@ export function CommandPalette({
       onOpenChange(nextOpen);
     },
     [onOpenChange]
+  );
+
+  const handleQueryChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setQuery(e.target.value);
+      setFocusedIndex(-1);
+    },
+    []
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -143,7 +147,7 @@ export function CommandPalette({
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleQueryChange}
             placeholder="Search or type a command..."
             className="border-0 p-0 h-auto text-sm bg-transparent placeholder:text-muted-foreground/50 focus:ring-0 focus:outline-none"
             autoFocus

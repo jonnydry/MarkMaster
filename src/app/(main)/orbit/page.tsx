@@ -45,7 +45,7 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-grok";
+import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { getStaggerClass } from "@/lib/stagger";
 import { cn } from "@/lib/utils";

@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { CheckSquare, SlidersHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -163,7 +162,14 @@ function DashboardContent() {
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
-  const { setSelectedTags, setPage, setMediaFilter, setAuthorFilter } = filters;
+  const {
+    setSelectedTags,
+    setPage,
+    setMediaFilter,
+    setAuthorFilter,
+    setCollectionId,
+    setBookmarkId,
+  } = filters;
   const visibleBookmarkIdSet = useMemo(
     () => new Set(bookmarks.map((bookmark) => bookmark.id)),
     [bookmarks]
@@ -210,9 +216,13 @@ function DashboardContent() {
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
   const authorFromUrl = searchParams.get("author");
+  const collectionFromUrl = searchParams.get("collection");
+  const bookmarkFromUrl = searchParams.get("bookmark");
   const tagFromUrlRef = useRef<string | null>(null);
   const tagsFromUrlRef = useRef<string | null>(null);
   const authorFromUrlRef = useRef<string | null>(null);
+  const collectionFromUrlRef = useRef<string | null>(null);
+  const bookmarkFromUrlRef = useRef<string | null>(null);
   useEffect(() => {
     if (tagsFromUrl && tagsFromUrl !== tagsFromUrlRef.current) {
       const next = tagsFromUrl.split(",").filter(Boolean);
@@ -225,14 +235,34 @@ function DashboardContent() {
     if (authorFromUrl !== authorFromUrlRef.current) {
       setAuthorFilter(authorFromUrl ? authorFromUrl.replace(/^@/, "") : "");
     }
+    if (collectionFromUrl !== collectionFromUrlRef.current) {
+      setCollectionId(collectionFromUrl ?? "");
+    }
+    if (bookmarkFromUrl !== bookmarkFromUrlRef.current) {
+      setBookmarkId(bookmarkFromUrl ?? "");
+    }
     tagFromUrlRef.current = tagFromUrl;
     tagsFromUrlRef.current = tagsFromUrl;
     authorFromUrlRef.current = authorFromUrl;
-  }, [tagFromUrl, tagsFromUrl, authorFromUrl, setPage, setSelectedTags, setAuthorFilter]);
+    collectionFromUrlRef.current = collectionFromUrl;
+    bookmarkFromUrlRef.current = bookmarkFromUrl;
+  }, [
+    tagFromUrl,
+    tagsFromUrl,
+    authorFromUrl,
+    collectionFromUrl,
+    bookmarkFromUrl,
+    setPage,
+    setSelectedTags,
+    setAuthorFilter,
+    setCollectionId,
+    setBookmarkId,
+  ]);
 
+  const activeBookmarkIdForView = filters.bookmarkId || activeBookmarkId;
   const activeBookmark = useMemo(
-    () => bookmarks.find((b) => b.id === activeBookmarkId),
-    [bookmarks, activeBookmarkId]
+    () => bookmarks.find((b) => b.id === activeBookmarkIdForView),
+    [bookmarks, activeBookmarkIdForView]
   );
 
   const clearSelection = useCallback(() => {
@@ -301,18 +331,18 @@ function DashboardContent() {
   }, []);
 
   useKeyboardShortcuts({
-    activeBookmarkId: selectionMode ? null : activeBookmarkId,
+    activeBookmarkId: selectionMode ? null : activeBookmarkIdForView,
     bookmarks: selectionMode ? [] : bookmarks,
     onNavigate: setActiveBookmarkId,
     onSearch: () => searchInputRef.current?.focus(),
     onTag: () => {
-      if (!activeBookmarkId) return;
-      setTagTargetIds([activeBookmarkId]);
+      if (!activeBookmarkIdForView) return;
+      setTagTargetIds([activeBookmarkIdForView]);
       setTagDialogOpen(true);
     },
     onCollection: () => {
-      if (!activeBookmarkId) return;
-      setCollectionTargetIds([activeBookmarkId]);
+      if (!activeBookmarkIdForView) return;
+      setCollectionTargetIds([activeBookmarkIdForView]);
       setCollectionDialogOpen(true);
     },
     onNote: () => setNoteDialogOpen(true),
@@ -563,7 +593,7 @@ function DashboardContent() {
               aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
               selectionMode={selectionMode}
               selectedBookmarkIdSet={selectedBookmarkIdSet}
-              activeBookmarkId={activeBookmarkId}
+              activeBookmarkId={activeBookmarkIdForView}
               onSelect={setActiveBookmarkId}
               onSelectionChange={toggleBookmarkSelection}
               onTagClick={filters.toggleTag}
@@ -602,7 +632,7 @@ function DashboardContent() {
       <AddNoteDialog
         open={noteDialogOpen}
         onOpenChange={setNoteDialogOpen}
-        bookmarkId={activeBookmarkId}
+        bookmarkId={activeBookmarkIdForView}
         existingNote={activeBookmark ? activeBookmark.notes[0]?.content : undefined}
         onSave={actions.handleAddNote}
       />

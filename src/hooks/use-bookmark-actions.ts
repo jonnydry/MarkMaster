@@ -11,10 +11,6 @@ function asBookmarkIds(bookmarkIds: string | string[]) {
   return Array.isArray(bookmarkIds) ? bookmarkIds : [bookmarkIds];
 }
 
-function getBookmarkLabel(count: number) {
-  return `${count} bookmark${count === 1 ? "" : "s"}`;
-}
-
 type BookmarkQueryData = {
   bookmarks: BookmarkWithRelations[];
   total: number;

@@ -74,11 +74,20 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
+const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> = new Set([
+  "tag",
+  "collection",
+  "bookmark",
+  "core",
+  "overflow",
+]);
+
 export default function OrbitMapPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusBookmarkIdParam = searchParams?.get("focus") ?? null;
   const focusAnchorIdParam = searchParams?.get("anchor") ?? null;
+  const assignmentBookmarkIdParam = searchParams?.get("bookmark") ?? null;
   const { data: session } = useSession();
   const actions = useBookmarkActions();
   const { createCollection, createCollectionQuick } = useCreateCollection();
@@ -89,13 +98,11 @@ export default function OrbitMapPage() {
   const selectIdParam = searchParams?.get("select") ?? null;
   const selectKindParam = searchParams?.get("kind") ?? null;
 
-  const initialSelection = useMemo<OrbitMapSelection | null>(() => {
+  const selection = useMemo<OrbitMapSelection | null>(() => {
     if (
       selectIdParam &&
       selectKindParam &&
-      ["tag", "collection", "bookmark", "core", "overflow"].includes(
-        selectKindParam
-      )
+      MAP_SELECTION_KINDS.has(selectKindParam as OrbitMapSelection["kind"])
     ) {
       return { kind: selectKindParam as OrbitMapSelection["kind"], id: selectIdParam };
     }
@@ -103,27 +110,29 @@ export default function OrbitMapPage() {
       return { kind: "bookmark", id: focusBookmarkIdParam };
     }
     return null;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [selection, setSelection] = useState<OrbitMapSelection | null>(
-    initialSelection
-  );
+  }, [focusBookmarkIdParam, selectIdParam, selectKindParam]);
   const [hoverSelection, setHoverSelection] =
     useState<OrbitMapSelection | null>(null);
 
   const handleSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
-      setSelection(next);
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (next) {
         params.set("select", next.id);
         params.set("kind", next.kind);
+        if (next.kind === "bookmark") {
+          params.set("bookmark", next.id);
+        }
       } else {
         params.delete("select");
         params.delete("kind");
+        params.delete("bookmark");
       }
       // Preserve focus/anchor params; remove select when clearing.
-      router.replace(`/orbit/map?${params.toString()}`, { scroll: false });
+      const query = params.toString();
+      router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
+        scroll: false,
+      });
     },
     [router, searchParams]
   );
@@ -153,9 +162,9 @@ export default function OrbitMapPage() {
   }, [activeSelection, graph]);
 
   const selectedBookmarkId = useMemo(() => {
-    if (!selection || selection.kind !== "bookmark") return null;
-    return selection.id;
-  }, [selection]);
+    if (selection?.kind === "bookmark") return selection.id;
+    return assignmentBookmarkIdParam ?? focusBookmarkIdParam;
+  }, [assignmentBookmarkIdParam, focusBookmarkIdParam, selection]);
 
   const focus: OrbitMapFocus | null = useMemo(() => {
     if (!focusBookmarkIdParam || !focusAnchorIdParam) return null;
@@ -480,6 +489,7 @@ export default function OrbitMapPage() {
               data={graph}
               selection={selection}
               hoverSelection={hoverSelection}
+              selectedBookmarkId={selectedBookmarkId}
               focusedBookmark={null}
               focusedBookmarkLoading={false}
               onAssign={handleAssign}

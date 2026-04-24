@@ -8,7 +8,7 @@ import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
 } from "@/lib/orbit-decision";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-grok";
+import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
   OrbitApplyResult,

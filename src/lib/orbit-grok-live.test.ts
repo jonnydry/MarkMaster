@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { scanOrbitBookmarksWithXai } from "@/lib/orbit-grok";
 
-const LIVE = Boolean(process.env.XAI_API_KEY?.trim());
+const LIVE =
+  process.env.RUN_LIVE_XAI_TESTS === "1" &&
+  Boolean(process.env.XAI_API_KEY?.trim());
 
 describe.skipIf(!LIVE)("scanOrbitBookmarksWithXai (live xAI)", () => {
   it("returns a validated plan from the real Responses API", async () => {

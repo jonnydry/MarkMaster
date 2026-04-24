@@ -1,6 +1,9 @@
+import "server-only";
+
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRESET_COLORS } from "@/lib/constants";
+import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import type {
   OrbitApplyResult,
   OrbitCollectionRollup,
@@ -12,8 +15,6 @@ import type {
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
 const DEFAULT_XAI_MODEL = "grok-4.20-reasoning";
 
-/** Upper bound for bookmarks sent to xAI per Orbit scan (prompt size + API limits). */
-export const ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN = 24;
 const MAX_TEXT_LENGTH = 1_200;
 const MAX_NOTE_LENGTH = 400;
 const MAX_URLS_PER_BOOKMARK = 3;
@@ -948,20 +949,22 @@ export async function applyOrbitScanPlan(args: {
     }
 
     if (tagAssignments.length > 0) {
-      const assignmentRows = Array.from(
-        new Set(tagAssignments.map((assignment) => `${assignment.bookmarkId}:${assignment.tagKey}`))
-      )
-        .map((compoundKey) => {
-          const [bookmarkId, tagKey] = compoundKey.split(":");
-          const tag = tagMap.get(tagKey);
-          if (!tag) return null;
+      const seenAssignments = new Set<string>();
+      const assignmentRows: Array<{ bookmarkId: string; tagId: string }> = [];
 
-          return {
-            bookmarkId,
-            tagId: tag.id,
-          };
-        })
-        .filter(Boolean) as Array<{ bookmarkId: string; tagId: string }>;
+      for (const assignment of tagAssignments) {
+        const tag = tagMap.get(assignment.tagKey);
+        if (!tag) continue;
+
+        const assignmentKey = `${assignment.bookmarkId}\0${tag.id}`;
+        if (seenAssignments.has(assignmentKey)) continue;
+
+        seenAssignments.add(assignmentKey);
+        assignmentRows.push({
+          bookmarkId: assignment.bookmarkId,
+          tagId: tag.id,
+        });
+      }
 
       if (assignmentRows.length > 0) {
         const createManyResult = await tx.bookmarkTag.createMany({

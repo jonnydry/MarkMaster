@@ -94,6 +94,7 @@ export const bookmarksQuerySchema = z
     tagFilter: z.string().default(""),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),
+    bookmarkId: z.string().optional(),
     collectionId: z.string().optional(),
     unaffiliated: booleanQueryFlagSchema,
   })

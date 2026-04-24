@@ -27,6 +27,7 @@ interface OrbitMapRailProps {
   data: OrbitGraphPayload;
   selection: OrbitMapSelection | null;
   hoverSelection: OrbitMapSelection | null;
+  selectedBookmarkId: string | null;
   focusedBookmark: BookmarkWithRelations | null;
   focusedBookmarkLoading: boolean;
   onAssign: () => void;
@@ -91,6 +92,7 @@ export function OrbitMapRail({
   data,
   selection,
   hoverSelection,
+  selectedBookmarkId,
   focusedBookmark,
   focusedBookmarkLoading,
   onAssign,
@@ -115,6 +117,7 @@ export function OrbitMapRail({
           focusedBookmark={focusedBookmark}
           focusedBookmarkLoading={focusedBookmarkLoading}
           hasExplicitSelection={Boolean(selection)}
+          selectedBookmarkId={selectedBookmarkId}
           connected={connected}
           onAssign={onAssign}
           onAddTag={onAddTag}
@@ -160,6 +163,7 @@ interface SelectedClusterBodyProps {
   focusedBookmark: BookmarkWithRelations | null;
   focusedBookmarkLoading: boolean;
   hasExplicitSelection: boolean;
+  selectedBookmarkId: string | null;
   connected: OrbitGraphNode[];
   onAssign: () => void;
   onAddTag: () => void;
@@ -174,6 +178,7 @@ function SelectedClusterBody({
   focusedBookmark,
   focusedBookmarkLoading,
   hasExplicitSelection,
+  selectedBookmarkId,
   connected,
   onAssign,
   onAddTag,
@@ -256,7 +261,7 @@ function SelectedClusterBody({
             size="sm"
             className="h-9 gap-1.5 bg-white text-slate-950 hover:bg-white/90"
             onClick={onAssign}
-            disabled={!hasExplicitSelection}
+            disabled={!selectedBookmarkId}
           >
             <Crosshair className="size-4" />
             Assign
@@ -266,7 +271,7 @@ function SelectedClusterBody({
             variant="outline"
             className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
             onClick={onAddTag}
-            disabled={!hasExplicitSelection}
+            disabled={!selectedBookmarkId}
           >
             <TagIcon className="size-4" />
             Tag
@@ -315,7 +320,7 @@ function SelectedClusterBody({
             size="sm"
             className="h-9 gap-1.5 bg-white text-slate-950 hover:bg-white/90"
             onClick={onAssign}
-            disabled={!hasExplicitSelection || node.variant === "x_folder"}
+            disabled={!selectedBookmarkId || node.variant === "x_folder"}
             title={
               node.variant === "x_folder"
                 ? "X folders are read-only"
@@ -330,7 +335,7 @@ function SelectedClusterBody({
             variant="outline"
             className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
             onClick={onAddToCollection}
-            disabled={!hasExplicitSelection || node.variant === "x_folder"}
+            disabled={!selectedBookmarkId || node.variant === "x_folder"}
           >
             <Folder className="size-4" />
             Collect
@@ -539,5 +544,4 @@ function RailMetric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
 

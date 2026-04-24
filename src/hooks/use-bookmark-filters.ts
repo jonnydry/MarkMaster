@@ -16,6 +16,8 @@ export function useBookmarkFilters() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [collectionId, setCollectionId] = useState("");
+  const [bookmarkId, setBookmarkId] = useState("");
   const [page, setPage] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -53,8 +55,18 @@ export function useBookmarkFilters() {
       authorFilter !== "" ||
       dateFrom !== "" ||
       dateTo !== "" ||
-      selectedTags.length > 0,
-    [mediaFilter, authorFilter, dateFrom, dateTo, selectedTags]
+      selectedTags.length > 0 ||
+      collectionId !== "" ||
+      bookmarkId !== "",
+    [
+      mediaFilter,
+      authorFilter,
+      dateFrom,
+      dateTo,
+      selectedTags,
+      collectionId,
+      bookmarkId,
+    ]
   );
 
   const clearFilters = useCallback(() => {
@@ -63,6 +75,8 @@ export function useBookmarkFilters() {
     setDateFrom("");
     setDateTo("");
     setSelectedTags([]);
+    setCollectionId("");
+    setBookmarkId("");
     resetPage();
   }, [resetPage]);
 
@@ -78,8 +92,22 @@ export function useBookmarkFilters() {
       tagFilter: selectedTags.join(","),
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
+      ...(collectionId && { collectionId }),
+      ...(bookmarkId && { bookmarkId }),
     }).toString();
-  }, [page, debouncedSearch, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
+  }, [
+    page,
+    debouncedSearch,
+    sortField,
+    sortDirection,
+    mediaFilter,
+    authorFilter,
+    selectedTags,
+    dateFrom,
+    dateTo,
+    collectionId,
+    bookmarkId,
+  ]);
 
   const setSortFieldWrapped = useCallback(
     (v: SortField) => {
@@ -137,6 +165,22 @@ export function useBookmarkFilters() {
     [resetPage]
   );
 
+  const setCollectionIdWrapped = useCallback(
+    (v: string) => {
+      setCollectionId(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setBookmarkIdWrapped = useCallback(
+    (v: string) => {
+      setBookmarkId(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
   return useMemo(
     () => ({
       search,
@@ -155,6 +199,10 @@ export function useBookmarkFilters() {
       setDateTo: setDateToWrapped,
       selectedTags,
       setSelectedTags: setSelectedTagsWrapped,
+      collectionId,
+      setCollectionId: setCollectionIdWrapped,
+      bookmarkId,
+      setBookmarkId: setBookmarkIdWrapped,
       page,
       setPage,
       toggleTag,
@@ -180,6 +228,10 @@ export function useBookmarkFilters() {
       setDateToWrapped,
       selectedTags,
       setSelectedTagsWrapped,
+      collectionId,
+      setCollectionIdWrapped,
+      bookmarkId,
+      setBookmarkIdWrapped,
       page,
       toggleTag,
       hasActiveFilters,

@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Download,
-  Trash2,
   Sun,
   Moon,
   Tag,
@@ -58,7 +57,6 @@ export default function SettingsPage() {
 
   const {
     data: collections = [],
-    isLoading: collectionsLoading,
     isError: collectionsError,
     error: collectionsErrorValue,
     refetch: refetchCollections,

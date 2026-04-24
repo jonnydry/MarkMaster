@@ -150,14 +150,6 @@ function getNodeIdentity(node: OrbitGraphNode): OrbitMapSelection {
   }
 }
 
-function sameSelection(
-  a: OrbitMapSelection | null,
-  b: OrbitMapSelection | null
-) {
-  if (!a || !b) return a === b;
-  return a.kind === b.kind && a.id === b.id;
-}
-
 function normalizeLinkEndpoint(
   value: NodeDatum | string | number | undefined
 ): NodeDatum | null {
@@ -494,10 +486,6 @@ export const OrbitMapCanvas = forwardRef<
     canvas.height = size.height * dpr;
     canvas.style.width = `${size.width}px`;
     canvas.style.height = `${size.height}px`;
-
-    const hasActiveAnimation = () => {
-      return nodesRef.current.some((n) => n.assignAnimation !== undefined);
-    };
 
     const hasActiveSimulation = () => {
       const sim = simulationRef.current;
