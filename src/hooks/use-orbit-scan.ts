@@ -35,6 +35,10 @@ export interface OrbitScanHandle extends OrbitScanState {
     bookmarkId: string,
     variant: "primary" | "alt"
   ) => Promise<OrbitApplyResult | null>;
+  applyReviewedPlan: (
+    reviewedPlan: OrbitScanPlan,
+    opts?: { createCollections?: boolean }
+  ) => Promise<OrbitApplyResult | null>;
   applyEntirePlan: (opts?: {
     createCollections?: boolean;
   }) => Promise<OrbitApplyResult | null>;
@@ -205,6 +209,72 @@ export function useOrbitScan(): OrbitScanHandle {
     [plan, dismissed, queryClient]
   );
 
+  const applyReviewedPlan = useCallback(
+    async (
+      reviewedPlan: OrbitScanPlan,
+      opts?: { createCollections?: boolean }
+    ) => {
+      if (!plan) return null;
+
+      const scannedBookmarkIdsForPlan = new Set(
+        plan.plan.suggestions.map((suggestion) => suggestion.bookmarkId)
+      );
+      const reviewedBookmarkIds = Array.from(
+        new Set(
+          reviewedPlan.suggestions.map((suggestion) => suggestion.bookmarkId)
+        )
+      );
+
+      if (reviewedBookmarkIds.length === 0) return null;
+
+      const hasUnscannedBookmark = reviewedBookmarkIds.some(
+        (bookmarkId) => !scannedBookmarkIdsForPlan.has(bookmarkId)
+      );
+      if (hasUnscannedBookmark) {
+        setError("Review only the bookmarks from the current Orbit scan.");
+        return null;
+      }
+
+      setApplyingBatch(true);
+      setError(null);
+
+      try {
+        const response = await sendJson<{ applied: OrbitApplyResult }>(
+          "/api/orbit/scan",
+          {
+            method: "POST",
+            body: {
+              mode: "apply",
+              createCollections: opts?.createCollections ?? true,
+              plan: JSON.parse(JSON.stringify(reviewedPlan)) as JsonValue,
+            },
+          }
+        );
+
+        await invalidateLibraryQueries(queryClient);
+        await queryClient.invalidateQueries({ queryKey: ["orbit", "graph"] });
+
+        setDismissed((current) => {
+          const next = new Set(current);
+          for (const bookmarkId of reviewedBookmarkIds) {
+            next.add(bookmarkId);
+          }
+          return next;
+        });
+
+        return response.applied;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not apply reviewed plan";
+        setError(message);
+        throw err;
+      } finally {
+        setApplyingBatch(false);
+      }
+    },
+    [plan, queryClient]
+  );
+
   const dismiss = useCallback((bookmarkId: string) => {
     setDismissed((current) => {
       if (current.has(bookmarkId)) return current;
@@ -246,6 +316,7 @@ export function useOrbitScan(): OrbitScanHandle {
     error,
     scanNow,
     applySuggestion,
+    applyReviewedPlan,
     applyEntirePlan,
     dismiss,
     getDecision,

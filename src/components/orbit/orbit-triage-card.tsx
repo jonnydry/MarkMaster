@@ -29,8 +29,7 @@ interface OrbitTriageCardProps {
   onAddTag?: (bookmarkId: string) => void;
   onAddToCollection?: (bookmarkId: string) => void;
   onDelete?: (bookmarkId: string) => void;
-  onApplyPrimary?: (bookmarkId: string) => void;
-  onApplyAlternative?: (bookmarkId: string) => void;
+  onReviewSuggestion?: (bookmarkId: string) => void;
   onKeepInOrbit?: (bookmarkId: string) => void;
   className?: string;
 }
@@ -56,8 +55,7 @@ export function OrbitTriageCard({
   onAddTag,
   onAddToCollection,
   onDelete,
-  onApplyPrimary,
-  onApplyAlternative,
+  onReviewSuggestion,
   onKeepInOrbit,
   className,
 }: OrbitTriageCardProps) {
@@ -155,23 +153,17 @@ export function OrbitTriageCard({
                   size="sm"
                   className="h-8 gap-1.5 bg-white text-slate-950 hover:bg-white/90"
                   disabled={applying}
-                  onClick={() => onApplyPrimary?.(bookmark.id)}
+                  onClick={() => onReviewSuggestion?.(bookmark.id)}
                 >
                   {applying ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Sparkles className="size-3.5" />
                   )}
-                  Apply
+                  Review
                 </Button>
                 {alternative && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                    disabled={applying}
-                    onClick={() => onApplyAlternative?.(bookmark.id)}
-                  >
+                  <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 text-xs text-white/75">
                     {alternative.kind === "collection" ? (
                       <Folder className="size-3.5" />
                     ) : (
@@ -180,7 +172,7 @@ export function OrbitTriageCard({
                     {alternative.kind === "collection"
                       ? alternative.label
                       : `Tag as ${alternative.label}`}
-                  </Button>
+                  </span>
                 )}
                 <Button
                   size="sm"

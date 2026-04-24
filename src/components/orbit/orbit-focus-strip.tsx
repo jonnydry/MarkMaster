@@ -233,7 +233,7 @@ function ScanSlot({
           ) : (
             <Sparkles className="size-3.5" />
           )}
-          Apply all reviewed suggestions
+          Review and apply
         </Button>
       </div>
     </div>

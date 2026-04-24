@@ -99,7 +99,12 @@ export const orbitScanOverviewSchema = z.object({
 
 export const orbitScanPlanSchema = z.object({
   overview: orbitScanOverviewSchema,
-  suggestions: z.array(orbitBookmarkSuggestionSchema),
+  suggestions: z
+    .array(orbitBookmarkSuggestionSchema)
+    .max(
+      ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+      `Apply up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} Orbit suggestions at a time`
+    ),
 });
 
 export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
