@@ -75,9 +75,13 @@ export function FilterPanel({
             {MEDIA_OPTIONS.map(({ value, label, icon: Icon }) => (
               <Button
                 key={value}
-                variant={mediaFilter === value ? "default" : "outline"}
+                variant="outline"
                 size="sm"
-                className="h-7 gap-1.5 text-xs"
+                className={`h-7 gap-1.5 text-xs ${
+                  mediaFilter === value
+                    ? "menu-selection-active border-transparent pr-5 text-foreground"
+                    : "bg-surface-2"
+                }`}
                 onClick={() => onMediaFilterChange(value)}
               >
                 <Icon className="w-3 h-3" />
@@ -136,9 +140,9 @@ export function FilterPanel({
               {tags.map((tag) => (
                 <button
                   key={tag.id}
-                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`rounded-md px-2 py-1 text-xs font-medium transition-all ${
                     selectedTags.includes(tag.id)
-                      ? "bg-primary text-primary-foreground"
+                      ? "menu-selection-active pr-5"
                       : "bg-surface-2 text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}

@@ -134,7 +134,7 @@ export function Sidebar({
               title={label}
               className={`flex items-center rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                 isActive
-                  ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
+                  ? "menu-selection-active font-medium"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }${expanded ? " h-10 gap-3" : " h-10 w-10 justify-center"}`}
             >
@@ -169,7 +169,7 @@ export function Sidebar({
                           aria-pressed={isSelected}
                           className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isSelected
-                              ? "bg-primary/10 text-foreground font-medium"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >
@@ -237,9 +237,9 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isCollectionActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >
@@ -289,9 +289,9 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isCollectionActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >

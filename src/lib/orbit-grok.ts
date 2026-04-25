@@ -29,6 +29,62 @@ const GENERIC_COLLECTION_NAMES = new Set([
   "general",
   "other",
 ]);
+const GENERIC_TAG_NAMES = new Set([
+  ...GENERIC_COLLECTION_NAMES,
+  "interesting",
+  "saved",
+  "post",
+  "posts",
+  "tweet",
+  "tweets",
+  "x",
+  "link",
+  "links",
+  "article",
+  "articles",
+  "read",
+  "reading",
+  "resource",
+  "resources",
+]);
+const TAG_CANONICAL_ALIASES = new Map([
+  ["artificial intelligence", "ai"],
+  ["a i", "ai"],
+  ["large language model", "llm"],
+  ["large language models", "llm"],
+  ["llms", "llm"],
+  ["machine learning", "ml"],
+  ["typescript", "ts"],
+  ["javascript", "js"],
+]);
+const ACRONYMS = new Set([
+  "ai",
+  "api",
+  "css",
+  "html",
+  "js",
+  "llm",
+  "ml",
+  "pdf",
+  "sql",
+  "ts",
+  "ui",
+  "ux",
+]);
+const DOTTED_TECH_TAG_NAMES = new Set([
+  "asp.net",
+  "d3.js",
+  "deno.land",
+  "express.js",
+  "next.js",
+  "node.js",
+  "nuxt.js",
+  "p5.js",
+  "react.js",
+  "socket.io",
+  "three.js",
+  "vue.js",
+]);
 
 export class OrbitGrokError extends Error {
   status: number;
@@ -206,6 +262,55 @@ function normalizeWhitespace(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function stripLabelNoise(value: string) {
+  return normalizeWhitespace(value)
+    .replace(/^[#"'`“”‘’()[\]{}]+/, "")
+    .replace(/[,"'`“”‘’()[\]{}]+$/, "");
+}
+
+function titleCaseLabel(value: string) {
+  return value
+    .split(" ")
+    .map((word) => {
+      const lower = word.toLowerCase();
+      if (ACRONYMS.has(lower)) return lower.toUpperCase();
+      if (/^[A-Z0-9]+$/.test(word)) return word;
+      return `${lower.slice(0, 1).toUpperCase()}${lower.slice(1)}`;
+    })
+    .join(" ");
+}
+
+function normalizeSuggestedTagName(value: string) {
+  const stripped = stripLabelNoise(value);
+  if (!stripped) return "";
+  return titleCaseLabel(stripped);
+}
+
+function normalizeSuggestedCollectionName(value: string) {
+  const stripped = stripLabelNoise(value);
+  if (!stripped) return "";
+  return titleCaseLabel(stripped);
+}
+
+function isUrlLikeLabel(value: string) {
+  const normalized = stripLabelNoise(value).toLowerCase();
+  if (/^https?:\/\//.test(normalized) || /^www\./.test(normalized)) {
+    return true;
+  }
+  if (
+    DOTTED_TECH_TAG_NAMES.has(normalized) ||
+    /^[a-z0-9+#-]+\.js$/.test(normalized)
+  ) {
+    return false;
+  }
+  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/.*)?$/.test(normalized);
+}
+
+function normalizeTagKey(value: string) {
+  const key = normalizeKey(stripLabelNoise(value));
+  return TAG_CANONICAL_ALIASES.get(key) ?? key;
+}
+
 function truncateText(value: string | null | undefined, maxLength: number) {
   if (!value) return "";
   const normalized = value.trim();
@@ -351,21 +456,25 @@ function buildPromptPayload(args: {
       "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
       "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
       "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
+      "Sparse titles, bare URLs, previews, engagement copy, and boilerplate excerpts are weak signals. Do not tag from metadata noise alone.",
+      "When title and excerpt disagree, prefer the explicit tweet/quoted text and choose the narrower topic, or return low confidence if no topic is clear.",
     ],
 
     taggingRules: [
       "Reuse an existingTag exactly (case-insensitive name match) whenever it clearly fits. Set reuseExisting=true and keep that tag's exact color.",
       "Otherwise create a new tag: a short, reusable topic or content-type label, 1-3 words, Title Case (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
       "For new tags pick a color from the palette. Use the SAME color for semantically related new tags when reasonable.",
-      "Max 3 tags per bookmark. No near-duplicates (e.g. don't pair 'LLM' and 'LLMs', or 'AI' and 'Artificial Intelligence').",
+      "Max 3 tags per bookmark. No near-duplicates or parent/child duplicates (e.g. don't pair 'LLM' and 'LLMs', 'AI' and 'Artificial Intelligence', or 'TypeScript' and 'Programming' unless both add clear recall value).",
       "Prefer topic or content-type tags over stylistic or sentiment tags.",
-      "Never use generic labels: General, Misc, Other, Interesting, Saved, Bookmark, Thread (unless Thread is a content type used on purpose).",
+      "Never use generic or source labels: General, Misc, Other, Interesting, Saved, Bookmark, Post, Tweet, X, Link, Article, Resource, Thread (unless Thread is a content type used on purpose), domain names, or URL fragments.",
+      "For sparse bookmarks, return one precise tag at most; if the topic is only guessed from an excerpt or title, use confidence medium or low.",
     ],
 
     collectionRules: [
       "A collection is a durable, themed home for multiple related bookmarks — not a tag alias.",
       "Reuse an existingCollection (reuseExisting=true) for any bookmark that clearly belongs there, even if it's the only one in this batch.",
       "Only propose a NEW collection (reuseExisting=false) when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
+      "Do not create a collection from overlapping but different topics. If bookmarks only share a broad parent theme, use tags and leave collection null.",
       "Collection name: 2-4 words, Title Case, specific (not 'Interesting Posts', 'Saved Stuff').",
       "Collection description: one short sentence describing what belongs here.",
       "It is expected and correct that many bookmarks have collection=null. Only suggest when the fit is obvious.",
@@ -498,12 +607,35 @@ export function normalizeOrbitScanPlan(
   const existingTagMap = new Map(
     context.existingTags.map((tag) => [normalizeKey(tag.name), tag])
   );
+  const existingTagAliasMap = new Map<string, OrbitTagContext>();
+  for (const tag of context.existingTags) {
+    const exactKey = normalizeKey(tag.name);
+    const aliasKey = normalizeTagKey(tag.name);
+    if (aliasKey === exactKey || existingTagMap.has(aliasKey)) continue;
+    if (!existingTagAliasMap.has(aliasKey)) {
+      existingTagAliasMap.set(aliasKey, tag);
+    }
+  }
   const existingCollectionMap = new Map(
     context.existingCollections.map((collection) => [
       normalizeKey(collection.name),
       collection,
     ])
   );
+  const collectionSuggestionBookmarkIds = new Map<string, Set<string>>();
+  for (const suggestion of rawPlan.suggestions) {
+    if (!bookmarkIdSet.has(suggestion.bookmarkId) || !suggestion.collection) continue;
+
+    const normalizedName = normalizeSuggestedCollectionName(suggestion.collection.name);
+    const key = normalizeKey(normalizedName);
+    if (!normalizedName || GENERIC_COLLECTION_NAMES.has(key)) continue;
+
+    if (existingCollectionMap.has(key)) continue;
+    const bookmarkIds =
+      collectionSuggestionBookmarkIds.get(key) ?? new Set<string>();
+    bookmarkIds.add(suggestion.bookmarkId);
+    collectionSuggestionBookmarkIds.set(key, bookmarkIds);
+  }
 
   const suggestionMap = new Map<string, OrbitScanPlan["suggestions"][number]>();
 
@@ -514,14 +646,18 @@ export function normalizeOrbitScanPlan(
     const seenTagKeys = new Set<string>();
     const normalizedTags = suggestion.tags
       .map((tag) => {
-        const normalizedName = normalizeWhitespace(tag.name);
+        const normalizedName = normalizeSuggestedTagName(tag.name);
         if (!normalizedName) return null;
 
-        const key = normalizeKey(normalizedName);
+        const key = normalizeTagKey(normalizedName);
+        if (GENERIC_TAG_NAMES.has(key) || isUrlLikeLabel(normalizedName)) return null;
         if (seenTagKeys.has(key)) return null;
         seenTagKeys.add(key);
 
-        const existingTag = existingTagMap.get(key);
+        const existingTag =
+          existingTagMap.get(normalizeKey(normalizedName)) ??
+          existingTagAliasMap.get(key) ??
+          existingTagMap.get(key);
         return {
           name: existingTag?.name ?? normalizedName.slice(0, 50),
           color: existingTag?.color ?? normalizeColor(normalizedName, tag.color),
@@ -534,13 +670,17 @@ export function normalizeOrbitScanPlan(
 
     let normalizedCollection: OrbitScanPlan["suggestions"][number]["collection"] = null;
     if (suggestion.collection) {
-      const normalizedName = normalizeWhitespace(suggestion.collection.name);
+      const normalizedName = normalizeSuggestedCollectionName(
+        suggestion.collection.name
+      );
       const key = normalizeKey(normalizedName);
       const existingCollection = existingCollectionMap.get(key);
 
       if (
         normalizedName &&
         !GENERIC_COLLECTION_NAMES.has(key) &&
+        (existingCollection ||
+          (collectionSuggestionBookmarkIds.get(key)?.size ?? 0) >= 2) &&
         normalizedName.length <= 100
       ) {
         normalizedCollection = {

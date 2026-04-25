@@ -84,6 +84,248 @@ describe("normalizeOrbitScanPlan", () => {
       collection: null,
     });
   });
+
+  it("cleans noisy tags and collapses overlapping topic labels", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Noisy pass",
+        taggingStrategy: "Clean up model labels",
+        collectionStrategy: "Avoid one-off buckets",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "medium",
+          reasoning: "Sparse bookmark, but URL preview mentions model evals.",
+          tags: [
+            {
+              name: " Artificial Intelligence ",
+              color: "#ef4444",
+              reason: "Broad duplicate",
+              reuseExisting: false,
+            },
+            {
+              name: "#AI",
+              color: "#22c55e",
+              reason: "Duplicate alias",
+              reuseExisting: false,
+            },
+            {
+              name: "Article",
+              color: "#f97316",
+              reason: "Generic metadata",
+              reuseExisting: false,
+            },
+            {
+              name: "arxiv.org",
+              color: "#06b6d4",
+              reason: "Domain, not a topic",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0].tags).toEqual([
+      {
+        name: "AI",
+        color: "#1d9bf0",
+        reason: "Broad duplicate",
+        reuseExisting: true,
+      },
+    ]);
+  });
+
+  it("keeps dotted technology tags while dropping bare domains", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Dotted labels",
+        taggingStrategy: "Keep tech names",
+        collectionStrategy: "No collections",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "Framework bookmark",
+          tags: [
+            {
+              name: "Next.js",
+              color: "#000000",
+              reason: "Framework topic",
+              reuseExisting: false,
+            },
+            {
+              name: "node.js",
+              color: "#22c55e",
+              reason: "Runtime topic",
+              reuseExisting: false,
+            },
+            {
+              name: "example.com",
+              color: "#ef4444",
+              reason: "Domain, not topic",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0].tags.map((tag) => tag.name)).toEqual([
+      "Next.js",
+      "Node.js",
+    ]);
+  });
+
+  it("prefers exact existing tag matches over canonical alias matches", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Alias pass",
+        taggingStrategy: "Reuse exact tags",
+        collectionStrategy: "No collections",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "AI topic",
+          tags: [
+            {
+              name: "AI",
+              color: "#ef4444",
+              reason: "Exact short tag",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [
+        { name: "AI", color: "#1d9bf0" },
+        { name: "Artificial Intelligence", color: "#a855f7" },
+      ],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0].tags).toEqual([
+      {
+        name: "AI",
+        color: "#1d9bf0",
+        reason: "Exact short tag",
+        reuseExisting: true,
+      },
+    ]);
+  });
+
+  it("drops singleton new collections while keeping repeated and existing homes", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Collection pass",
+        taggingStrategy: "Use topics",
+        collectionStrategy: "Only durable homes",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "medium",
+          reasoning: "AI eval bookmark",
+          tags: [],
+          collection: {
+            name: " AI Papers ",
+            description: "AI papers and preprints.",
+            reason: "Shared research theme",
+            reuseExisting: false,
+          },
+        },
+        {
+          bookmarkId: "b2",
+          confidence: "medium",
+          reasoning: "Another AI paper bookmark",
+          tags: [],
+          collection: {
+            name: "ai papers",
+            description: "AI papers and preprints.",
+            reason: "Shared research theme",
+            reuseExisting: false,
+          },
+        },
+        {
+          bookmarkId: "b3",
+          confidence: "medium",
+          reasoning: "One-off garden bookmark",
+          tags: [],
+          collection: {
+            name: "Garden Ideas",
+            description: "Garden notes.",
+            reason: "Singleton theme",
+            reuseExisting: false,
+          },
+        },
+        {
+          bookmarkId: "b4",
+          confidence: "high",
+          reasoning: "Belongs in an existing reading collection",
+          tags: [],
+          collection: {
+            name: "reading queue",
+            description: "Model supplied description",
+            reason: "Existing user collection",
+            reuseExisting: false,
+          },
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1", "b2", "b3", "b4"],
+      existingTags: [],
+      existingCollections: [
+        { name: "Reading Queue", description: "Saved long-form reads" },
+      ],
+    });
+
+    expect(normalized.suggestions.map((suggestion) => suggestion.collection)).toEqual([
+      {
+        name: "AI Papers",
+        description: "AI papers and preprints.",
+        reason: "Shared research theme",
+        reuseExisting: false,
+      },
+      {
+        name: "AI Papers",
+        description: "AI papers and preprints.",
+        reason: "Shared research theme",
+        reuseExisting: false,
+      },
+      null,
+      {
+        name: "Reading Queue",
+        description: "Saved long-form reads",
+        reason: "Existing user collection",
+        reuseExisting: true,
+      },
+    ]);
+  });
 });
 
 describe("buildOrbitScanSummary", () => {

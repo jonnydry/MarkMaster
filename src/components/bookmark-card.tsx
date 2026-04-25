@@ -4,19 +4,20 @@ import { useState, useMemo, memo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
+  ArrowUpRight,
+  ArchiveX,
   Heart,
   Repeat2,
   MessageCircle,
-  ExternalLink,
-  Tag,
-  FolderPlus,
-  StickyNote,
-  Trash2,
+  Tags,
+  FolderInput,
+  NotebookPen,
   BadgeCheck,
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
+import { createTextHighlighter } from "@/lib/text-highlighter";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -42,76 +43,6 @@ function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
-}
-
-const MENTION_OR_URL_SPLITTER = /((?:@|#)\w+|https?:\/\/\S+)/g;
-const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
-
-function escapeRegExp(s: string): string {
-  return s.replace(REGEX_ESCAPE_RE, "\\$&");
-}
-
-function buildSearchRegex(searchQuery: string | undefined): RegExp | null {
-  if (!searchQuery) return null;
-  return new RegExp(`(${escapeRegExp(searchQuery)})`, "gi");
-}
-
-function highlightMatch(text: string, regex: RegExp): React.ReactNode {
-  if (!text) return text;
-  // Capturing group in regex makes split interleave [text, match, text, ...].
-  const parts = text.split(regex);
-  const result: React.ReactNode[] = [];
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      if (parts[i]) result.push(parts[i]);
-    } else {
-      result.push(
-        <mark key={`m-${i}`} className="bg-primary/20 text-foreground rounded px-0.5">
-          {parts[i]}
-        </mark>
-      );
-    }
-  }
-  if (result.length === 0) return text;
-  return result.length === 1 ? result[0] : result;
-}
-
-function highlightText(text: string, searchQuery?: string): React.ReactNode {
-  const searchRegex = buildSearchRegex(searchQuery);
-  const parts = text.split(MENTION_OR_URL_SPLITTER);
-  return parts.map((part, i) => {
-    if (part.startsWith("@") || part.startsWith("#")) {
-      if (searchRegex) {
-        return (
-          <span key={i} className="text-primary font-medium">
-            {highlightMatch(part, searchRegex)}
-          </span>
-        );
-      }
-      return (
-        <span key={i} className="text-primary font-medium">
-          {part}
-        </span>
-      );
-    }
-    if (part.startsWith("http")) {
-      return (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          {part}
-        </a>
-      );
-    }
-    if (searchRegex) {
-      return <span key={i}>{highlightMatch(part, searchRegex)}</span>;
-    }
-    return part;
-  });
 }
 
 function TagPill({
@@ -218,6 +149,10 @@ export const BookmarkCard = memo(function BookmarkCard({
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
   const isInteractive = selectionMode || Boolean(onSelect);
+  const highlighter = useMemo(
+    () => createTextHighlighter(searchQuery),
+    [searchQuery]
+  );
   const handleCardActivation = () => {
     if (selectionMode) {
       onSelectionChange?.(bookmark.id, !selected);
@@ -235,23 +170,22 @@ export const BookmarkCard = memo(function BookmarkCard({
     }
   };
   const highlightedText = useMemo(
-    () => highlightText(bookmark.tweetText, searchQuery),
-    [bookmark.tweetText, searchQuery]
+    () => highlighter.tweet(bookmark.tweetText),
+    [bookmark.tweetText, highlighter]
   );
-  const highlightedAuthorName = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(bookmark.authorDisplayName, regex) : bookmark.authorDisplayName;
-  }, [bookmark.authorDisplayName, searchQuery]);
-  const highlightedUsername = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(bookmark.authorUsername, regex) : bookmark.authorUsername;
-  }, [bookmark.authorUsername, searchQuery]);
+  const highlightedAuthorName = useMemo(
+    () => highlighter.plain(bookmark.authorDisplayName, "author"),
+    [bookmark.authorDisplayName, highlighter]
+  );
+  const highlightedUsername = useMemo(
+    () => highlighter.plain(bookmark.authorUsername, "username"),
+    [bookmark.authorUsername, highlighter]
+  );
+  const firstNoteContent = bookmark.notes[0]?.content;
   const highlightedNote = useMemo(() => {
-    const note = bookmark.notes[0]?.content;
-    if (!note) return note;
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(note, regex) : note;
-  }, [bookmark.notes, searchQuery]);
+    if (!firstNoteContent) return firstNoteContent;
+    return highlighter.plain(firstNoteContent, "note");
+  }, [firstNoteContent, highlighter]);
 
   if (viewMode === "compact") {
     return (
@@ -416,8 +350,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                   onAddTag(bookmark.id);
                 }}
                 className={`h-7 px-2 text-xs gap-1 ${hasTag ? "text-primary" : "text-muted-foreground"}`}
+                aria-label={hasTag ? "Edit tags" : "Add tags"}
+                title={hasTag ? "Edit tags" : "Add tags"}
               >
-                <Tag className="w-3 h-3" />
+                <Tags className="w-3 h-3" />
               </Button>
             )}
             {onAddToCollection && (
@@ -429,8 +365,12 @@ export const BookmarkCard = memo(function BookmarkCard({
                   onAddToCollection(bookmark.id);
                 }}
                 className={`h-7 px-2 text-xs gap-1 ${hasCollection ? "text-primary" : "text-muted-foreground"}`}
+                aria-label={
+                  hasCollection ? "Change collection" : "Add to collection"
+                }
+                title={hasCollection ? "Change collection" : "Add to collection"}
               >
-                <FolderPlus className="w-3 h-3" />
+                <FolderInput className="w-3 h-3" />
               </Button>
             )}
             <Button
@@ -441,8 +381,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                 window.open(tweetUrl, "_blank");
               }}
               className="h-7 px-2 text-xs gap-1 text-muted-foreground ml-auto"
+              aria-label="Open on X"
+              title="Open on X"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ArrowUpRight className="w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -519,8 +461,8 @@ export const BookmarkCard = memo(function BookmarkCard({
             <div className="flex self-start shrink-0 items-center gap-1 rounded-xl border border-hairline-soft bg-surface-1 p-1 shadow-sm opacity-100 transition-all sm:self-auto sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
               {onAddTag && (
                 <ActionButton
-                  icon={Tag}
-                  label="Add Tag"
+                  icon={Tags}
+                  label="Add tags"
                   onClick={() => onAddTag(bookmark.id)}
                   shortcut="T"
                   active={bookmark.tags.length > 0}
@@ -528,8 +470,8 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
               {onAddToCollection && (
                 <ActionButton
-                  icon={FolderPlus}
-                  label="Add to Collection"
+                  icon={FolderInput}
+                  label="Add to collection"
                   onClick={() => onAddToCollection(bookmark.id)}
                   shortcut="C"
                   active={bookmark.collectionItems && bookmark.collectionItems.length > 0}
@@ -537,22 +479,22 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
               {onAddNote && (
                 <ActionButton
-                  icon={StickyNote}
-                  label="Add Note"
+                  icon={NotebookPen}
+                  label="Add note"
                   onClick={() => onAddNote(bookmark.id)}
                   shortcut="N"
                   active={bookmark.notes.length > 0}
                 />
               )}
               <ActionButton
-                icon={ExternalLink}
+                icon={ArrowUpRight}
                 label="Open on X"
                 onClick={() => window.open(tweetUrl, "_blank")}
                 shortcut="O"
               />
               {onDelete && (
                 <ActionButton
-                  icon={Trash2}
+                  icon={ArchiveX}
                   label={deleteLabel}
                   onClick={() => onDelete(bookmark.id)}
                 />

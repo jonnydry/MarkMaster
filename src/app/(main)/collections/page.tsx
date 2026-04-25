@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -47,8 +47,22 @@ export default function CollectionsPage() {
 
   const { data: tags = [] } = useTagsQuery();
 
-  const userCollections = collections.filter((c) => c.type !== "x_folder");
-  const xFolders = collections.filter((c) => c.type === "x_folder");
+  const { userCollections, xFolders } = useMemo(() => {
+    const grouped = {
+      userCollections: [] as typeof collections,
+      xFolders: [] as typeof collections,
+    };
+
+    for (const collection of collections) {
+      if (collection.type === "x_folder") {
+        grouped.xFolders.push(collection);
+      } else {
+        grouped.userCollections.push(collection);
+      }
+    }
+
+    return grouped;
+  }, [collections]);
   const collectionsSummary =
     !isLoading &&
     !isError &&
@@ -58,9 +72,9 @@ export default function CollectionsPage() {
         }${xFolders.length > 0 ? ` · ${xFolders.length} X ${xFolders.length === 1 ? "folder" : "folders"}` : ""}`
       : undefined;
 
-  const goToTagOnDashboard = (tagId: string) => {
+  const goToTagOnDashboard = useCallback((tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
-  };
+  }, [router]);
 
   const handleNavigate = useCallback(
     (collectionId: string) => router.push(`/collections/${collectionId}`),
@@ -153,96 +167,108 @@ export default function CollectionsPage() {
           />
 
           <div className="p-4 sm:p-5">
-          {isLoading ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-36 rounded-2xl border border-hairline-soft bg-surface-1 p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl skeleton-shimmer" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3 w-24 rounded skeleton-shimmer" />
-                      <div className="h-3 w-16 rounded skeleton-shimmer" />
+            {isLoading ? (
+              <div className="grid gap-2 xl:grid-cols-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border border-hairline-soft bg-surface-1 px-3 py-2.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-lg skeleton-shimmer" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-3 w-40 rounded skeleton-shimmer" />
+                        <div className="h-3 w-28 rounded skeleton-shimmer" />
+                      </div>
+                      <div className="h-7 w-16 rounded-md skeleton-shimmer" />
                     </div>
                   </div>
-                  <div className="mt-4 space-y-2">
-                    <div className="h-3 w-full rounded skeleton-shimmer" />
-                    <div className="h-3 w-4/5 rounded skeleton-shimmer" />
-                  </div>
+                ))}
+              </div>
+            ) : isError ? (
+              <div className="flex h-64 flex-col items-center justify-center text-center">
+                <div className="rounded-xl border border-hairline-soft bg-surface-1 p-5">
+                  <p className="text-sm font-medium text-foreground">
+                    Collections could not be loaded
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {error instanceof Error ? error.message : "Please try again."}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => refetch()}
+                  >
+                    Retry
+                  </Button>
                 </div>
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="rounded-2xl border border-hairline-soft bg-surface-1 p-6">
-                <p className="text-sm font-medium text-foreground">Collections could not be loaded</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {error instanceof Error ? error.message : "Please try again."}
-                </p>
-                <Button size="sm" variant="outline" className="mt-3" onClick={() => refetch()}>
-                  Retry
-                </Button>
               </div>
-            </div>
-) : collections.length === 0 ? (
-            <div className="flex h-72 flex-col items-center justify-center text-center">
-              <div className="rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 shadow-sm sm:px-8">
-              <Layers className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h2 className="mb-2 text-lg font-medium">No collections yet</h2>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Create a collection to start curating your bookmarks
-              </p>
-              <Button onClick={() => setCreateOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Create your first collection
-              </Button>
+            ) : collections.length === 0 ? (
+              <div className="flex h-72 flex-col items-center justify-center text-center">
+                <div className="rounded-xl border border-hairline-soft bg-surface-1 px-6 py-7 shadow-sm sm:px-8">
+                  <Layers className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
+                  <h2 className="mb-2 text-lg font-medium">No collections yet</h2>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    Create a collection to start curating your bookmarks
+                  </p>
+                  <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Create your first collection
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {userCollections.length > 0 && (
-                <section>
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                    <Layers className="w-4 h-4" />
-                    My Collections
-                  </h2>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {userCollections.map((col, i) => (
-                      <UserCollectionCard
-                        key={col.id}
-                        collection={col}
-                        index={i}
-                        onNavigate={handleNavigate}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
+            ) : (
+              <div className="space-y-6">
+                {userCollections.length > 0 && (
+                  <section>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <Layers className="w-3.5 h-3.5" />
+                        My Collections
+                      </h2>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground/60">
+                        {userCollections.length}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 xl:grid-cols-2">
+                      {userCollections.map((col) => (
+                        <UserCollectionCard
+                          key={col.id}
+                          collection={col}
+                          onNavigate={handleNavigate}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-              {xFolders.length > 0 && (
-                <section>
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    X Folders
-                  </h2>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {xFolders.map((col, i) => (
-                      <XFolderCard
-                        key={col.id}
-                        collection={col}
-                        index={i}
-                        onNavigate={handleNavigate}
-                        onCopy={handleCopy}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          )}
+                {xFolders.length > 0 && (
+                  <section>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        X Folders
+                      </h2>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground/60">
+                        {xFolders.length}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 xl:grid-cols-2">
+                      {xFolders.map((col) => (
+                        <XFolderCard
+                          key={col.id}
+                          collection={col}
+                          onNavigate={handleNavigate}
+                          onCopy={handleCopy}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

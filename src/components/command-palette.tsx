@@ -37,14 +37,18 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const normalizedQuery = query.trim().toLowerCase();
 
   const filteredTags = useMemo(
-    () => tags.filter((tag) => tag.name.toLowerCase().includes(query.toLowerCase())),
-    [tags, query]
+    () =>
+      normalizedQuery
+        ? tags.filter((tag) => tag.name.toLowerCase().includes(normalizedQuery))
+        : tags,
+    [tags, normalizedQuery]
   );
 
   const items = useMemo<CommandItem[]>(() => {
-    if (query === "") {
+    if (normalizedQuery === "") {
       const media = MEDIA_FILTERS.map((f) => ({ kind: "media" as const, ...f }));
       const tagItems = tags.slice(0, 6).map((t) => ({
         kind: "tag" as const,
@@ -65,7 +69,7 @@ export function CommandPalette({
       }));
     }
     return [];
-  }, [query, tags, filteredTags]);
+  }, [normalizedQuery, tags, filteredTags]);
 
   useEffect(() => {
     if (focusedIndex >= 0) {
@@ -164,10 +168,10 @@ export function CommandPalette({
         <div id="cmd-list" role="listbox" className="p-2 max-h-[400px] overflow-y-auto">
           {items.map((item, i) => {
             const isFocused = i === focusedIndex;
-            const showQuickFiltersHeading = query === "" && i === 0 && item.kind === "media";
+            const showQuickFiltersHeading = normalizedQuery === "" && i === 0 && item.kind === "media";
             const showTagsHeading =
-              query === "" && item.kind === "tag" && items[i - 1]?.kind === "media";
-            const showSearchTagsHeading = query !== "" && i === 0;
+              normalizedQuery === "" && item.kind === "tag" && items[i - 1]?.kind === "media";
+            const showSearchTagsHeading = normalizedQuery !== "" && i === 0;
 
             return (
               <div key={item.kind === "media" ? item.value : item.id}>
@@ -193,8 +197,8 @@ export function CommandPalette({
                     }
                   }}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-muted",
-                    isFocused && "bg-muted"
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-muted",
+                    isFocused && "menu-selection-active pr-5"
                   )}
                 >
                   {item.kind === "media" ? (
@@ -218,7 +222,7 @@ export function CommandPalette({
             );
           })}
 
-          {items.length === 0 && query !== "" && (
+          {items.length === 0 && normalizedQuery !== "" && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               No tags match <span className="font-medium text-foreground">{query}</span>.
             </div>
