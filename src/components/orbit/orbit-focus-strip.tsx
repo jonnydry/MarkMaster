@@ -4,8 +4,9 @@ import {
   Compass,
   Loader2,
   Map as MapIcon,
-  Sparkles,
 } from "lucide-react";
+
+import { GrokMark } from "@/components/brands/grok-mark";
 
 import { Button } from "@/components/ui/button";
 import { confidencePercent } from "@/lib/orbit-decision";
@@ -174,7 +175,7 @@ function ScanSlot({
           {scanning ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Sparkles className="size-3.5" />
+            <GrokMark className="size-3.5" title="Grok" />
           )}
           {scanning
             ? "Categorizing…"
@@ -218,7 +219,7 @@ function ScanSlot({
           {scanning ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Sparkles className="size-3.5" />
+            <GrokMark className="size-3.5" title="Grok" />
           )}
           Refresh
         </Button>
@@ -231,7 +232,7 @@ function ScanSlot({
           {applying ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Sparkles className="size-3.5" />
+            <GrokMark className="size-3.5" title="Grok" />
           )}
           Review and apply
         </Button>

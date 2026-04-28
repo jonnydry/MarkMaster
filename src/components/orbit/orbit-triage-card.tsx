@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { Folder, Loader2, Sparkles, Tag as TagIcon } from "lucide-react";
+import { Folder, Loader2, Tag as TagIcon } from "lucide-react";
 
+import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { confidencePercent, formatConfidence } from "@/lib/orbit-decision";
@@ -158,7 +159,7 @@ export function OrbitTriageCard({
                   {applying ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
-                    <Sparkles className="size-3.5" />
+                    <GrokMark className="size-3.5" title="Grok" />
                   )}
                   Review
                 </Button>

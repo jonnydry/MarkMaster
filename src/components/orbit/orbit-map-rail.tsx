@@ -9,9 +9,10 @@ import {
   FolderOpen,
   LayoutGrid,
   Orbit as OrbitIcon,
-  Sparkles,
   Tag as TagIcon,
 } from "lucide-react";
+
+import { GrokMark } from "@/components/brands/grok-mark";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -372,7 +373,7 @@ function SelectedClusterBody({
       <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-200">
-            <Sparkles className="size-4" />
+            <GrokMark className="size-4" title="Grok" />
           </span>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">

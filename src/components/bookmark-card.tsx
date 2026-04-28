@@ -6,15 +6,19 @@ import Image from "next/image";
 import {
   ArrowUpRight,
   ArchiveX,
-  Heart,
-  Repeat2,
-  MessageCircle,
   Tags,
   FolderInput,
   NotebookPen,
   BadgeCheck,
   Check,
 } from "lucide-react";
+import { XLogoMark } from "@/components/brands/x-logo-mark";
+import {
+  X_POST_METRIC_ICON_CLASS,
+  XPostLikeIcon,
+  XPostReplyIcon,
+  XPostRepostIcon,
+} from "@/components/brands/x-post-metric-icons";
 import { Button } from "@/components/ui/button";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import { createTextHighlighter } from "@/lib/text-highlighter";
@@ -232,6 +236,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                 addSuffix: true,
               })}
             </span>
+            <XLogoMark
+              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              title="Post from X"
+            />
           </div>
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
             {highlightedText}
@@ -251,11 +259,11 @@ export const BookmarkCard = memo(function BookmarkCard({
         {metrics && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
             <span className="flex items-center gap-1">
-              <Heart className="w-3 h-3" />
+              <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
               {formatCount(metrics.like_count)}
             </span>
             <span className="flex items-center gap-1">
-              <Repeat2 className="w-3 h-3" />
+              <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
               {formatCount(metrics.retweet_count)}
             </span>
           </div>
@@ -296,6 +304,12 @@ export const BookmarkCard = memo(function BookmarkCard({
             />
           </div>
         )}
+        <XLogoMark
+          className={`pointer-events-none absolute top-2.5 z-[5] h-3.5 w-3.5 text-muted-foreground ${
+            selectionMode ? "right-11" : "right-2.5"
+          }`}
+          title="Post from X"
+        />
         {firstMediaUrl && !imageError.has(firstMediaUrl) && (
           <div className="relative aspect-video bg-muted overflow-hidden">
             <Image
@@ -438,25 +452,31 @@ export const BookmarkCard = memo(function BookmarkCard({
         )}
         <div className="flex-1 min-w-0">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="font-semibold text-sm text-foreground truncate">
-                {highlightedAuthorName}
-              </span>
-              {bookmark.authorVerified && (
-                <BadgeCheck
-                  className="size-3.5 text-primary shrink-0"
-                  aria-label="Verified account"
-                />
-              )}
-              <span className="text-muted-foreground truncate">
-                @{highlightedUsername}
-              </span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground whitespace-nowrap">
-                {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
-                  addSuffix: true,
-                })}
-              </span>
+            <div className="flex min-w-0 w-full items-center gap-2 sm:w-auto">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
+                <span className="font-semibold text-sm text-foreground truncate">
+                  {highlightedAuthorName}
+                </span>
+                {bookmark.authorVerified && (
+                  <BadgeCheck
+                    className="size-3.5 text-primary shrink-0"
+                    aria-label="Verified account"
+                  />
+                )}
+                <span className="text-muted-foreground truncate">
+                  @{highlightedUsername}
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
+              <XLogoMark
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:ml-2"
+                title="Post from X"
+              />
             </div>
             <div className="flex self-start shrink-0 items-center gap-1 rounded-xl border border-hairline-soft bg-surface-1 p-1 shadow-sm opacity-100 transition-all sm:self-auto sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
               {onAddTag && (
@@ -595,17 +615,17 @@ export const BookmarkCard = memo(function BookmarkCard({
             <dl className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground">
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Replies</dt>
-                <MessageCircle className="size-3.5" aria-hidden="true" />
+                <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
                 <dd>{formatCount(metrics.reply_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
-                <dt className="sr-only">Retweets</dt>
-                <Repeat2 className="size-3.5" aria-hidden="true" />
+                <dt className="sr-only">Reposts</dt>
+                <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
                 <dd>{formatCount(metrics.retweet_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Likes</dt>
-                <Heart className="size-3.5" aria-hidden="true" />
+                <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
                 <dd>{formatCount(metrics.like_count)}</dd>
               </div>
             </dl>

@@ -5,10 +5,10 @@ import {
   CheckCircle2,
   Folder,
   Loader2,
-  Sparkles,
   Tag as TagIcon,
 } from "lucide-react";
 
+import { GrokMark } from "@/components/brands/grok-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -193,7 +193,7 @@ export function OrbitReviewDialog({
         <DialogHeader className="border-b border-white/10 px-5 py-4">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-300/10 text-sky-100">
-              <Sparkles className="size-4" />
+              <GrokMark className="size-4" title="Grok" />
             </span>
             <div className="min-w-0">
               <DialogTitle>{title}</DialogTitle>

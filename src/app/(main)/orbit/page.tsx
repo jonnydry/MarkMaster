@@ -25,13 +25,13 @@ import {
   Loader2,
   Map as MapIcon,
   Orbit as OrbitIcon,
-  Sparkles,
   TagIcon,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { GrokMark } from "@/components/brands/grok-mark";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -635,7 +635,7 @@ export default function OrbitPage() {
                       {queueIsLoading || scan.scanning ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
-                        <Sparkles className="size-4" />
+                        <GrokMark className="size-4" title="Grok" />
                       )}
                       {scanButtonLabel}
                     </Button>
@@ -713,7 +713,7 @@ export default function OrbitPage() {
                       {scan.scanning ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : (
-                        <Sparkles className="size-3.5" />
+                        <GrokMark className="size-3.5" title="Grok" />
                       )}
                       Auto-categorize selection
                     </Button>

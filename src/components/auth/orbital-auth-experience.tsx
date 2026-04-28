@@ -1,6 +1,8 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { GrokMark } from "@/components/brands/grok-mark";
+import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
@@ -46,27 +48,6 @@ const FEATURE_ROWS: readonly FeatureRow[] = [
 ] as const;
 
 const CURRENT_YEAR = new Date().getFullYear();
-
-function XBrandIcon({ className = "size-5 fill-current" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-function SparkleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={className}
-      fill="currentColor"
-    >
-      <path d="M12 2.5a.75.75 0 0 1 .72.54l1.16 4.06a3.5 3.5 0 0 0 2.4 2.4l4.06 1.16a.75.75 0 0 1 0 1.44l-4.06 1.16a3.5 3.5 0 0 0-2.4 2.4l-1.16 4.06a.75.75 0 0 1-1.44 0l-1.16-4.06a3.5 3.5 0 0 0-2.4-2.4L3.66 12.1a.75.75 0 0 1 0-1.44l4.06-1.16a3.5 3.5 0 0 0 2.4-2.4l1.16-4.06A.75.75 0 0 1 12 2.5Zm6.5 13a.5.5 0 0 1 .48.36l.43 1.5a1.5 1.5 0 0 0 1.03 1.03l1.5.43a.5.5 0 0 1 0 .96l-1.5.43a1.5 1.5 0 0 0-1.03 1.03l-.43 1.5a.5.5 0 0 1-.96 0l-.43-1.5a1.5 1.5 0 0 0-1.03-1.03l-1.5-.43a.5.5 0 0 1 0-.96l1.5-.43a1.5 1.5 0 0 0 1.03-1.03l.43-1.5a.5.5 0 0 1 .48-.36Z" />
-    </svg>
-  );
-}
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -206,7 +187,7 @@ export function OrbitalAuthExperience({
 
                 <div className="animate-fade-in-up stagger-5 flex max-w-[600px] items-start gap-4 rounded-[24px] border border-primary/20 bg-primary/[0.04] p-5 backdrop-blur-sm sm:p-6">
                   <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary shadow-[0_0_16px_rgba(59,130,246,0.25)]">
-                    <SparkleIcon className="size-4" />
+                    <GrokMark className="size-4" title="Grok" />
                   </span>
                   <p className="text-[14.5px] leading-relaxed text-muted-foreground">
                     <span className="font-medium text-foreground/90">
@@ -238,7 +219,10 @@ export function OrbitalAuthExperience({
                     onClick={handleSignIn}
                     className="group h-[60px] rounded-full border-0 bg-primary px-8 text-[1.05rem] font-semibold text-primary-foreground shadow-[0_16px_40px_rgba(74,123,255,0.35)] transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_20px_48px_rgba(74,123,255,0.45)]"
                   >
-                    <XBrandIcon className="mr-2.5 size-[22px] fill-current" />
+                    <XLogoMark
+                      className="mr-2.5 size-[22px] text-primary-foreground"
+                      title={undefined}
+                    />
                     Sign in with X
                     <ArrowRightIcon className="ml-1.5 size-[18px] opacity-80 transition-transform group-hover:translate-x-1" />
                   </Button>
@@ -298,7 +282,7 @@ export function OrbitalAuthExperience({
                         aria-hidden
                         className="absolute -right-1.5 -top-1.5 inline-flex size-[18px] items-center justify-center rounded-full border border-background bg-primary text-primary-foreground"
                       >
-                        <SparkleIcon className="size-3" />
+                        <GrokMark className="size-2.5" title={undefined} />
                       </span>
                     ) : null}
                   </div>
@@ -309,7 +293,8 @@ export function OrbitalAuthExperience({
                         {feature.title}
                       </h3>
                       {feature.badge ? (
-                        <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-primary/85">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-primary/85">
+                          <GrokMark className="size-3" title={undefined} />
                           {feature.badge}
                         </span>
                       ) : null}
