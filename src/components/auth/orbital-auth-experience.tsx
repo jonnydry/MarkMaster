@@ -10,44 +10,34 @@ import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 type FeatureRow = {
   step: string;
   title: string;
-  description: string;
-  emphasized: boolean;
-  badge?: string;
+  icon: "grok" | "search" | "tag" | "collection";
 };
 
 const FEATURE_ROWS: readonly FeatureRow[] = [
   {
     step: "01",
     title: "Grok tags and sorts for you",
-    description:
-      "Grok‑4 proposes up to three tags and a collection home for each un‑sorted bookmark. You review every move before it lands.",
-    emphasized: true,
-    badge: "Grok",
+    icon: "grok",
   },
   {
     step: "02",
     title: "Search everything",
-    description:
-      "Find any bookmark by text, author, or your own notes — even when you only remember a fragment.",
-    emphasized: false,
+    icon: "search",
   },
   {
     step: "03",
     title: "Tag by topic",
-    description:
-      "Group related saves so the important ones stay easy to find instead of drifting down the feed.",
-    emphasized: false,
+    icon: "tag",
   },
   {
     step: "04",
     title: "Curate collections",
-    description:
-      "Build sets of related posts you can revisit privately or share as a clean public page.",
-    emphasized: false,
+    icon: "collection",
   },
 ] as const;
 
 const CURRENT_YEAR = new Date().getFullYear();
+const SPLASH_BACKGROUND_IMAGE_URL = "/rocket-launch-background.png";
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -109,6 +99,70 @@ function OrbitRings({ className }: { className?: string }) {
   );
 }
 
+function FeatureIcon({
+  icon,
+  className,
+}: {
+  icon: FeatureRow["icon"];
+  className?: string;
+}) {
+  if (icon === "grok") {
+    return <GrokMark className={className} title={undefined} />;
+  }
+
+  if (icon === "search") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className={className}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m16.2 16.2 4 4" />
+      </svg>
+    );
+  }
+
+  if (icon === "tag") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className={className}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M20.5 13.5 13.5 20.5a2.2 2.2 0 0 1-3.1 0L3 13.1V3h10.1l7.4 7.4a2.2 2.2 0 0 1 0 3.1Z" />
+        <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6.5A2.5 2.5 0 0 1 4 17.5v-11Z" />
+      <path d="M8 8h8M8 12h8" />
+    </svg>
+  );
+}
+
 function handleSignIn() {
   void signIn(TWITTER_PROVIDER_ID, { callbackUrl: "/dashboard" });
 }
@@ -119,206 +173,161 @@ export function OrbitalAuthExperience({
   errorMessage?: string | null;
 }) {
   return (
-    <div className="dark relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground selection:bg-primary/30">
+    <div className="dark relative isolate flex min-h-screen flex-col overflow-hidden bg-[#00040B] text-foreground selection:bg-primary/30">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <div
-          className="absolute left-[-140px] top-[140px] size-[520px] rounded-full blur-[18px]"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(73,123,255,0.22) 0%, rgba(73,123,255,0.10) 34%, rgba(18,19,21,0) 74%)",
-          }}
-        />
-        <div
-          className="absolute right-[-180px] top-[90px] size-[600px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(247,249,252,0.08) 0%, rgba(18,19,21,0) 68%)",
-          }}
-        />
-      </div>
+        className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: [
+            "linear-gradient(90deg, rgba(0,4,11,0.82) 0%, rgba(0,4,11,0.62) 34%, rgba(0,4,11,0.16) 52%, rgba(0,4,11,0.62) 100%)",
+            "linear-gradient(180deg, rgba(0,4,11,0.30) 0%, rgba(0,4,11,0.08) 40%, rgba(0,4,11,0.78) 100%)",
+            `url(${SPLASH_BACKGROUND_IMAGE_URL})`,
+          ].join(", "),
+          backgroundPosition: "center bottom, center bottom, center bottom",
+          backgroundRepeat: "no-repeat, no-repeat, no-repeat",
+          backgroundSize: "cover, cover, cover",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_58%,rgba(10,132,255,0.20)_0%,rgba(10,132,255,0.08)_21%,rgba(0,4,11,0)_48%)]"
+      />
 
-      <header className="relative z-10 mx-auto flex w-full max-w-[1440px] items-center justify-end px-4 pt-5 sm:px-8 sm:pt-7 lg:px-12 lg:pt-8">
+      <header className="relative z-10 mx-auto flex w-full max-w-[1440px] items-center justify-end px-5 pt-5 sm:px-8 sm:pt-7 lg:px-[72px] lg:pt-8">
         <button
           type="button"
           onClick={handleSignIn}
-          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[15px] font-semibold text-white/90 shadow-[0_1px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-white/10 hover:text-white"
         >
           Sign in
-          <ArrowRightIcon className="size-3.5 opacity-70" />
+          <ArrowRightIcon className="size-4 opacity-80" />
         </button>
       </header>
 
-      <main className="relative z-[1] mx-auto flex w-full max-w-[1440px] flex-1 items-center px-4 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
-        <div className="grid w-full grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_480px]">
-          <section className="flex min-w-0 items-center lg:pr-4 xl:pr-10">
-            <div className="w-full max-w-[700px]">
-              <div className="flex flex-col items-start gap-8 lg:gap-10">
-                <div className="flex flex-col items-start gap-6">
-                  <div className="animate-fade-in-up stagger-1 flex items-center gap-6">
-                    <MarkMasterLogo
-                      width={120}
-                      height={120}
-                      priority
-                      className="-ml-2 h-20 w-20 drop-shadow-[0_12px_28px_rgba(74,123,255,0.35)] sm:h-28 sm:w-28 lg:h-[120px] lg:w-[120px]"
-                    />
-                    <span className="heading-font text-[3rem] font-bold tracking-[-0.03em] text-foreground sm:text-[4rem] lg:text-[4.5rem]">
-                      MarkMaster
-                    </span>
-                  </div>
-                  <div className="space-y-4">
-                    <p
-                      className="animate-fade-in-up stagger-2 inline-flex items-center gap-2 text-[11.5px] uppercase tracking-[0.2em] text-muted-foreground/90 sm:text-[12.5px]"
-                    >
-                      <span className="inline-flex size-1.5 rounded-full bg-primary/80 shadow-[0_0_0_4px_rgba(59,130,246,0.12)]" />
-                      Your saved posts, finally organized
-                    </p>
-                    <h1 className="animate-fade-in-up stagger-3 heading-font max-w-[700px] text-[3.5rem] font-semibold leading-[0.95] tracking-[-0.04em] text-foreground sm:text-[4.25rem] lg:text-[5rem] lg:leading-[5.25rem]">
-                      A home for your X bookmarks.
-                    </h1>
-                    <p className="animate-fade-in-up stagger-4 max-w-[580px] text-[1.125rem] leading-[1.8] font-light text-muted-foreground sm:text-[1.25rem] lg:text-[1.375rem] lg:leading-[1.8]">
-                      Grok auto-tags and sorts your saves so you can find them
-                      fast — without leaving your bookmarks in a black box.
-                    </p>
-                  </div>
+      <main className="relative z-[1] mx-auto flex w-full max-w-[1440px] flex-1 items-center px-5 pb-10 pt-8 sm:px-8 sm:pt-10 lg:px-[72px] lg:pb-12 lg:pt-10">
+        <div className="grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,520px)_minmax(340px,400px)] lg:justify-between lg:gap-8">
+          <section className="min-w-0">
+            <div className="flex max-w-[540px] flex-col items-start">
+              <div className="animate-fade-in-up stagger-1 flex items-center gap-5 sm:gap-6">
+                <span className="grid size-[70px] shrink-0 place-items-center rounded-full border border-primary/45 bg-primary/10 shadow-[0_0_42px_rgba(10,132,255,0.42)] backdrop-blur-sm sm:size-[82px] lg:size-[88px]">
+                  <MarkMasterLogo
+                    width={82}
+                    height={82}
+                    priority
+                    className="h-[54px] w-[54px] drop-shadow-[0_0_18px_rgba(10,132,255,0.72)] sm:h-[64px] sm:w-[64px] lg:h-[68px] lg:w-[68px]"
+                  />
+                </span>
+                <span className="heading-font text-[2.45rem] font-extrabold leading-none tracking-[-0.05em] text-white drop-shadow-[0_3px_24px_rgba(0,0,0,0.9)] sm:text-[3.2rem] lg:text-[3.35rem]">
+                  MarkMaster
+                </span>
+              </div>
+
+              <h1 className="animate-fade-in-up stagger-2 heading-font mt-14 max-w-[540px] text-[3.35rem] font-extrabold leading-[0.98] tracking-[-0.055em] text-white drop-shadow-[0_5px_34px_rgba(0,0,0,0.9)] sm:text-[4.25rem] lg:mt-[78px] lg:text-[4.55rem]">
+                <span className="block">A home for your</span>
+                <span className="block text-primary drop-shadow-[0_0_32px_rgba(10,132,255,0.56)]">
+                  X bookmarks.
+                </span>
+              </h1>
+
+              <p className="animate-fade-in-up stagger-3 mt-7 max-w-[455px] text-[1.075rem] font-light leading-[1.75] text-[#D4DDEA] drop-shadow-[0_2px_18px_rgba(0,0,0,0.85)] sm:text-[1.18rem]">
+                Grok auto-tags and sorts your saves so you can find them fast
+                without leaving your bookmarks in a black box.
+              </p>
+
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className="animate-fade-in mt-7 max-w-[520px] rounded-[24px] border border-destructive/40 bg-destructive/15 p-5 text-[14.5px] leading-relaxed text-destructive-foreground shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:p-6"
+                >
+                  {errorMessage}
                 </div>
+              )}
 
-                <div className="animate-fade-in-up stagger-5 flex max-w-[600px] items-start gap-4 rounded-[24px] border border-primary/20 bg-primary/[0.04] p-5 backdrop-blur-sm sm:p-6">
-                  <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary shadow-[0_0_16px_rgba(59,130,246,0.25)]">
-                    <GrokMark className="size-4" title="Grok" />
-                  </span>
-                  <p className="text-[14.5px] leading-relaxed text-muted-foreground">
-                    <span className="font-medium text-foreground/90">
-                      AI-assisted, not AI-replaced
-                    </span>{" "}
-                    — Grok suggests, you approve. Nothing gets sorted without your say.
-                    <span className="mt-2 block text-[13px] text-muted-foreground/75">
-                      Scans run with{" "}
-                      <code className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[11.5px] text-foreground/80">
-                        store: false
-                      </code>{" "}
-                      — your bookmarks aren&apos;t retained for training.
-                    </span>
-                  </p>
-                </div>
+              <div className="animate-fade-in-up stagger-4 mt-9 flex flex-col items-start gap-4">
+                <Button
+                  size="lg"
+                  onClick={handleSignIn}
+                  className="group h-[58px] rounded-full border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
+                >
+                  <XLogoMark
+                    className="mr-2.5 size-[22px] text-primary-foreground"
+                    title={undefined}
+                  />
+                  Sign in with X
+                  <ArrowRightIcon className="ml-2 size-[18px] opacity-85 transition-transform group-hover:translate-x-1" />
+                </Button>
 
-                {errorMessage && (
-                  <div
-                    role="alert"
-                    className="animate-fade-in max-w-[600px] rounded-[24px] border border-destructive/30 bg-destructive/10 p-5 text-[14.5px] leading-relaxed text-destructive sm:p-6"
-                  >
-                    {errorMessage}
-                  </div>
-                )}
-
-                <div className="animate-fade-in-up stagger-6 flex flex-col items-start gap-4">
-                  <Button
-                    size="lg"
-                    onClick={handleSignIn}
-                    className="group h-[60px] rounded-full border-0 bg-primary px-8 text-[1.05rem] font-semibold text-primary-foreground shadow-[0_16px_40px_rgba(74,123,255,0.35)] transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_20px_48px_rgba(74,123,255,0.45)]"
-                  >
-                    <XLogoMark
-                      className="mr-2.5 size-[22px] text-primary-foreground"
-                      title={undefined}
-                    />
-                    Sign in with X
-                    <ArrowRightIcon className="ml-1.5 size-[18px] opacity-80 transition-transform group-hover:translate-x-1" />
-                  </Button>
-
-                  <p className="flex items-center gap-2.5 text-[13.5px] text-muted-foreground/90">
-                    <span className="size-1.5 shrink-0 rounded-full bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-                    Read-only bookmark access — no posting, no feed clutter.
-                  </p>
-                </div>
+                <p className="flex items-center gap-2.5 text-[13.5px] text-[#B8C6DA] drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)]">
+                  <span className="size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_12px_rgba(10,132,255,0.7)]" />
+                  Read-only bookmark access. No posting, no feed clutter.
+                </p>
               </div>
             </div>
           </section>
 
           <aside
-            className="animate-fade-in-up stagger-3 relative isolate hidden overflow-hidden rounded-[34px] border border-foreground/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_24px_80px_rgba(0,0,0,0.36)] backdrop-blur-[10px] lg:flex lg:flex-col"
+            className="animate-fade-in-up stagger-3 relative isolate min-w-0 overflow-hidden rounded-[34px] border border-white/15 bg-[#071427]/65 p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_24px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl sm:p-8 lg:p-8"
             style={{
               background:
-                "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)",
+                "linear-gradient(180deg, rgba(12,18,30,0.82) 0%, rgba(4,12,24,0.70) 100%)",
             }}
           >
             <OrbitRings
-              className="pointer-events-none absolute -right-20 -top-6 h-[280px] w-[360px] text-primary/55"
-            />
-            <OrbitRings
-              className="pointer-events-none absolute -bottom-24 -left-16 h-[240px] w-[320px] -scale-x-100 text-foreground/30"
+              className="pointer-events-none absolute -right-24 top-14 h-[260px] w-[360px] text-primary/35"
             />
 
-            <div className="relative z-10 border-b border-foreground/10 px-[32px] py-[30px]">
-              <p className="text-[12.5px] uppercase tracking-[0.18em] text-muted-foreground/75">
-                How it works
+            <div className="relative z-10">
+              <p className="text-[13px] font-bold uppercase tracking-[0.22em] text-[#A9B9D1]">
+                HOW IT WORKS
               </p>
-              <h2 className="heading-font mt-[12px] max-w-[340px] text-[32px] leading-[1.1] font-semibold tracking-[-0.01em] text-foreground">
+              <h2 className="heading-font mt-5 max-w-[320px] text-[2.25rem] font-extrabold leading-[1.08] tracking-[-0.05em] text-white drop-shadow-[0_2px_22px_rgba(0,0,0,0.76)] sm:text-[2.45rem]">
                 Let Grok do the sorting.
               </h2>
-              <p className="mt-3.5 max-w-[360px] text-[15px] leading-relaxed text-muted-foreground/85">
-                Import your X bookmarks, review Grok&apos;s suggestions, and build
-                a searchable library you control.
+              <p className="mt-5 max-w-[310px] text-[1rem] leading-[1.7] text-[#C2CEE0]">
+                Import your X bookmarks, review Grok&apos;s suggestions, and build a
+                searchable library you control.
               </p>
             </div>
 
-            <div className="relative z-10 px-[32px]">
+            <div className="relative z-10 mt-8 flex flex-col">
               {FEATURE_ROWS.map((feature) => (
                 <div
                   key={feature.step}
-                  className="flex items-start gap-[20px] border-t border-foreground/10 py-[18px] first:border-t-0"
+                  className="group flex items-center gap-4 border-t border-white/[0.06] py-4 first:border-t-0"
                 >
-                  <div
-                    className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[14.5px] font-semibold ${
-                      feature.emphasized
-                        ? "bg-primary/20 text-primary/85 ring-1 ring-primary/30"
-                        : "bg-foreground/5 text-muted-foreground"
-                    }`}
-                  >
+                  <span className="font-mono text-[13px] font-medium text-white/40">
                     {feature.step}
-                    {feature.emphasized ? (
-                      <span
-                        aria-hidden
-                        className="absolute -right-1.5 -top-1.5 inline-flex size-[18px] items-center justify-center rounded-full border border-background bg-primary text-primary-foreground"
-                      >
-                        <GrokMark className="size-2.5" title={undefined} />
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="min-w-0 space-y-1.5 pt-0.5">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h3 className="heading-font text-[17.5px] leading-[22px] font-semibold tracking-[-0.005em] text-foreground">
-                        {feature.title}
-                      </h3>
-                      {feature.badge ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-primary/85">
-                          <GrokMark className="size-3" title={undefined} />
-                          {feature.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="max-w-[320px] text-[14.5px] leading-relaxed text-muted-foreground/80">
-                      {feature.description}
-                    </p>
-                  </div>
+                  </span>
+                  <FeatureIcon icon={feature.icon} className="size-[16px] text-white/60" />
+                  <h3 className="min-w-0 text-[15px] font-semibold tracking-[-0.01em] text-white/90">
+                    {feature.title}
+                  </h3>
                 </div>
               ))}
+            </div>
+
+            <div className="relative z-10 mt-8 flex items-start gap-3.5 rounded-[22px] border border-primary/20 bg-primary/[0.08] p-4 text-[13.5px] leading-relaxed text-[#BFD0E7]">
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15 text-primary">
+                <GrokMark className="size-4" title="Grok" />
+              </span>
+              <p>
+                <span className="font-semibold text-white">
+                  AI-assisted, not AI-replaced.
+                </span>{" "}
+                Grok suggests tags and collections; you approve every move.
+                Scans run with{" "}
+                <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] text-white/90">
+                  store: false
+                </code>
+                .
+              </p>
             </div>
           </aside>
         </div>
       </main>
 
-      <footer className="relative z-10 mx-auto w-full max-w-[1440px] px-4 pb-5 sm:px-8 sm:pb-6 lg:px-12 lg:pb-8">
-        <div className="flex flex-col gap-2 border-t border-foreground/[0.06] pt-5 text-[12.5px] text-muted-foreground/70 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
-          </p>
-          <p className="font-mono text-[11.5px] uppercase tracking-[0.2em] text-muted-foreground/50">
-            MarkMaster
-          </p>
-        </div>
+      <footer className="relative z-10 mx-auto w-full max-w-[1440px] px-5 pb-6 text-center text-[13px] text-[#AEBBD0]/70 sm:px-8 lg:px-[72px] lg:pb-8">
+        © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
       </footer>
     </div>
   );
