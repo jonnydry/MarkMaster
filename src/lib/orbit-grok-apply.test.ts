@@ -22,7 +22,7 @@ describe("applyOrbitScanPlan", () => {
   });
 
   it("creates a new tag and records bookmark tag assignments", async () => {
-    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
@@ -109,7 +109,7 @@ describe("applyOrbitScanPlan", () => {
   });
 
   it("skips creating a collection when only one bookmark maps to a new bucket", async () => {
-    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
@@ -160,7 +160,7 @@ describe("applyOrbitScanPlan", () => {
   });
 
   it("reuses an existing tag (case-insensitive) instead of creating a duplicate", async () => {
-    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([
       { id: "t-existing", userId: "u1", name: "AI", color: "#1d9bf0" },
     ]);
@@ -220,7 +220,7 @@ describe("applyOrbitScanPlan", () => {
   });
 
   it("assigns tags whose normalized names contain colons", async () => {
-    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
@@ -283,7 +283,7 @@ describe("applyOrbitScanPlan", () => {
   });
 
   it("appends a single bookmark to an existing collection instead of skipping it", async () => {
-    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" }]);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([
       {

@@ -223,9 +223,9 @@ export function OrbitalAuthExperience({
               </div>
 
               <h1 className="animate-fade-in-up stagger-2 heading-font mt-14 max-w-[540px] text-[3.35rem] font-extrabold leading-[0.98] tracking-[-0.055em] text-white drop-shadow-[0_5px_34px_rgba(0,0,0,0.9)] sm:text-[4.25rem] lg:mt-[78px] lg:text-[4.55rem]">
-                <span className="block">A home for your</span>
+                <span className="block">Put your X bookmarks in</span>
                 <span className="block text-primary drop-shadow-[0_0_32px_rgba(10,132,255,0.56)]">
-                  X bookmarks.
+                  Orbit
                 </span>
               </h1>
 

@@ -1,6 +1,15 @@
 import { isValidElement } from "react";
+import type { ReactNode, ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { highlightPlainText, highlightTweetText } from "@/lib/text-highlighter";
+
+type ElementWithProps = ReactElement<{
+  className?: string;
+  href?: string;
+}>;
+
+const isElement = (node: ReactNode): node is ElementWithProps =>
+  isValidElement(node);
 
 describe("text highlighter", () => {
   it("returns plain text when there is no query match", () => {
@@ -11,31 +20,28 @@ describe("text highlighter", () => {
     const highlighted = highlightPlainText("Alpha beta alpha", "alpha");
 
     expect(Array.isArray(highlighted)).toBe(true);
-    const nodes = highlighted as unknown[];
-    expect(isValidElement(nodes[0])).toBe(true);
+    const nodes = highlighted as ReactNode[];
+    expect(isElement(nodes[0])).toBe(true);
     expect(nodes[1]).toBe(" beta ");
-    expect(isValidElement(nodes[2])).toBe(true);
+    expect(isElement(nodes[2])).toBe(true);
   });
 
   it("preserves mention and URL rendering while highlighting mentions", () => {
-    const highlighted = highlightTweetText("Read this from @Ada https://x.com/a", "ada");
+    const highlighted = highlightTweetText(
+      "Read this from @Ada https://x.com/a",
+      "ada"
+    );
 
     expect(Array.isArray(highlighted)).toBe(true);
-    const nodes = highlighted as unknown[];
-    expect(nodes.some((node) => isValidElement(node))).toBe(true);
+    const nodes = highlighted as ReactNode[];
+    const elements = nodes.filter(isElement);
+    expect(elements.length).toBeGreaterThan(0);
     expect(
-      nodes.some(
-        (node) =>
-          isValidElement(node) &&
-          node.props.className === "font-medium text-primary"
-      )
+      elements.some((el) => el.props.className === "font-medium text-primary")
     ).toBe(true);
     expect(
-      nodes.some(
-        (node) =>
-          isValidElement(node) &&
-          node.type === "a" &&
-          node.props.href === "https://x.com/a"
+      elements.some(
+        (el) => el.type === "a" && el.props.href === "https://x.com/a"
       )
     ).toBe(true);
   });
