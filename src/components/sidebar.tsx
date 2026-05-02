@@ -136,7 +136,7 @@ export function Sidebar({
                 isActive
                   ? "menu-selection-active font-medium"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }${expanded ? " h-10 gap-3" : " h-10 w-10 justify-center"}`}
+              }${expanded ? " h-10 gap-3 px-2.5" : " h-10 w-10 justify-center"}`}
             >
               <Icon className="size-5 shrink-0" />
               {expanded && (

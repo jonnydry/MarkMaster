@@ -21,7 +21,7 @@ import {
   type SimulationNodeDatum,
 } from "d3-force";
 
-import { Minus, Plus, RotateCcw } from "lucide-react";
+import { Clock, Filter, Layers, Minus, Plus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   OrbitGraphEdge,
@@ -68,9 +68,11 @@ type NodeDatum = SimulationNodeDatum & {
   };
 };
 
+type LinkKind = OrbitGraphEdge["kind"] | "bookmark-bookmark";
+
 type LinkDatum = SimulationLinkDatum<NodeDatum> & {
   edge: OrbitGraphEdge;
-  kind: OrbitGraphEdge["kind"];
+  kind: LinkKind;
 };
 
 const DPR_CAP = 2;
@@ -172,6 +174,56 @@ function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
+/* ------------------------------------------------------------------ */
+// Deterministic seeding + position persistence
+/* ------------------------------------------------------------------ */
+
+const POSITIONS_STORAGE_KEY = "orbit-map-positions-v1";
+const MAX_B2B_EDGES = 400;
+
+type GraphFilter = "all" | "loose" | "recent";
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function seededPosition(id: string): { x: number; y: number } {
+  const h = hashString(id);
+  const angle = (h % 10000) / 10000 * Math.PI * 2;
+  const radius = 120 + ((h >> 8) % 10000) / 10000 * 200;
+  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+}
+
+function saveNodePositions(nodes: NodeDatum[]) {
+  try {
+    const data = Object.fromEntries(
+      nodes
+        .filter((n) => n.x !== undefined && n.y !== undefined)
+        .map((n) => [n.node.id, { x: n.x, y: n.y }])
+    );
+    localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function loadNodePositions(): Map<string, { x: number; y: number }> {
+  try {
+    const raw = localStorage.getItem(POSITIONS_STORAGE_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, { x: number; y: number }>;
+    return new Map(Object.entries(parsed));
+  } catch {
+    return new Map();
+  }
+}
+
+/* ------------------------------------------------------------------ */
+
 export const OrbitMapCanvas = forwardRef<
   OrbitMapCanvasHandle,
   OrbitMapCanvasProps
@@ -219,6 +271,24 @@ export const OrbitMapCanvas = forwardRef<
     startDist: number;
     moved: boolean;
   } | null>(null);
+
+  const [activeFilter, setActiveFilter] = useState<GraphFilter>("all");
+  const [hoverCard, setHoverCard] = useState<{
+    node: NodeDatum;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+
+  // Pre-compute overflow counts from raw data.
+  const overflowCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const node of data.nodes) {
+      if (node.kind === "overflow") {
+        map.set(node.anchorId, node.remaining);
+      }
+    }
+    return map;
+  }, [data]);
 
   // Filter the raw graph to just nodes we want to render. Overflow markers
   // disappear — the rail surfaces the truncation count instead.
@@ -284,16 +354,28 @@ export const OrbitMapCanvas = forwardRef<
   // --- build nodes + links + simulation when data changes ---
   useEffect(() => {
     const prevById = nodesByIdRef.current;
+    const savedPositions = loadNodePositions();
 
     const nextNodes: NodeDatum[] = renderableData.nodes.map((node) => {
       const existing = prevById.get(node.id);
       const radius = getNodeRadius(node);
+      let x = existing?.x;
+      let y = existing?.y;
+
+      if (x === undefined || y === undefined) {
+        const saved = savedPositions.get(node.id);
+        if (saved) {
+          x = saved.x;
+          y = saved.y;
+        }
+      }
+
       return {
         ...existing,
         node,
         radius,
-        x: existing?.x,
-        y: existing?.y,
+        x,
+        y,
         vx: existing?.vx ?? 0,
         vy: existing?.vy ?? 0,
         fx: existing?.fx,
@@ -355,6 +437,50 @@ export const OrbitMapCanvas = forwardRef<
       ];
     });
 
+    // --- bookmark-to-bookmark edges via shared tags ---
+    const tagToBookmarks = new Map<string, string[]>();
+    for (const edge of renderableData.edges) {
+      if (edge.kind === "bookmark-tag") {
+        const list = tagToBookmarks.get(edge.tagId) ?? [];
+        list.push(edge.bookmarkId);
+        tagToBookmarks.set(edge.tagId, list);
+      }
+    }
+
+    const pairShared = new Map<string, number>();
+    for (const [, bIds] of tagToBookmarks) {
+      if (bIds.length < 2) continue;
+      for (let i = 0; i < bIds.length; i++) {
+        for (let j = i + 1; j < bIds.length; j++) {
+          const a = bIds[i];
+          const b = bIds[j];
+          if (a === b) continue;
+          const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+          pairShared.set(key, (pairShared.get(key) ?? 0) + 1);
+        }
+      }
+    }
+
+    const b2bEntries = Array.from(pairShared.entries())
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_B2B_EDGES);
+
+    for (const [key] of b2bEntries) {
+      const [a, b] = key.split("|");
+      const source = nextById.get(a);
+      const target = nextById.get(b);
+      if (!source || !target) continue;
+      pushAdj(a, b);
+      pushAdj(b, a);
+      nextLinks.push({
+        source,
+        target,
+        edge: { kind: "loose", bookmarkId: a } as OrbitGraphEdge,
+        kind: "bookmark-bookmark",
+      });
+    }
+
     nodesRef.current = nextNodes;
     linksRef.current = nextLinks;
     adjacencyRef.current = adjacency;
@@ -364,6 +490,8 @@ export const OrbitMapCanvas = forwardRef<
     if (simulationRef.current) {
       simulationRef.current.stop();
     }
+
+    let savedPositionsOnce = false;
 
     const simulation = forceSimulation<NodeDatum, LinkDatum>(nextNodes)
       .alphaDecay(0.025)
@@ -380,6 +508,8 @@ export const OrbitMapCanvas = forwardRef<
                 return 68;
               case "loose":
                 return 140;
+              case "bookmark-bookmark":
+                return 42;
               default:
                 return 80;
             }
@@ -392,6 +522,8 @@ export const OrbitMapCanvas = forwardRef<
                 return 0.55;
               case "loose":
                 return 0.04;
+              case "bookmark-bookmark":
+                return 0.1;
               default:
                 return 0.2;
             }
@@ -418,18 +550,20 @@ export const OrbitMapCanvas = forwardRef<
           .strength(0.8)
       )
       .force("center", forceCenter(0, 0).strength(0.06))
-    .on("tick", () => {
-      needsRenderRef.current = true;
-    });
+      .on("tick", () => {
+        needsRenderRef.current = true;
+        if (!savedPositionsOnce && simulation.alpha() < 0.02) {
+          savedPositionsOnce = true;
+          saveNodePositions(nextNodes);
+        }
+      });
 
-    // Seed unseeded nodes in a loose disc so the first paint doesn't show a
-    // violent explosion.
+    // Seed unseeded nodes deterministically so layouts are stable across reloads.
     for (const node of nextNodes) {
       if (node.x === undefined || node.y === undefined) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 120 + Math.random() * 200;
-        node.x = Math.cos(angle) * radius;
-        node.y = Math.sin(angle) * radius;
+        const pos = seededPosition(node.node.id);
+        node.x = pos.x;
+        node.y = pos.y;
       }
     }
 
@@ -437,6 +571,7 @@ export const OrbitMapCanvas = forwardRef<
     simulation.alpha(0.9).restart();
 
     return () => {
+      saveNodePositions(nextNodes);
       simulation.stop();
     };
   }, [renderableData]);
@@ -501,6 +636,24 @@ export const OrbitMapCanvas = forwardRef<
       const links = linksRef.current;
       const adjacency = adjacencyRef.current;
       const now = performance.now();
+
+      // Build visible-node set based on active filter.
+      const visibleNodeIds = new Set<string>();
+      for (const datum of nodes) {
+        if (activeFilter === "all") {
+          visibleNodeIds.add(datum.node.id);
+        } else if (activeFilter === "loose") {
+          if (datum.node.kind === "core" || datum.node.kind === "bookmark" && !datum.node.affiliated) {
+            visibleNodeIds.add(datum.node.id);
+          }
+        } else if (activeFilter === "recent") {
+          if (datum.node.kind !== "bookmark") {
+            visibleNodeIds.add(datum.node.id);
+          } else if (datum.node.recent) {
+            visibleNodeIds.add(datum.node.id);
+          }
+        }
+      }
 
       // Animate simple straight-line assignments.
       let animating = false;
@@ -569,16 +722,26 @@ export const OrbitMapCanvas = forwardRef<
         if (source.x === undefined || source.y === undefined) continue;
         if (target.x === undefined || target.y === undefined) continue;
 
+        // Skip edges that connect to an invisible node.
+        if (!visibleNodeIds.has(source.node.id) || !visibleNodeIds.has(target.node.id)) {
+          continue;
+        }
+
         const touchesActive =
           activeId !== null &&
           (source.node.id === activeId || target.node.id === activeId);
 
         let alpha = 0.18;
-        if (activeId) {
+        let lineWidth = 0.6;
+        if (link.kind === "bookmark-bookmark") {
+          alpha = activeId ? (touchesActive ? 0.35 : 0.03) : 0.06;
+          lineWidth = 0.4;
+        } else if (activeId) {
           alpha = touchesActive ? 0.6 : 0.06;
+          lineWidth = touchesActive ? 1 : 0.6;
         }
         ctx.strokeStyle = `${linkRgb}${alpha})`;
-        ctx.lineWidth = (touchesActive ? 1 : 0.6) / view.zoom;
+        ctx.lineWidth = lineWidth / view.zoom;
 
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
@@ -590,6 +753,7 @@ export const OrbitMapCanvas = forwardRef<
       for (const datum of nodes) {
         if (datum.node.kind !== "bookmark") continue;
         if (datum.x === undefined || datum.y === undefined) continue;
+        if (!visibleNodeIds.has(datum.node.id)) continue;
 
         const dimmed = isDimmed(datum.node.id);
         const isActive = activeId === datum.node.id;
@@ -616,6 +780,7 @@ export const OrbitMapCanvas = forwardRef<
       for (const datum of nodes) {
         if (!isAnchorKind(datum.node.kind)) continue;
         if (datum.x === undefined || datum.y === undefined) continue;
+        if (!visibleNodeIds.has(datum.node.id)) continue;
 
         const dimmed = isDimmed(datum.node.id);
         const isActive = activeId === datum.node.id;
@@ -641,12 +806,15 @@ export const OrbitMapCanvas = forwardRef<
         const label = getAnchorLabel(datum.node);
         if (!label) continue;
 
+        const overflow = overflowCounts.get(datum.node.id);
+        const fullLabel = overflow ? `${label} +${overflow}` : label;
+
         ctx.font = labelFont;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         const labelAlpha = dimmed ? 0.25 : isActive ? 1 : 0.78;
         ctx.fillStyle = `rgba(226, 232, 240, ${labelAlpha})`;
-        ctx.fillText(label, datum.x, datum.y + datum.radius + 4 / view.zoom);
+        ctx.fillText(fullLabel, datum.x, datum.y + datum.radius + 4 / view.zoom);
       }
 
       // --- focus pulse on a predicted anchor (arrival target) ---
@@ -696,7 +864,7 @@ export const OrbitMapCanvas = forwardRef<
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [size.height, size.width]);
+  }, [size.height, size.width, activeFilter, overflowCounts]);
 
   // --- hit testing ---
   const findNodeAt = useCallback(
@@ -738,6 +906,7 @@ export const OrbitMapCanvas = forwardRef<
         moved: false,
       };
       setIsDragging(true);
+      setHoverCard(null);
       needsRenderRef.current = true;
       applyCursor();
     },
@@ -752,6 +921,7 @@ export const OrbitMapCanvas = forwardRef<
         const dy = event.clientY - drag.y;
         if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 3) {
           drag.moved = true;
+          setHoverCard(null);
           applyCursor();
         }
         if (drag.moved) {
@@ -772,9 +942,32 @@ export const OrbitMapCanvas = forwardRef<
         if (onHoverChange) {
           onHoverChange(hovered ? getNodeIdentity(hovered.node) : null);
         }
+
+        if (hovered && hovered.node.kind === "bookmark" && hovered.x !== undefined && hovered.y !== undefined) {
+          const container = containerRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const view = viewRef.current;
+            const screenX = rect.left + rect.width / 2 + view.x + hovered.x * view.zoom;
+            const screenY = rect.top + rect.height / 2 + view.y + hovered.y * view.zoom;
+            setHoverCard({ node: hovered, screenX, screenY });
+          }
+        } else {
+          setHoverCard(null);
+        }
+      } else if (hovered && hovered.node.kind === "bookmark" && hoverCard && hovered.x !== undefined && hovered.y !== undefined) {
+        // Update position while hovering (e.g. during subtle pan)
+        const container = containerRef.current;
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const view = viewRef.current;
+          const screenX = rect.left + rect.width / 2 + view.x + hovered.x * view.zoom;
+          const screenY = rect.top + rect.height / 2 + view.y + hovered.y * view.zoom;
+          setHoverCard({ node: hovered, screenX, screenY });
+        }
       }
     },
-    [applyCursor, findNodeAt, onHoverChange]
+    [applyCursor, findNodeAt, onHoverChange, hoverCard]
   );
 
   const handleMouseUp = useCallback(
@@ -799,6 +992,7 @@ export const OrbitMapCanvas = forwardRef<
   const handleMouseLeave = useCallback(() => {
     isDraggingRef.current = null;
     setIsDragging(false);
+    setHoverCard(null);
     needsRenderRef.current = true;
     if (hoverRef.current) {
       hoverRef.current = null;
@@ -984,6 +1178,7 @@ export const OrbitMapCanvas = forwardRef<
       view.x = cursorX - worldX * nextZoom;
       view.y = cursorY - worldY * nextZoom;
       needsRenderRef.current = true;
+      setHoverCard(null);
     };
 
     container.addEventListener("wheel", onWheel, { passive: false });
@@ -1123,6 +1318,76 @@ export const OrbitMapCanvas = forwardRef<
       onTouchEnd={handleTouchEnd}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
+
+      {/* Filter toolbar */}
+      <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-1 rounded-xl border border-white/10 bg-black/60 p-1 shadow-lg backdrop-blur-sm">
+        {(
+          [
+            { key: "all", label: "All", icon: Layers },
+            { key: "loose", label: "Loose", icon: Filter },
+            { key: "recent", label: "Recent", icon: Clock },
+          ] as const
+        ).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              setActiveFilter(key);
+              needsRenderRef.current = true;
+            }}
+            className={cn(
+              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors",
+              activeFilter === key
+                ? "bg-white/15 text-white"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
+            )}
+            title={label}
+          >
+            <Icon className="size-3.5" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Hover card */}
+      {hoverCard && hoverCard.node.node.kind === "bookmark" && (
+        <div
+          className="pointer-events-none absolute z-20 w-64 rounded-xl border border-white/10 bg-[#0f1525]/95 p-3 shadow-xl backdrop-blur-md"
+          style={{
+            left: Math.min(
+              Math.max(hoverCard.screenX + 14, 8),
+              size.width - 264
+            ),
+            top: Math.min(
+              Math.max(hoverCard.screenY + 14, 8),
+              size.height - 120
+            ),
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-block size-2 rounded-full",
+                hoverCard.node.node.affiliated
+                  ? "bg-slate-200"
+                  : "bg-amber-300"
+              )}
+            />
+            <span className="truncate text-xs font-semibold text-white">
+              @{hoverCard.node.node.authorUsername}
+            </span>
+          </div>
+          <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-white/75">
+            {hoverCard.node.node.title}
+          </p>
+          {hoverCard.node.node.recent && (
+            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-sky-200/80">
+              <Clock className="size-3" />
+              Recent
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Zoom controls */}
       <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col gap-1.5">
