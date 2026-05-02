@@ -180,8 +180,33 @@ function hexToRgb(hex: string): [number, number, number] {
 
 const POSITIONS_STORAGE_KEY = "orbit-map-positions-v1";
 const MAX_B2B_EDGES = 400;
+const MAX_BOOKMARKS_PER_SHARED_TAG_EDGE_PASS = 80;
 
 type GraphFilter = "all" | "loose" | "recent";
+
+function isNodeVisibleForFilter(
+  node: OrbitGraphNode,
+  filter: GraphFilter
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "loose") {
+    return (
+      node.kind === "core" || (node.kind === "bookmark" && !node.affiliated)
+    );
+  }
+  if (node.kind !== "bookmark") return true;
+  return node.recent;
+}
+
+function buildVisibleNodeIds(nodes: NodeDatum[], filter: GraphFilter) {
+  const visibleNodeIds = new Set<string>();
+  for (const datum of nodes) {
+    if (isNodeVisibleForFilter(datum.node, filter)) {
+      visibleNodeIds.add(datum.node.id);
+    }
+  }
+  return visibleNodeIds;
+}
 
 function hashString(str: string): number {
   let hash = 0;
@@ -245,6 +270,7 @@ export const OrbitMapCanvas = forwardRef<
   const nodesRef = useRef<NodeDatum[]>([]);
   const linksRef = useRef<LinkDatum[]>([]);
   const nodesByIdRef = useRef<Map<string, NodeDatum>>(new Map());
+  const visibleNodeIdsRef = useRef<Set<string>>(new Set());
   // Adjacency map: node id -> set of 1-hop neighbor ids. Used for the
   // Obsidian-style dim-the-rest highlight.
   const adjacencyRef = useRef<Map<string, Set<string>>>(new Map());
@@ -273,6 +299,7 @@ export const OrbitMapCanvas = forwardRef<
   } | null>(null);
 
   const [activeFilter, setActiveFilter] = useState<GraphFilter>("all");
+  const activeFilterRef = useRef<GraphFilter>("all");
   const [hoverCard, setHoverCard] = useState<{
     node: NodeDatum;
     screenX: number;
@@ -350,6 +377,14 @@ export const OrbitMapCanvas = forwardRef<
   useEffect(() => {
     focusRef.current = focus ?? null;
   }, [focus]);
+
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+    visibleNodeIdsRef.current = buildVisibleNodeIds(
+      nodesRef.current,
+      activeFilter
+    );
+  }, [activeFilter]);
 
   // --- build nodes + links + simulation when data changes ---
   useEffect(() => {
@@ -450,10 +485,14 @@ export const OrbitMapCanvas = forwardRef<
     const pairShared = new Map<string, number>();
     for (const [, bIds] of tagToBookmarks) {
       if (bIds.length < 2) continue;
-      for (let i = 0; i < bIds.length; i++) {
-        for (let j = i + 1; j < bIds.length; j++) {
-          const a = bIds[i];
-          const b = bIds[j];
+      const cappedBookmarkIds = bIds.slice(
+        0,
+        MAX_BOOKMARKS_PER_SHARED_TAG_EDGE_PASS
+      );
+      for (let i = 0; i < cappedBookmarkIds.length; i++) {
+        for (let j = i + 1; j < cappedBookmarkIds.length; j++) {
+          const a = cappedBookmarkIds[i];
+          const b = cappedBookmarkIds[j];
           if (a === b) continue;
           const key = a < b ? `${a}|${b}` : `${b}|${a}`;
           pairShared.set(key, (pairShared.get(key) ?? 0) + 1);
@@ -484,6 +523,10 @@ export const OrbitMapCanvas = forwardRef<
     nodesRef.current = nextNodes;
     linksRef.current = nextLinks;
     adjacencyRef.current = adjacency;
+    visibleNodeIdsRef.current = buildVisibleNodeIds(
+      nextNodes,
+      activeFilterRef.current
+    );
 
     // Obsidian-like layout: no radial rings, no pinned hub. Light center
     // force + repulsion + collision keeps the graph legible.
@@ -637,23 +680,8 @@ export const OrbitMapCanvas = forwardRef<
       const adjacency = adjacencyRef.current;
       const now = performance.now();
 
-      // Build visible-node set based on active filter.
-      const visibleNodeIds = new Set<string>();
-      for (const datum of nodes) {
-        if (activeFilter === "all") {
-          visibleNodeIds.add(datum.node.id);
-        } else if (activeFilter === "loose") {
-          if (datum.node.kind === "core" || datum.node.kind === "bookmark" && !datum.node.affiliated) {
-            visibleNodeIds.add(datum.node.id);
-          }
-        } else if (activeFilter === "recent") {
-          if (datum.node.kind !== "bookmark") {
-            visibleNodeIds.add(datum.node.id);
-          } else if (datum.node.recent) {
-            visibleNodeIds.add(datum.node.id);
-          }
-        }
-      }
+      const visibleNodeIds = buildVisibleNodeIds(nodes, activeFilter);
+      visibleNodeIdsRef.current = visibleNodeIds;
 
       // Animate simple straight-line assignments.
       let animating = false;
@@ -880,12 +908,19 @@ export const OrbitMapCanvas = forwardRef<
 
       // Iterate in reverse so anchors (drawn last) win ties.
       const nodes = nodesRef.current;
+      const visibleNodeIds = visibleNodeIdsRef.current;
       for (let i = nodes.length - 1; i >= 0; i -= 1) {
         const node = nodes[i];
         if (node.x === undefined || node.y === undefined) continue;
+        if (visibleNodeIds.size > 0 && !visibleNodeIds.has(node.node.id)) {
+          continue;
+        }
         const dx = localX - node.x;
         const dy = localY - node.y;
-        const hitRadius = Math.max(node.radius + 4, isAnchorKind(node.node.kind) ? 10 : 4);
+        const hitRadius = Math.max(
+          node.radius + 4,
+          isAnchorKind(node.node.kind) ? 10 : 4
+        );
         if (dx * dx + dy * dy <= hitRadius * hitRadius) {
           return node;
         }
@@ -1332,6 +1367,10 @@ export const OrbitMapCanvas = forwardRef<
             key={key}
             type="button"
             onClick={() => {
+              visibleNodeIdsRef.current = buildVisibleNodeIds(
+                nodesRef.current,
+                key
+              );
               setActiveFilter(key);
               needsRenderRef.current = true;
             }}

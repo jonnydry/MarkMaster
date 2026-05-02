@@ -3,9 +3,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { fetchJson } from "@/lib/fetch-json";
+import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
 import type { OrbitGraphPayload } from "@/types";
-
-export const ORBIT_GRAPH_QUERY_KEY = ["orbit", "graph"] as const;
 
 export function useOrbitGraphQuery() {
   return useQuery<OrbitGraphPayload>({

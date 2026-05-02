@@ -4,7 +4,10 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { sendJson } from "@/lib/fetch-json";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import {
+  invalidateLibraryQueries,
+  invalidateOrbitGraphQuery,
+} from "@/lib/query-invalidation";
 import type { BookmarkWithRelations } from "@/types";
 
 function asBookmarkIds(bookmarkIds: string | string[]) {
@@ -74,6 +77,7 @@ export function useBookmarkActions() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
+      void invalidateOrbitGraphQuery(queryClient);
     },
   });
 
@@ -124,6 +128,7 @@ export function useBookmarkActions() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
+      void invalidateOrbitGraphQuery(queryClient);
     },
   });
 
@@ -199,6 +204,7 @@ export function useBookmarkActions() {
       queryClient.invalidateQueries({
         queryKey: ["collection", vars.collectionId],
       });
+      void invalidateOrbitGraphQuery(queryClient);
     },
   });
 
@@ -240,6 +246,7 @@ export function useBookmarkActions() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void invalidateOrbitGraphQuery(queryClient);
     },
   });
 

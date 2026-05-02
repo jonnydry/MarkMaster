@@ -127,8 +127,9 @@ export default function OrbitMapPage() {
         params.delete("select");
         params.delete("kind");
         params.delete("bookmark");
+        params.delete("focus");
+        params.delete("anchor");
       }
-      // Preserve focus/anchor params; remove select when clearing.
       const query = params.toString();
       router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
         scroll: false,
@@ -206,15 +207,19 @@ export default function OrbitMapPage() {
   }, [graph, searchDeferred]);
 
   useEffect(() => {
-    if (!focus || !graph) return;
+    if (!focusBookmarkIdParam || !graph) return;
+    const bookmarkExists = graph.nodes.some(
+      (node) => node.kind === "bookmark" && node.id === focusBookmarkIdParam
+    );
+    if (!bookmarkExists) return;
     const handle = window.setTimeout(() => {
       canvasRef.current?.focusOn({
         kind: "bookmark",
-        id: focus.bookmarkId,
+        id: focusBookmarkIdParam,
       });
     }, 60);
     return () => window.clearTimeout(handle);
-  }, [focus, graph]);
+  }, [focusBookmarkIdParam, graph]);
 
   const goToTagOnDashboard = useCallback(
     (tagId: string) => {

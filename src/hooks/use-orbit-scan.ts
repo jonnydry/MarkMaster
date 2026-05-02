@@ -139,7 +139,6 @@ export function useOrbitScan(): OrbitScanHandle {
         );
 
         await invalidateLibraryQueries(queryClient);
-        await queryClient.invalidateQueries({ queryKey: ["orbit", "graph"] });
 
         setDismissed((current) => {
           const next = new Set(current);
@@ -191,7 +190,6 @@ export function useOrbitScan(): OrbitScanHandle {
         );
 
         await invalidateLibraryQueries(queryClient);
-        await queryClient.invalidateQueries({ queryKey: ["orbit", "graph"] });
 
         setPlan(null);
         setDismissed(new Set());
@@ -252,7 +250,6 @@ export function useOrbitScan(): OrbitScanHandle {
         );
 
         await invalidateLibraryQueries(queryClient);
-        await queryClient.invalidateQueries({ queryKey: ["orbit", "graph"] });
 
         setDismissed((current) => {
           const next = new Set(current);
