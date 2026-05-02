@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import React, { useId, useMemo } from "react";
 import Link from "next/link";
 import {
   BarChart,
@@ -70,23 +70,29 @@ function SectionHeading({
   );
 }
 
-export function TopVoicesCard({
+export const TopVoicesCard = React.memo(function TopVoicesCard({
   authors,
   totalBookmarks,
 }: {
   authors: AnalyticsData["topAuthors"];
   totalBookmarks: number;
 }) {
-  const max = authors.reduce((m, a) => Math.max(m, a.count), 0) || 1;
-  const topShare =
-    totalBookmarks > 0
-      ? (authors.slice(0, 3).reduce((s, a) => s + a.count, 0) / totalBookmarks) * 100
-      : 0;
-  const topShareSingle =
-    totalBookmarks > 0 && authors.length > 0
-      ? (authors[0].count / totalBookmarks) * 100
-      : 0;
-  const overexposed = topShareSingle >= 15;
+  const max = useMemo(() => authors.reduce((m, a) => Math.max(m, a.count), 0) || 1, [authors]);
+  const topShare = useMemo(
+    () =>
+      totalBookmarks > 0
+        ? (authors.slice(0, 3).reduce((s, a) => s + a.count, 0) / totalBookmarks) * 100
+        : 0,
+    [authors, totalBookmarks]
+  );
+  const topShareSingle = useMemo(
+    () =>
+      totalBookmarks > 0 && authors.length > 0
+        ? (authors[0].count / totalBookmarks) * 100
+        : 0,
+    [authors, totalBookmarks]
+  );
+  const overexposed = useMemo(() => topShareSingle >= 15, [topShareSingle]);
 
   return (
     <Card className={`${chartCardClass} animate-fade-in-up`}>
@@ -183,30 +189,43 @@ export function TopVoicesCard({
       )}
     </Card>
   );
-}
+});
 
-export function ContentMixCard({
+export const ContentMixCard = React.memo(function ContentMixCard({
   breakdown,
 }: {
   breakdown: AnalyticsData["mediaBreakdown"];
 }) {
-  const total = breakdown.reduce((s, m) => s + m.count, 0);
-  const byKey = new Map(breakdown.map((b) => [b.type, b.count]));
-  const segments = MIX_SERIES.map((s) => ({
-    ...s,
-    count: byKey.get(s.key) ?? 0,
-    pct: total > 0 ? ((byKey.get(s.key) ?? 0) / total) * 100 : 0,
-  })).filter((s) => s.count > 0);
+  const total = useMemo(() => breakdown.reduce((s, m) => s + m.count, 0), [breakdown]);
+  const byKey = useMemo(() => new Map(breakdown.map((b) => [b.type, b.count])), [breakdown]);
+  const segments = useMemo(
+    () =>
+      MIX_SERIES.map((s) => ({
+        ...s,
+        count: byKey.get(s.key) ?? 0,
+        pct: total > 0 ? ((byKey.get(s.key) ?? 0) / total) * 100 : 0,
+      })).filter((s) => s.count > 0),
+    [byKey, total]
+  );
 
-  const chartData = [
-    segments.reduce<Record<string, number | string>>(
-      (acc, s) => {
-        acc[s.key] = s.pct;
-        return acc;
-      },
-      { name: "mix" }
-    ),
-  ];
+  const chartData = useMemo(
+    () => [
+      segments.reduce<Record<string, number | string>>(
+        (acc, s) => {
+          acc[s.key] = s.pct;
+          return acc;
+        },
+        { name: "mix" }
+      ),
+    ],
+    [segments]
+  );
+
+  const contentMixLabel = useMemo(() => {
+    if (segments.length === 0) return "Content mix chart";
+    const summary = segments.map((s) => `${s.pct.toFixed(0)}% ${s.label}`).join(", ");
+    return `Bar chart showing content mix: ${summary}`;
+  }, [segments]);
 
   return (
     <Card className={`${chartCardClass} animate-fade-in-up stagger-1`}>
@@ -219,7 +238,7 @@ export function ContentMixCard({
         <EmptyBox />
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="rounded-xl border border-hairline-soft bg-surface-2 p-3">
+          <div className="rounded-xl border border-hairline-soft bg-surface-2 p-3" role="img" aria-label={contentMixLabel}>
             <ResponsiveContainer width="100%" height={44}>
               <BarChart
                 data={chartData}
@@ -276,14 +295,14 @@ export function ContentMixCard({
       )}
     </Card>
   );
-}
+});
 
-export function TagRankCard({
+export const TagRankCard = React.memo(function TagRankCard({
   tags,
 }: {
   tags: AnalyticsData["tagDistribution"];
 }) {
-  const max = tags.reduce((m, t) => Math.max(m, t.count), 0) || 1;
+  const max = useMemo(() => tags.reduce((m, t) => Math.max(m, t.count), 0) || 1, [tags]);
   return (
     <Card className={`${chartCardClass} animate-fade-in-up stagger-2`}>
       <SectionHeading
@@ -327,9 +346,9 @@ export function TagRankCard({
       )}
     </Card>
   );
-}
+});
 
-export function TimelineCard({
+export const TimelineCard = React.memo(function TimelineCard({
   analytics,
   range,
   rangeControl,
@@ -346,6 +365,11 @@ export function TimelineCard({
     [timeline.data]
   );
 
+  const timelineLabel = useMemo(() => {
+    if (timeline.data.length === 0) return "Bookmarks over time chart";
+    return `Area chart showing ${rangeTotal.toLocaleString()} bookmarks over ${rangeLabel(range)}`;
+  }, [timeline.data.length, rangeTotal, range]);
+
   return (
     <Card className={`${chartCardClass} animate-fade-in-up stagger-3`}>
       <SectionHeading
@@ -359,7 +383,7 @@ export function TimelineCard({
       {timeline.data.length === 0 ? (
         <EmptyBox height={220} />
       ) : (
-        <div className="rounded-xl border border-hairline-soft bg-surface-2 px-3 py-4">
+        <div className="rounded-xl border border-hairline-soft bg-surface-2 px-3 py-4" role="img" aria-label={timelineLabel}>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
               data={timeline.data}
@@ -439,11 +463,12 @@ export function TimelineCard({
       )}
     </Card>
   );
-}
+});
 
 function EmptyBox({ height = 180 }: { height?: number }) {
   return (
     <div
+      role="status"
       style={{ height }}
       className="flex items-center justify-center rounded-xl border border-dashed border-hairline-soft bg-surface-2 text-sm text-muted-foreground"
     >

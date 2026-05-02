@@ -1,0 +1,5 @@
+Third-party marks (trademarks remain with their owners):
+
+- X / post display: Monochrome X logo and engagement-style glyphs follow X Developer display guidance. Official bitmaps: https://developer.x.com/en/docs/x-for-websites/web-intents/image-resources — brand logo assets: https://about.x.com/en/who-we-are/brand-toolkit
+
+- Grok: Symbol paths in src/components/brands/grok-mark.tsx trace the Feb 2025 Grok wordmark artwork documented at https://commons.wikimedia.org/wiki/File:Grok-feb-2025-logo.svg (source cited: grok.com). Use per https://x.ai/legal/brand-guidelines — prefer unaltered files from xAI when updating.

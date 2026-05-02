@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, FolderOpen, BarChart3, Settings, Layers } from "lucide-react";
+import { Bookmark, FolderOpen, BarChart3, Settings, Layers, Orbit } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
@@ -38,6 +38,7 @@ export interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
+  { href: "/orbit", icon: Orbit, label: "Orbit" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },
@@ -133,9 +134,9 @@ export function Sidebar({
               title={label}
               className={`flex items-center rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                 isActive
-                  ? "bg-primary/10 text-primary font-medium border-l-2 border-l-primary -ml-[2px] pl-[calc(0.75rem+2px)]"
+                  ? "menu-selection-active font-medium"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }${expanded ? " h-10 gap-3" : " h-10 w-10 justify-center"}`}
+              }${expanded ? " h-10 gap-3 px-2.5" : " h-10 w-10 justify-center"}`}
             >
               <Icon className="size-5 shrink-0" />
               {expanded && (
@@ -168,7 +169,7 @@ export function Sidebar({
                           aria-pressed={isSelected}
                           className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isSelected
-                              ? "bg-primary/10 text-foreground font-medium"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >
@@ -236,9 +237,9 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isCollectionActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >
@@ -288,9 +289,9 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-colors ${
+                          className={`flex w-full items-center justify-between rounded-md px-2.5 py-1 text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                             isCollectionActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              ? "menu-selection-active pr-6 font-medium"
                               : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                           }`}
                         >

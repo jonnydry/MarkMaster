@@ -77,7 +77,9 @@ function buildSlowPathWhereSql({
   dateFrom,
   dateTo,
   collectionId,
+  bookmarkId,
   mediaFilter,
+  unaffiliated,
 }: {
   userId: string;
   search: string;
@@ -86,7 +88,9 @@ function buildSlowPathWhereSql({
   dateFrom?: string;
   dateTo?: string;
   collectionId?: string;
+  bookmarkId?: string;
   mediaFilter: "all" | "images" | "video" | "links" | "text-only";
+  unaffiliated: boolean;
 }) {
   const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
 
@@ -129,12 +133,33 @@ function buildSlowPathWhereSql({
     conditions.push(Prisma.sql`b."tweetCreatedAt" < ${getNextDateStart(dateTo)}`);
   }
 
+  if (bookmarkId) {
+    conditions.push(Prisma.sql`b."id" = ${bookmarkId}`);
+  }
+
   if (collectionId) {
     conditions.push(Prisma.sql`
       EXISTS (
         SELECT 1
         FROM "CollectionItem" ci
         WHERE ci."bookmarkId" = b."id" AND ci."collectionId" = ${collectionId}
+      )
+    `);
+  }
+
+  if (unaffiliated) {
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "BookmarkTag" bt
+        WHERE bt."bookmarkId" = b."id"
+      )
+    `);
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "CollectionItem" ci
+        WHERE ci."bookmarkId" = b."id"
       )
     `);
   }
@@ -192,12 +217,15 @@ export async function GET(req: NextRequest) {
     tagFilter,
     dateFrom,
     dateTo,
+    bookmarkId,
     collectionId,
+    unaffiliated,
   } = parsed.data;
 
   const tagIds = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
+  const relationFilters: Prisma.BookmarkWhereInput[] = [];
 
   if (search) {
     where.OR = [
@@ -213,7 +241,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (tagIds.length > 0) {
-    where.tags = { some: { tagId: { in: tagIds } } };
+    relationFilters.push({ tags: { some: { tagId: { in: tagIds } } } });
   }
 
   if (dateFrom || dateTo) {
@@ -222,8 +250,21 @@ export async function GET(req: NextRequest) {
     if (dateTo) where.tweetCreatedAt.lt = getNextDateStart(dateTo);
   }
 
+  if (bookmarkId) {
+    where.id = bookmarkId;
+  }
+
   if (collectionId) {
-    where.collectionItems = { some: { collectionId } };
+    relationFilters.push({ collectionItems: { some: { collectionId } } });
+  }
+
+  if (unaffiliated) {
+    relationFilters.push({ tags: { none: {} } });
+    relationFilters.push({ collectionItems: { none: {} } });
+  }
+
+  if (relationFilters.length > 0) {
+    where.AND = relationFilters;
   }
 
   if (mediaFilter === "links") {
@@ -280,7 +321,9 @@ export async function GET(req: NextRequest) {
     dateFrom,
     dateTo,
     collectionId,
+    bookmarkId,
     mediaFilter,
+    unaffiliated,
   });
   const orderSql = getSlowPathOrderSql(sortField);
   const directionSql = Prisma.raw(sortDirection.toUpperCase());

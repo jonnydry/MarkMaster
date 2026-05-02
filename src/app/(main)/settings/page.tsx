@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Download,
-  Trash2,
   Sun,
   Moon,
   Tag,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -24,14 +22,14 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
-import { PRESET_COLORS } from "@/lib/constants";
 import { sendJson } from "@/lib/fetch-json";
 import {
   invalidateLibraryQueries,
   invalidateTagsQuery,
 } from "@/lib/query-invalidation";
 import { toast } from "sonner";
-import type { DbUser } from "@/lib/auth";
+import { TagRow } from "./tag-row";
+import { TagEditRow } from "./tag-edit-row";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -43,9 +41,7 @@ const CreateCollectionDialog = dynamic(
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
   const { createCollection } = useCreateCollection();
@@ -53,6 +49,7 @@ export default function SettingsPage() {
 
   const {
     data: tags = [],
+    isLoading: tagsLoading,
     isError: tagsError,
     error: tagsErrorValue,
     refetch: refetchTags,
@@ -69,7 +66,7 @@ export default function SettingsPage() {
   const [editTagName, setEditTagName] = useState("");
   const [editTagColor, setEditTagColor] = useState("");
 
-  const handleDeleteTag = async (tagId: string) => {
+  const handleDeleteTag = useCallback(async (tagId: string) => {
     if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
     try {
       await sendJson("/api/tags", {
@@ -83,13 +80,13 @@ export default function SettingsPage() {
         error instanceof Error ? error.message : "Could not delete tag"
       );
     }
-  };
+  }, [queryClient]);
 
-  const handleUpdateTag = async (tagId: string) => {
+  const handleUpdateTag = useCallback(async (tagId: string, name: string, color: string) => {
     try {
       await sendJson("/api/tags", {
         method: "PATCH",
-        body: { tagId, name: editTagName, color: editTagColor },
+        body: { tagId, name, color },
       });
       await invalidateTagsQuery(queryClient);
       setEditingTag(null);
@@ -99,7 +96,17 @@ export default function SettingsPage() {
         error instanceof Error ? error.message : "Could not update tag"
       );
     }
-  };
+  }, [queryClient]);
+
+  const handleStartEdit = useCallback((tag: { id: string; name: string; color: string }) => {
+    setEditingTag(tag.id);
+    setEditTagName(tag.name);
+    setEditTagColor(tag.color);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingTag(null);
+  }, []);
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
@@ -114,7 +121,7 @@ export default function SettingsPage() {
         : "Please try again.";
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -260,12 +267,25 @@ export default function SettingsPage() {
               </Card>
             </div>
 
-            <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-primary" />
-                <h2 className="font-semibold heading-font">Manage Tags</h2>
-              </div>
-              {tags.length === 0 ? (
+              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-primary" />
+                  <h2 className="font-semibold heading-font">Manage Tags</h2>
+                </div>
+                {tagsLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 rounded-xl border border-hairline-soft bg-surface-1 px-4 py-3"
+                      >
+                        <div className="h-5 w-5 rounded-full skeleton-shimmer" />
+                        <div className="h-3 w-24 rounded skeleton-shimmer" />
+                        <div className="ml-auto h-3 w-16 rounded skeleton-shimmer" />
+                      </div>
+                    ))}
+                  </div>
+                ) : tags.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-hairline-soft bg-surface-2 px-4 py-10 text-center">
                   <Tag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
                   <p className="text-sm font-medium text-foreground">No tags yet</p>
@@ -275,85 +295,27 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-hairline-soft bg-surface-2">
-                  {tags.map((tag, index) => (
-                    <div
-                      key={tag.id}
-                      className={`flex flex-wrap items-center gap-3 px-4 py-3 ${
-                        index > 0 ? "border-t border-hairline-soft" : ""
-                      }`}
-                    >
-                      {editingTag === tag.id ? (
-                        <>
-                          <div className="flex flex-wrap gap-1.5">
-                            {PRESET_COLORS.map((c) => (
-                              <button
-                                key={c}
-                                aria-label={`Select color ${c}`}
-                                aria-pressed={editTagColor === c}
-                                className={`h-6 w-6 rounded-full border transition-transform ${
-                                  editTagColor === c
-                                    ? "scale-105 border-foreground ring-2 ring-foreground/30 ring-offset-2 ring-offset-surface-2"
-                                    : "border-black/10"
-                                }`}
-                                style={{ backgroundColor: c }}
-                                onClick={() => setEditTagColor(c)}
-                              />
-                            ))}
-                          </div>
-                          <Input
-                            value={editTagName}
-                            onChange={(e) => setEditTagName(e.target.value)}
-                            className="h-8 min-w-[12rem] flex-1 border-hairline-soft bg-surface-1"
-                            onKeyDown={(e) =>
-                              e.key === "Enter" && handleUpdateTag(tag.id)
-                            }
-                          />
-                            <Button size="sm" className="shadow-sm" onClick={() => handleUpdateTag(tag.id)}>
-                              Save
-                            </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingTag(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div
-                            className="h-4 w-4 shrink-0 rounded-full"
-                            style={{ backgroundColor: tag.color }}
-                          />
-                          <span className="flex-1 text-sm font-medium">{tag.name}</span>
-                          <span className="rounded-full border border-hairline-soft bg-surface-1 px-2 py-0.5 text-xs text-muted-foreground shadow-sm">
-                            {tag._count.bookmarks}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:bg-surface-1 hover:text-foreground"
-                            onClick={() => {
-                              setEditingTag(tag.id);
-                              setEditTagName(tag.name);
-                              setEditTagColor(tag.color);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            aria-label={`Delete tag ${tag.name}`}
-                            onClick={() => handleDeleteTag(tag.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                  {tags.map((tag, index) =>
+                    editingTag === tag.id ? (
+                      <TagEditRow
+                        key={tag.id}
+                        tag={tag}
+                        index={index}
+                        initialName={editTagName}
+                        initialColor={editTagColor}
+                        onSave={handleUpdateTag}
+                        onCancel={handleCancelEdit}
+                      />
+                    ) : (
+                      <TagRow
+                        key={tag.id}
+                        tag={tag}
+                        index={index}
+                        onStartEdit={handleStartEdit}
+                        onDelete={handleDeleteTag}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 
@@ -47,6 +47,15 @@ const FEATURE_ICONS: Record<string, string> = {
   Sync: "🔄",
 };
 
+const STAGGER_CLASSES = [
+  "stagger-1",
+  "stagger-2",
+  "stagger-3",
+  "stagger-4",
+  "stagger-5",
+  "stagger-6",
+];
+
 export function LandingExperience() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
@@ -70,6 +79,7 @@ export function LandingExperience() {
         </div>
       </header>
 
+      <main>
       <section className="relative border-b border-border overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-emerald/[0.03] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/[0.04] rounded-full blur-[120px] pointer-events-none" />
@@ -110,7 +120,7 @@ export function LandingExperience() {
 
           <div className="animate-fade-in-up stagger-3 overflow-hidden rounded-xl border border-border bg-card shadow-xl shadow-black/[0.04] dark:shadow-black/20">
             <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary/80">
-              <MarkMasterLogo width={32} height={32} className="shrink-0" priority />
+              <MarkMasterLogo width={32} height={32} className="shrink-0" />
               <span className="text-sm font-semibold text-foreground">
                 MarkMaster
               </span>
@@ -128,8 +138,8 @@ export function LandingExperience() {
                     <span className="text-sm font-semibold">
                       Lenny Rachitsky
                     </span>
-                    <div className="flex size-4 items-center justify-center rounded-full bg-primary text-[6px] font-bold text-primary-foreground">
-                      ✓
+                    <div className="flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <Check className="size-2.5" strokeWidth={3} />
                     </div>
                     <span className="text-xs text-muted-foreground">
                       @lennysan
@@ -245,7 +255,7 @@ export function LandingExperience() {
             {FEATURES.map(({ title, outcome, desc }, i) => (
               <div
                 key={title}
-                className={`group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 animate-fade-in stagger-${i + 1}`}
+                className={`group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 animate-fade-in ${STAGGER_CLASSES[i] ?? ""}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -266,11 +276,12 @@ export function LandingExperience() {
           </div>
         </div>
       </section>
+      </main>
 
       <footer className="px-8 py-6 sm:px-12">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <MarkMasterLogo width={28} height={28} className="shrink-0" />
+            <MarkMasterLogo width={28} height={28} className="shrink-0" aria-hidden="true" />
             <span className="text-sm font-semibold text-muted-foreground heading-font">
               MarkMaster
             </span>

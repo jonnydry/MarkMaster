@@ -5,14 +5,12 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CheckSquare, Tag, FolderPlus, Trash2, ChevronLeft, ChevronRight, SlidersHorizontal, Bookmark } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckSquare, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
-import { BookmarkCard } from "@/components/bookmark-card";
 import { PageHeader } from "@/components/page-header";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
@@ -23,14 +21,19 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
-import { getStaggerClass } from "@/lib/stagger";
 import { cn } from "@/lib/utils";
 import type {
   ViewMode,
   BookmarkWithRelations,
   MediaFilter,
 } from "@/types";
-import type { DbUser } from "@/lib/auth";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { BookmarkList } from "./bookmark-list";
+import { DashboardSkeleton } from "./dashboard-skeleton";
+import { DashboardEmptyState } from "./dashboard-empty-state";
+import { DashboardErrorState } from "./dashboard-error-state";
+import { PaginationBar } from "./pagination-bar";
+import { SelectionToolbar } from "./selection-toolbar";
 
 type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -39,6 +42,13 @@ type BookmarkResponse = {
 };
 
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
+
+const MEDIA_FILTER_LABELS: Record<string, string> = {
+  images: "Images",
+  video: "Video",
+  links: "Links",
+  "text-only": "Text",
+};
 
 const CommandPalette = dynamic(
   () => import("@/components/command-palette").then((m) => m.CommandPalette),
@@ -112,9 +122,7 @@ function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
 function DashboardContent() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { data: session } = useSession() as {
-    data: { dbUser?: DbUser } | null;
-  };
+  const { data: session } = useSession();
 
   const filters = useBookmarkFilters();
   const actions = useBookmarkActions();
@@ -154,7 +162,14 @@ function DashboardContent() {
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
-  const { setSelectedTags, setPage, setMediaFilter, setAuthorFilter } = filters;
+  const {
+    setSelectedTags,
+    setPage,
+    setMediaFilter,
+    setAuthorFilter,
+    setCollectionId,
+    setBookmarkId,
+  } = filters;
   const visibleBookmarkIdSet = useMemo(
     () => new Set(bookmarks.map((bookmark) => bookmark.id)),
     [bookmarks]
@@ -171,6 +186,11 @@ function DashboardContent() {
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
   );
+  const searchQuery = useMemo(
+    () => (filters.search ? filters.search : undefined),
+    [filters.search]
+  );
+
   const aboveFoldMediaBookmarkId = useMemo(() => {
     const first = bookmarks.find((b) => {
       const m = b.media?.[0];
@@ -196,9 +216,13 @@ function DashboardContent() {
   const tagFromUrl = searchParams.get("tag");
   const tagsFromUrl = searchParams.get("tags");
   const authorFromUrl = searchParams.get("author");
+  const collectionFromUrl = searchParams.get("collection");
+  const bookmarkFromUrl = searchParams.get("bookmark");
   const tagFromUrlRef = useRef<string | null>(null);
   const tagsFromUrlRef = useRef<string | null>(null);
   const authorFromUrlRef = useRef<string | null>(null);
+  const collectionFromUrlRef = useRef<string | null>(null);
+  const bookmarkFromUrlRef = useRef<string | null>(null);
   useEffect(() => {
     if (tagsFromUrl && tagsFromUrl !== tagsFromUrlRef.current) {
       const next = tagsFromUrl.split(",").filter(Boolean);
@@ -211,12 +235,35 @@ function DashboardContent() {
     if (authorFromUrl !== authorFromUrlRef.current) {
       setAuthorFilter(authorFromUrl ? authorFromUrl.replace(/^@/, "") : "");
     }
+    if (collectionFromUrl !== collectionFromUrlRef.current) {
+      setCollectionId(collectionFromUrl ?? "");
+    }
+    if (bookmarkFromUrl !== bookmarkFromUrlRef.current) {
+      setBookmarkId(bookmarkFromUrl ?? "");
+    }
     tagFromUrlRef.current = tagFromUrl;
     tagsFromUrlRef.current = tagsFromUrl;
     authorFromUrlRef.current = authorFromUrl;
-  }, [tagFromUrl, tagsFromUrl, authorFromUrl, setPage, setSelectedTags, setAuthorFilter]);
+    collectionFromUrlRef.current = collectionFromUrl;
+    bookmarkFromUrlRef.current = bookmarkFromUrl;
+  }, [
+    tagFromUrl,
+    tagsFromUrl,
+    authorFromUrl,
+    collectionFromUrl,
+    bookmarkFromUrl,
+    setPage,
+    setSelectedTags,
+    setAuthorFilter,
+    setCollectionId,
+    setBookmarkId,
+  ]);
 
-  const activeBookmark = bookmarks.find((b) => b.id === activeBookmarkId);
+  const activeBookmarkIdForView = filters.bookmarkId || activeBookmarkId;
+  const activeBookmark = useMemo(
+    () => bookmarks.find((b) => b.id === activeBookmarkIdForView),
+    [bookmarks, activeBookmarkIdForView]
+  );
 
   const clearSelection = useCallback(() => {
     setSelectedBookmarkIds([]);
@@ -284,18 +331,18 @@ function DashboardContent() {
   }, []);
 
   useKeyboardShortcuts({
-    activeBookmarkId: selectionMode ? null : activeBookmarkId,
+    activeBookmarkId: selectionMode ? null : activeBookmarkIdForView,
     bookmarks: selectionMode ? [] : bookmarks,
     onNavigate: setActiveBookmarkId,
     onSearch: () => searchInputRef.current?.focus(),
     onTag: () => {
-      if (!activeBookmarkId) return;
-      setTagTargetIds([activeBookmarkId]);
+      if (!activeBookmarkIdForView) return;
+      setTagTargetIds([activeBookmarkIdForView]);
       setTagDialogOpen(true);
     },
     onCollection: () => {
-      if (!activeBookmarkId) return;
-      setCollectionTargetIds([activeBookmarkId]);
+      if (!activeBookmarkIdForView) return;
+      setCollectionTargetIds([activeBookmarkIdForView]);
       setCollectionDialogOpen(true);
     },
     onNote: () => setNoteDialogOpen(true),
@@ -331,28 +378,26 @@ function DashboardContent() {
 
   const dbUser = session?.dbUser;
 
-  const handleCommandPaletteFilter = (filter: {
-    mediaFilter?: MediaFilter;
-    selectedTag?: string;
-  }) => {
-    if (filter.mediaFilter) {
-      filters.setMediaFilter(filter.mediaFilter);
-    }
-    if (filter.selectedTag) {
-      filters.setSelectedTags([filter.selectedTag]);
-      filters.setPage(1);
-    }
-  };
+  const handleCommandPaletteFilter = useCallback(
+    (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
+      if (filter.mediaFilter) {
+        filters.setMediaFilter(filter.mediaFilter);
+      }
+      if (filter.selectedTag) {
+        filters.setSelectedTags([filter.selectedTag]);
+        filters.setPage(1);
+      }
+    },
+    [filters]
+  );
 
-  const mediaFilterLabels: Record<string, string> = {
-    images: "Images",
-    video: "Video",
-    links: "Links",
-    "text-only": "Text only",
-  };
+  const primaryFilterLabel =
+    filters.mediaFilter === "all"
+      ? "All Bookmarks"
+      : MEDIA_FILTER_LABELS[filters.mediaFilter] || filters.mediaFilter;
 
   return (
-    <div className="app-shell-bg flex h-screen max-w-[100vw] overflow-x-hidden">
+    <div className="app-shell-bg flex h-screen overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -396,10 +441,10 @@ function DashboardContent() {
                   filters.setSelectedTags([]);
                   filters.setMediaFilter("all");
                 }}
-                aria-label={`Show all bookmarks (${total.toLocaleString()})`}
+                aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
                 className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                All Bookmarks
+                {primaryFilterLabel}
                 <span className="hidden text-xs opacity-70 sm:inline" aria-hidden>{total.toLocaleString()}</span>
               </button>
               {filters.selectedTags.map((tagId) => {
@@ -415,15 +460,6 @@ function DashboardContent() {
                   </button>
                 ) : null;
               })}
-              {filters.mediaFilter !== "all" && (
-                <button
-                  onClick={() => filters.setMediaFilter("all")}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
-                >
-                  {mediaFilterLabels[filters.mediaFilter] || filters.mediaFilter}
-                  <span className="text-primary/60 hover:text-primary ml-0.5" aria-hidden>×</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setShowFilters((v) => !v)}
@@ -481,65 +517,14 @@ function DashboardContent() {
             <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">Updating results...</p>
           )}
           {selectionMode && (
-            <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 bg-secondary/50 px-4 py-2.5 sm:px-5">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-medium text-foreground">
-                  {visibleSelectedBookmarkIds.length > 0
-                    ? `${visibleSelectedBookmarkIds.length} selected`
-                    : "Select bookmarks to apply bulk actions"}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 px-3 text-sm"
-                  onClick={selectVisibleBookmarks}
-                >
-                  Select page
-                </Button>
-                {visibleSelectedBookmarkIds.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 px-3 text-sm"
-                    onClick={clearSelection}
-                  >
-                    Clear
-                  </Button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 gap-1.5 px-3 text-sm"
-                  disabled={visibleSelectedBookmarkIds.length === 0}
-                  onClick={openBulkTagDialog}
-                >
-                  <Tag className="size-4" />
-                  Tag
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 gap-1.5 px-3 text-sm"
-                  disabled={visibleSelectedBookmarkIds.length === 0}
-                  onClick={openBulkCollectionDialog}
-                >
-                  <FolderPlus className="size-4" />
-                  Add to Collection
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 gap-1.5 px-3 text-sm text-destructive hover:text-destructive"
-                  disabled={visibleSelectedBookmarkIds.length === 0}
-                  onClick={() => void handleBulkHide()}
-                >
-                  <Trash2 className="size-4" />
-                  Hide
-                </Button>
-              </div>
-            </div>
+            <SelectionToolbar
+              selectedCount={visibleSelectedBookmarkIds.length}
+              onSelectPage={selectVisibleBookmarks}
+              onClear={clearSelection}
+              onTag={openBulkTagDialog}
+              onAddToCollection={openBulkCollectionDialog}
+              onHide={handleBulkHide}
+            />
           )}
             </PageHeader>
 
@@ -567,7 +552,8 @@ function DashboardContent() {
             <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
               <div
                 className={cn(
-                  "relative z-10 mx-auto max-w-2xl overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  "relative z-10 overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  bookmarkFeedColumnClassName,
                   appChromeFrostedClassName
                 )}
               >
@@ -583,150 +569,48 @@ function DashboardContent() {
           </div>
 
           {isLoading ? (
-            <div
-              className="max-w-2xl mx-auto space-y-0"
-              role="status"
-              aria-live="polite"
-              aria-label="Loading bookmarks"
-            >
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={`border-b border-border px-4 py-3 sm:px-5 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}>
-                  <div className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full skeleton-shimmer shrink-0" />
-                    <div className="flex-1 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-3.5 w-20 rounded skeleton-shimmer" />
-                        <div className="h-3 w-14 rounded skeleton-shimmer" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="h-3 w-full rounded skeleton-shimmer" />
-                        <div className="h-3 w-4/5 rounded skeleton-shimmer" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <span className="sr-only">Loading bookmarks</span>
-            </div>
+            <DashboardSkeleton viewMode={viewMode} />
           ) : isError ? (
-            <div className="flex items-center justify-center h-64 px-6">
-              <div className="text-center space-y-3 max-w-md">
-                <p className="text-lg font-medium">Bookmarks could not be loaded</p>
-                <p className="text-sm text-muted-foreground">
-                  {error instanceof Error ? error.message : "Please try again."}
-                </p>
-                <Button onClick={() => refetch()} size="sm">
-                  Retry
-                </Button>
-              </div>
+            <div className={bookmarkFeedColumnClassName}>
+              <DashboardErrorState
+                message={error instanceof Error ? error.message : undefined}
+                onRetry={() => refetch()}
+              />
             </div>
           ) : bookmarks.length === 0 ? (
-            <div className="flex h-72 items-center justify-center px-4 sm:px-6">
-              <div className="animate-fade-in rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 text-center shadow-sm sm:px-8">
-                <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
-                <p className="mb-2 text-lg font-medium heading-font">No bookmarks found</p>
-                <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                  {filters.search || filters.hasActiveFilters
-                    ? "Try adjusting your filters or search query"
-                    : "Use Sync in the sidebar (menu on mobile) to fetch your bookmarks from X"}
-                </p>
-                {(filters.search || filters.hasActiveFilters) && (
-                  <div className="mt-4 flex justify-center">
-                    <Button variant="outline" size="sm" onClick={filters.clearFilters}>
-                      Clear filters
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
-              {bookmarks.map((bookmark, i) => (
-                <BookmarkCard
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  viewMode={viewMode}
-                  searchQuery={filters.search || undefined}
-                  priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
-                  selected={
-                    selectionMode
-                      ? selectedBookmarkIdSet.has(bookmark.id)
-                      : activeBookmarkId === bookmark.id
-                  }
-                  onSelect={setActiveBookmarkId}
-                  selectionMode={selectionMode}
-                  onSelectionChange={toggleBookmarkSelection}
-                  onTagClick={filters.toggleTag}
-                  onAddTag={handleBookmarkAddTag}
-                  onAddToCollection={handleBookmarkAddToCollection}
-                  onAddNote={handleBookmarkAddNote}
-                  onDelete={actions.handleDeleteBookmark}
-                  className={getStaggerClass(i, "animate-fade-in-up")}
-                />
-              ))}
+            <div className={bookmarkFeedColumnClassName}>
+              <DashboardEmptyState
+                search={filters.search}
+                hasActiveFilters={filters.hasActiveFilters}
+                onClearFilters={filters.clearFilters}
+              />
             </div>
           ) : (
-            <div className="max-w-2xl mx-auto">
-              {bookmarks.map((bookmark, i) => (
-                <BookmarkCard
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  viewMode={viewMode}
-                  searchQuery={filters.search || undefined}
-                  priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
-                  selected={
-                    selectionMode
-                      ? selectedBookmarkIdSet.has(bookmark.id)
-                      : activeBookmarkId === bookmark.id
-                  }
-                  onSelect={setActiveBookmarkId}
-                  selectionMode={selectionMode}
-                  onSelectionChange={toggleBookmarkSelection}
-                  onTagClick={filters.toggleTag}
-                  onAddTag={handleBookmarkAddTag}
-                  onAddToCollection={handleBookmarkAddToCollection}
-                  onAddNote={handleBookmarkAddNote}
-                  onDelete={actions.handleDeleteBookmark}
-                  className={getStaggerClass(i, "animate-fade-in")}
-                />
-              ))}
-            </div>
+            <BookmarkList
+              bookmarks={bookmarks}
+              viewMode={viewMode}
+              searchQuery={searchQuery}
+              aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+              selectionMode={selectionMode}
+              selectedBookmarkIdSet={selectedBookmarkIdSet}
+              activeBookmarkId={activeBookmarkIdForView}
+              onSelect={setActiveBookmarkId}
+              onSelectionChange={toggleBookmarkSelection}
+              onTagClick={filters.toggleTag}
+              onAddTag={handleBookmarkAddTag}
+              onAddToCollection={handleBookmarkAddToCollection}
+              onAddNote={handleBookmarkAddNote}
+              onDelete={actions.handleDeleteBookmark}
+            />
           )}
 
-          {totalPages > 1 && (
-            <div className="flex flex-col items-center gap-3 py-4 border-t border-border">
-              <div className="flex items-center gap-2 text-sm" role="navigation" aria-label="Pagination">
-                <button
-                  type="button"
-                  onClick={() => filters.setPage((p) => p - 1)}
-                  disabled={filters.page <= 1}
-                  aria-label="Previous page"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <ChevronLeft className="size-4" aria-hidden />
-                </button>
-                <span className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
-                  <span className="sr-only">Page </span>
-                  {filters.page} <span className="text-muted-foreground/50" aria-hidden>of</span> <span className="sr-only">of</span> {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => filters.setPage((p) => p + 1)}
-                  disabled={filters.page >= totalPages}
-                  aria-label="Next page"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <ChevronRight className="size-4" aria-hidden />
-                </button>
-              </div>
-              <div className="w-24 h-1 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary/40 rounded-full transition-all duration-300"
-                  style={{ width: `${((filters.page - 1) / Math.max(totalPages - 1, 1)) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
+          <div className={bookmarkFeedColumnClassName}>
+            <PaginationBar
+              page={filters.page}
+              totalPages={totalPages}
+              onPageChange={filters.setPage}
+            />
+          </div>
         </div>
       </div>
 
@@ -748,8 +632,8 @@ function DashboardContent() {
       <AddNoteDialog
         open={noteDialogOpen}
         onOpenChange={setNoteDialogOpen}
-        bookmarkId={activeBookmarkId}
-        existingNote={activeBookmark?.notes[0]?.content}
+        bookmarkId={activeBookmarkIdForView}
+        existingNote={activeBookmark ? activeBookmark.notes[0]?.content : undefined}
         onSave={actions.handleAddNote}
       />
 

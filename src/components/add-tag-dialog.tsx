@@ -4,11 +4,13 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { PRESET_COLORS } from "@/lib/constants";
 import type { TagWithCount } from "@/types";
 
@@ -33,20 +35,29 @@ export function AddTagDialog({
 }: AddTagDialogProps) {
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [pendingTagId, setPendingTagId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
   const isBulk = bookmarkIds.length > 1;
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setName("");
       setColor(PRESET_COLORS[0]);
+      setPendingTagId(null);
+      setAddingNew(false);
     }
     onOpenChange(nextOpen);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name.trim() || bookmarkIds.length === 0) return;
-    onAddTag(bookmarkIds, name.trim(), color);
-    setName("");
+    setAddingNew(true);
+    try {
+      await onAddTag(bookmarkIds, name.trim(), color);
+      setName("");
+    } finally {
+      setAddingNew(false);
+    }
   };
 
   return (
@@ -56,6 +67,11 @@ export function AddTagDialog({
           <DialogTitle>
             {isBulk ? `Tag ${bookmarkIds.length} bookmarks` : "Manage Tags"}
           </DialogTitle>
+          <DialogDescription>
+            {isBulk
+              ? "Apply or remove tags across the selected bookmarks."
+              : "Apply existing tags or create a new one for this bookmark."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {isBulk && (
@@ -72,20 +88,30 @@ export function AddTagDialog({
               <div className="flex flex-wrap gap-1.5">
                 {existingTags.map((tag) => {
                   const isApplied = bookmarkTags.includes(tag.id);
+                  const isPending = pendingTagId === tag.id;
                   return (
                     <button
                       key={tag.id}
-                      className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                      type="button"
+                      aria-pressed={isApplied}
+                      disabled={isPending || pendingTagId !== null}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium transition-colors disabled:opacity-60 ${
                         isApplied
                           ? "bg-primary/10 text-primary"
                           : "bg-card text-muted-foreground border border-border hover:text-foreground"
                       }`}
-                      onClick={() => {
+                      onClick={async () => {
                         if (bookmarkIds.length === 0) return;
-                        if (isApplied) onRemoveTag(bookmarkIds, tag.id);
-                        else onAddTag(bookmarkIds, tag.name, tag.color);
+                        setPendingTagId(tag.id);
+                        try {
+                          if (isApplied) await onRemoveTag(bookmarkIds, tag.id);
+                          else await onAddTag(bookmarkIds, tag.name, tag.color);
+                        } finally {
+                          setPendingTagId(null);
+                        }
                       }}
                     >
+                      {isPending && <Loader2 className="h-3 w-3 animate-spin" />}
                       {tag.name}
                     </button>
                   );
@@ -106,7 +132,8 @@ export function AddTagDialog({
                 className="flex-1"
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               />
-              <Button onClick={handleAdd} disabled={!name.trim()}>
+              <Button onClick={handleAdd} disabled={!name.trim() || addingNew || pendingTagId !== null}>
+                {addingNew && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                 Add
               </Button>
             </div>
@@ -114,6 +141,7 @@ export function AddTagDialog({
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
+                  type="button"
                   aria-label={`Select color ${c}`}
                   aria-pressed={color === c}
                   className={`w-6 h-6 rounded-full transition-transform ${

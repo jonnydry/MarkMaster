@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Copy, ExternalLink, Check } from "lucide-react";
 import { generateClipboardThread } from "@/lib/share-content";
+import { cn } from "@/lib/utils";
 import type { ShareContent } from "@/lib/share-content";
 
 interface ShareDialogProps {
@@ -24,29 +26,34 @@ export function ShareDialog({
   shareContent,
 }: ShareDialogProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const copyToClipboard = useCallback(async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      // fallback
+    }
+  }, []);
 
   if (!shareContent) return null;
 
   const isSmallCollection = shareContent.itemCount <= 10;
-
-  const copyToClipboard = async (text: string, field: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch {
-      // fallback
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share &quot;{shareContent.collectionName}&quot;</DialogTitle>
+          <DialogDescription>
+            Copy a public link or compose a post for X.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-5" aria-live="polite">
           {/* Share link */}
           <div>
             <h3 className="text-sm font-medium mb-2">Public Link</h3>
@@ -86,11 +93,13 @@ export function ShareDialog({
                 href={shareContent.xIntentUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                className={cn(
+                  buttonVariants({ variant: "default", size: "sm" }),
+                  "gap-1.5 hover:bg-primary/80"
+                )}
               >
-                <Button variant="default" size="sm" className="gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Open X Compose
-                </Button>
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                Open X Compose
               </a>
               <Button
                 variant="outline"

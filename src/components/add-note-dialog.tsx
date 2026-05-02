@@ -4,9 +4,11 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -30,25 +32,34 @@ function NoteForm({
   onCancel: () => void;
 }) {
   const [content, setContent] = useState(existingNote || "");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!content.trim()) return;
-    onSave(bookmarkId, content.trim());
+    setSaving(true);
+    try {
+      await onSave(bookmarkId, content.trim());
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="space-y-4">
       <Textarea
+        autoFocus
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Why did you bookmark this? Add context for your future self..."
         className="min-h-[120px] resize-none"
+        disabled={saving}
       />
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={!content.trim()}>
+        <Button onClick={handleSave} disabled={!content.trim() || saving}>
+          {saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
           Save
         </Button>
       </div>
@@ -70,6 +81,11 @@ export function AddNoteDialog({
           <DialogTitle>
             {existingNote ? "Edit Note" : "Add Note"}
           </DialogTitle>
+          <DialogDescription>
+            {existingNote
+              ? "Update your note for this bookmark."
+              : "Add context or reminders for your future self."}
+          </DialogDescription>
         </DialogHeader>
         {bookmarkId && (
           <NoteForm

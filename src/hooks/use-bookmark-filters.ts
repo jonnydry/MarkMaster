@@ -3,6 +3,9 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { SortField, SortDirection, MediaFilter } from "@/types";
 
+const PAGE_LIMIT = "20";
+const DEBOUNCE_MS = 300;
+
 export function useBookmarkFilters() {
   const [search, setSearchImmediate] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -13,6 +16,8 @@ export function useBookmarkFilters() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [collectionId, setCollectionId] = useState("");
+  const [bookmarkId, setBookmarkId] = useState("");
   const [page, setPage] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -32,7 +37,7 @@ export function useBookmarkFilters() {
     } else {
       debounceRef.current = setTimeout(() => {
         setDebouncedSearch(v);
-      }, 300);
+      }, DEBOUNCE_MS);
     }
     resetPage();
   }, [resetPage]);
@@ -44,12 +49,25 @@ export function useBookmarkFilters() {
     resetPage();
   }, [resetPage]);
 
-  const hasActiveFilters =
-    mediaFilter !== "all" ||
-    authorFilter !== "" ||
-    dateFrom !== "" ||
-    dateTo !== "" ||
-    selectedTags.length > 0;
+  const hasActiveFilters = useMemo(
+    () =>
+      mediaFilter !== "all" ||
+      authorFilter !== "" ||
+      dateFrom !== "" ||
+      dateTo !== "" ||
+      selectedTags.length > 0 ||
+      collectionId !== "" ||
+      bookmarkId !== "",
+    [
+      mediaFilter,
+      authorFilter,
+      dateFrom,
+      dateTo,
+      selectedTags,
+      collectionId,
+      bookmarkId,
+    ]
+  );
 
   const clearFilters = useCallback(() => {
     setMediaFilter("all");
@@ -57,13 +75,15 @@ export function useBookmarkFilters() {
     setDateFrom("");
     setDateTo("");
     setSelectedTags([]);
+    setCollectionId("");
+    setBookmarkId("");
     resetPage();
   }, [resetPage]);
 
   const queryString = useMemo(() => {
     return new URLSearchParams({
       page: page.toString(),
-      limit: "20",
+      limit: PAGE_LIMIT,
       search: debouncedSearch,
       sortField,
       sortDirection,
@@ -72,32 +92,152 @@ export function useBookmarkFilters() {
       tagFilter: selectedTags.join(","),
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
+      ...(collectionId && { collectionId }),
+      ...(bookmarkId && { bookmarkId }),
     }).toString();
-  }, [page, debouncedSearch, sortField, sortDirection, mediaFilter, authorFilter, selectedTags, dateFrom, dateTo]);
-
-  return {
-    search,
-    setSearch,
-    sortField,
-    setSortField: useCallback((v: SortField) => { setSortField(v); resetPage(); }, [resetPage]),
-    sortDirection,
-    setSortDirection: useCallback((v: SortDirection) => { setSortDirection(v); resetPage(); }, [resetPage]),
-    mediaFilter,
-    setMediaFilter: useCallback((v: MediaFilter) => { setMediaFilter(v); resetPage(); }, [resetPage]),
-    authorFilter,
-    setAuthorFilter: useCallback((v: string) => { setAuthorFilter(v); resetPage(); }, [resetPage]),
-    dateFrom,
-    setDateFrom: useCallback((v: string) => { setDateFrom(v); resetPage(); }, [resetPage]),
-    dateTo,
-    setDateTo: useCallback((v: string) => { setDateTo(v); resetPage(); }, [resetPage]),
-    selectedTags,
-    setSelectedTags,
+  }, [
     page,
-    setPage,
-    toggleTag,
-    hasActiveFilters,
-    clearFilters,
-    queryString,
-    isSearchPending: search !== debouncedSearch,
-  };
+    debouncedSearch,
+    sortField,
+    sortDirection,
+    mediaFilter,
+    authorFilter,
+    selectedTags,
+    dateFrom,
+    dateTo,
+    collectionId,
+    bookmarkId,
+  ]);
+
+  const setSortFieldWrapped = useCallback(
+    (v: SortField) => {
+      setSortField(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setSortDirectionWrapped = useCallback(
+    (v: SortDirection) => {
+      setSortDirection(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setMediaFilterWrapped = useCallback(
+    (v: MediaFilter) => {
+      setMediaFilter(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setAuthorFilterWrapped = useCallback(
+    (v: string) => {
+      setAuthorFilter(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setDateFromWrapped = useCallback(
+    (v: string) => {
+      setDateFrom(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setDateToWrapped = useCallback(
+    (v: string) => {
+      setDateTo(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setSelectedTagsWrapped = useCallback(
+    (v: string[]) => {
+      setSelectedTags(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setCollectionIdWrapped = useCallback(
+    (v: string) => {
+      setCollectionId(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  const setBookmarkIdWrapped = useCallback(
+    (v: string) => {
+      setBookmarkId(v);
+      resetPage();
+    },
+    [resetPage]
+  );
+
+  return useMemo(
+    () => ({
+      search,
+      setSearch,
+      sortField,
+      setSortField: setSortFieldWrapped,
+      sortDirection,
+      setSortDirection: setSortDirectionWrapped,
+      mediaFilter,
+      setMediaFilter: setMediaFilterWrapped,
+      authorFilter,
+      setAuthorFilter: setAuthorFilterWrapped,
+      dateFrom,
+      setDateFrom: setDateFromWrapped,
+      dateTo,
+      setDateTo: setDateToWrapped,
+      selectedTags,
+      setSelectedTags: setSelectedTagsWrapped,
+      collectionId,
+      setCollectionId: setCollectionIdWrapped,
+      bookmarkId,
+      setBookmarkId: setBookmarkIdWrapped,
+      page,
+      setPage,
+      toggleTag,
+      hasActiveFilters,
+      clearFilters,
+      queryString,
+      isSearchPending: search !== debouncedSearch,
+    }),
+    [
+      search,
+      setSearch,
+      sortField,
+      setSortFieldWrapped,
+      sortDirection,
+      setSortDirectionWrapped,
+      mediaFilter,
+      setMediaFilterWrapped,
+      authorFilter,
+      setAuthorFilterWrapped,
+      dateFrom,
+      setDateFromWrapped,
+      dateTo,
+      setDateToWrapped,
+      selectedTags,
+      setSelectedTagsWrapped,
+      collectionId,
+      setCollectionIdWrapped,
+      bookmarkId,
+      setBookmarkIdWrapped,
+      page,
+      toggleTag,
+      hasActiveFilters,
+      clearFilters,
+      queryString,
+      debouncedSearch,
+    ]
+  );
 }

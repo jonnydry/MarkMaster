@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const booleanQueryFlagSchema = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
 const bookmarkIdsSchema = z
   .array(z.string().min(1, "Bookmark ID is required"))
   .min(1, "At least one bookmark is required");
@@ -75,21 +80,46 @@ export const reorderCollectionItemsSchema = z.object({
 
 export const deleteBookmarkSchema = bookmarkTargetSchema;
 
-export const bookmarksQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().default(""),
-  sortField: z
-    .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "authorUsername"])
-    .default("bookmarkedAt"),
-  sortDirection: z.enum(["asc", "desc"]).default("desc"),
-  mediaFilter: z.enum(["all", "images", "video", "links", "text-only"]).default("all"),
-  authorFilter: z.string().default(""),
-  tagFilter: z.string().default(""),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-  collectionId: z.string().optional(),
-});
+export const bookmarksQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    search: z.string().default(""),
+    sortField: z
+      .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "authorUsername"])
+      .default("bookmarkedAt"),
+    sortDirection: z.enum(["asc", "desc"]).default("desc"),
+    mediaFilter: z.enum(["all", "images", "video", "links", "text-only"]).default("all"),
+    authorFilter: z.string().default(""),
+    tagFilter: z.string().default(""),
+    dateFrom: z.string().optional(),
+    dateTo: z.string().optional(),
+    bookmarkId: z.string().optional(),
+    collectionId: z.string().optional(),
+    unaffiliated: booleanQueryFlagSchema,
+  })
+  .superRefine((value, ctx) => {
+    if (!value.unaffiliated) return;
+
+    const hasTagFilter = value.tagFilter.split(",").some((id) => id.trim().length > 0);
+    if (hasTagFilter) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tagFilter"],
+        message:
+          "unaffiliated=true cannot be combined with tagFilter (unaffiliated bookmarks have no tags by definition).",
+      });
+    }
+
+    if (value.collectionId && value.collectionId.trim().length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["collectionId"],
+        message:
+          "unaffiliated=true cannot be combined with collectionId (unaffiliated bookmarks are not in any collection).",
+      });
+    }
+  });
 
 export const exportQuerySchema = z.object({
   format: z.enum(["json", "csv"]).default("json"),

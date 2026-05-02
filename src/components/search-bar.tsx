@@ -36,8 +36,14 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
         if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-          const tag = (e.target as HTMLElement).tagName;
-          if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          const target = e.target as HTMLElement;
+          const tag = target.tagName;
+          if (
+            tag !== "INPUT" &&
+            tag !== "TEXTAREA" &&
+            tag !== "SELECT" &&
+            !target.isContentEditable
+          ) {
             e.preventDefault();
             inputRef.current?.focus();
           }
@@ -51,7 +57,10 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     }, []);
 
     const defaultHint = !value && (
-      <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm">
+      <kbd
+        aria-hidden="true"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm"
+      >
         /
       </kbd>
     );
@@ -64,6 +73,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          aria-label={placeholder}
           className={cn(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass

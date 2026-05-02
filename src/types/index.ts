@@ -138,3 +138,167 @@ export interface SyncStatusResponse {
   currentRun: SyncRunSummary | null;
   recentRuns: SyncRunSummary[];
 }
+
+export type OrbitScanConfidence = "high" | "medium" | "low";
+
+export interface OrbitTagSuggestion {
+  name: string;
+  color: string;
+  reason: string;
+  reuseExisting: boolean;
+}
+
+export interface OrbitCollectionSuggestion {
+  name: string;
+  description: string;
+  reason: string;
+  reuseExisting: boolean;
+}
+
+export interface OrbitBookmarkSuggestion {
+  bookmarkId: string;
+  confidence: OrbitScanConfidence;
+  reasoning: string;
+  tags: OrbitTagSuggestion[];
+  collection: OrbitCollectionSuggestion | null;
+}
+
+export interface OrbitScanOverview {
+  summary: string;
+  taggingStrategy: string;
+  collectionStrategy: string;
+}
+
+export interface OrbitScanPlan {
+  overview: OrbitScanOverview;
+  suggestions: OrbitBookmarkSuggestion[];
+}
+
+export interface OrbitScanSummary {
+  bookmarkCount: number;
+  bookmarksWithTags: number;
+  bookmarksWithCollections: number;
+  tagAssignments: number;
+  uniqueTags: number;
+  collectionBuckets: number;
+  reusedExistingTags: number;
+  reusedExistingCollections: number;
+  newCollectionBuckets: number;
+}
+
+export interface OrbitTagRollup {
+  name: string;
+  color: string;
+  count: number;
+  reuseExisting: boolean;
+}
+
+export interface OrbitCollectionRollup {
+  name: string;
+  description: string;
+  count: number;
+  reuseExisting: boolean;
+  bookmarkIds: string[];
+}
+
+export interface OrbitScanResponsePayload {
+  model: string;
+  scannedAt: string;
+  privacy: {
+    storeDisabled: boolean;
+    zeroDataRetention: boolean | null;
+  };
+  plan: OrbitScanPlan;
+  summary: OrbitScanSummary;
+  tagRollups: OrbitTagRollup[];
+  collectionRollups: OrbitCollectionRollup[];
+}
+
+export type OrbitDecisionKind = "collection" | "tag";
+
+export interface OrbitDecision {
+  kind: OrbitDecisionKind;
+  label: string;
+  color?: string;
+  reuseExisting: boolean;
+  confidence: OrbitScanConfidence;
+}
+
+export interface OrbitBookmarkDecision {
+  bookmarkId: string;
+  confidence: OrbitScanConfidence;
+  reasoning: string;
+  primary: OrbitDecision | null;
+  alternative: OrbitDecision | null;
+}
+
+export interface OrbitApplyResult {
+  bookmarkCount: number;
+  createdTags: number;
+  reusedTags: number;
+  tagAssignments: number;
+  createdCollections: number;
+  reusedCollections: number;
+  collectionAssignments: number;
+  skippedNewCollectionSingletons: number;
+}
+
+export type OrbitGraphCollectionVariant = "user_collection" | "x_folder";
+
+export type OrbitGraphNode =
+  | { kind: "core"; id: "orbit-index"; totalBookmarks: number; looseBookmarks: number }
+  | {
+      kind: "tag";
+      id: string;
+      name: string;
+      color: string;
+      count: number;
+    }
+  | {
+      kind: "collection";
+      id: string;
+      name: string;
+      variant: OrbitGraphCollectionVariant;
+      count: number;
+    }
+  | {
+      kind: "bookmark";
+      id: string;
+      title: string;
+      authorUsername: string;
+      authorDisplayName: string;
+      affiliated: boolean;
+      recent: boolean;
+    }
+  | {
+      kind: "overflow";
+      id: string;
+      anchorId: string;
+      anchorKind: "tag" | "collection" | "core";
+      remaining: number;
+    };
+
+export type OrbitGraphEdge =
+  | { kind: "bookmark-tag"; bookmarkId: string; tagId: string }
+  | { kind: "bookmark-collection"; bookmarkId: string; collectionId: string }
+  | { kind: "loose"; bookmarkId: string }
+  | { kind: "overflow"; overflowId: string; anchorId: string };
+
+export interface OrbitGraphStats {
+  totalBookmarks: number;
+  affiliatedBookmarks: number;
+  looseBookmarks: number;
+  renderedBookmarks: number;
+  truncatedBookmarks: number;
+  tagCount: number;
+  userCollectionCount: number;
+  xFolderCount: number;
+}
+
+export interface OrbitGraphPayload {
+  nodes: OrbitGraphNode[];
+  edges: OrbitGraphEdge[];
+  stats: OrbitGraphStats;
+  generatedAt: string;
+  nodeCap: number;
+}

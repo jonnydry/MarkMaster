@@ -1,0 +1,50 @@
+<svg width="1600" height="620" viewBox="0 0 1600 620" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1600" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#121418"/>
+      <stop offset="0.44" stop-color="#0f1724"/>
+      <stop offset="1" stop-color="#0f1012"/>
+    </linearGradient>
+    <linearGradient id="wash" x1="150" y1="30" x2="1520" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.035"/>
+      <stop offset="0.36" stop-color="#3b82f6" stop-opacity="0.18"/>
+      <stop offset="0.68" stop-color="#2dd4bf" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bottomFade" x1="800" y1="250" x2="800" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f1012" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0f1012" stop-opacity="0.95"/>
+    </linearGradient>
+    <filter id="blurLine" x="-120" y="-60" width="1840" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.45"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="1600" height="620" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.84" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 0.085"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="1600" height="620" fill="url(#base)"/>
+  <rect width="1600" height="620" fill="url(#wash)"/>
+  <path d="M-120 214C150 90 547 77 954 155C1217 205 1430 296 1670 430" stroke="#ffffff" stroke-opacity="0.055" stroke-width="74" stroke-linecap="square"/>
+  <path d="M-85 397C257 505 687 490 1078 342C1306 255 1456 169 1648 87" stroke="#3b82f6" stroke-opacity="0.06" stroke-width="68" stroke-linecap="square"/>
+  <path d="M130 521C444 406 890 374 1270 464C1412 497 1525 549 1618 610" stroke="#2dd4bf" stroke-opacity="0.045" stroke-width="54" stroke-linecap="square"/>
+  <g filter="url(#blurLine)">
+    <ellipse cx="1142" cy="306" rx="476" ry="126" transform="rotate(-17 1142 306)" stroke="#f0ebe3" stroke-opacity="0.26" stroke-width="1.15"/>
+    <ellipse cx="1120" cy="312" rx="376" ry="92" transform="rotate(13 1120 312)" stroke="#60a5fa" stroke-opacity="0.24" stroke-width="1"/>
+    <ellipse cx="1124" cy="312" rx="244" ry="58" transform="rotate(-38 1124 312)" stroke="#2dd4bf" stroke-opacity="0.25" stroke-width="1"/>
+    <ellipse cx="1122" cy="312" rx="622" ry="154" transform="rotate(-4 1122 312)" stroke="#ffffff" stroke-opacity="0.075" stroke-width="1"/>
+  </g>
+  <circle cx="1122" cy="312" r="45" fill="#f0ebe3" fill-opacity="0.03" stroke="#f0ebe3" stroke-opacity="0.12"/>
+  <circle cx="1122" cy="312" r="4" fill="#60a5fa"/>
+  <path d="M124 172H1510" stroke="#ffffff" stroke-opacity="0.055"/>
+  <path d="M90 386H1478" stroke="#ffffff" stroke-opacity="0.045"/>
+  <path d="M1210 104H1518" stroke="#ffffff" stroke-opacity="0.12"/>
+  <path d="M1156 130H1348" stroke="#60a5fa" stroke-opacity="0.19"/>
+  <path d="M840 482H1114" stroke="#2dd4bf" stroke-opacity="0.16"/>
+  <path d="M940 510H1260" stroke="#ffffff" stroke-opacity="0.075"/>
+  <rect width="1600" height="620" filter="url(#grain)" opacity="0.75"/>
+  <rect width="1600" height="620" fill="url(#bottomFade)"/>
+</svg>

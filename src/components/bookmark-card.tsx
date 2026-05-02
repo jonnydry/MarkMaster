@@ -4,18 +4,24 @@ import { useState, useMemo, memo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
-  Heart,
-  Repeat2,
-  MessageCircle,
-  ExternalLink,
-  Tag,
-  FolderPlus,
-  StickyNote,
-  Trash2,
+  ArrowUpRight,
+  ArchiveX,
+  Tags,
+  FolderInput,
+  NotebookPen,
   BadgeCheck,
   Check,
 } from "lucide-react";
+import { XLogoMark } from "@/components/brands/x-logo-mark";
+import {
+  X_POST_METRIC_ICON_CLASS,
+  XPostLikeIcon,
+  XPostReplyIcon,
+  XPostRepostIcon,
+} from "@/components/brands/x-post-metric-icons";
 import { Button } from "@/components/ui/button";
+import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
+import { createTextHighlighter } from "@/lib/text-highlighter";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -43,76 +49,6 @@ function formatCount(n: number): string {
   return n.toString();
 }
 
-const MENTION_OR_URL_SPLITTER = /((?:@|#)\w+|https?:\/\/\S+)/g;
-const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
-
-function escapeRegExp(s: string): string {
-  return s.replace(REGEX_ESCAPE_RE, "\\$&");
-}
-
-function buildSearchRegex(searchQuery: string | undefined): RegExp | null {
-  if (!searchQuery) return null;
-  return new RegExp(`(${escapeRegExp(searchQuery)})`, "gi");
-}
-
-function highlightMatch(text: string, regex: RegExp): React.ReactNode {
-  if (!text) return text;
-  // Capturing group in regex makes split interleave [text, match, text, ...].
-  const parts = text.split(regex);
-  const result: React.ReactNode[] = [];
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      if (parts[i]) result.push(parts[i]);
-    } else {
-      result.push(
-        <mark key={`m-${i}`} className="bg-primary/20 text-foreground rounded px-0.5">
-          {parts[i]}
-        </mark>
-      );
-    }
-  }
-  if (result.length === 0) return text;
-  return result.length === 1 ? result[0] : result;
-}
-
-function highlightText(text: string, searchQuery?: string): React.ReactNode {
-  const searchRegex = buildSearchRegex(searchQuery);
-  const parts = text.split(MENTION_OR_URL_SPLITTER);
-  return parts.map((part, i) => {
-    if (part.startsWith("@") || part.startsWith("#")) {
-      if (searchRegex) {
-        return (
-          <span key={i} className="text-primary font-medium">
-            {highlightMatch(part, searchRegex)}
-          </span>
-        );
-      }
-      return (
-        <span key={i} className="text-primary font-medium">
-          {part}
-        </span>
-      );
-    }
-    if (part.startsWith("http")) {
-      return (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          {part}
-        </a>
-      );
-    }
-    if (searchRegex) {
-      return <span key={i}>{highlightMatch(part, searchRegex)}</span>;
-    }
-    return part;
-  });
-}
-
 function TagPill({
   name,
   onClick,
@@ -122,6 +58,7 @@ function TagPill({
 }) {
   return (
     <button
+      type="button"
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -162,8 +99,7 @@ function ActionButton({
       }`}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
-      <Icon className="w-3.5 h-3.5" />
-      <span className="sr-only">{label}</span>
+      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
     </Button>
   );
 }
@@ -183,6 +119,7 @@ function SelectionToggle({
         onToggle();
       }}
       aria-pressed={selected}
+      aria-label="Select bookmark"
       className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         selected
           ? "bg-primary border-primary text-primary-foreground"
@@ -211,11 +148,15 @@ export const BookmarkCard = memo(function BookmarkCard({
   className,
   priorityMedia = false,
 }: BookmarkCardProps) {
-  const [imageError, setImageError] = useState<Set<string>>(new Set());
+  const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
   const isInteractive = selectionMode || Boolean(onSelect);
+  const highlighter = useMemo(
+    () => createTextHighlighter(searchQuery),
+    [searchQuery]
+  );
   const handleCardActivation = () => {
     if (selectionMode) {
       onSelectionChange?.(bookmark.id, !selected);
@@ -233,23 +174,22 @@ export const BookmarkCard = memo(function BookmarkCard({
     }
   };
   const highlightedText = useMemo(
-    () => highlightText(bookmark.tweetText, searchQuery),
-    [bookmark.tweetText, searchQuery]
+    () => highlighter.tweet(bookmark.tweetText),
+    [bookmark.tweetText, highlighter]
   );
-  const highlightedAuthorName = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(bookmark.authorDisplayName, regex) : bookmark.authorDisplayName;
-  }, [bookmark.authorDisplayName, searchQuery]);
-  const highlightedUsername = useMemo(() => {
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(bookmark.authorUsername, regex) : bookmark.authorUsername;
-  }, [bookmark.authorUsername, searchQuery]);
+  const highlightedAuthorName = useMemo(
+    () => highlighter.plain(bookmark.authorDisplayName, "author"),
+    [bookmark.authorDisplayName, highlighter]
+  );
+  const highlightedUsername = useMemo(
+    () => highlighter.plain(bookmark.authorUsername, "username"),
+    [bookmark.authorUsername, highlighter]
+  );
+  const firstNoteContent = bookmark.notes[0]?.content;
   const highlightedNote = useMemo(() => {
-    const note = bookmark.notes[0]?.content;
-    if (!note) return note;
-    const regex = buildSearchRegex(searchQuery);
-    return regex ? highlightMatch(note, regex) : note;
-  }, [bookmark.notes, searchQuery]);
+    if (!firstNoteContent) return firstNoteContent;
+    return highlighter.plain(firstNoteContent, "note");
+  }, [firstNoteContent, highlighter]);
 
   if (viewMode === "compact") {
     return (
@@ -261,6 +201,12 @@ export const BookmarkCard = memo(function BookmarkCard({
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
+        aria-pressed={isInteractive ? selected : undefined}
+        aria-label={
+          isInteractive
+            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            : undefined
+        }
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
@@ -290,6 +236,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                 addSuffix: true,
               })}
             </span>
+            <XLogoMark
+              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              title="Post from X"
+            />
           </div>
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
             {highlightedText}
@@ -309,11 +259,11 @@ export const BookmarkCard = memo(function BookmarkCard({
         {metrics && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
             <span className="flex items-center gap-1">
-              <Heart className="w-3 h-3" />
+              <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
               {formatCount(metrics.like_count)}
             </span>
             <span className="flex items-center gap-1">
-              <Repeat2 className="w-3 h-3" />
+              <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
               {formatCount(metrics.retweet_count)}
             </span>
           </div>
@@ -337,6 +287,12 @@ export const BookmarkCard = memo(function BookmarkCard({
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
+        aria-pressed={isInteractive ? selected : undefined}
+        aria-label={
+          isInteractive
+            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            : undefined
+        }
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
@@ -348,6 +304,12 @@ export const BookmarkCard = memo(function BookmarkCard({
             />
           </div>
         )}
+        <XLogoMark
+          className={`pointer-events-none absolute top-2.5 z-[5] h-3.5 w-3.5 text-muted-foreground ${
+            selectionMode ? "right-11" : "right-2.5"
+          }`}
+          title="Post from X"
+        />
         {firstMediaUrl && !imageError.has(firstMediaUrl) && (
           <div className="relative aspect-video bg-muted overflow-hidden">
             <Image
@@ -402,8 +364,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                   onAddTag(bookmark.id);
                 }}
                 className={`h-7 px-2 text-xs gap-1 ${hasTag ? "text-primary" : "text-muted-foreground"}`}
+                aria-label={hasTag ? "Edit tags" : "Add tags"}
+                title={hasTag ? "Edit tags" : "Add tags"}
               >
-                <Tag className="w-3 h-3" />
+                <Tags className="w-3 h-3" />
               </Button>
             )}
             {onAddToCollection && (
@@ -415,8 +379,12 @@ export const BookmarkCard = memo(function BookmarkCard({
                   onAddToCollection(bookmark.id);
                 }}
                 className={`h-7 px-2 text-xs gap-1 ${hasCollection ? "text-primary" : "text-muted-foreground"}`}
+                aria-label={
+                  hasCollection ? "Change collection" : "Add to collection"
+                }
+                title={hasCollection ? "Change collection" : "Add to collection"}
               >
-                <FolderPlus className="w-3 h-3" />
+                <FolderInput className="w-3 h-3" />
               </Button>
             )}
             <Button
@@ -427,8 +395,10 @@ export const BookmarkCard = memo(function BookmarkCard({
                 window.open(tweetUrl, "_blank");
               }}
               className="h-7 px-2 text-xs gap-1 text-muted-foreground ml-auto"
+              aria-label="Open on X"
+              title="Open on X"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ArrowUpRight className="w-3 h-3" />
             </Button>
           </div>
         </div>
@@ -445,6 +415,12 @@ export const BookmarkCard = memo(function BookmarkCard({
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
+      aria-pressed={isInteractive ? selected : undefined}
+      aria-label={
+        isInteractive
+          ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+          : undefined
+      }
       onClick={isInteractive ? handleCardActivation : undefined}
       onKeyDown={handleCardKeyDown}
     >
@@ -464,7 +440,11 @@ export const BookmarkCard = memo(function BookmarkCard({
             className="w-10 h-10 rounded-full shrink-0"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-secondary shrink-0 flex items-center justify-center">
+          <div
+            className="w-10 h-10 rounded-full bg-secondary shrink-0 flex items-center justify-center"
+            role="img"
+            aria-label={`${bookmark.authorDisplayName} avatar`}
+          >
             <span className="text-sm font-semibold text-muted-foreground">
               {bookmark.authorDisplayName.charAt(0).toUpperCase()}
             </span>
@@ -472,31 +452,37 @@ export const BookmarkCard = memo(function BookmarkCard({
         )}
         <div className="flex-1 min-w-0">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="font-semibold text-sm text-foreground truncate">
-                {highlightedAuthorName}
-              </span>
-              {bookmark.authorVerified && (
-                <BadgeCheck
-                  className="size-3.5 text-primary shrink-0"
-                  aria-label="Verified account"
-                />
-              )}
-              <span className="text-muted-foreground truncate">
-                @{highlightedUsername}
-              </span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-muted-foreground whitespace-nowrap">
-                {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
-                  addSuffix: true,
-                })}
-              </span>
+            <div className="flex min-w-0 w-full items-center gap-2 sm:w-auto">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
+                <span className="font-semibold text-sm text-foreground truncate">
+                  {highlightedAuthorName}
+                </span>
+                {bookmark.authorVerified && (
+                  <BadgeCheck
+                    className="size-3.5 text-primary shrink-0"
+                    aria-label="Verified account"
+                  />
+                )}
+                <span className="text-muted-foreground truncate">
+                  @{highlightedUsername}
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
+              <XLogoMark
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:ml-2"
+                title="Post from X"
+              />
             </div>
             <div className="flex self-start shrink-0 items-center gap-1 rounded-xl border border-hairline-soft bg-surface-1 p-1 shadow-sm opacity-100 transition-all sm:self-auto sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
               {onAddTag && (
                 <ActionButton
-                  icon={Tag}
-                  label="Add Tag"
+                  icon={Tags}
+                  label="Add tags"
                   onClick={() => onAddTag(bookmark.id)}
                   shortcut="T"
                   active={bookmark.tags.length > 0}
@@ -504,8 +490,8 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
               {onAddToCollection && (
                 <ActionButton
-                  icon={FolderPlus}
-                  label="Add to Collection"
+                  icon={FolderInput}
+                  label="Add to collection"
                   onClick={() => onAddToCollection(bookmark.id)}
                   shortcut="C"
                   active={bookmark.collectionItems && bookmark.collectionItems.length > 0}
@@ -513,22 +499,22 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
               {onAddNote && (
                 <ActionButton
-                  icon={StickyNote}
-                  label="Add Note"
+                  icon={NotebookPen}
+                  label="Add note"
                   onClick={() => onAddNote(bookmark.id)}
                   shortcut="N"
                   active={bookmark.notes.length > 0}
                 />
               )}
               <ActionButton
-                icon={ExternalLink}
+                icon={ArrowUpRight}
                 label="Open on X"
                 onClick={() => window.open(tweetUrl, "_blank")}
                 shortcut="O"
               />
               {onDelete && (
                 <ActionButton
-                  icon={Trash2}
+                  icon={ArchiveX}
                   label={deleteLabel}
                   onClick={() => onDelete(bookmark.id)}
                 />
@@ -561,8 +547,8 @@ export const BookmarkCard = memo(function BookmarkCard({
                       height={m.height || 900}
                       sizes={
                         mediaItems.length === 1
-                          ? "(max-width: 768px) 100vw, 672px"
-                          : "(max-width: 768px) 50vw, 336px"
+                          ? `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`
+                          : `(max-width: 768px) 50vw, ${Math.round(BOOKMARK_FEED_MAX_WIDTH_PX / 2)}px`
                       }
                       className={`w-full object-cover ${
                         mediaItems.length === 1 ? "max-h-80" : "aspect-square"
@@ -587,7 +573,10 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.quotedTweet && (
-            <div className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3">
+            <div
+              aria-label="Quoted tweet"
+              className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3"
+            >
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="font-medium text-sm text-foreground">
                   {bookmark.quotedTweet.author?.name}
@@ -603,7 +592,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.notes.length > 0 && (
-            <div className="mt-3 rounded-r-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
+            <div className="mt-3 rounded-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
               <p className="text-xs leading-snug text-muted-foreground">
                 {highlightedNote}
               </p>
@@ -623,32 +612,23 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {metrics && (
-            <div
-              className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground"
-              aria-label="Tweet engagement"
-            >
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.reply_count} replies`}
-              >
-                <MessageCircle className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.reply_count)}</span>
-              </span>
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.retweet_count} retweets`}
-              >
-                <Repeat2 className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.retweet_count)}</span>
-              </span>
-              <span
-                className="flex items-center gap-1 text-xs"
-                aria-label={`${metrics.like_count} likes`}
-              >
-                <Heart className="size-3.5" aria-hidden />
-                <span aria-hidden>{formatCount(metrics.like_count)}</span>
-              </span>
-            </div>
+            <dl className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Replies</dt>
+                <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
+                <dd>{formatCount(metrics.reply_count)}</dd>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Reposts</dt>
+                <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
+                <dd>{formatCount(metrics.retweet_count)}</dd>
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <dt className="sr-only">Likes</dt>
+                <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
+                <dd>{formatCount(metrics.like_count)}</dd>
+              </div>
+            </dl>
           )}
         </div>
       </div>
