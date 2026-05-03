@@ -9,5 +9,9 @@ export default async function MainLayout({
 }) {
   const session = await auth();
   if (!session) redirect("/login");
-  return <AuthenticatedShell>{children}</AuthenticatedShell>;
+  return (
+    <div className="app-viewport overflow-hidden">
+      <AuthenticatedShell>{children}</AuthenticatedShell>
+    </div>
+  );
 }

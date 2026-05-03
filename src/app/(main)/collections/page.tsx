@@ -116,7 +116,7 @@ export default function CollectionsPage() {
   );
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}

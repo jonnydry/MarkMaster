@@ -293,7 +293,7 @@ export default function OrbitMapPage() {
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-hidden">
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
