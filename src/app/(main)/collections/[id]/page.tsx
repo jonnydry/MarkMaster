@@ -239,7 +239,7 @@ export default function CollectionDetailPage({
 
   if (isPending) {
     return (
-      <div className="app-shell-bg flex h-screen items-center justify-center">
+      <div className="app-shell-bg app-viewport flex items-center justify-center">
         <div className="max-w-4xl mx-auto w-full px-6 space-y-4">
           <div className="h-8 w-48 rounded skeleton-shimmer" />
           <div className="space-y-3">
@@ -267,7 +267,7 @@ export default function CollectionDetailPage({
   if (isError || !collection) {
     const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
     return (
-      <div className="app-shell-bg flex h-screen flex-col items-center justify-center gap-4 px-6 overflow-x-hidden">
+      <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
         <div className="rounded-2xl border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
           <p className="text-sm font-medium text-foreground">
             {isNotFound
@@ -293,8 +293,8 @@ export default function CollectionDetailPage({
   }
 
   return (
-    <div className="app-shell-bg flex h-screen flex-col overflow-x-hidden">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+    <div className="app-shell-bg app-viewport flex flex-col overflow-x-hidden">
+      <div className="app-main-scroll scrollbar-thin">
           <PageHeader
             sticky
             titleClassName="text-2xl sm:text-3xl"

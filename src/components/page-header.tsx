@@ -45,7 +45,7 @@ export function PageHeader({
       <div className={cn("px-4 py-3 sm:px-5", bodyClassName)}>
         {hasHeaderRow ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               {leading ? <div className="shrink-0">{leading}</div> : null}
               <div className="min-w-0">
                 {title ? (
@@ -72,7 +72,7 @@ export function PageHeader({
               </div>
             </div>
             {actions ? (
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
+              <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:shrink sm:justify-end sm:gap-3">
                 {actions}
               </div>
             ) : null}

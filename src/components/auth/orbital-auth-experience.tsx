@@ -173,7 +173,7 @@ export function OrbitalAuthExperience({
   errorMessage?: string | null;
 }) {
   return (
-    <div className="dark relative isolate flex min-h-screen flex-col overflow-hidden bg-[#00040B] text-foreground selection:bg-primary/30">
+    <div className="app-min-viewport dark relative isolate flex flex-col overflow-hidden bg-[#00040B] text-foreground selection:bg-primary/30">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"

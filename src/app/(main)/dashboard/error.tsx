@@ -10,7 +10,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   return (
-    <div className="flex items-center justify-center h-screen bg-background">
+    <div className="app-min-viewport flex items-center justify-center bg-background">
       <div className="text-center max-w-md">
         <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
         <p className="text-sm text-muted-foreground mb-4">

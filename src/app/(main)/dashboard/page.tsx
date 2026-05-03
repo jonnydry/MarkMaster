@@ -397,7 +397,7 @@ function DashboardContent() {
       : MEDIA_FILTER_LABELS[filters.mediaFilter] || filters.mediaFilter;
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -412,7 +412,7 @@ function DashboardContent() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="app-main-scroll scrollbar-thin">
           <div className="sticky top-0 z-20 isolate">
             <div
               className={cn(
@@ -583,6 +583,8 @@ function DashboardContent() {
                 search={filters.search}
                 hasActiveFilters={filters.hasActiveFilters}
                 onClearFilters={filters.clearFilters}
+                lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                onSyncComplete={handleSyncComplete}
               />
             </div>
           ) : (
@@ -672,7 +674,7 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center h-screen">
+        <div className="app-min-viewport flex items-center justify-center">
           <div role="status" aria-label="Loading" className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { tokenizeBookmarkSearch } from "@/lib/bookmark-search";
 import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
 
 const bookmarkInclude = {
@@ -71,7 +72,7 @@ function buildMediaFilterCondition(
 
 function buildSlowPathWhereSql({
   userId,
-  search,
+  searchTerms,
   authorFilter,
   tagIds,
   dateFrom,
@@ -82,7 +83,7 @@ function buildSlowPathWhereSql({
   unaffiliated,
 }: {
   userId: string;
-  search: string;
+  searchTerms: string[];
   authorFilter: string;
   tagIds: string[];
   dateFrom?: string;
@@ -94,8 +95,8 @@ function buildSlowPathWhereSql({
 }) {
   const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
 
-  if (search) {
-    const searchLike = `%${search}%`;
+  for (const term of searchTerms) {
+    const searchLike = `%${term}%`;
     conditions.push(Prisma.sql`
       (
         b."tweetText" ILIKE ${searchLike}
@@ -223,17 +224,20 @@ export async function GET(req: NextRequest) {
   } = parsed.data;
 
   const tagIds = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
+  const searchTerms = tokenizeBookmarkSearch(search);
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
   const relationFilters: Prisma.BookmarkWhereInput[] = [];
 
-  if (search) {
-    where.OR = [
-      { tweetText: { contains: search, mode: "insensitive" } },
-      { authorUsername: { contains: search, mode: "insensitive" } },
-      { authorDisplayName: { contains: search, mode: "insensitive" } },
-      { notes: { some: { content: { contains: search, mode: "insensitive" } } } },
-    ];
+  for (const term of searchTerms) {
+    relationFilters.push({
+      OR: [
+        { tweetText: { contains: term, mode: "insensitive" } },
+        { authorUsername: { contains: term, mode: "insensitive" } },
+        { authorDisplayName: { contains: term, mode: "insensitive" } },
+        { notes: { some: { content: { contains: term, mode: "insensitive" } } } },
+      ],
+    });
   }
 
   if (authorFilter) {
@@ -315,7 +319,7 @@ export async function GET(req: NextRequest) {
 
   const slowWhereSql = buildSlowPathWhereSql({
     userId: user.id,
-    search,
+    searchTerms,
     authorFilter,
     tagIds,
     dateFrom,

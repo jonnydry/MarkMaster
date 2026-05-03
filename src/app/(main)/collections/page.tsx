@@ -116,7 +116,7 @@ export default function CollectionsPage() {
   );
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -134,7 +134,7 @@ export default function CollectionsPage() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="app-main-scroll scrollbar-thin">
           <PageHeader
             sticky
             title="Collections"

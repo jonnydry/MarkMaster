@@ -14,9 +14,15 @@ interface SyncButtonProps {
   onSyncComplete?: () => void;
   /** Shown in the status line after the sync message, e.g. " · 99 bookmarks". */
   bookmarkCount?: number;
+  detail?: "compact" | "full";
 }
 
-export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncButtonProps) {
+export function SyncButton({
+  lastSyncAt,
+  onSyncComplete,
+  bookmarkCount,
+  detail = "compact",
+}: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
     useQuery<SyncStatusResponse>({
@@ -131,6 +137,13 @@ export function SyncButton({ lastSyncAt, onSyncComplete, bookmarkCount }: SyncBu
           )}
         </div>
       )}
+      {detail === "full" ? (
+        <div className="mt-1 grid gap-1.5 border-t border-hairline-soft pt-2 text-[11px] leading-snug text-muted-foreground">
+          <p>Fetches newest X bookmarks and updates existing saves.</p>
+          <p>Mirrors X bookmark folders into synced collections.</p>
+          <p>Pauses safely on rate limits and resumes on the next sync.</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -140,7 +153,7 @@ function getSyncStatusCopy(
   latestRun: SyncRunSummary | null | undefined,
   lastSyncAt: Date | null
 ) {
-    if (currentRun) {
+  if (currentRun) {
     return {
       dotClass: "bg-primary animate-pulse",
       label: `Syncing${currentRun.totalFetched > 0 ? ` · ${currentRun.totalFetched} fetched` : ""}...`,

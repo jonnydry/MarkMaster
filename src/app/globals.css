@@ -115,6 +115,8 @@
   --page-shell-depth-bottom: #f3f1ec;
   --page-shell-ambient: rgba(59, 130, 246, 0.08);
   --page-shell-highlight: rgba(255, 255, 255, 0.4);
+  --app-header-height: 72px;
+  --header-height: var(--app-header-height);
   --success: #22c55e;
 }
 
@@ -278,6 +280,44 @@
         var(--background) 44%,
         var(--page-shell-depth-bottom) 100%
       );
+  }
+  .app-viewport {
+    min-height: 100vh;
+    min-height: 100svh;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .app-min-viewport {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+  .app-fixed-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .app-main-scroll {
+    min-height: 0;
+    flex: 1 1 0%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .orbit-map-stage {
+    min-height: clamp(280px, calc(100dvh - 14rem), 480px);
+  }
+  @supports not (height: 100dvh) {
+    .orbit-map-stage {
+      min-height: clamp(280px, calc(100vh - 14rem), 480px);
+    }
+  }
+  @media (min-width: 1024px) {
+    .orbit-map-stage {
+      min-height: 0;
+    }
+  }
+  @media (max-height: 700px) {
+    :root {
+      --app-header-height: 64px;
+    }
   }
   .heading-font {
     font-family: var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;

@@ -20,6 +20,7 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { LibraryControlCenter } from "@/components/library-control-center";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson } from "@/lib/fetch-json";
@@ -113,7 +114,7 @@ export default function AnalyticsPage() {
   }, [analytics]);
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -134,7 +135,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="app-main-scroll scrollbar-thin">
           <PageHeader
             sticky
             title="Analytics"
@@ -169,7 +170,18 @@ export default function AnalyticsPage() {
                   onRetry={() => refetch()}
                 />
               ) : analytics.totalBookmarks === 0 ? (
-                <EmptyState />
+                <LibraryControlCenter
+                  totalBookmarks={0}
+                  untriagedCount={0}
+                  totalTags={analytics.totalTags}
+                  totalCollections={analytics.totalCollections}
+                  notedCount={analytics.notedCount}
+                  lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
+                  onSyncComplete={() => {
+                    void invalidateLibraryQueries(queryClient);
+                    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+                  }}
+                />
               ) : (
                 <>
                   <section className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
@@ -191,6 +203,19 @@ export default function AnalyticsPage() {
                       />
                     </div>
                   </section>
+
+                  <LibraryControlCenter
+                    totalBookmarks={analytics.totalBookmarks}
+                    untriagedCount={analytics.untaggedCount}
+                    totalTags={analytics.totalTags}
+                    totalCollections={analytics.totalCollections}
+                    notedCount={analytics.notedCount}
+                    lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
+                    onSyncComplete={() => {
+                      void invalidateLibraryQueries(queryClient);
+                      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+                    }}
+                  />
 
                   <TopVoicesCard
                     authors={analytics.topAuthors}
@@ -273,7 +298,7 @@ function LibraryHealthCard({
 
         {!allTriaged ? (
           <Link
-            href="/dashboard"
+            href="/orbit"
             className={`${buttonVariants({ size: "sm" })} shrink-0`}
           >
             Triage now
@@ -441,24 +466,6 @@ function ErrorState({
         <Button size="sm" className="mt-4" onClick={onRetry}>
           Retry
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center text-center">
-      <div className="max-w-sm rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-10 shadow-sm">
-        <p className="heading-font text-xl font-semibold">Nothing to analyze yet</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sync your X bookmarks to see how your library grows, what kind of
-          content fills it, and which voices you keep coming back to.
-        </p>
-        <Link href="/dashboard" className={`${buttonVariants()} mt-5`}>
-          Go to dashboard
-          <ArrowRight className="ml-1 h-3.5 w-3.5" />
-        </Link>
       </div>
     </div>
   );

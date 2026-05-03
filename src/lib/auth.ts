@@ -10,13 +10,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.AUTH_TWITTER_SECRET!,
       // Must set `url`: passing only `params` replaces the default string URL and
       // normalizeEndpoint falls back to https://authjs.dev (broken OAuth).
-        authorization: {
-          url: "https://x.com/i/oauth2/authorize",
-          params: {
-            scope: "tweet.read users.read bookmark.read offline.access",
-          },
+      authorization: {
+        url: "https://x.com/i/oauth2/authorize",
+        params: {
+          scope: "tweet.read users.read bookmark.read offline.access",
         },
-      }),
+      },
+    }),
   ],
   callbacks: {
     async signIn({ account, profile }) {
@@ -108,20 +108,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.xId) {
-        const user = await prisma.user.findUnique({
-          where: { xId: token.xId as string },
-          select: {
-            id: true,
-            xId: true,
-            username: true,
-            displayName: true,
-            profileImageUrl: true,
-            lastSyncAt: true,
-          },
-        });
-        if (user) {
-          (session as unknown as SessionWithUser).dbUser = user;
+      if (typeof token.xId === "string" && token.xId.length > 0) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { xId: token.xId },
+            select: {
+              id: true,
+              xId: true,
+              username: true,
+              displayName: true,
+              profileImageUrl: true,
+              lastSyncAt: true,
+            },
+          });
+          if (user) {
+            (session as unknown as SessionWithUser).dbUser = user;
+          }
+        } catch (e) {
+          console.error("[auth] session prisma lookup failed:", e);
         }
       }
       return session;
@@ -151,8 +155,13 @@ export interface SessionWithUser {
 }
 
 export async function getDbUser(): Promise<DbUser | null> {
-  const session = (await auth()) as SessionWithUser | null;
-  return session?.dbUser ?? null;
+  try {
+    const session = (await auth()) as SessionWithUser | null;
+    return session?.dbUser ?? null;
+  } catch (e) {
+    console.error("[auth] getDbUser failed:", e);
+    return null;
+  }
 }
 
 export async function getUserTokens(userId: string) {

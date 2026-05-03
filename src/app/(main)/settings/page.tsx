@@ -11,6 +11,9 @@ import {
   Moon,
   Tag,
   LogOut,
+  BrainCircuit,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
+import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
@@ -121,7 +125,7 @@ export default function SettingsPage() {
         : "Please try again.";
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
         <Sidebar
           tags={tags}
@@ -139,7 +143,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="app-main-scroll scrollbar-thin">
           <PageHeader
             sticky
             title="Settings"
@@ -179,6 +183,47 @@ export default function SettingsPage() {
                   </Button>
                 </Card>
               )}
+
+              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <h2 className="font-semibold heading-font">Connection & Trust</h2>
+                </div>
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-hairline-soft bg-surface-2 p-4">
+                    <p className="text-sm font-medium">
+                      {session?.dbUser?.username
+                        ? `Connected to @${session.dbUser.username}`
+                        : "X account connection"}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      MarkMaster requests read-only bookmark access. Sync imports
+                      bookmarks and X folders into your searchable archive.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <TrustItem
+                      icon={KeyRound}
+                      label="Encrypted tokens"
+                      copy="Access and refresh tokens are encrypted before storage."
+                    />
+                    <TrustItem
+                      icon={BrainCircuit}
+                      label="Review-first AI"
+                      copy="Orbit asks Grok only when you scan, then waits for approval."
+                    />
+                  </div>
+                  <SyncButton
+                    lastSyncAt={
+                      session?.dbUser?.lastSyncAt
+                        ? new Date(session.dbUser.lastSyncAt)
+                        : null
+                    }
+                    onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                    detail="full"
+                  />
+                </div>
+              </Card>
 
               <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
@@ -329,6 +374,26 @@ export default function SettingsPage() {
         onOpenChange={setCreateOpen}
         onCreateCollection={createCollection}
       />
+    </div>
+  );
+}
+
+function TrustItem({
+  icon: Icon,
+  label,
+  copy,
+}: {
+  icon: typeof ShieldCheck;
+  label: string;
+  copy: string;
+}) {
+  return (
+    <div className="rounded-xl border border-hairline-soft bg-surface-2 p-3">
+      <div className="flex items-center gap-2">
+        <Icon className="size-3.5 text-primary" aria-hidden />
+        <p className="text-sm font-medium text-foreground">{label}</p>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy}</p>
     </div>
   );
 }

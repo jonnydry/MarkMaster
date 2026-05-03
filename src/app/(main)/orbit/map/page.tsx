@@ -293,7 +293,7 @@ export default function OrbitMapPage() {
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -446,7 +446,7 @@ export default function OrbitMapPage() {
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 pb-4 pt-2 sm:px-5 lg:flex-row">
-          <div className="relative flex min-h-[480px] min-w-0 flex-1 overflow-hidden rounded-[28px] lg:min-h-0">
+          <div className="orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden rounded-[28px]">
             {isLoading ? (
               <div className="flex h-full w-full items-center justify-center rounded-[28px] border border-white/10 bg-[#0b0f1a]">
                 <div className="flex items-center gap-2 text-sm text-white/60">

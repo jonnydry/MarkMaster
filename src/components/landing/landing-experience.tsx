@@ -58,7 +58,7 @@ const STAGGER_CLASSES = [
 
 export function LandingExperience() {
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+    <div className="app-min-viewport bg-background text-foreground font-sans selection:bg-primary/30">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
           <div className="flex items-center gap-3">

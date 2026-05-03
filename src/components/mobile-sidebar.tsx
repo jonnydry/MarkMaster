@@ -108,7 +108,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
       </Button>
 
       <div
-        className={`fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300 ${
+        className={`app-fixed-viewport fixed inset-x-0 top-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setOpen(false)}
@@ -117,7 +117,7 @@ export function MobileSidebar(props: MobileSidebarProps) {
 
       <div
         ref={panelRef}
-        className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border/70 bg-sidebar/95 shadow-xl backdrop-blur-xl md:hidden dark:bg-sidebar/80 transition-transform duration-300 ease-out ${
+        className={`app-fixed-viewport fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border/70 bg-sidebar/95 shadow-xl backdrop-blur-xl transition-transform duration-300 ease-out md:hidden dark:bg-sidebar/80 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"

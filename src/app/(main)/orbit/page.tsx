@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -81,6 +81,77 @@ const VIEW_MODE_OPTIONS: Array<{
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
+
+function OrbitHeaderEtching() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[360px] overflow-hidden sm:block"
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 360 88"
+        className="absolute right-0 top-1/2 h-24 w-[360px] -translate-y-1/2 opacity-80 [mask-image:linear-gradient(90deg,transparent,black_18%,black_82%,transparent)]"
+        fill="none"
+      >
+        <defs>
+          <filter
+            id="orbit-header-etching-soften"
+            x="-20%"
+            y="-30%"
+            width="140%"
+            height="160%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur stdDeviation="0.35" />
+          </filter>
+        </defs>
+        <g filter="url(#orbit-header-etching-soften)">
+          <ellipse
+            cx="240"
+            cy="44"
+            rx="92"
+            ry="18"
+            stroke="rgba(255,255,255,0.18)"
+            strokeWidth="1"
+          />
+          <ellipse
+            cx="240"
+            cy="44"
+            rx="92"
+            ry="18"
+            stroke="rgba(15,23,42,0.46)"
+            strokeWidth="1"
+            transform="rotate(58 240 44)"
+          />
+          <ellipse
+            cx="240"
+            cy="44"
+            rx="92"
+            ry="18"
+            stroke="rgba(147,197,253,0.22)"
+            strokeWidth="1"
+            transform="rotate(-58 240 44)"
+          />
+          <circle
+            cx="240"
+            cy="44"
+            r="5.5"
+            fill="rgba(255,255,255,0.08)"
+            stroke="rgba(15,23,42,0.62)"
+          />
+          <circle cx="156" cy="30" r="2.5" fill="rgba(191,219,254,0.34)" />
+          <circle cx="310" cy="62" r="2" fill="rgba(255,255,255,0.22)" />
+        </g>
+        <path
+          d="M118 44H338"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth="1"
+          strokeDasharray="2 14"
+        />
+      </svg>
+    </div>
+  );
+}
 
 const AddTagDialog = dynamic(
   () => import("@/components/add-tag-dialog").then((m) => m.AddTagDialog),
@@ -531,7 +602,7 @@ export default function OrbitPage() {
   })();
 
   return (
-    <div className="app-shell-bg flex h-screen overflow-x-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-x-hidden">
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -545,9 +616,11 @@ export default function OrbitPage() {
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <div className="app-main-scroll scrollbar-thin">
           <div className="sticky top-0 z-10">
             <PageHeader
+              className="isolate overflow-hidden"
+              bodyClassName="relative overflow-hidden"
               title={
                 <span className="flex items-center gap-2">
                   <OrbitIcon className="size-5 text-primary" />
@@ -571,107 +644,22 @@ export default function OrbitPage() {
                 </div>
               }
               actions={dbUser ? <UserNavDynamic user={dbUser} /> : null}
-            />
+            >
+              <OrbitHeaderEtching />
+            </PageHeader>
           </div>
 
-          <div className="space-y-4 px-4 pb-6 pt-0 sm:px-5">
-            <section
-              className="relative -mx-4 min-h-[390px] overflow-hidden px-4 pb-8 pt-12 sm:-mx-5 sm:px-5 sm:pt-16 lg:min-h-[448px] lg:pt-20"
-              style={{
-                backgroundImage:
-                  "linear-gradient(180deg, rgba(15,16,18,0) 0%, rgba(15,16,18,0.1) 60%, var(--background) 100%), url('/orbit-page-field.svg')",
-                backgroundPosition: "center top",
-                backgroundRepeat: "no-repeat",
-                backgroundSize: "cover",
-              }}
-            >
-              <div
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute left-0 top-1/3 h-px w-full bg-white/[0.055]"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute left-[6%] top-24 hidden h-40 w-px bg-white/[0.07] lg:block"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute right-[9%] top-20 hidden h-px w-64 bg-primary/20 lg:block"
-                aria-hidden
-              />
-              <div className="relative mx-auto flex w-full max-w-[1120px] flex-col gap-8">
-                <div className="flex min-h-[324px] max-w-[760px] flex-col justify-center">
-                  <p
-                    className="text-[11px] font-medium uppercase tracking-[0.32em] text-sky-200/90"
-                    style={MONO_STYLE}
-                  >
-                    Orbit / Default mode
-                  </p>
-                  <h1 className="heading-font mt-7 max-w-[760px] text-5xl font-semibold leading-[0.95] tracking-tight text-foreground sm:text-6xl lg:text-[5.25rem]">
-                    Make the next move obvious.
+          <div className="space-y-4 px-4 pb-6 pt-3 sm:px-5">
+            <section className={cn(bookmarkFeedColumnClassName, "pt-1")}>
+              <div className="flex flex-col gap-4 border-b border-hairline-soft pb-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <h1 className="text-base font-semibold text-foreground">
+                    Categorize unsorted bookmarks
                   </h1>
-                  <p className="mt-6 max-w-[620px] text-base leading-7 text-foreground/70 sm:text-lg">
-                    Grok scans the visible queue or your selected bookmarks,
-                    then you review every proposed tag and collection move
-                    before apply.
-                  </p>
-                  <p className="mt-3 max-w-[620px] text-sm leading-6 text-muted-foreground">
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                     {scanHelperText}
                   </p>
-
-                  <div className="mt-8 flex flex-wrap items-center gap-3">
-                    <Button
-                      size="lg"
-                      className="h-12 rounded-none border-white/80 bg-foreground px-5 text-background shadow-[0_18px_45px_-24px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
-                      disabled={
-                        queueIsLoading ||
-                        scan.scanning ||
-                        scanTargetIds.length === 0
-                      }
-                      onClick={handleScan}
-                    >
-                      {queueIsLoading || scan.scanning ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <GrokMark className="size-4" title="Grok" />
-                      )}
-                      {scanButtonLabel}
-                    </Button>
-
-                    {scan.plan ? (
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        className="h-12 rounded-none border-primary/30 bg-primary/10 px-5 text-sky-100 backdrop-blur-md hover:border-primary/50 hover:bg-primary/15 hover:text-foreground"
-                        disabled={scan.applyingBatch}
-                        onClick={handleOpenReviewAll}
-                      >
-                        {scan.applyingBatch ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <ListChecks className="size-4" />
-                        )}
-                        Review pass
-                      </Button>
-                    ) : null}
-
-                    <Link
-                      href={
-                        resolvedActiveBookmarkId
-                          ? `/orbit/map?focus=${resolvedActiveBookmarkId}`
-                          : "/orbit/map"
-                      }
-                      className="inline-flex h-12 items-center gap-2 border border-white/15 bg-white/[0.045] px-5 text-sm font-medium text-foreground/85 backdrop-blur-md transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
-                    >
-                      <MapIcon className="size-4 text-sky-200" aria-hidden />
-                      Open graph
-                    </Link>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <span className="inline-flex size-1.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(59,130,246,0.16)]" />
                       {scanningSelection ? "Selection pass" : "Queue pass"}
@@ -679,8 +667,58 @@ export default function OrbitPage() {
                     <span aria-hidden className="text-white/20">
                       /
                     </span>
-                    <span>{scanScopeLabel}</span>
+                    <span style={MONO_STYLE}>{scanScopeLabel}</span>
                   </div>
+                </div>
+
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-9 rounded-lg border-white/80 bg-foreground px-3 text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
+                    disabled={
+                      queueIsLoading ||
+                      scan.scanning ||
+                      scanTargetIds.length === 0
+                    }
+                    onClick={handleScan}
+                  >
+                    {queueIsLoading || scan.scanning ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <GrokMark className="size-4" title="Grok" />
+                    )}
+                    {scanButtonLabel}
+                  </Button>
+
+                  {scan.plan ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 rounded-lg border-primary/30 bg-primary/10 px-3 text-sky-100 hover:border-primary/50 hover:bg-primary/15 hover:text-foreground"
+                      disabled={scan.applyingBatch}
+                      onClick={handleOpenReviewAll}
+                    >
+                      {scan.applyingBatch ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <ListChecks className="size-4" />
+                      )}
+                      Review pass
+                    </Button>
+                  ) : null}
+
+                  <Link
+                    href={
+                      resolvedActiveBookmarkId
+                        ? `/orbit/map?focus=${resolvedActiveBookmarkId}`
+                        : "/orbit/map"
+                    }
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/[0.045] px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+                  >
+                    <MapIcon className="size-4 text-sky-200" aria-hidden />
+                    Open graph
+                  </Link>
                 </div>
               </div>
             </section>
@@ -1082,17 +1120,46 @@ function QueueEmptyState({
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
         {searching
           ? "Try a different search term or clear the query."
-          : "Every bookmark already belongs to a tag, collection, or folder. New unsorted saves will appear here when they need a decision."}
+          : "Every bookmark has at least one tag, collection, or synced folder. This is a good moment to search, share, or inspect the graph."}
       </p>
-      <div className="mt-5 flex justify-center">
-        <Button
-          size="sm"
-          variant="outline"
-          className="rounded-none"
-          onClick={searching ? onClearSearch : onOpenBookmarks}
-        >
-          {searching ? "Clear search" : "Open bookmarks"}
-        </Button>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {searching ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-lg"
+            onClick={onClearSearch}
+          >
+            Clear search
+          </Button>
+        ) : (
+          <>
+            <Link
+              href="/orbit/map"
+              className={cn(buttonVariants({ size: "sm" }), "rounded-lg")}
+            >
+              <MapIcon className="size-3.5" aria-hidden />
+              Inspect graph
+            </Link>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-lg"
+              onClick={onOpenBookmarks}
+            >
+              Search bookmarks
+            </Button>
+            <Link
+              href="/collections"
+              className={cn(
+                buttonVariants({ size: "sm", variant: "outline" }),
+                "rounded-lg"
+              )}
+            >
+              Open collections
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );
