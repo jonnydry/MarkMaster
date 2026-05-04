@@ -105,7 +105,11 @@ export function Providers({
   );
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider
+      session={session ?? null}
+      refetchOnWindowFocus={false}
+      refetchWhenOffline={false}
+    >
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>{children}</ThemeProvider>
       </QueryClientProvider>

@@ -395,6 +395,8 @@ function DashboardContent() {
     filters.mediaFilter === "all"
       ? "All Bookmarks"
       : MEDIA_FILTER_LABELS[filters.mediaFilter] || filters.mediaFilter;
+  const primaryFilterCompactLabel =
+    filters.mediaFilter === "all" ? "All" : primaryFilterLabel;
 
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
@@ -420,113 +422,140 @@ function DashboardContent() {
                 appChromeFrostedClassName
               )}
             >
-            <PageHeader chromeless bodyClassName="px-0 py-0">
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-5">
-            <div className="md:hidden">
-              <MobileSidebar
-                tags={tags}
-                collections={collections}
-                selectedTags={filters.selectedTags}
-                onTagToggle={filters.toggleTag}
-                onCreateCollection={handleCreateCollectionOpen}
-                lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-                totalBookmarks={total}
-                onSyncComplete={handleSyncComplete}
-              />
-            </div>
+              <PageHeader chromeless bodyClassName="px-0 py-0">
+                <div className="dashboard-toolbar px-4 py-2.5 sm:px-5">
+                  <div className="dashboard-toolbar-row flex flex-wrap items-center gap-2">
+                    <div className="dashboard-mobile-menu md:hidden">
+                      <MobileSidebar
+                        tags={tags}
+                        collections={collections}
+                        selectedTags={filters.selectedTags}
+                        onTagToggle={filters.toggleTag}
+                        onCreateCollection={handleCreateCollectionOpen}
+                        lastSyncAt={
+                          dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
+                        }
+                        totalBookmarks={total}
+                        onSyncComplete={handleSyncComplete}
+                      />
+                    </div>
 
-            <div className="order-3 flex min-w-0 w-full flex-wrap items-center gap-1.5 sm:order-none sm:flex-1 sm:w-auto">
-              <button
-                onClick={() => {
-                  filters.setSelectedTags([]);
-                  filters.setMediaFilter("all");
-                }}
-                aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-                className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium bg-primary text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                {primaryFilterLabel}
-                <span className="hidden text-xs opacity-70 sm:inline" aria-hidden>{total.toLocaleString()}</span>
-              </button>
-              {filters.selectedTags.map((tagId) => {
-                const tag = tags.find((t) => t.id === tagId);
-                return tag ? (
-                  <button
-                    key={tagId}
-                    onClick={() => filters.toggleTag(tagId)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
-                  >
-                    #{tag.name}
-                    <span className="text-primary/60 hover:text-primary ml-0.5" aria-hidden>×</span>
-                  </button>
-                ) : null;
-              })}
-              <button
-                type="button"
-                onClick={() => setShowFilters((v) => !v)}
-                aria-expanded={showFilters}
-                aria-controls="dashboard-filter-panel"
-                aria-label={showFilters ? "Hide filters" : "Show filters"}
-                className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                  showFilters
-                    ? "bg-secondary text-foreground border-border"
-                    : "text-muted-foreground bg-secondary hover:text-foreground border-border"
-                }`}
-              >
-                <SlidersHorizontal className="size-4" aria-hidden />
-                <span className="hidden sm:inline">Filters</span>
-                {filters.hasActiveFilters && (
-                  <span className="w-2 h-2 rounded-full bg-primary" aria-hidden />
+                    <div className="dashboard-filter-strip order-3 flex min-w-0 w-full flex-wrap items-center gap-1.5 sm:order-none sm:flex-1 sm:w-auto">
+                      <button
+                        onClick={() => {
+                          filters.setSelectedTags([]);
+                          filters.setMediaFilter("all");
+                        }}
+                        aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
+                        className="dashboard-filter-summary inline-flex h-10 max-w-full items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <span className="dashboard-filter-summary-full truncate">
+                          {primaryFilterLabel}
+                        </span>
+                        <span className="dashboard-filter-summary-compact truncate">
+                          {primaryFilterCompactLabel}
+                        </span>
+                        <span className="text-xs opacity-70" aria-hidden>
+                          {total.toLocaleString()}
+                        </span>
+                      </button>
+                      {filters.selectedTags.map((tagId) => {
+                        const tag = tags.find((t) => t.id === tagId);
+                        return tag ? (
+                          <button
+                            key={tagId}
+                            onClick={() => filters.toggleTag(tagId)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
+                          >
+                            #{tag.name}
+                            <span
+                              className="text-primary/60 hover:text-primary ml-0.5"
+                              aria-hidden
+                            >
+                              ×
+                            </span>
+                          </button>
+                        ) : null;
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setShowFilters((v) => !v)}
+                        aria-expanded={showFilters}
+                        aria-controls="dashboard-filter-panel"
+                        aria-label={showFilters ? "Hide filters" : "Show filters"}
+                        className={`dashboard-action-button inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                          showFilters
+                            ? "bg-secondary text-foreground border-border"
+                            : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                        }`}
+                      >
+                        <SlidersHorizontal className="size-4" aria-hidden />
+                        <span className="dashboard-action-label">Filters</span>
+                        {filters.hasActiveFilters && (
+                          <span
+                            className="w-2 h-2 rounded-full bg-primary"
+                            aria-hidden
+                          />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectionMode) {
+                            clearSelection();
+                          } else {
+                            setSelectionMode(true);
+                          }
+                        }}
+                        aria-pressed={selectionMode}
+                        aria-label={
+                          selectionMode ? "Exit selection mode" : "Enter selection mode"
+                        }
+                        className={`dashboard-action-button inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                          selectionMode
+                            ? "bg-secondary text-foreground border-border"
+                            : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                        }`}
+                      >
+                        <CheckSquare className="size-4" aria-hidden />
+                        <span className="dashboard-action-label">
+                          {selectionMode ? "Done" : "Select"}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="dashboard-toolbar-controls order-2 ml-auto flex w-full shrink-0 items-center gap-2 sm:order-none sm:ml-0 sm:w-auto">
+                      <SortControls
+                        sortField={filters.sortField}
+                        viewMode={viewMode}
+                        onSortFieldChange={filters.setSortField}
+                        onViewModeChange={setViewMode}
+                      />
+                      {dbUser && (
+                        <div className="dashboard-user-nav shrink-0">
+                          <UserNavDynamic user={dbUser} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {(isFetching || filters.isSearchPending) && !isLoading && (
+                  <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">
+                    Updating results...
+                  </p>
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectionMode) {
-                    clearSelection();
-                  } else {
-                    setSelectionMode(true);
-                  }
-                }}
-                aria-pressed={selectionMode}
-                aria-label={selectionMode ? "Exit selection mode" : "Enter selection mode"}
-                className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                  selectionMode
-                    ? "bg-secondary text-foreground border-border"
-                    : "text-muted-foreground bg-secondary hover:text-foreground border-border"
-                }`}
-              >
-                <CheckSquare className="size-4" aria-hidden />
-                <span className="hidden sm:inline">
-                  {selectionMode ? "Done" : "Select"}
-                </span>
-              </button>
-            </div>
-
-            <div className="order-2 ml-auto flex w-full items-center gap-2 sm:order-none sm:ml-0 sm:w-auto shrink-0">
-              <SortControls
-                sortField={filters.sortField}
-                viewMode={viewMode}
-                onSortFieldChange={filters.setSortField}
-                onViewModeChange={setViewMode}
-              />
-              {dbUser && <UserNavDynamic user={dbUser} />}
-            </div>
-          </div>
-
-          {(isFetching || filters.isSearchPending) && !isLoading && (
-            <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">Updating results...</p>
-          )}
-          {selectionMode && (
-            <SelectionToolbar
-              selectedCount={visibleSelectedBookmarkIds.length}
-              onSelectPage={selectVisibleBookmarks}
-              onClear={clearSelection}
-              onTag={openBulkTagDialog}
-              onAddToCollection={openBulkCollectionDialog}
-              onHide={handleBulkHide}
-            />
-          )}
-            </PageHeader>
+                {selectionMode && (
+                  <SelectionToolbar
+                    selectedCount={visibleSelectedBookmarkIds.length}
+                    onSelectPage={selectVisibleBookmarks}
+                    onClear={clearSelection}
+                    onTag={openBulkTagDialog}
+                    onAddToCollection={openBulkCollectionDialog}
+                    onHide={handleBulkHide}
+                  />
+                )}
+              </PageHeader>
 
             {showFilters && (
               <div id="dashboard-filter-panel" className="animate-slide-down-fade">

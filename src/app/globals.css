@@ -301,6 +301,99 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  .dashboard-toolbar {
+    container-type: inline-size;
+  }
+  .dashboard-toolbar-row {
+    align-items: center;
+  }
+  .dashboard-filter-summary {
+    min-width: 0;
+  }
+  .dashboard-filter-summary-compact {
+    display: none;
+  }
+  .dashboard-action-label,
+  .dashboard-view-label {
+    display: inline;
+  }
+  .dashboard-sort-trigger {
+    flex-basis: 7.25rem;
+  }
+  .dashboard-view-mode {
+    width: max-content;
+  }
+  @container (max-width: 880px) {
+    .dashboard-toolbar-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+    }
+    .dashboard-mobile-menu {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .dashboard-filter-strip {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      width: 100%;
+    }
+    .dashboard-toolbar-controls {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-row: 3;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      margin-left: 0;
+      width: 100%;
+      min-width: 0;
+    }
+    .dashboard-sort-controls {
+      display: grid;
+      grid-template-columns: 8.5rem auto;
+      justify-content: start;
+      grid-column: 1;
+      width: auto;
+      min-width: 0;
+    }
+    .dashboard-sort-trigger {
+      width: 8.5rem;
+      min-width: 0;
+    }
+    .dashboard-view-mode {
+      justify-self: end;
+    }
+    .dashboard-view-button {
+      width: 2.5rem;
+      padding-inline: 0;
+    }
+    .dashboard-view-label {
+      display: none;
+    }
+    .dashboard-view-icon {
+      margin-right: 0;
+    }
+    .dashboard-filter-summary-full {
+      display: none;
+    }
+    .dashboard-filter-summary-compact {
+      display: inline;
+    }
+    .dashboard-user-nav {
+      grid-column: 2;
+      justify-self: end;
+    }
+  }
+  @container (max-width: 560px) {
+    .dashboard-action-button {
+      width: 2.5rem;
+      padding-inline: 0;
+      justify-content: center;
+    }
+    .dashboard-action-label {
+      display: none;
+    }
+  }
   .orbit-map-stage {
     min-height: clamp(280px, calc(100dvh - 14rem), 480px);
   }

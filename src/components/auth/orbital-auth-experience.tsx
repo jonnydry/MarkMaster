@@ -5,6 +5,11 @@ import { GrokMark } from "@/components/brands/grok-mark";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import {
+  MarkMasterCollectionsIcon,
+  MarkMasterSearchIcon,
+  MarkMasterTagsIcon,
+} from "@/components/markmaster-icons";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 
 type FeatureRow = {
@@ -111,56 +116,14 @@ function FeatureIcon({
   }
 
   if (icon === "search") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        className={className}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="11" cy="11" r="7" />
-        <path d="m16.2 16.2 4 4" />
-      </svg>
-    );
+    return <MarkMasterSearchIcon className={className} aria-hidden="true" />;
   }
 
   if (icon === "tag") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        className={className}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20.5 13.5 13.5 20.5a2.2 2.2 0 0 1-3.1 0L3 13.1V3h10.1l7.4 7.4a2.2 2.2 0 0 1 0 3.1Z" />
-        <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" />
-      </svg>
-    );
+    return <MarkMasterTagsIcon className={className} aria-hidden="true" />;
   }
 
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6.5A2.5 2.5 0 0 1 4 17.5v-11Z" />
-      <path d="M8 8h8M8 12h8" />
-    </svg>
-  );
+  return <MarkMasterCollectionsIcon className={className} aria-hidden="true" />;
 }
 
 function handleSignIn() {

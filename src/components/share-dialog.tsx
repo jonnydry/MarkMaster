@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Copy, ExternalLink, Check } from "lucide-react";
+import { toast } from "sonner";
 import { generateClipboardThread } from "@/lib/share-content";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { ShareContent } from "@/lib/share-content";
 
@@ -29,13 +31,13 @@ export function ShareDialog({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const copyToClipboard = useCallback(async (text: string, field: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const copied = await copyTextToClipboard(text);
+    if (copied) {
       setCopiedField(field);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopiedField(null), 2000);
-    } catch {
-      // fallback
+    } else {
+      toast.error("Could not copy to clipboard");
     }
   }, []);
 

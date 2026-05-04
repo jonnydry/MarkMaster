@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { MarkMasterSyncIcon } from "@/components/markmaster-icons";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import type { SyncRunSummary, SyncStatusResponse } from "@/types";
 
@@ -87,7 +87,7 @@ export function SyncButton({
         aria-busy={isAnySyncRunning}
         className="h-10 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
       >
-        <RefreshCw
+        <MarkMasterSyncIcon
           className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
         />
         {isAnySyncRunning ? "Syncing..." : "Sync"}

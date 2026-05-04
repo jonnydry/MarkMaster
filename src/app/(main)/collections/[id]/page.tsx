@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   bookmarkCollectionCardCellClassName,
   bookmarkCollectionRowSyncedClassName,
@@ -146,11 +147,11 @@ export default function CollectionDetailPage({
 
   const handleCopyShareLink = async () => {
     if (!collection?.shareSlug) return;
-    try {
-      const url = `${window.location.origin}/share/${collection.shareSlug}`;
-      await navigator.clipboard.writeText(url);
+    const url = `${window.location.origin}/share/${collection.shareSlug}`;
+    const copied = await copyTextToClipboard(url);
+    if (copied) {
       toast.success("Share link copied!");
-    } catch {
+    } else {
       toast.error("Could not copy link to clipboard");
     }
   };
