@@ -13,7 +13,7 @@ import type {
 } from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
-const DEFAULT_XAI_MODEL = "grok-4.20-reasoning";
+const DEFAULT_XAI_MODEL = "grok-4.3";
 
 const MAX_TEXT_LENGTH = 1_200;
 const MAX_NOTE_LENGTH = 400;
