@@ -2,19 +2,19 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  Bookmark,
+  FolderOpen,
+  Orbit,
+  Search,
+  Tags,
+} from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { SyncButton } from "@/components/sync-button";
 import { cn } from "@/lib/utils";
-import {
-  MarkMasterAnalyticsIcon,
-  MarkMasterBookmarksIcon,
-  MarkMasterCollectionsIcon,
-  MarkMasterOrbitIcon,
-  MarkMasterSearchIcon,
-  MarkMasterTagsIcon,
-} from "@/components/markmaster-icons";
 
 type LibraryControlCenterProps = {
   totalBookmarks: number;
@@ -106,23 +106,23 @@ export function LibraryControlCenter({
             <ControlMetric
               label="Bookmarks"
               value={totalBookmarks.toLocaleString()}
-              icon={MarkMasterBookmarksIcon}
+              icon={Bookmark}
             />
             <ControlMetric
               label="In Orbit"
               value={untriagedCount.toLocaleString()}
-              icon={MarkMasterOrbitIcon}
+              icon={Orbit}
               active={untriagedCount > 0}
             />
             <ControlMetric
               label="Tags"
               value={totalTags.toLocaleString()}
-              icon={MarkMasterTagsIcon}
+              icon={Tags}
             />
             <ControlMetric
               label="Collections"
               value={totalCollections.toLocaleString()}
-              icon={MarkMasterCollectionsIcon}
+              icon={FolderOpen}
             />
           </div>
 
@@ -130,17 +130,17 @@ export function LibraryControlCenter({
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
               <ActionLink
                 href="/dashboard"
-                icon={MarkMasterSearchIcon}
+                icon={Search}
                 label="Search across posts, authors, and notes"
               />
               <ActionLink
                 href="/orbit"
-                icon={MarkMasterOrbitIcon}
+                icon={Orbit}
                 label="Use Orbit for unsorted saves"
               />
               <ActionLink
                 href="/analytics"
-                icon={MarkMasterAnalyticsIcon}
+                icon={BarChart3}
                 label={
                   notedCount === undefined
                     ? "Check library health"

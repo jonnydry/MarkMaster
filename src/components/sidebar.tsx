@@ -3,18 +3,18 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  BarChart3,
+  Bookmark,
+  FolderOpen,
+  Orbit,
+  Settings,
+} from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
-import {
-  MarkMasterAnalyticsIcon,
-  MarkMasterBookmarksIcon,
-  MarkMasterCollectionsIcon,
-  MarkMasterOrbitIcon,
-  MarkMasterSettingsIcon,
-} from "@/components/markmaster-icons";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
@@ -43,11 +43,11 @@ export interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/dashboard", icon: MarkMasterBookmarksIcon, label: "Bookmarks" },
-  { href: "/orbit", icon: MarkMasterOrbitIcon, label: "Orbit" },
-  { href: "/collections", icon: MarkMasterCollectionsIcon, label: "Collections" },
-  { href: "/analytics", icon: MarkMasterAnalyticsIcon, label: "Analytics" },
-  { href: "/settings", icon: MarkMasterSettingsIcon, label: "Settings" },
+  { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
+  { href: "/orbit", icon: Orbit, label: "Orbit" },
+  { href: "/collections", icon: FolderOpen, label: "Collections" },
+  { href: "/analytics", icon: BarChart3, label: "Analytics" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar({
@@ -250,7 +250,7 @@ export function Sidebar({
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            <MarkMasterCollectionsIcon className="h-4 w-4 shrink-0" />
+                            <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
                           <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
@@ -302,7 +302,7 @@ export function Sidebar({
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            <MarkMasterCollectionsIcon className="h-4 w-4 shrink-0" />
+                            <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
                           <span className="ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">

@@ -4,12 +4,8 @@ import { signIn } from "next-auth/react";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
+import { FolderOpen, Search, Tag } from "lucide-react";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
-import {
-  MarkMasterCollectionsIcon,
-  MarkMasterSearchIcon,
-  MarkMasterTagsIcon,
-} from "@/components/markmaster-icons";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 
 type FeatureRow = {
@@ -116,14 +112,14 @@ function FeatureIcon({
   }
 
   if (icon === "search") {
-    return <MarkMasterSearchIcon className={className} aria-hidden="true" />;
+    return <Search className={className} aria-hidden="true" />;
   }
 
   if (icon === "tag") {
-    return <MarkMasterTagsIcon className={className} aria-hidden="true" />;
+    return <Tag className={className} aria-hidden="true" />;
   }
 
-  return <MarkMasterCollectionsIcon className={className} aria-hidden="true" />;
+  return <FolderOpen className={className} aria-hidden="true" />;
 }
 
 function handleSignIn() {
