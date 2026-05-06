@@ -230,6 +230,8 @@ export interface OrbitBookmarkDecision {
   reasoning: string;
   primary: OrbitDecision | null;
   alternative: OrbitDecision | null;
+  /** All tag names from the Grok suggestion (same order as the scan plan). */
+  suggestedTags: Array<{ name: string; color: string }>;
 }
 
 export interface OrbitApplyResult {

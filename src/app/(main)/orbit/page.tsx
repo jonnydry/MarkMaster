@@ -16,6 +16,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import {
   AlignJustify,
+  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Folder,
@@ -39,6 +40,7 @@ import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { OrbitTriageCard } from "@/components/orbit/orbit-triage-card";
 import { OrbitReviewDialog } from "@/components/orbit/orbit-review-dialog";
+import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
@@ -68,6 +70,23 @@ type BookmarkResponse = {
 const RECENT_PAGE_SIZE = 12;
 const ALL_PAGE_SIZE = 20;
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
+
+function buildOrbitScanContextKey(args: {
+  orbitView: OrbitView;
+  page: number;
+  queryString: string;
+  scanningSelection: boolean;
+  scanTargetIds: string[];
+}): string {
+  const sortedTargets = [...args.scanTargetIds].sort().join("|");
+  return [
+    args.orbitView,
+    String(args.page),
+    args.queryString,
+    args.scanningSelection ? `sel:${sortedTargets}` : "queue",
+  ].join("::");
+}
+
 const VIEW_MODE_OPTIONS: Array<{
   value: ViewMode;
   label: string;
@@ -269,6 +288,9 @@ export default function OrbitPage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewBookmarkId, setReviewBookmarkId] = useState<string | null>(null);
   const [reviewSessionId, setReviewSessionId] = useState(0);
+  const [scanContextAtLastRun, setScanContextAtLastRun] = useState<string | null>(
+    null
+  );
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
@@ -388,6 +410,34 @@ export default function OrbitPage() {
   const showQueueTools =
     isLoading || isError || total > 0 || hasSearchQuery;
 
+  const currentScanContextKey = useMemo(
+    () =>
+      buildOrbitScanContextKey({
+        orbitView,
+        page,
+        queryString,
+        scanningSelection,
+        scanTargetIds,
+      }),
+    [orbitView, page, queryString, scanningSelection, scanTargetIds]
+  );
+
+  const staleScanPlan = Boolean(
+    scan.plan &&
+      scanContextAtLastRun &&
+      scanContextAtLastRun !== currentScanContextKey
+  );
+
+  const canApplyStrongMatches = useMemo(() => {
+    if (!scan.plan) return false;
+    return scan.plan.plan.suggestions.some(
+      (suggestion) =>
+        !scan.dismissedBookmarkIds.has(suggestion.bookmarkId) &&
+        suggestion.confidence === "high" &&
+        (suggestion.tags.length > 0 || suggestion.collection !== null)
+    );
+  }, [scan.plan, scan.dismissedBookmarkIds]);
+
   const resolvedActiveBookmarkId =
     activeBookmarkId && bookmarkById.has(activeBookmarkId)
       ? activeBookmarkId
@@ -427,6 +477,12 @@ export default function OrbitPage() {
     if (!scan.error) return;
     toast.error(scan.error);
   }, [scan.error]);
+
+  useEffect(() => {
+    if (!scan.plan) {
+      setScanContextAtLastRun(null);
+    }
+  }, [scan.plan]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -482,9 +538,20 @@ export default function OrbitPage() {
 
   const handleScan = useCallback(async () => {
     if (scanTargetIds.length === 0) return;
+    const contextKey = buildOrbitScanContextKey({
+      orbitView,
+      page,
+      queryString,
+      scanningSelection,
+      scanTargetIds,
+    });
+    toast.info(
+      "Grok is categorizing your queue — large batches can take a minute."
+    );
     try {
       const result = await scan.scanNow(scanTargetIds);
       if (result) {
+        setScanContextAtLastRun(contextKey);
         const scopeLabel = scanningSelection ? "selected" : "Orbit";
         toast.success(
           `Grok categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
@@ -495,7 +562,14 @@ export default function OrbitPage() {
     } catch {
       // Error state is surfaced via scan.error effect.
     }
-  }, [scan, scanTargetIds, scanningSelection]);
+  }, [
+    orbitView,
+    page,
+    queryString,
+    scan,
+    scanTargetIds,
+    scanningSelection,
+  ]);
 
   const handleReviewOpenChange = useCallback((open: boolean) => {
     setReviewOpen(open);
@@ -544,6 +618,33 @@ export default function OrbitPage() {
     },
     [scan]
   );
+
+  const handleApplyAlternative = useCallback(
+    async (bookmarkId: string) => {
+      try {
+        const applied = await scan.applySuggestion(bookmarkId, "alt");
+        if (applied) {
+          toast.success(`Applied alternative · ${formatAppliedToast(applied)}`);
+        }
+      } catch {
+        // handled by scan.error effect
+      }
+    },
+    [scan]
+  );
+
+  const handleApplyStrongMatches = useCallback(async () => {
+    try {
+      const applied = await scan.applyPlanSubset({ minConfidence: "high" });
+      if (applied) {
+        toast.success(`Applied strong matches · ${formatAppliedToast(applied)}`);
+      } else {
+        toast.message("No strong matches left to apply in this pass.");
+      }
+    } catch {
+      // handled by scan.error effect
+    }
+  }, [scan]);
 
   const toggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => {
@@ -691,21 +792,38 @@ export default function OrbitPage() {
                   </Button>
 
                   {scan.plan ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-9 rounded-lg border-primary/30 bg-primary/10 px-3 text-sky-100 hover:border-primary/50 hover:bg-primary/15 hover:text-foreground"
-                      disabled={scan.applyingBatch}
-                      onClick={handleOpenReviewAll}
-                    >
-                      {scan.applyingBatch ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <ListChecks className="size-4" />
-                      )}
-                      Review pass
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-lg border-emerald-400/25 bg-emerald-400/10 px-3 text-emerald-100 hover:border-emerald-400/45 hover:bg-emerald-400/15 hover:text-foreground"
+                        disabled={scan.applyingBatch || !canApplyStrongMatches}
+                        onClick={handleApplyStrongMatches}
+                      >
+                        {scan.applyingBatch ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <BadgeCheck className="size-4" />
+                        )}
+                        Apply strong matches
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-lg border-primary/30 bg-primary/10 px-3 text-sky-100 hover:border-primary/50 hover:bg-primary/15 hover:text-foreground"
+                        disabled={scan.applyingBatch}
+                        onClick={handleOpenReviewAll}
+                      >
+                        {scan.applyingBatch ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <ListChecks className="size-4" />
+                        )}
+                        Review pass
+                      </Button>
+                    </>
                   ) : null}
 
                   <Link
@@ -723,7 +841,35 @@ export default function OrbitPage() {
               </div>
             </section>
 
+            {scan.plan ? (
+              <section className={bookmarkFeedColumnClassName}>
+                <OrbitScanOverviewStrip payload={scan.plan} />
+              </section>
+            ) : null}
+
             <section className={cn(bookmarkFeedColumnClassName, "flex flex-col gap-3")}>
+              {staleScanPlan ? (
+                <div
+                  role="status"
+                  className="flex flex-col gap-3 rounded-2xl border border-amber-400/28 bg-amber-400/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <p className="text-sm text-amber-50/95">
+                    This Grok pass was run on a different search, page, or
+                    selection. Review or dismiss it before trusting the
+                    suggestions.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9 shrink-0 border-amber-200/35 bg-amber-950/20 text-amber-100 hover:bg-amber-950/35"
+                    onClick={() => scan.clearPlan()}
+                  >
+                    Dismiss plan
+                  </Button>
+                </div>
+              ) : null}
+
               <QueueHeader
                 orbitView={orbitView}
                 total={total}
@@ -850,6 +996,7 @@ export default function OrbitPage() {
                       onAddToCollection={handleBookmarkAddToCollection}
                       onDelete={actions.handleDeleteBookmark}
                       onReviewSuggestion={handleOpenBookmarkReview}
+                      onApplyAlternative={handleApplyAlternative}
                       onKeepInOrbit={handleKeepInOrbit}
                       className={getStaggerClass(index, "animate-fade-in-up")}
                     />

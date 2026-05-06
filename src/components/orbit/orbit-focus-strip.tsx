@@ -9,7 +9,7 @@ import {
 import { GrokMark } from "@/components/brands/grok-mark";
 
 import { Button } from "@/components/ui/button";
-import { confidencePercent } from "@/lib/orbit-decision";
+import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import { cn } from "@/lib/utils";
 import type {
   BookmarkWithRelations,
@@ -257,7 +257,7 @@ function FocusSlot({
 
   const { bookmark, decision } = focus;
   const primary = decision.primary;
-  const confidencePct = confidencePercent(decision.confidence);
+  const confidenceText = confidenceLabel(decision.confidence);
 
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-3 py-1.5 text-xs text-white">
@@ -276,10 +276,11 @@ function FocusSlot({
         <span className="truncate text-white/55">No confident move</span>
       )}
       <span
-        className="rounded-full border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] tabular-nums text-white/85"
+        className="rounded-full border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/85"
         style={MONO_STYLE}
+        title={formatConfidence(decision.confidence)}
       >
-        {confidencePct}%
+        {confidenceText}
       </span>
     </div>
   );

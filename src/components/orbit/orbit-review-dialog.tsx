@@ -6,12 +6,21 @@ import {
   Folder,
   Loader2,
   Tag as TagIcon,
+  X,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +31,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   buildReviewedOrbitPlan,
   createOrbitReviewDraft,
+  splitTagNames,
   type OrbitReviewSuggestionDraft,
 } from "@/lib/orbit-review";
 import { cn } from "@/lib/utils";
@@ -60,6 +75,277 @@ interface OrbitReviewDialogProps {
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
+
+function draftTagKey(name: string): string {
+  return name.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function addTagToDraftString(current: string, rawName: string): string {
+  const trimmed = rawName.replace(/\s+/g, " ").trim();
+  if (!trimmed) return current;
+  const nextRaw = current.trim() ? `${current}, ${trimmed}` : trimmed;
+  return splitTagNames(nextRaw).join(", ");
+}
+
+function removeTagAtFromDraftString(current: string, index: number): string {
+  const parsed = splitTagNames(current);
+  if (index < 0 || index >= parsed.length) return current;
+  parsed.splice(index, 1);
+  return parsed.join(", ");
+}
+
+interface OrbitReviewTagFieldProps {
+  tagNames: string;
+  included: boolean;
+  existingTags: TagWithCount[];
+  onTagNamesChange: (next: string) => void;
+}
+
+function OrbitReviewTagField({
+  tagNames,
+  included,
+  existingTags,
+  onTagNamesChange,
+}: OrbitReviewTagFieldProps) {
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState("");
+
+  const parsed = useMemo(() => splitTagNames(tagNames), [tagNames]);
+  const atTagCap = parsed.length >= 3;
+
+  const tagColorForDisplay = useCallback(
+    (label: string) => {
+      const key = draftTagKey(label);
+      return (
+        existingTags.find((t) => draftTagKey(t.name) === key)?.color ?? "#94a3b8"
+      );
+    },
+    [existingTags]
+  );
+
+  const commitCustom = useCallback(() => {
+    if (atTagCap || !included) return;
+    const next = addTagToDraftString(tagNames, customDraft);
+    onTagNamesChange(next);
+    setCustomDraft("");
+  }, [atTagCap, customDraft, included, onTagNamesChange, tagNames]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex min-h-8 flex-wrap gap-1.5">
+        {parsed.length === 0 ? (
+          <span className="text-xs text-white/35">No tags yet</span>
+        ) : (
+          parsed.map((label, idx) => (
+            <span
+              key={`${label}-${idx}`}
+              className="inline-flex items-center gap-1 rounded-md border border-white/12 bg-white/5 py-0.5 pl-2 pr-1 text-[11px] text-white/85"
+            >
+              <span
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: tagColorForDisplay(label) }}
+                aria-hidden
+              />
+              {label}
+              <button
+                type="button"
+                className="rounded p-0.5 text-white/50 hover:bg-white/10 hover:text-white"
+                aria-label={`Remove ${label}`}
+                disabled={!included}
+                onClick={() =>
+                  onTagNamesChange(removeTagAtFromDraftString(tagNames, idx))
+                }
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <Popover open={libraryOpen} onOpenChange={setLibraryOpen}>
+          <PopoverTrigger
+            disabled={!included || atTagCap}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "border-white/18 bg-white/[0.06] text-white hover:bg-white/10"
+            )}
+          >
+            From library
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-72 border border-white/15 bg-slate-950 p-0 text-white shadow-2xl"
+          >
+            <Command className="relative max-h-80 rounded-lg border-0 bg-slate-950 text-white [&_[cmdk-input-wrapper]]:border-white/10">
+              <CommandInput
+                placeholder="Search tags…"
+                className="text-white placeholder:text-white/35"
+              />
+              <CommandList>
+                <CommandEmpty className="text-white/50">
+                  No matching tags.
+                </CommandEmpty>
+                <CommandGroup heading="Your library">
+                  {existingTags.map((tag) => {
+                    const taken = parsed.some(
+                      (p) => draftTagKey(p) === draftTagKey(tag.name)
+                    );
+                    return (
+                      <CommandItem
+                        key={tag.id}
+                        value={tag.name}
+                        disabled={taken || atTagCap}
+                        className="text-white data-[selected=true]:bg-white/10"
+                        onSelect={() => {
+                          onTagNamesChange(
+                            addTagToDraftString(tagNames, tag.name)
+                          );
+                          setLibraryOpen(false);
+                        }}
+                      >
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                          aria-hidden
+                        />
+                        {tag.name}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <Input
+          value={customDraft}
+          onChange={(event) => setCustomDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitCustom();
+            }
+          }}
+          disabled={!included || atTagCap}
+          placeholder={
+            atTagCap ? "Max 3 tags" : "New tag, press Enter"
+          }
+          className="min-w-0 flex-1 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+        />
+      </div>
+    </div>
+  );
+}
+
+interface OrbitReviewCollectionFieldProps {
+  collectionName: string;
+  collectionDescription: string;
+  included: boolean;
+  namePlaceholder: string;
+  existingCollections: CollectionWithCount[];
+  onCollectionNameChange: (name: string) => void;
+  onCollectionDescriptionChange: (description: string) => void;
+}
+
+function OrbitReviewCollectionField({
+  collectionName,
+  collectionDescription,
+  included,
+  namePlaceholder,
+  existingCollections,
+  onCollectionNameChange,
+  onCollectionDescriptionChange,
+}: OrbitReviewCollectionFieldProps) {
+  const [pickOpen, setPickOpen] = useState(false);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        <Input
+          value={collectionName}
+          onChange={(event) =>
+            onCollectionNameChange(event.target.value)
+          }
+          disabled={!included}
+          placeholder={namePlaceholder}
+          className="min-w-0 flex-1 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+        />
+        <Popover open={pickOpen} onOpenChange={setPickOpen}>
+          <PopoverTrigger
+            disabled={!included}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "default" }),
+              "h-9 shrink-0 border-white/18 bg-white/[0.06] px-2.5 text-white hover:bg-white/10"
+            )}
+          >
+            Pick
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="w-80 border border-white/15 bg-slate-950 p-0 text-white shadow-2xl"
+          >
+            <Command className="relative max-h-80 rounded-lg border-0 bg-slate-950 text-white">
+              <CommandInput
+                placeholder="Search collections…"
+                className="text-white placeholder:text-white/35"
+              />
+              <CommandList>
+                <CommandEmpty className="text-white/50">
+                  No matching collections.
+                </CommandEmpty>
+                <CommandGroup heading="Your library">
+                  {existingCollections.map((collection) => (
+                    <CommandItem
+                      key={collection.id}
+                      value={`${collection.name} ${collection.description ?? ""}`}
+                      className="text-white data-[selected=true]:bg-white/10"
+                      onSelect={() => {
+                        onCollectionNameChange(collection.name);
+                        onCollectionDescriptionChange(
+                          collection.description ?? ""
+                        );
+                        setPickOpen(false);
+                      }}
+                    >
+                      <Folder className="size-3.5 text-sky-200/90" />
+                      {collection.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                <CommandGroup>
+                  <CommandItem
+                    value="__clear__orbit_collection__"
+                    className="text-amber-200/90 data-[selected=true]:bg-white/10"
+                    onSelect={() => {
+                      onCollectionNameChange("");
+                      onCollectionDescriptionChange("");
+                      setPickOpen(false);
+                    }}
+                  >
+                    Clear collection move
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+      <p className="text-[10px] leading-snug text-white/45">
+        Pick an existing folder or type a new name in the field.
+      </p>
+      <Textarea
+        value={collectionDescription}
+        onChange={(event) =>
+          onCollectionDescriptionChange(event.target.value)
+        }
+        disabled={!included || !collectionName.trim()}
+        placeholder="Optional description for new collection moves"
+        className="min-h-14 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+      />
+    </div>
+  );
+}
 
 function getPreviewText(bookmark: BookmarkWithRelations | null): string {
   if (!bookmark) return "Bookmark is outside the current page.";
@@ -216,9 +502,6 @@ export function OrbitReviewDialog({
                   const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
                   const preview = getPreviewText(bookmark);
                   const checkboxId = `orbit-review-include-${draft.bookmarkId}`;
-                  const tagInputId = `orbit-review-tags-${draft.bookmarkId}`;
-                  const collectionInputId = `orbit-review-collection-${draft.bookmarkId}`;
-                  const descriptionInputId = `orbit-review-description-${draft.bookmarkId}`;
 
                   return (
                     <div
@@ -265,69 +548,45 @@ export function OrbitReviewDialog({
                         </div>
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="mt-4 grid gap-4 md:grid-cols-2 md:items-start">
                         <div className="space-y-1.5">
-                          <Label
-                            htmlFor={tagInputId}
-                            className="gap-1.5 text-xs text-white/70"
-                          >
-                            <TagIcon className="size-3.5" />
+                          <p className="flex items-center gap-1.5 text-xs text-white/70">
+                            <TagIcon className="size-3.5 shrink-0" />
                             Tags
-                          </Label>
-                          <Input
-                            id={tagInputId}
-                            value={draft.tagNames}
-                            onChange={(event) =>
+                          </p>
+                          <OrbitReviewTagField
+                            tagNames={draft.tagNames}
+                            included={draft.included}
+                            existingTags={existingTags}
+                            onTagNamesChange={(next) =>
                               updateDraft(draft.bookmarkId, {
-                                tagNames: event.target.value,
+                                tagNames: next,
                               })
                             }
-                            disabled={!draft.included}
-                            placeholder="research, ai, tools"
-                            className="border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label
-                            htmlFor={collectionInputId}
-                            className="gap-1.5 text-xs text-white/70"
-                          >
-                            <Folder className="size-3.5" />
+                          <p className="flex items-center gap-1.5 text-xs text-white/70">
+                            <Folder className="size-3.5 shrink-0" />
                             Collection
-                          </Label>
-                          <Input
-                            id={collectionInputId}
-                            value={draft.collectionName}
-                            onChange={(event) =>
+                          </p>
+                          <OrbitReviewCollectionField
+                            collectionName={draft.collectionName}
+                            collectionDescription={draft.collectionDescription}
+                            included={draft.included}
+                            namePlaceholder="No collection move"
+                            existingCollections={existingCollections}
+                            onCollectionNameChange={(name) =>
                               updateDraft(draft.bookmarkId, {
-                                collectionName: event.target.value,
+                                collectionName: name,
                               })
                             }
-                            disabled={!draft.included}
-                            placeholder="No collection move"
-                            className="border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5 md:col-span-2">
-                          <Label
-                            htmlFor={descriptionInputId}
-                            className="text-xs text-white/70"
-                          >
-                            Collection description
-                          </Label>
-                          <Textarea
-                            id={descriptionInputId}
-                            value={draft.collectionDescription}
-                            onChange={(event) =>
+                            onCollectionDescriptionChange={(description) =>
                               updateDraft(draft.bookmarkId, {
-                                collectionDescription: event.target.value,
+                                collectionDescription: description,
                               })
                             }
-                            disabled={!draft.included || !draft.collectionName.trim()}
-                            placeholder="Optional for new collection moves"
-                            className="min-h-14 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
                           />
                         </div>
                       </div>

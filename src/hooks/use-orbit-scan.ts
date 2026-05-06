@@ -7,12 +7,14 @@ import { sendJson, type JsonValue } from "@/lib/fetch-json";
 import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
+  shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
   OrbitApplyResult,
   OrbitBookmarkDecision,
+  OrbitScanConfidence,
   OrbitScanPlan,
   OrbitScanResponsePayload,
 } from "@/types";
@@ -41,6 +43,9 @@ export interface OrbitScanHandle extends OrbitScanState {
   ) => Promise<OrbitApplyResult | null>;
   applyEntirePlan: (opts?: {
     createCollections?: boolean;
+  }) => Promise<OrbitApplyResult | null>;
+  applyPlanSubset: (opts: {
+    minConfidence: OrbitScanConfidence;
   }) => Promise<OrbitApplyResult | null>;
   dismiss: (bookmarkId: string) => void;
   getDecision: (bookmarkId: string) => OrbitBookmarkDecision | null;
@@ -132,7 +137,7 @@ export function useOrbitScan(): OrbitScanHandle {
             method: "POST",
             body: {
               mode: "apply",
-              createCollections: variant === "primary",
+              createCollections: shouldCreateCollectionsForPlan(filteredPlan),
               plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
             },
           }
@@ -198,6 +203,80 @@ export function useOrbitScan(): OrbitScanHandle {
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Could not apply plan";
+        setError(message);
+        throw err;
+      } finally {
+        setApplyingBatch(false);
+      }
+    },
+    [plan, dismissed, queryClient]
+  );
+
+  const applyPlanSubset = useCallback(
+    async (opts: { minConfidence: OrbitScanConfidence }) => {
+      if (!plan) return null;
+
+      const pool = plan.plan.suggestions.filter(
+        (suggestion) => !dismissed.has(suggestion.bookmarkId)
+      );
+      const filtered = pool.filter(
+        (suggestion) =>
+          suggestion.confidence === opts.minConfidence &&
+          (suggestion.tags.length > 0 || suggestion.collection !== null)
+      );
+      if (filtered.length === 0) return null;
+
+      const filteredPlan: OrbitScanPlan = {
+        overview: plan.plan.overview,
+        suggestions: filtered,
+      };
+      const createCollections = shouldCreateCollectionsForPlan(filteredPlan);
+      const appliedIds = new Set(
+        filteredPlan.suggestions.map((suggestion) => suggestion.bookmarkId)
+      );
+
+      setApplyingBatch(true);
+      setError(null);
+
+      try {
+        const response = await sendJson<{ applied: OrbitApplyResult }>(
+          "/api/orbit/scan",
+          {
+            method: "POST",
+            body: {
+              mode: "apply",
+              createCollections,
+              plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
+            },
+          }
+        );
+
+        await invalidateLibraryQueries(queryClient);
+
+        setDismissed((current) => {
+          const next = new Set(current);
+          for (const bookmarkId of appliedIds) {
+            next.add(bookmarkId);
+          }
+          return next;
+        });
+
+        setPlan((current) => {
+          if (!current) return null;
+          const nextSuggestions = current.plan.suggestions.filter(
+            (suggestion) => !appliedIds.has(suggestion.bookmarkId)
+          );
+          if (nextSuggestions.length === 0) return null;
+          return {
+            ...current,
+            plan: { ...current.plan, suggestions: nextSuggestions },
+          };
+        });
+
+        return response.applied;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not apply plan subset";
         setError(message);
         throw err;
       } finally {
@@ -315,6 +394,7 @@ export function useOrbitScan(): OrbitScanHandle {
     applySuggestion,
     applyReviewedPlan,
     applyEntirePlan,
+    applyPlanSubset,
     dismiss,
     getDecision,
     hasSuggestion,

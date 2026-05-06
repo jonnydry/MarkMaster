@@ -41,7 +41,7 @@ function truncate(value: string, maxLength: number): string {
   return normalizeWhitespace(value).slice(0, maxLength);
 }
 
-function splitTagNames(value: string): string[] {
+export function splitTagNames(value: string): string[] {
   const deduped = new Map<string, string>();
 
   for (const rawName of value.split(/[,\n]/)) {

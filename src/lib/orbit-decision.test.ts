@@ -4,6 +4,7 @@ import {
   buildSingleSuggestionPlan,
   derivePrimaryAndAlternative,
   formatConfidence,
+  shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import type { OrbitBookmarkSuggestion, OrbitScanPlan } from "@/types";
 
@@ -69,21 +70,83 @@ describe("derivePrimaryAndAlternative", () => {
 });
 
 describe("buildBookmarkDecision", () => {
-  it("carries reasoning and confidence through", () => {
+  it("carries reasoning, confidence, and all suggested tags through", () => {
     const decision = buildBookmarkDecision(baseSuggestion);
     expect(decision.bookmarkId).toBe("b1");
     expect(decision.confidence).toBe("high");
     expect(decision.reasoning).toBe("Reasoning");
     expect(decision.primary?.kind).toBe("collection");
     expect(decision.alternative?.kind).toBe("tag");
+    expect(decision.suggestedTags).toEqual([
+      { name: "Research", color: "#1d9bf0" },
+      { name: "Tools", color: "#22c55e" },
+    ]);
   });
 });
 
 describe("formatConfidence", () => {
-  it("maps tri-state confidence to percent copy", () => {
-    expect(formatConfidence("high")).toBe("91% confidence");
-    expect(formatConfidence("medium")).toBe("68% confidence");
-    expect(formatConfidence("low")).toBe("42% confidence");
+  it("uses qualitative copy, not fake percentages", () => {
+    expect(formatConfidence("high")).toBe(
+      "Strong match (qualitative, not a score)"
+    );
+    expect(formatConfidence("medium")).toBe(
+      "Reasonable guess (qualitative, not a score)"
+    );
+    expect(formatConfidence("low")).toBe(
+      "Uncertain (qualitative, not a score)"
+    );
+  });
+});
+
+describe("shouldCreateCollectionsForPlan", () => {
+  const overview = {
+    summary: "S",
+    taggingStrategy: "T",
+    collectionStrategy: "C",
+  };
+
+  it("is true when any suggestion has a new collection", () => {
+    const plan: OrbitScanPlan = {
+      overview,
+      suggestions: [
+        {
+          ...baseSuggestion,
+          collection: {
+            name: "New",
+            description: "D",
+            reason: "R",
+            reuseExisting: false,
+          },
+        },
+      ],
+    };
+    expect(shouldCreateCollectionsForPlan(plan)).toBe(true);
+  });
+
+  it("is false when collections are existing-only or absent", () => {
+    expect(
+      shouldCreateCollectionsForPlan({
+        overview,
+        suggestions: [
+          {
+            ...baseSuggestion,
+            collection: {
+              name: "Existing",
+              description: "D",
+              reason: "R",
+              reuseExisting: true,
+            },
+          },
+        ],
+      })
+    ).toBe(false);
+
+    expect(
+      shouldCreateCollectionsForPlan({
+        overview,
+        suggestions: [{ ...baseSuggestion, collection: null }],
+      })
+    ).toBe(false);
   });
 });
 

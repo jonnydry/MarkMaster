@@ -6,23 +6,28 @@ import type {
   OrbitScanPlan,
 } from "@/types";
 
-/**
- * Confidence labels → percent-style copy for the UI.
- * Grok only ever returns a tri-state confidence, so we map it to an
- * approximate percent range that matches the Paper artboards (e.g. "91% confidence").
- */
-const CONFIDENCE_PERCENT: Record<OrbitScanConfidence, number> = {
-  high: 91,
-  medium: 68,
-  low: 42,
+/** Grok returns tri-state confidence only — surface qualitative labels, not fake percentages. */
+const CONFIDENCE_LABEL: Record<OrbitScanConfidence, string> = {
+  high: "Strong match",
+  medium: "Reasonable guess",
+  low: "Uncertain",
 };
 
-export function confidencePercent(confidence: OrbitScanConfidence): number {
-  return CONFIDENCE_PERCENT[confidence];
+export function confidenceLabel(confidence: OrbitScanConfidence): string {
+  return CONFIDENCE_LABEL[confidence];
 }
 
+/** Tooltip / assistive copy explaining that confidence is qualitative. */
 export function formatConfidence(confidence: OrbitScanConfidence): string {
-  return `${CONFIDENCE_PERCENT[confidence]}% confidence`;
+  return `${CONFIDENCE_LABEL[confidence]} (qualitative, not a score)`;
+}
+
+/** Whether applying this plan may need to create new collection rows. */
+export function shouldCreateCollectionsForPlan(plan: OrbitScanPlan): boolean {
+  return plan.suggestions.some(
+    (suggestion) =>
+      suggestion.collection !== null && !suggestion.collection.reuseExisting
+  );
 }
 
 function tagDecision(
@@ -85,12 +90,17 @@ export function buildBookmarkDecision(
   suggestion: OrbitBookmarkSuggestion
 ): OrbitBookmarkDecision {
   const { primary, alternative } = derivePrimaryAndAlternative(suggestion);
+  const suggestedTags = suggestion.tags.map((tag) => ({
+    name: tag.name,
+    color: tag.color,
+  }));
   return {
     bookmarkId: suggestion.bookmarkId,
     confidence: suggestion.confidence,
     reasoning: suggestion.reasoning,
     primary,
     alternative,
+    suggestedTags,
   };
 }
 

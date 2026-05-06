@@ -6,7 +6,7 @@ import { Folder, Loader2, Tag as TagIcon } from "lucide-react";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
 import { BookmarkCard } from "@/components/bookmark-card";
-import { confidencePercent, formatConfidence } from "@/lib/orbit-decision";
+import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import { cn } from "@/lib/utils";
 import type {
   BookmarkWithRelations,
@@ -31,6 +31,7 @@ interface OrbitTriageCardProps {
   onAddToCollection?: (bookmarkId: string) => void;
   onDelete?: (bookmarkId: string) => void;
   onReviewSuggestion?: (bookmarkId: string) => void;
+  onApplyAlternative?: (bookmarkId: string) => void;
   onKeepInOrbit?: (bookmarkId: string) => void;
   className?: string;
 }
@@ -57,12 +58,13 @@ export function OrbitTriageCard({
   onAddToCollection,
   onDelete,
   onReviewSuggestion,
+  onApplyAlternative,
   onKeepInOrbit,
   className,
 }: OrbitTriageCardProps) {
   const primary = decision?.primary ?? null;
   const alternative = decision?.alternative ?? null;
-  const confidencePct = decision ? confidencePercent(decision.confidence) : null;
+  const confidenceText = decision ? confidenceLabel(decision.confidence) : null;
 
   const confidenceTone = useMemo(() => {
     if (!decision) return "";
@@ -110,15 +112,15 @@ export function OrbitTriageCard({
             >
               Primary suggestion
             </span>
-            {confidencePct !== null && (
+            {confidenceText !== null && (
               <span
                 className={cn(
-                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] tabular-nums",
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px]",
                   confidenceTone
                 )}
                 title={formatConfidence(decision.confidence)}
               >
-                {confidencePct}% confidence
+                {confidenceText}
               </span>
             )}
           </div>
@@ -149,6 +151,35 @@ export function OrbitTriageCard({
                 </p>
               )}
 
+              {decision.suggestedTags.length > 0 ? (
+                <div>
+                  <p
+                    className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/40"
+                    style={{
+                      fontFamily:
+                        "'IBM Plex Mono', ui-monospace, monospace",
+                    }}
+                  >
+                    All suggested tags
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {decision.suggestedTags.map((tag, idx) => (
+                      <span
+                        key={`${tag.name}-${idx}`}
+                        className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/75"
+                      >
+                        <span
+                          className="size-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                          aria-hidden
+                        />
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Button
                   size="sm"
@@ -164,16 +195,27 @@ export function OrbitTriageCard({
                   Review
                 </Button>
                 {alternative && (
-                  <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 text-xs text-white/75">
-                    {alternative.kind === "collection" ? (
-                      <Folder className="size-3.5" />
-                    ) : (
-                      <TagIcon className="size-3.5" />
-                    )}
-                    {alternative.kind === "collection"
-                      ? alternative.label
-                      : `Tag as ${alternative.label}`}
-                  </span>
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+                      disabled={applying || !onApplyAlternative}
+                      onClick={() => onApplyAlternative?.(bookmark.id)}
+                    >
+                      {applying ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : alternative.kind === "collection" ? (
+                        <Folder className="size-3.5" />
+                      ) : (
+                        <TagIcon className="size-3.5" />
+                      )}
+                      {alternative.kind === "collection"
+                        ? `Add to ${alternative.label}`
+                        : `Tag ${alternative.label}`}
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
