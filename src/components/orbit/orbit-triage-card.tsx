@@ -74,7 +74,7 @@ export function OrbitTriageCard({
       case "medium":
         return "border-sky-400/30 bg-sky-400/10 text-sky-100";
       case "low":
-        return "border-amber-400/30 bg-amber-400/10 text-amber-100";
+        return "border-blue-500/30 bg-blue-500/10 text-blue-100";
       default:
         return "";
     }

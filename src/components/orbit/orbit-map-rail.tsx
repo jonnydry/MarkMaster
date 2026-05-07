@@ -170,7 +170,7 @@ export function OrbitMapRail({
             )}
           >
             <li className="flex items-center gap-3">
-              <span className="inline-block size-2.5 rounded-full bg-amber-300" />
+              <span className="inline-block size-2.5 rounded-full bg-sky-300" />
               <span>Loose bookmark</span>
             </li>
             <li className="flex items-center gap-3">
@@ -468,7 +468,7 @@ function SelectedClusterBody({
           </Button>
         </div>
         {isLoose && (
-          <p className="text-xs text-amber-300/80">Not yet tagged or collected</p>
+          <p className="text-xs text-sky-300/80">Not yet tagged or collected</p>
         )}
         {tagConnections.length > 0 && (
           <div className="space-y-1.5">
@@ -572,7 +572,7 @@ function ConnectedList({
                   <span
                     className={cn(
                       "inline-block size-1.5 shrink-0 rounded-full",
-                      b.affiliated ? "bg-slate-200" : "bg-amber-300"
+                      b.affiliated ? "bg-slate-200" : "bg-sky-300"
                     )}
                   />
                   <span className="min-w-0 truncate">

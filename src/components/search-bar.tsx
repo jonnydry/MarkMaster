@@ -59,7 +59,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     const defaultHint = !value && (
       <kbd
         aria-hidden="true"
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-md border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-sm border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm"
       >
         /
       </kbd>
@@ -78,7 +78,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass
               ? "rounded-2xl border-0 bg-transparent shadow-none focus:border-transparent focus:shadow-none focus:ring-2 focus:ring-primary/25 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-transparent"
-              : "rounded-xl border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
+              : "rounded-md border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
             inputClassName
           )}
         />

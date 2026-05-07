@@ -466,7 +466,7 @@ export default function OrbitMapPage() {
                                       "inline-block size-1.5 rounded-full",
                                       node.affiliated
                                         ? "bg-slate-200"
-                                        : "bg-amber-300"
+                                        : "bg-sky-300"
                                     )}
                                   />
                                   <span className="truncate">

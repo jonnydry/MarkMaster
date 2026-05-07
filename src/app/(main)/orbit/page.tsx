@@ -851,9 +851,9 @@ export default function OrbitPage() {
               {staleScanPlan ? (
                 <div
                   role="status"
-                  className="flex flex-col gap-3 rounded-2xl border border-amber-400/28 bg-amber-400/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-2xl border border-sky-400/28 bg-sky-400/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <p className="text-sm text-amber-50/95">
+                  <p className="text-sm text-sky-50/95">
                     This Grok pass was run on a different search, page, or
                     selection. Review or dismiss it before trusting the
                     suggestions.
@@ -862,7 +862,7 @@ export default function OrbitPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-9 shrink-0 border-amber-200/35 bg-amber-950/20 text-amber-100 hover:bg-amber-950/35"
+                    className="h-9 shrink-0 border-sky-200/35 bg-sky-950/20 text-sky-100 hover:bg-sky-950/35"
                     onClick={() => scan.clearPlan()}
                   >
                     Dismiss plan
@@ -1168,7 +1168,7 @@ function QueueHeader({
                 className={cn(
                   "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors",
                   selectionMode
-                    ? "bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
+                    ? "bg-sky-500/15 text-sky-200 hover:bg-sky-500/25"
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                 )}
               >

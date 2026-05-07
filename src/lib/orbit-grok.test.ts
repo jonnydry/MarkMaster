@@ -112,7 +112,7 @@ describe("normalizeOrbitScanPlan", () => {
             },
             {
               name: "Article",
-              color: "#f97316",
+              color: "#93c5fd",
               reason: "Generic metadata",
               reuseExisting: false,
             },

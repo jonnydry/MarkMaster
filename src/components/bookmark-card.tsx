@@ -63,7 +63,7 @@ function TagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="rounded-lg border border-hairline-soft bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+      className="border-b border-primary/35 bg-transparent px-0.5 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
     >
       {name}
     </button>
@@ -92,10 +92,10 @@ function ActionButton({
         onClick();
       }}
       aria-label={label}
-      className={`rounded-lg border border-transparent ${
+      className={`rounded-sm border border-transparent ${
         active
-          ? "bg-accent-soft text-primary"
-          : "text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground"
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
       }`}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
@@ -120,7 +120,7 @@ function SelectionToggle({
       }}
       aria-pressed={selected}
       aria-label="Select bookmark"
-      className={`flex items-center justify-center w-5 h-5 rounded border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+      className={`flex items-center justify-center w-5 h-5 rounded-sm border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
         selected
           ? "bg-primary border-primary text-primary-foreground"
           : "bg-background border-border text-transparent hover:border-primary/50"
@@ -194,10 +194,10 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-all duration-150 hover:bg-surface-1 ${
+        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 hover:bg-accent-soft/40 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
-          selected ? "border-l-2 border-l-primary bg-primary/[0.06]" : ""
+          selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -280,10 +280,10 @@ export const BookmarkCard = memo(function BookmarkCard({
 
     return (
       <div
-        className={`group relative overflow-hidden rounded-xl border border-hairline-soft bg-surface-1 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md ${
+        className={`group relative overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/70 transition-colors duration-150 hover:border-primary/30 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
-          selected ? "ring-2 ring-primary border-primary/40" : ""
+          selected ? "border-primary/45 ring-1 ring-primary/35" : ""
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -408,10 +408,10 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group border-b border-hairline-soft px-5 py-3.5 transition-all duration-150 hover:bg-surface-1/70 ${
+      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 hover:bg-accent-soft/35 ${
         isInteractive ? "cursor-pointer" : ""
       } ${
-        selected ? "border-l-2 border-l-primary bg-primary/[0.06]" : ""
+        selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -478,7 +478,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 title="Post from X"
               />
             </div>
-            <div className="flex self-start shrink-0 items-center gap-1 rounded-xl border border-hairline-soft bg-surface-1 p-1 shadow-sm opacity-100 transition-all sm:self-auto sm:translate-y-1 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
+            <div className="flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto sm:opacity-0 sm:group-hover:opacity-100">
               {onAddTag && (
                 <ActionButton
                   icon={Tags}
@@ -528,7 +528,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
           {mediaItems && mediaItems.length > 0 && (
             <div
-              className={`mt-3 overflow-hidden rounded-xl border border-hairline-soft bg-surface-1 ${
+              className={`mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent ${
                 mediaItems.length === 1 ? "" : "grid grid-cols-2 gap-0.5"
               }`}
             >
@@ -575,7 +575,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {bookmark.quotedTweet && (
             <div
               aria-label="Quoted tweet"
-              className="mt-3 rounded-xl border border-hairline-soft bg-surface-1 p-3"
+              className="mt-3 rounded-sm border border-hairline-soft bg-transparent p-3"
             >
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="font-medium text-sm text-foreground">
@@ -592,7 +592,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           )}
 
           {bookmark.notes.length > 0 && (
-            <div className="mt-3 rounded-lg border-l-2 border-l-note bg-surface-2 px-3 py-2.5">
+            <div className="mt-3 border-l-2 border-l-note bg-transparent px-3 py-2.5">
               <p className="text-xs leading-snug text-muted-foreground">
                 {highlightedNote}
               </p>

@@ -17,7 +17,7 @@ export function PaginationBar({ page, totalPages, onPageChange }: PaginationBarP
           onClick={() => onPageChange((p) => p - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
         >
           <ChevronLeft className="size-4" aria-hidden />
         </button>
@@ -34,7 +34,7 @@ export function PaginationBar({ page, totalPages, onPageChange }: PaginationBarP
           onClick={() => onPageChange((p) => p + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
         >
           <ChevronRight className="size-4" aria-hidden />
         </button>

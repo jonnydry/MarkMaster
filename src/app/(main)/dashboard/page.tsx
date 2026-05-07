@@ -440,14 +440,14 @@ function DashboardContent() {
                       />
                     </div>
 
-                    <div className="dashboard-filter-strip order-3 flex min-w-0 w-full flex-wrap items-center gap-1.5 sm:order-none sm:flex-1 sm:w-auto">
+                    <div className="dashboard-filter-strip order-3 flex min-w-0 w-full flex-wrap items-center gap-2 sm:order-none sm:flex-1 sm:w-auto">
                       <button
                         onClick={() => {
                           filters.setSelectedTags([]);
                           filters.setMediaFilter("all");
                         }}
                         aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-                        className="dashboard-filter-summary inline-flex h-10 max-w-full items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="dashboard-filter-summary inline-flex h-9 max-w-full items-center gap-2 whitespace-nowrap rounded-sm border border-hairline-strong border-l-primary bg-background/35 px-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                       >
                         <span className="dashboard-filter-summary-full truncate">
                           {primaryFilterLabel}
@@ -465,11 +465,11 @@ function DashboardContent() {
                           <button
                             key={tagId}
                             onClick={() => filters.toggleTag(tagId)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors border border-primary/20"
+                            className="inline-flex items-center gap-1 border-b-2 border-primary px-0.5 py-1 text-xs font-semibold text-foreground transition-colors hover:text-primary"
                           >
                             #{tag.name}
                             <span
-                              className="text-primary/60 hover:text-primary ml-0.5"
+                              className="ml-0.5 text-primary/60 hover:text-primary"
                               aria-hidden
                             >
                               ×
@@ -483,10 +483,10 @@ function DashboardContent() {
                         aria-expanded={showFilters}
                         aria-controls="dashboard-filter-panel"
                         aria-label={showFilters ? "Hide filters" : "Show filters"}
-                        className={`dashboard-action-button inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                        className={`dashboard-action-button inline-flex h-9 items-center gap-1.5 rounded-sm border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                           showFilters
-                            ? "bg-secondary text-foreground border-border"
-                            : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                            ? "border-primary/35 bg-primary/10 text-foreground"
+                            : "border-hairline-strong bg-background/35 text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
                         }`}
                       >
                         <SlidersHorizontal className="size-4" aria-hidden />
@@ -511,10 +511,10 @@ function DashboardContent() {
                         aria-label={
                           selectionMode ? "Exit selection mode" : "Enter selection mode"
                         }
-                        className={`dashboard-action-button inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                        className={`dashboard-action-button inline-flex h-9 items-center gap-1.5 rounded-sm border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
                           selectionMode
-                            ? "bg-secondary text-foreground border-border"
-                            : "text-muted-foreground bg-secondary hover:text-foreground border-border"
+                            ? "border-primary/35 bg-primary/10 text-foreground"
+                            : "border-hairline-strong bg-background/35 text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
                         }`}
                       >
                         <CheckSquare className="size-4" aria-hidden />
@@ -581,7 +581,7 @@ function DashboardContent() {
             <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
               <div
                 className={cn(
-                  "relative z-10 overflow-hidden rounded-2xl border border-hairline-strong shadow-xl",
+                  "relative z-10 overflow-hidden rounded-2xl border border-hairline-strong shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
                   bookmarkFeedColumnClassName,
                   appChromeFrostedClassName
                 )}

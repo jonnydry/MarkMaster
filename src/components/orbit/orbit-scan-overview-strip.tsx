@@ -161,7 +161,7 @@ export function OrbitScanOverviewStrip({
                         lib
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider text-amber-200/80">
+                      <span className="text-[9px] uppercase tracking-wider text-sky-200/80">
                         new
                       </span>
                     )}
@@ -194,7 +194,7 @@ export function OrbitScanOverviewStrip({
                         lib
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider text-amber-200/80">
+                      <span className="text-[9px] uppercase tracking-wider text-sky-200/80">
                         new
                       </span>
                     )}

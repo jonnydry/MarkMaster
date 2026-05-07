@@ -19,18 +19,18 @@ export function SelectionToolbar({
   onHide,
 }: SelectionToolbarProps) {
   return (
-    <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 bg-secondary/50 px-4 py-2.5 sm:px-5">
+    <div className="animate-slide-down-fade flex flex-wrap items-center justify-between gap-2 border-t border-hairline-soft bg-background/35 px-4 py-2.5 sm:px-5">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-foreground">
           {selectedCount > 0
             ? `${selectedCount} selected`
             : "Select bookmarks to apply bulk actions"}
         </span>
-        <Button variant="outline" size="sm" className="h-10 px-3 text-sm" onClick={onSelectPage}>
+        <Button variant="outline" size="sm" className="h-8 px-3 text-sm" onClick={onSelectPage}>
           Select page
         </Button>
         {selectedCount > 0 && (
-          <Button variant="ghost" size="sm" className="h-10 px-3 text-sm" onClick={onClear}>
+          <Button variant="ghost" size="sm" className="h-8 px-3 text-sm" onClick={onClear}>
             Clear
           </Button>
         )}
@@ -39,7 +39,7 @@ export function SelectionToolbar({
         <Button
           variant="outline"
           size="sm"
-          className="h-10 gap-1.5 px-3 text-sm"
+          className="h-8 gap-1.5 px-3 text-sm"
           disabled={selectedCount === 0}
           onClick={onTag}
         >
@@ -49,7 +49,7 @@ export function SelectionToolbar({
         <Button
           variant="outline"
           size="sm"
-          className="h-10 gap-1.5 px-3 text-sm"
+          className="h-8 gap-1.5 px-3 text-sm"
           disabled={selectedCount === 0}
           onClick={onAddToCollection}
         >
@@ -59,7 +59,7 @@ export function SelectionToolbar({
         <Button
           variant="outline"
           size="sm"
-          className="h-10 gap-1.5 px-3 text-sm text-destructive hover:text-destructive"
+          className="h-8 gap-1.5 px-3 text-sm text-destructive hover:text-destructive"
           disabled={selectedCount === 0}
           onClick={() => void onHide()}
         >

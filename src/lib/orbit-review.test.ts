@@ -50,7 +50,7 @@ const sourcePlan: OrbitScanPlan = {
 };
 
 const existingTags: TagWithCount[] = [
-  { id: "t1", name: "Research", color: "#f59e0b", _count: { bookmarks: 8 } },
+  { id: "t1", name: "Research", color: "#38bdf8", _count: { bookmarks: 8 } },
 ];
 
 const existingCollections: CollectionWithCount[] = [
@@ -114,7 +114,7 @@ describe("buildReviewedOrbitPlan", () => {
       tags: [
         {
           name: "Research",
-          color: "#f59e0b",
+          color: "#38bdf8",
           reuseExisting: true,
         },
         {

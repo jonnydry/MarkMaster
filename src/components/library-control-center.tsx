@@ -72,7 +72,7 @@ export function LibraryControlCenter({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-2xl border border-hairline-soft bg-surface-1 shadow-sm",
+        "overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/70",
         className
       )}
     >
@@ -151,7 +151,7 @@ export function LibraryControlCenter({
           ) : null}
         </div>
 
-        <div className="border-t border-hairline-soft bg-surface-2/55 p-4 lg:border-l lg:border-t-0">
+        <div className="border-t border-hairline-soft bg-transparent p-4 lg:border-l lg:border-t-0">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Sync status
           </p>
@@ -179,7 +179,7 @@ function ControlMetric({
   active?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-hairline-soft bg-surface-2 px-3 py-2.5">
+    <div className="rounded-sm border border-hairline-soft bg-transparent px-3 py-2.5">
       <div className="flex items-center gap-2">
         <Icon
           className={cn(
@@ -209,7 +209,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-hairline-soft bg-surface-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+      className="inline-flex min-h-10 items-center gap-2 rounded-sm border border-hairline-soft bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/25 hover:bg-accent-soft hover:text-foreground"
     >
       <Icon className="size-4 shrink-0 text-primary/75" aria-hidden />
       <span className="min-w-0 leading-5">{label}</span>

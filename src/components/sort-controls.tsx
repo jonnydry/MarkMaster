@@ -40,7 +40,7 @@ export function SortControls({
       >
         <SelectTrigger
           size="lg"
-          className="dashboard-sort-trigger min-w-[100px] flex-1 gap-1.5 rounded-xl border-hairline-strong bg-surface-1 shadow-sm sm:flex-none"
+          className="dashboard-sort-trigger min-w-[100px] flex-1 gap-1.5 rounded-sm border-hairline-strong bg-background/35 font-semibold hover:border-primary/30 sm:flex-none"
         >
           <ArrowDownUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span>Sort</span>
@@ -54,24 +54,28 @@ export function SortControls({
           <SelectItem value="authorUsername">Author</SelectItem>
         </SelectContent>
       </Select>
-      <div className="dashboard-view-mode flex flex-1 items-center gap-0.5 rounded-xl border border-hairline-soft bg-surface-2 p-1 shadow-sm sm:flex-none">
-        {VIEW_MODES.map(({ value, label, icon: Icon }) => (
-          <Button
-            key={value}
-            variant={viewMode === value ? "default" : "ghost"}
-            size="sm"
-            className={`dashboard-view-button h-10 px-2.5 text-sm ${
-              viewMode === value
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title={`${label} view`}
-            onClick={() => onViewModeChange(value)}
-          >
-            <Icon className="size-4 dashboard-view-icon" />
-            <span className="dashboard-view-label">{label}</span>
-          </Button>
-        ))}
+      <div className="dashboard-view-mode flex flex-1 items-center gap-0.5 rounded-sm border border-hairline-soft bg-background/35 p-0.5 sm:flex-none">
+        {VIEW_MODES.map(({ value, label, icon: Icon }) => {
+          const selected = viewMode === value;
+          return (
+            <Button
+              key={value}
+              variant={selected ? "default" : "ghost"}
+              size="sm"
+              aria-pressed={selected}
+              className={cn(
+                "dashboard-view-button h-8 rounded-sm px-2.5 text-sm",
+                !selected &&
+                  "border border-transparent text-muted-foreground hover:border-hairline-soft hover:text-foreground"
+              )}
+              title={`${label} view`}
+              onClick={() => onViewModeChange(value)}
+            >
+              <Icon className="size-4 dashboard-view-icon" />
+              <span className="dashboard-view-label">{label}</span>
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

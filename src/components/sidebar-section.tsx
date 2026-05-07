@@ -26,13 +26,13 @@ export function SidebarSection({
 
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between gap-1 px-1">
+      <div className="mb-2 flex items-center justify-between gap-1 border-b border-hairline-soft px-1 pb-1.5">
         <button
           type="button"
           onClick={toggle}
           aria-expanded={open}
           aria-controls={contentId}
-          className="group flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="group flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
         >
           <ChevronDown
             aria-hidden

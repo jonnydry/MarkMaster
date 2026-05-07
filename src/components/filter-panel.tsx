@@ -48,7 +48,7 @@ export function FilterPanel({
     <div
       role="region"
       aria-label="Filters"
-      className="space-y-3 border-b border-hairline-soft bg-surface-1 px-5 py-3"
+      className="space-y-3 border-b border-hairline-soft bg-background/45 px-5 py-3 backdrop-blur-xl"
     >
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -77,10 +77,10 @@ export function FilterPanel({
                 key={value}
                 variant="outline"
                 size="sm"
-                className={`h-7 gap-1.5 text-xs ${
+                className={`h-7 gap-1.5 rounded-sm text-xs ${
                   mediaFilter === value
-                    ? "menu-selection-active border-transparent pr-5 text-foreground"
-                    : "bg-surface-2"
+                    ? "border-primary/35 bg-primary/10 text-foreground"
+                    : "border-hairline-soft bg-transparent text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
                 }`}
                 onClick={() => onMediaFilterChange(value)}
               >
@@ -100,7 +100,7 @@ export function FilterPanel({
             value={authorFilter}
             onChange={(e) => onAuthorFilterChange(e.target.value)}
             placeholder="Filter by username..."
-            className="h-9 border-hairline-soft bg-surface-2 text-sm"
+            className="h-9 rounded-sm border-hairline-soft bg-transparent text-sm"
           />
         </div>
 
@@ -114,7 +114,7 @@ export function FilterPanel({
               type="date"
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
-              className="h-9 border-hairline-soft bg-surface-2 text-sm"
+              className="h-9 rounded-sm border-hairline-soft bg-transparent text-sm"
             />
           </div>
           <div>
@@ -126,7 +126,7 @@ export function FilterPanel({
               type="date"
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
-              className="h-9 border-hairline-soft bg-surface-2 text-sm"
+              className="h-9 rounded-sm border-hairline-soft bg-transparent text-sm"
             />
           </div>
         </div>
@@ -140,10 +140,10 @@ export function FilterPanel({
               {tags.map((tag) => (
                 <button
                   key={tag.id}
-                  className={`rounded-md px-2 py-1 text-xs font-medium transition-all ${
+                  className={`rounded-sm border border-transparent px-2 py-1 text-xs font-semibold transition-colors ${
                     selectedTags.includes(tag.id)
-                      ? "menu-selection-active pr-5"
-                      : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                      ? "border-primary/35 bg-primary/10 text-foreground"
+                      : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
                   }`}
                   onClick={() => onTagToggle(tag.id)}
                   aria-pressed={selectedTags.includes(tag.id)}

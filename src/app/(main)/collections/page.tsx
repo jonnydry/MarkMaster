@@ -172,10 +172,10 @@ export default function CollectionsPage() {
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div
                     key={i}
-                    className="rounded-xl border border-hairline-soft bg-surface-1 px-3 py-2.5"
+                    className="rounded-md border border-hairline-soft bg-surface-1 px-3 py-2.5"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-lg skeleton-shimmer" />
+                      <div className="h-9 w-9 rounded-md skeleton-shimmer" />
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="h-3 w-40 rounded skeleton-shimmer" />
                         <div className="h-3 w-28 rounded skeleton-shimmer" />
@@ -187,7 +187,7 @@ export default function CollectionsPage() {
               </div>
             ) : isError ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
-                <div className="rounded-xl border border-hairline-soft bg-surface-1 p-5">
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/70 p-5">
                   <p className="text-sm font-medium text-foreground">
                     Collections could not be loaded
                   </p>
@@ -206,7 +206,7 @@ export default function CollectionsPage() {
               </div>
             ) : collections.length === 0 ? (
               <div className="flex h-72 flex-col items-center justify-center text-center">
-                <div className="rounded-xl border border-hairline-soft bg-surface-1 px-6 py-7 shadow-sm sm:px-8">
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-7 sm:px-8">
                   <Layers className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
                   <h2 className="mb-2 text-lg font-medium">No collections yet</h2>
                   <p className="mb-4 text-sm text-muted-foreground">

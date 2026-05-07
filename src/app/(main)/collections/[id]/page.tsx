@@ -247,7 +247,7 @@ export default function CollectionDetailPage({
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-hairline-soft bg-surface-1 px-4 py-4"
+                className="rounded-md border border-hairline-soft bg-surface-1 px-4 py-4"
               >
                 <div className="flex gap-3">
                   <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
@@ -269,7 +269,7 @@ export default function CollectionDetailPage({
     const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
     return (
       <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
-        <div className="rounded-2xl border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
+        <div className="rounded-md border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
           <p className="text-sm font-medium text-foreground">
             {isNotFound
               ? "Collection not found"
@@ -348,7 +348,7 @@ export default function CollectionDetailPage({
               <Button
                 variant="outline"
                 size="icon"
-                className="size-10 shrink-0 border-hairline-soft bg-surface-1 shadow-sm"
+                className="size-10 shrink-0 border-hairline-soft bg-transparent"
                 onClick={() => router.push("/collections")}
               >
                 <ArrowLeft className="size-4" />
@@ -364,7 +364,7 @@ export default function CollectionDetailPage({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-10 gap-1.5 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
+                      className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
                       onClick={handleCopyAsCollection}
                     >
                       <Copy className="size-4" />
@@ -387,7 +387,7 @@ export default function CollectionDetailPage({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-10 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
+                      className="h-9 border-hairline-soft bg-transparent px-3 text-sm"
                       onClick={handleTogglePublic}
                     >
                       {collection.isPublic ? "Make Private" : "Make Public"}
@@ -397,7 +397,7 @@ export default function CollectionDetailPage({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-10 gap-1.5 border-hairline-soft bg-surface-1 px-3 text-sm shadow-sm"
+                          className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
                           onClick={handleCopyShareLink}
                         >
                           <Copy className="size-4" />
@@ -407,7 +407,7 @@ export default function CollectionDetailPage({
                           href={`/share/${collection.shareSlug}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex size-10 items-center justify-center rounded-xl border border-hairline-soft bg-surface-1 shadow-sm transition-colors hover:bg-surface-2"
+                          className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-accent-soft"
                           aria-label="Open public collection page"
                           title="Open public collection page"
                         >
@@ -419,7 +419,7 @@ export default function CollectionDetailPage({
                       <Button
                         variant="default"
                         size="sm"
-                        className="h-10 gap-1.5 px-3 text-sm shadow-sm"
+                        className="h-9 gap-1.5 px-3 text-sm"
                         onClick={handleShareOnX}
                       >
                         <Share2 className="size-4" />
@@ -448,7 +448,7 @@ export default function CollectionDetailPage({
 
         {sortedItems.length === 0 ? (
           <div className="py-20 text-center">
-            <div className="mx-auto max-w-md rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 shadow-sm">
+            <div className="mx-auto max-w-md rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-8">
             {isSyncedFromX ? (
               <FolderOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
             ) : (
@@ -486,7 +486,7 @@ export default function CollectionDetailPage({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground sm:h-7 sm:w-7"
+                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
                       disabled={reordering || index === 0}
                       onClick={() => moveItem(index, -1)}
                       aria-label="Move bookmark up"
@@ -497,7 +497,7 @@ export default function CollectionDetailPage({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-surface-2 hover:text-foreground sm:h-7 sm:w-7"
+                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
                       disabled={reordering || index === sortedItems.length - 1}
                       onClick={() => moveItem(index, 1)}
                       aria-label="Move bookmark down"

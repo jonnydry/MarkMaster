@@ -31,7 +31,7 @@ function itemLabel(count: number) {
 }
 
 const compactCardClassName =
-  "group flex min-h-[4.75rem] cursor-pointer items-center gap-3 rounded-xl border border-hairline-soft bg-surface-1 px-3 py-2.5 text-left transition-colors hover:border-primary/25 hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:76px]";
+  "group flex min-h-[4.75rem] cursor-pointer items-center gap-3 rounded-sm border border-hairline-soft bg-surface-1/70 px-3 py-2.5 text-left transition-colors hover:border-primary/25 hover:bg-accent-soft/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:76px]";
 
 function handleRowKeyDown(
   event: React.KeyboardEvent<HTMLElement>,
@@ -61,7 +61,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-hairline-soft bg-surface-2 text-primary">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-primary">
         <Layers2 className="h-4 w-4" aria-hidden="true" />
       </div>
 
@@ -71,7 +71,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
             {collection.name}
           </h3>
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[0.68rem] font-medium text-muted-foreground"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-hairline-soft bg-transparent px-1.5 py-0.5 text-[0.68rem] font-semibold text-muted-foreground"
             title={collection.isPublic ? "Public collection" : "Private collection"}
           >
             {collection.isPublic ? (
@@ -140,7 +140,7 @@ export const XFolderCard = React.memo(function XFolderCard({
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-hairline-soft bg-surface-2 text-muted-foreground">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-muted-foreground">
         <FolderOpen className="h-4 w-4" aria-hidden="true" />
       </div>
 
@@ -149,7 +149,7 @@ export const XFolderCard = React.memo(function XFolderCard({
           <h3 className="truncate text-sm font-semibold text-foreground">
             {collection.name}
           </h3>
-          <span className="inline-flex shrink-0 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[0.68rem] font-medium text-primary">
+          <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary">
             X Folder
           </span>
         </div>

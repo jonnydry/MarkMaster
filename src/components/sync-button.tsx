@@ -80,12 +80,13 @@ export function SyncButton({
   };
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-xl border border-hairline-soft bg-surface-2 p-2 shadow-sm">
+    <div className="flex w-full shrink-0 flex-col gap-1.5 border border-sidebar-border bg-transparent p-2">
       <Button
         type="button"
         onClick={handleSync}
         aria-busy={isAnySyncRunning}
-        className="h-10 w-full gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+        variant="outline"
+        className="h-9 w-full gap-2 border-primary/45 bg-primary/10 text-sm font-semibold text-foreground hover:border-primary/70 hover:bg-primary/15"
       >
         <RefreshCw
           className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}

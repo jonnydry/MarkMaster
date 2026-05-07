@@ -88,7 +88,7 @@ const COLOR_ANCHOR_TAG = "#9ca3af";
 const COLOR_ANCHOR_COLLECTION = "#60a5fa";
 const COLOR_ANCHOR_X_FOLDER = "#38bdf8";
 const COLOR_BOOKMARK = "#cbd5f5";
-const COLOR_BOOKMARK_LOOSE = "#fbbf24";
+const COLOR_BOOKMARK_LOOSE = "#7dd3fc";
 const COLOR_LINK = "rgba(148, 163, 184, ";
 
 function isAnchorKind(kind: OrbitGraphNode["kind"]): boolean {
@@ -1564,7 +1564,7 @@ export const OrbitMapCanvas = forwardRef<
                 "inline-block size-2 rounded-full",
                 hoverCard.node.node.affiliated
                   ? "bg-slate-200"
-                  : "bg-amber-300"
+                  : "bg-sky-300"
               )}
             />
             <span className="truncate text-xs font-semibold text-white">

@@ -21,7 +21,7 @@ export function DashboardEmptyState({
 
   return (
     <div className="flex h-72 items-center justify-center px-4 sm:px-6">
-      <div className="animate-fade-in w-full max-w-xl rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 text-center shadow-sm sm:px-8">
+      <div className="animate-fade-in w-full max-w-xl rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-8 text-center sm:px-8">
         <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
         <p className="mb-2 text-lg font-medium heading-font">No bookmarks found</p>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">

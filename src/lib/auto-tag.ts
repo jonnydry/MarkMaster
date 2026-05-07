@@ -7,7 +7,7 @@ interface TagRule {
 const TAG_RULES: TagRule[] = [
   {
     name: "Code",
-    color: "#22c55e",
+    color: "#38bdf8",
     test: (text) =>
       /```[\s\S]*```/.test(text) ||
       /\b(function|const |let |var |import |export |class |def |async |await )\b/.test(text),
@@ -20,17 +20,17 @@ const TAG_RULES: TagRule[] = [
   },
   {
     name: "Thread",
-    color: "#a855f7",
+    color: "#60a5fa",
     test: (text) => /🧵|\bthread\b/i.test(text) || /\b1\/\d+\b/.test(text),
   },
   {
     name: "Media",
-    color: "#ec4899",
+    color: "#2563eb",
     test: (_text, media) => Array.isArray(media) && media.length > 0,
   },
   {
     name: "Question",
-    color: "#f97316",
+    color: "#93c5fd",
     test: (text) => text.includes("?") && text.length < 280,
   },
 ];

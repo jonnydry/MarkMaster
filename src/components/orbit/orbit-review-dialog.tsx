@@ -316,7 +316,7 @@ function OrbitReviewCollectionField({
                 <CommandGroup>
                   <CommandItem
                     value="__clear__orbit_collection__"
-                    className="text-amber-200/90 data-[selected=true]:bg-white/10"
+                    className="text-sky-200/90 data-[selected=true]:bg-white/10"
                     onSelect={() => {
                       onCollectionNameChange("");
                       onCollectionDescriptionChange("");

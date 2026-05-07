@@ -8,10 +8,10 @@ import type {
 
 const DEFAULT_REVIEW_TAG_COLORS = [
   "#1d9bf0",
-  "#22c55e",
-  "#a855f7",
-  "#f59e0b",
-  "#ef4444",
+  "#2563eb",
+  "#38bdf8",
+  "#60a5fa",
+  "#71717a",
 ] as const;
 
 export interface OrbitReviewSuggestionDraft {
