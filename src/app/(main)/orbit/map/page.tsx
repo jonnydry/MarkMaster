@@ -354,108 +354,17 @@ export default function OrbitMapPage() {
           }
         />
 
-        <div className="px-4 pt-2 sm:px-5">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-              <Search className="size-4 text-white/40" />
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Find tags, collections, or bookmarks…"
-              className="h-10 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-white/20 focus:bg-white/[0.07]"
-            />
-            {searchDeferred && searchResults.length > 0 && (
-              <div className="absolute z-20 mt-1.5 max-h-64 w-full overflow-auto rounded-xl border border-white/10 bg-[#0b0f1a] shadow-xl">
-                <ul className="py-1">
-                  {searchResults.slice(0, 20).map((node) => {
-                    const identity: OrbitMapSelection =
-                      node.kind === "core"
-                        ? { kind: "core", id: node.id }
-                        : node.kind === "tag"
-                          ? { kind: "tag", id: node.id }
-                          : node.kind === "collection"
-                            ? { kind: "collection", id: node.id }
-                            : { kind: "bookmark", id: node.id };
-                    return (
-                      <li key={node.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleSelectionChange(identity);
-                            canvasRef.current?.focusOn(identity);
-                            setSearch("");
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white"
-                        >
-                          {node.kind === "tag" && (
-                            <>
-                              <span
-                                className="inline-block size-2 rounded-full"
-                                style={{ backgroundColor: node.color }}
-                              />
-                              <span className="truncate">{node.name}</span>
-                              <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                Tag
-                              </span>
-                            </>
-                          )}
-                          {node.kind === "collection" && (
-                            <>
-                              <Folder className="size-3.5 text-sky-300" />
-                              <span className="truncate">{node.name}</span>
-                              <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                {node.variant === "x_folder"
-                                  ? "X folder"
-                                  : "Collection"}
-                              </span>
-                            </>
-                          )}
-                          {node.kind === "bookmark" && (
-                            <>
-                              <span
-                                className={cn(
-                                  "inline-block size-1.5 rounded-full",
-                                  node.affiliated
-                                    ? "bg-slate-200"
-                                    : "bg-amber-300"
-                                )}
-                              />
-                              <span className="truncate">
-                                @{node.authorUsername}
-                              </span>
-                              <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                Bookmark
-                              </span>
-                            </>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-            {searchDeferred && searchResults.length === 0 && (
-              <div className="absolute z-20 mt-1.5 w-full rounded-xl border border-white/10 bg-[#0b0f1a] p-3 text-sm text-white/50 shadow-xl">
-                No results for “{searchDeferred}”
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 pb-4 pt-2 sm:px-5 lg:flex-row">
-          <div className="orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden rounded-[28px]">
+        <div className="flex min-h-0 min-w-0 flex-1 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+          <div className="orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-white/[0.055] bg-[#070b13]">
             {isLoading ? (
-              <div className="flex h-full w-full items-center justify-center rounded-[28px] border border-white/10 bg-[#0b0f1a]">
+              <div className="flex h-full w-full items-center justify-center bg-[#0b0f1a]">
                 <div className="flex items-center gap-2 text-sm text-white/60">
                   <Loader2 className="size-4 animate-spin" />
                   Charting graph…
                 </div>
               </div>
             ) : isError ? (
-              <div className="flex h-full w-full items-center justify-center rounded-[28px] border border-white/10 bg-[#0b0f1a] p-6 text-center">
+              <div className="flex h-full w-full items-center justify-center bg-[#0b0f1a] p-6 text-center">
                 <div className="max-w-md space-y-3">
                   <p className="text-lg font-medium text-white">
                     Graph could not be loaded
@@ -478,32 +387,170 @@ export default function OrbitMapPage() {
                 onOpenBookmark={handleOpenBookmark}
                 focus={focus}
                 className="h-full w-full"
+                filterControlsClassName="top-[4.65rem] lg:top-[4.65rem]"
+                zoomControlsClassName="bottom-[12.5rem] right-3 sm:bottom-[11rem] lg:bottom-4 lg:right-4"
               />
             ) : null}
 
-            {isFetching && !isLoading && (
-              <div className="pointer-events-none absolute right-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-xs text-white/70 backdrop-blur-sm">
-                <Loader2 className="size-3.5 animate-spin" />
-                Refreshing
+            <div className="pointer-events-none absolute inset-x-3 top-3 z-30 lg:inset-x-auto lg:left-4 lg:w-[min(520px,calc(100%-404px))] xl:w-[min(560px,calc(100%-420px))]">
+              <div className="pointer-events-auto relative rounded-full border border-white/[0.055] bg-white/[0.035] px-3 py-2 shadow-none backdrop-blur-xl">
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                    <Search className="size-4 text-white/40" />
+                  </div>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Find tags, collections, or bookmarks…"
+                    disabled={!graph}
+                    className="h-9 w-full rounded-full border-0 bg-transparent pl-9 pr-10 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  {isFetching && !isLoading && (
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <Loader2 className="size-3.5 animate-spin text-white/55" />
+                    </div>
+                  )}
+                </div>
+
+                {searchDeferred && searchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 overflow-auto rounded-2xl border border-white/[0.08] bg-[#07111d]/72 shadow-none backdrop-blur-xl">
+                    <ul className="py-1">
+                      {searchResults.slice(0, 20).map((node) => {
+                        const identity: OrbitMapSelection =
+                          node.kind === "core"
+                            ? { kind: "core", id: node.id }
+                            : node.kind === "tag"
+                              ? { kind: "tag", id: node.id }
+                              : node.kind === "collection"
+                                ? { kind: "collection", id: node.id }
+                                : { kind: "bookmark", id: node.id };
+                        return (
+                          <li key={node.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleSelectionChange(identity);
+                                canvasRef.current?.focusOn(identity);
+                                setSearch("");
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                            >
+                              {node.kind === "tag" && (
+                                <>
+                                  <span
+                                    className="inline-block size-2 rounded-full"
+                                    style={{ backgroundColor: node.color }}
+                                  />
+                                  <span className="truncate">{node.name}</span>
+                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
+                                    Tag
+                                  </span>
+                                </>
+                              )}
+                              {node.kind === "collection" && (
+                                <>
+                                  <Folder className="size-3.5 text-sky-300" />
+                                  <span className="truncate">{node.name}</span>
+                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
+                                    {node.variant === "x_folder"
+                                      ? "X folder"
+                                      : "Collection"}
+                                  </span>
+                                </>
+                              )}
+                              {node.kind === "bookmark" && (
+                                <>
+                                  <span
+                                    className={cn(
+                                      "inline-block size-1.5 rounded-full",
+                                      node.affiliated
+                                        ? "bg-slate-200"
+                                        : "bg-amber-300"
+                                    )}
+                                  />
+                                  <span className="truncate">
+                                    @{node.authorUsername}
+                                  </span>
+                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
+                                    Bookmark
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {searchDeferred && searchResults.length === 0 && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 rounded-2xl border border-white/[0.08] bg-[#07111d]/72 p-3 text-sm text-white/50 shadow-none backdrop-blur-xl">
+                    No results for “{searchDeferred}”
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {stats && (
+              <div className="pointer-events-none absolute bottom-5 left-5 z-20 hidden max-w-[calc(100%-6rem)] items-center gap-3 text-white/60 lg:flex">
+                <MapMetric label="Loose" value={stats.looseBookmarks} />
+                <span className="h-6 w-px bg-white/[0.08]" />
+                <MapMetric label="Tags" value={stats.tagCount} />
+                <span className="h-6 w-px bg-white/[0.08]" />
+                <MapMetric
+                  label="Collections"
+                  value={stats.userCollectionCount + stats.xFolderCount}
+                />
+                {truncatedCount > 0 && (
+                  <>
+                    <span className="h-6 w-px bg-white/[0.08]" />
+                    <MapMetric label="Hidden" value={truncatedCount} />
+                  </>
+                )}
               </div>
             )}
-          </div>
 
-          {graph && (
-            <OrbitMapRail
-              data={graph}
-              selection={selection}
-              hoverSelection={hoverSelection}
-              selectedBookmarkId={selectedBookmarkId}
-              focusedBookmark={null}
-              focusedBookmarkLoading={false}
-              onAssign={handleAssign}
-              onAddTag={openTagDialog}
-              onAddToCollection={openCollectionDialog}
-              onOpenBookmark={handleOpenBookmark}
-              onClearSelection={() => handleSelectionChange(null)}
-            />
-          )}
+            {graph && (
+              <>
+                <div className="pointer-events-none absolute right-3 top-3 z-30 hidden lg:block">
+                  <OrbitMapRail
+                    data={graph}
+                    selection={selection}
+                    hoverSelection={hoverSelection}
+                    selectedBookmarkId={selectedBookmarkId}
+                    focusedBookmark={null}
+                    focusedBookmarkLoading={false}
+                    onAssign={handleAssign}
+                    onAddTag={openTagDialog}
+                    onAddToCollection={openCollectionDialog}
+                    onOpenBookmark={handleOpenBookmark}
+                    onClearSelection={() => handleSelectionChange(null)}
+                    variant="overlay"
+                  />
+                </div>
+
+                <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
+                  <OrbitMapRail
+                    data={graph}
+                    selection={selection}
+                    hoverSelection={hoverSelection}
+                    selectedBookmarkId={selectedBookmarkId}
+                    focusedBookmark={null}
+                    focusedBookmarkLoading={false}
+                    onAssign={handleAssign}
+                    onAddTag={openTagDialog}
+                    onAddToCollection={openCollectionDialog}
+                    onOpenBookmark={handleOpenBookmark}
+                    onClearSelection={() => handleSelectionChange(null)}
+                    variant="overlay"
+                    className="max-h-[30dvh] w-full"
+                    showLegend={false}
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -544,6 +591,19 @@ export default function OrbitMapPage() {
         onOpenChange={setCreateCollectionOpen}
         onCreateCollection={createCollection}
       />
+    </div>
+  );
+}
+
+function MapMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/35">
+        {label}
+      </p>
+      <p className="text-sm font-semibold tabular-nums text-white/75">
+        {value.toLocaleString()}
+      </p>
     </div>
   );
 }

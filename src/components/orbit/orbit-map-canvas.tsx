@@ -16,6 +16,8 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
+  forceX,
+  forceY,
   type Simulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
@@ -53,6 +55,8 @@ interface OrbitMapCanvasProps {
   onOpenBookmark?: (bookmarkId: string) => void;
   focus?: OrbitMapFocus | null;
   className?: string;
+  filterControlsClassName?: string;
+  zoomControlsClassName?: string;
 }
 
 type NodeDatum = SimulationNodeDatum & {
@@ -76,7 +80,7 @@ type LinkDatum = SimulationLinkDatum<NodeDatum> & {
 };
 
 const DPR_CAP = 2;
-const MIN_ZOOM = 0.2;
+const MIN_ZOOM = 0.06;
 const MAX_ZOOM = 4;
 const BG_COLOR = "#0b0f1a";
 // Obsidian-style muted palette.
@@ -178,7 +182,7 @@ function hexToRgb(hex: string): [number, number, number] {
 // Deterministic seeding + position persistence
 /* ------------------------------------------------------------------ */
 
-const POSITIONS_STORAGE_KEY = "orbit-map-positions-v1";
+const POSITIONS_STORAGE_KEY = "orbit-map-positions-v3";
 const MAX_B2B_EDGES = 400;
 const MAX_BOOKMARKS_PER_SHARED_TAG_EDGE_PASS = 80;
 
@@ -223,11 +227,21 @@ function seededPosition(id: string): { x: number; y: number } {
   return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
 }
 
+function isFiniteCoordinate(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isFinitePosition(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { x?: unknown; y?: unknown };
+  return isFiniteCoordinate(candidate.x) && isFiniteCoordinate(candidate.y);
+}
+
 function saveNodePositions(nodes: NodeDatum[]) {
   try {
     const data = Object.fromEntries(
       nodes
-        .filter((n) => n.x !== undefined && n.y !== undefined)
+        .filter((n) => isFiniteCoordinate(n.x) && isFiniteCoordinate(n.y))
         .map((n) => [n.node.id, { x: n.x, y: n.y }])
     );
     localStorage.setItem(POSITIONS_STORAGE_KEY, JSON.stringify(data));
@@ -240,8 +254,12 @@ function loadNodePositions(): Map<string, { x: number; y: number }> {
   try {
     const raw = localStorage.getItem(POSITIONS_STORAGE_KEY);
     if (!raw) return new Map();
-    const parsed = JSON.parse(raw) as Record<string, { x: number; y: number }>;
-    return new Map(Object.entries(parsed));
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return new Map(
+      Object.entries(parsed).flatMap(([id, position]) =>
+        isFinitePosition(position) ? [[id, position]] : []
+      )
+    );
   } catch {
     return new Map();
   }
@@ -261,6 +279,8 @@ export const OrbitMapCanvas = forwardRef<
     onOpenBookmark,
     focus,
     className,
+    filterControlsClassName,
+    zoomControlsClassName,
   },
   ref
 ) {
@@ -278,6 +298,7 @@ export const OrbitMapCanvas = forwardRef<
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [isDragging, setIsDragging] = useState(false);
   const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
+  const userAdjustedViewRef = useRef(false);
   const hoverRef = useRef<NodeDatum | null>(null);
   const selectionRef = useRef<OrbitMapSelection | null>(selection);
   const focusRef = useRef<OrbitMapFocus | null>(focus ?? null);
@@ -370,9 +391,27 @@ export const OrbitMapCanvas = forwardRef<
     container.style.cursor = "grab";
   }, []);
 
+  const focusViewOnSelection = useCallback((target: OrbitMapSelection) => {
+    const datum = nodesByIdRef.current.get(target.id);
+    if (
+      !datum ||
+      !isFiniteCoordinate(datum.x) ||
+      !isFiniteCoordinate(datum.y)
+    ) {
+      return;
+    }
+    const view = viewRef.current;
+    view.x = -datum.x * view.zoom;
+    view.y = -datum.y * view.zoom;
+    needsRenderRef.current = true;
+  }, []);
+
   useEffect(() => {
     selectionRef.current = selection;
-  }, [selection]);
+    if (selection) {
+      focusViewOnSelection(selection);
+    }
+  }, [focusViewOnSelection, selection]);
 
   useEffect(() => {
     focusRef.current = focus ?? null;
@@ -386,6 +425,53 @@ export const OrbitMapCanvas = forwardRef<
     );
   }, [activeFilter]);
 
+  const fitViewToNodes = useCallback(() => {
+    const nodes = nodesRef.current.filter(
+      (node) =>
+        isFiniteCoordinate(node.x) &&
+        isFiniteCoordinate(node.y) &&
+        visibleNodeIdsRef.current.has(node.node.id)
+    );
+    if (nodes.length === 0) return;
+
+    const xs = nodes
+      .map((node) => (isFiniteCoordinate(node.x) ? node.x : 0))
+      .sort((a, b) => a - b);
+    const ys = nodes
+      .map((node) => (isFiniteCoordinate(node.y) ? node.y : 0))
+      .sort((a, b) => a - b);
+    const trim = nodes.length > 80
+      ? Math.floor(nodes.length * 0.08)
+      : nodes.length > 24
+        ? Math.floor(nodes.length * 0.06)
+        : 0;
+    const lowIndex = Math.min(trim, nodes.length - 1);
+    const highIndex = Math.max(nodes.length - trim - 1, lowIndex);
+    const minX = xs[lowIndex];
+    const maxX = xs[highIndex];
+    const minY = ys[lowIndex];
+    const maxY = ys[highIndex];
+
+    const graphWidth = Math.max(maxX - minX, 1);
+    const graphHeight = Math.max(maxY - minY, 1);
+    const availableWidth = Math.max(size.width - 120, 160);
+    const availableHeight = Math.max(size.height - 140, 160);
+    const zoom = Math.min(
+      1.25,
+      Math.max(
+        MIN_ZOOM,
+        Math.min(availableWidth / graphWidth, availableHeight / graphHeight)
+      )
+    );
+
+    viewRef.current = {
+      x: -((minX + maxX) / 2) * zoom,
+      y: -((minY + maxY) / 2) * zoom + Math.min(size.height * 0.04, 24),
+      zoom,
+    };
+    needsRenderRef.current = true;
+  }, [size.height, size.width]);
+
   // --- build nodes + links + simulation when data changes ---
   useEffect(() => {
     const prevById = nodesByIdRef.current;
@@ -397,12 +483,18 @@ export const OrbitMapCanvas = forwardRef<
       let x = existing?.x;
       let y = existing?.y;
 
-      if (x === undefined || y === undefined) {
+      if (!isFiniteCoordinate(x) || !isFiniteCoordinate(y)) {
         const saved = savedPositions.get(node.id);
         if (saved) {
           x = saved.x;
           y = saved.y;
         }
+      }
+
+      if (!isFiniteCoordinate(x) || !isFiniteCoordinate(y)) {
+        const seeded = seededPosition(node.id);
+        x = seeded.x;
+        y = seeded.y;
       }
 
       return {
@@ -411,10 +503,10 @@ export const OrbitMapCanvas = forwardRef<
         radius,
         x,
         y,
-        vx: existing?.vx ?? 0,
-        vy: existing?.vy ?? 0,
-        fx: existing?.fx,
-        fy: existing?.fy,
+        vx: isFiniteCoordinate(existing?.vx) ? existing.vx : 0,
+        vy: isFiniteCoordinate(existing?.vy) ? existing.vy : 0,
+        fx: isFiniteCoordinate(existing?.fx) ? existing.fx : undefined,
+        fy: isFiniteCoordinate(existing?.fy) ? existing.fy : undefined,
       };
     });
 
@@ -523,6 +615,7 @@ export const OrbitMapCanvas = forwardRef<
     nodesRef.current = nextNodes;
     linksRef.current = nextLinks;
     adjacencyRef.current = adjacency;
+    userAdjustedViewRef.current = false;
     visibleNodeIdsRef.current = buildVisibleNodeIds(
       nextNodes,
       activeFilterRef.current
@@ -577,14 +670,26 @@ export const OrbitMapCanvas = forwardRef<
         forceManyBody<NodeDatum>().strength((node) => {
           switch (node.node.kind) {
             case "core":
-              return -180;
+              return -120;
             case "tag":
             case "collection":
-              return -260;
+              return -180;
             default:
-              return -35;
+              return -22;
           }
         })
+      )
+      .force(
+        "x",
+        forceX<NodeDatum>(0).strength((node) =>
+          node.node.kind === "bookmark" ? 0.025 : 0.055
+        )
+      )
+      .force(
+        "y",
+        forceY<NodeDatum>(0).strength((node) =>
+          node.node.kind === "bookmark" ? 0.025 : 0.055
+        )
       )
       .force(
         "collide",
@@ -601,13 +706,19 @@ export const OrbitMapCanvas = forwardRef<
         }
       });
 
-    // Seed unseeded nodes deterministically so layouts are stable across reloads.
+    // Re-seed any non-finite positions defensively before the first paint.
     for (const node of nextNodes) {
-      if (node.x === undefined || node.y === undefined) {
+      if (!isFiniteCoordinate(node.x) || !isFiniteCoordinate(node.y)) {
         const pos = seededPosition(node.node.id);
         node.x = pos.x;
         node.y = pos.y;
       }
+    }
+
+    if (selectionRef.current) {
+      focusViewOnSelection(selectionRef.current);
+    } else {
+      fitViewToNodes();
     }
 
     simulationRef.current = simulation;
@@ -617,7 +728,15 @@ export const OrbitMapCanvas = forwardRef<
       saveNodePositions(nextNodes);
       simulation.stop();
     };
-  }, [renderableData]);
+  }, [fitViewToNodes, focusViewOnSelection, renderableData]);
+
+  useEffect(() => {
+    if (selectionRef.current) {
+      focusViewOnSelection(selectionRef.current);
+    } else {
+      fitViewToNodes();
+    }
+  }, [fitViewToNodes, focusViewOnSelection]);
 
   // --- resize observer ---
   useEffect(() => {
@@ -682,6 +801,16 @@ export const OrbitMapCanvas = forwardRef<
 
       const visibleNodeIds = buildVisibleNodeIds(nodes, activeFilter);
       visibleNodeIdsRef.current = visibleNodeIds;
+
+      if (
+        !selectionRef.current &&
+        !userAdjustedViewRef.current &&
+        !isDraggingRef.current &&
+        !touchRef.current &&
+        hasActiveSimulation()
+      ) {
+        fitViewToNodes();
+      }
 
       // Animate simple straight-line assignments.
       let animating = false;
@@ -892,7 +1021,7 @@ export const OrbitMapCanvas = forwardRef<
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [size.height, size.width, activeFilter, overflowCounts]);
+  }, [size.height, size.width, activeFilter, fitViewToNodes, overflowCounts]);
 
   // --- hit testing ---
   const findNodeAt = useCallback(
@@ -960,6 +1089,7 @@ export const OrbitMapCanvas = forwardRef<
           applyCursor();
         }
         if (drag.moved) {
+          userAdjustedViewRef.current = true;
           viewRef.current.x += dx;
           viewRef.current.y += dy;
           drag.x = event.clientX;
@@ -1106,6 +1236,7 @@ export const OrbitMapCanvas = forwardRef<
         }
         viewRef.current.x = state.startViewX + dx;
         viewRef.current.y = state.startViewY + dy;
+        userAdjustedViewRef.current = true;
         needsRenderRef.current = true;
       } else if (touches.length === 2 && state.ids.length === 2) {
         const t1 = touches[0];
@@ -1138,6 +1269,7 @@ export const OrbitMapCanvas = forwardRef<
           viewRef.current.zoom = nextZoom;
           viewRef.current.x = midX - rectCenterX - worldX * nextZoom;
           viewRef.current.y = midY - rectCenterY - worldY * nextZoom;
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
         }
       }
@@ -1212,6 +1344,7 @@ export const OrbitMapCanvas = forwardRef<
       view.zoom = nextZoom;
       view.x = cursorX - worldX * nextZoom;
       view.y = cursorY - worldY * nextZoom;
+      userAdjustedViewRef.current = true;
       needsRenderRef.current = true;
       setHoverCard(null);
     };
@@ -1232,33 +1365,39 @@ export const OrbitMapCanvas = forwardRef<
       switch (event.key) {
         case "ArrowLeft":
           view.x += panStep;
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowRight":
           view.x -= panStep;
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowUp":
           view.y += panStep;
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "ArrowDown":
           view.y -= panStep;
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "+":
         case "=":
           view.zoom = Math.min(MAX_ZOOM, view.zoom * 1.1);
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
         case "-":
         case "_":
           view.zoom = Math.max(MIN_ZOOM, view.zoom / 1.1);
+          userAdjustedViewRef.current = true;
           needsRenderRef.current = true;
           event.preventDefault();
           break;
@@ -1274,32 +1413,39 @@ export const OrbitMapCanvas = forwardRef<
   const handleZoomIn = useCallback(() => {
     const view = viewRef.current;
     view.zoom = Math.min(MAX_ZOOM, view.zoom * 1.25);
+    userAdjustedViewRef.current = true;
     needsRenderRef.current = true;
   }, []);
 
   const handleZoomOut = useCallback(() => {
     const view = viewRef.current;
     view.zoom = Math.max(MIN_ZOOM, view.zoom / 1.25);
+    userAdjustedViewRef.current = true;
     needsRenderRef.current = true;
   }, []);
 
   const handleResetView = useCallback(() => {
-    viewRef.current = { x: 0, y: 0, zoom: 1 };
-    needsRenderRef.current = true;
-  }, []);
+    userAdjustedViewRef.current = false;
+    if (selectionRef.current) {
+      focusViewOnSelection(selectionRef.current);
+    } else {
+      fitViewToNodes();
+    }
+  }, [fitViewToNodes, focusViewOnSelection]);
 
   useImperativeHandle(
     ref,
     () => ({
       focusOn(target) {
-        const datum = nodesByIdRef.current.get(target.id);
-        if (!datum || datum.x === undefined || datum.y === undefined) return;
-        const view = viewRef.current;
-        view.x = -datum.x * view.zoom;
-        view.y = -datum.y * view.zoom;
+        focusViewOnSelection(target);
       },
       resetView() {
-        viewRef.current = { x: 0, y: 0, zoom: 1 };
+        userAdjustedViewRef.current = false;
+        if (selectionRef.current) {
+          focusViewOnSelection(selectionRef.current);
+        } else {
+          fitViewToNodes();
+        }
       },
       async animateAssign(bookmarkId, anchorId) {
         const bookmark = nodesByIdRef.current.get(bookmarkId);
@@ -1328,7 +1474,7 @@ export const OrbitMapCanvas = forwardRef<
         });
       },
     }),
-    []
+    [fitViewToNodes, focusViewOnSelection]
   );
 
   return (
@@ -1339,7 +1485,7 @@ export const OrbitMapCanvas = forwardRef<
       tabIndex={0}
       data-dragging={isDragging ? "true" : undefined}
       className={cn(
-        "relative h-full w-full select-none overflow-hidden rounded-[28px] border border-white/10 outline-none touch-none overscroll-contain focus-visible:ring-2 focus-visible:ring-primary/60",
+        "relative h-full w-full select-none overflow-hidden rounded-[26px] outline-none touch-none overscroll-contain focus-visible:ring-2 focus-visible:ring-primary/60",
         className
       )}
       style={{ cursor: "grab", backgroundColor: BG_COLOR }}
@@ -1355,7 +1501,14 @@ export const OrbitMapCanvas = forwardRef<
       <canvas ref={canvasRef} className="absolute inset-0" />
 
       {/* Filter toolbar */}
-      <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-1 rounded-xl border border-white/10 bg-black/60 p-1 shadow-lg backdrop-blur-sm">
+      <div
+        className={cn(
+          "pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-1",
+          filterControlsClassName
+        )}
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+      >
         {(
           [
             { key: "all", label: "All", icon: Layers },
@@ -1372,13 +1525,15 @@ export const OrbitMapCanvas = forwardRef<
                 key
               );
               setActiveFilter(key);
+              userAdjustedViewRef.current = false;
+              fitViewToNodes();
               needsRenderRef.current = true;
             }}
             className={cn(
-              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors",
+              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
               activeFilter === key
-                ? "bg-white/15 text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
+                ? "border-white/[0.08] bg-white/[0.13] text-white"
+                : "text-white/50 hover:bg-white/[0.06] hover:text-white"
             )}
             title={label}
           >
@@ -1391,7 +1546,7 @@ export const OrbitMapCanvas = forwardRef<
       {/* Hover card */}
       {hoverCard && hoverCard.node.node.kind === "bookmark" && (
         <div
-          className="pointer-events-none absolute z-20 w-64 rounded-xl border border-white/10 bg-[#0f1525]/95 p-3 shadow-xl backdrop-blur-md"
+          className="pointer-events-none absolute z-20 w-64 rounded-2xl border border-white/[0.08] bg-[#07111d]/72 p-3 shadow-none backdrop-blur-xl"
           style={{
             left: Math.min(
               Math.max(hoverCard.screenX + 14, 8),
@@ -1429,31 +1584,38 @@ export const OrbitMapCanvas = forwardRef<
       )}
 
       {/* Zoom controls */}
-      <div className="pointer-events-none absolute bottom-4 right-4 flex flex-col gap-1.5">
-        <div className="pointer-events-auto inline-flex flex-col overflow-hidden rounded-xl border border-white/10 bg-black/60 shadow-lg backdrop-blur-sm">
+      <div
+        className={cn(
+          "pointer-events-none absolute bottom-4 right-4 flex flex-col gap-1.5",
+          zoomControlsClassName
+        )}
+        onMouseDown={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+      >
+        <div className="pointer-events-auto inline-flex flex-col overflow-hidden rounded-full border border-white/[0.055] bg-white/[0.035] shadow-none backdrop-blur-xl">
           <button
             type="button"
             aria-label="Zoom in"
             onClick={handleZoomIn}
-            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="inline-flex h-9 w-9 items-center justify-center text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <Plus className="size-4" />
           </button>
-          <span className="h-px w-full bg-white/10" />
+          <span className="h-px w-full bg-white/[0.08]" />
           <button
             type="button"
             aria-label="Zoom out"
             onClick={handleZoomOut}
-            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="inline-flex h-9 w-9 items-center justify-center text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <Minus className="size-4" />
           </button>
-          <span className="h-px w-full bg-white/10" />
+          <span className="h-px w-full bg-white/[0.08]" />
           <button
             type="button"
             aria-label="Reset view"
             onClick={handleResetView}
-            className="inline-flex h-9 w-9 items-center justify-center text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="inline-flex h-9 w-9 items-center justify-center text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <RotateCcw className="size-4" />
           </button>

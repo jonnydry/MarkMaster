@@ -36,6 +36,9 @@ interface OrbitMapRailProps {
   onAddToCollection: () => void;
   onOpenBookmark: (bookmarkId: string) => void;
   onClearSelection: () => void;
+  variant?: "rail" | "overlay";
+  className?: string;
+  showLegend?: boolean;
 }
 
 function findNode(
@@ -101,6 +104,9 @@ export function OrbitMapRail({
   onAddToCollection,
   onOpenBookmark,
   onClearSelection,
+  variant = "rail",
+  className,
+  showLegend = true,
 }: OrbitMapRailProps) {
   const activeSelection = selection ?? hoverSelection;
   const activeNode = findNode(data, activeSelection);
@@ -108,10 +114,24 @@ export function OrbitMapRail({
     () => (activeNode ? getConnectedBookmarkNodes(data, activeNode) : []),
     [activeNode, data]
   );
+  const isOverlay = variant === "overlay";
 
   return (
-    <aside className="flex w-full flex-col gap-3 lg:w-[300px] lg:shrink-0 xl:w-[320px]">
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm">
+    <aside
+      className={cn(
+        isOverlay
+          ? "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-[26px] border border-white/[0.055] bg-white/[0.035] p-4 shadow-none backdrop-blur-2xl [scrollbar-width:thin]"
+          : "flex w-full flex-col gap-3 lg:w-[300px] lg:shrink-0 xl:w-[320px]",
+        className
+      )}
+    >
+      <section
+        className={cn(
+          isOverlay
+            ? "min-w-0"
+            : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
+        )}
+      >
         <SelectedClusterBody
           node={activeNode}
           stats={data.stats}
@@ -125,35 +145,52 @@ export function OrbitMapRail({
           onAddToCollection={onAddToCollection}
           onOpenBookmark={onOpenBookmark}
           onClearSelection={onClearSelection}
+          isOverlay={isOverlay}
         />
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 shadow-sm backdrop-blur-sm">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
-          Legend
-        </p>
-        <ul className="mt-3 space-y-2">
-          <li className="flex items-center gap-3">
-            <span className="inline-block size-2.5 rounded-full bg-amber-300" />
-            <span>Loose bookmark</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <span className="inline-block size-2.5 rounded-full bg-slate-200" />
-            <span>Assigned bookmark</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <span className="inline-block size-3 rounded-full bg-blue-400" />
-            <span>Tag or collection</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <span className="h-px w-5 bg-slate-400/50" />
-            <span>Relationship</span>
-          </li>
-        </ul>
-        <p className="mt-3 text-xs text-white/50">
-          Scroll to zoom · drag to pan · click to focus · Esc to clear
-        </p>
-      </section>
+      {showLegend && (
+        <section
+          className={cn(
+            "text-sm text-white/70",
+            isOverlay
+              ? "mt-4 border-t border-white/[0.055] pt-3"
+              : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
+          )}
+        >
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
+            Legend
+          </p>
+          <ul
+            className={cn(
+              "mt-3 gap-2",
+              isOverlay
+                ? "grid grid-cols-1 text-xs sm:grid-cols-2"
+                : "space-y-2"
+            )}
+          >
+            <li className="flex items-center gap-3">
+              <span className="inline-block size-2.5 rounded-full bg-amber-300" />
+              <span>Loose bookmark</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="inline-block size-2.5 rounded-full bg-slate-200" />
+              <span>Assigned bookmark</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="inline-block size-3 rounded-full bg-blue-400" />
+              <span>Tag or collection</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="h-px w-5 bg-slate-400/50" />
+              <span>Relationship</span>
+            </li>
+          </ul>
+          <p className="mt-3 text-xs text-white/50">
+            Scroll to zoom · drag to pan · click to focus · Esc to clear
+          </p>
+        </section>
+      )}
     </aside>
   );
 }
@@ -171,6 +208,7 @@ interface SelectedClusterBodyProps {
   onAddToCollection: () => void;
   onOpenBookmark: (bookmarkId: string) => void;
   onClearSelection: () => void;
+  isOverlay: boolean;
 }
 
 function SelectedClusterBody({
@@ -186,6 +224,7 @@ function SelectedClusterBody({
   onAddToCollection,
   onOpenBookmark,
   onClearSelection,
+  isOverlay,
 }: SelectedClusterBodyProps) {
   if (!node) {
     return (
@@ -215,10 +254,12 @@ function SelectedClusterBody({
           <RailMetric
             label="Total"
             value={stats.totalBookmarks.toLocaleString()}
+            isOverlay={isOverlay}
           />
           <RailMetric
             label="Loose"
             value={stats.looseBookmarks.toLocaleString()}
+            isOverlay={isOverlay}
           />
         </div>
         {connected.length > 0 && (
@@ -226,6 +267,7 @@ function SelectedClusterBody({
             title="Loose bookmarks"
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
+            isOverlay={isOverlay}
           />
         )}
       </div>
@@ -260,7 +302,8 @@ function SelectedClusterBody({
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            className="h-9 gap-1.5 bg-white text-slate-950 hover:bg-white/90"
+            variant="outline"
+            className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
             onClick={onAssign}
             disabled={!selectedBookmarkId}
           >
@@ -290,6 +333,7 @@ function SelectedClusterBody({
             title="Connected bookmarks"
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
+            isOverlay={isOverlay}
           />
         )}
       </div>
@@ -319,7 +363,8 @@ function SelectedClusterBody({
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            className="h-9 gap-1.5 bg-white text-slate-950 hover:bg-white/90"
+            variant="outline"
+            className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
             onClick={onAssign}
             disabled={!selectedBookmarkId || node.variant === "x_folder"}
             title={
@@ -356,6 +401,7 @@ function SelectedClusterBody({
             title="Connected bookmarks"
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
+            isOverlay={isOverlay}
           />
         )}
       </div>
@@ -491,10 +537,12 @@ function ConnectedList({
   title,
   nodes,
   onOpenBookmark,
+  isOverlay,
 }: {
   title: string;
   nodes: OrbitGraphNode[];
   onOpenBookmark: (bookmarkId: string) => void;
+  isOverlay: boolean;
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
   if (bookmarks.length === 0) return null;
@@ -504,7 +552,14 @@ function ConnectedList({
       <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
         {title} · {bookmarks.length}
       </p>
-      <ScrollArea className="h-40 rounded-xl border border-white/8 bg-white/[0.03]">
+      <ScrollArea
+        className={cn(
+          "h-40 rounded-xl",
+          isOverlay
+            ? "bg-white/[0.025]"
+            : "border border-white/8 bg-white/[0.03]"
+        )}
+      >
         <ul className="space-y-0.5 p-2">
           {bookmarks.slice(0, 50).map((b) =>
             b.kind === "bookmark" ? (
@@ -533,9 +588,22 @@ function ConnectedList({
   );
 }
 
-function RailMetric({ label, value }: { label: string; value: string }) {
+function RailMetric({
+  label,
+  value,
+  isOverlay,
+}: {
+  label: string;
+  value: string;
+  isOverlay: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <div
+      className={cn(
+        "rounded-xl p-3",
+        isOverlay ? "bg-white/[0.025]" : "bg-white/[0.04]"
+      )}
+    >
       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/55">
         {label}
       </p>
