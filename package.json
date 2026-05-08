@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "next dev",
+    "dev": "NODE_OPTIONS=--dns-result-order=ipv4first next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
