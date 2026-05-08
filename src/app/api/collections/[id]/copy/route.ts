@@ -16,7 +16,7 @@ export async function POST(
     where: { id: sourceId, userId: user.id },
     include: {
       items: {
-        include: { bookmark: true },
+        select: { bookmarkId: true },
         orderBy: { sortOrder: "asc" },
       },
     },

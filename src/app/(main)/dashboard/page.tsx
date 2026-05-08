@@ -413,8 +413,8 @@ function DashboardContent() {
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="app-main-scroll scrollbar-thin">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="app-main-scroll h-full overflow-x-hidden scrollbar-thin">
           <div className="sticky top-0 z-20 isolate">
             <div
               className={cn(

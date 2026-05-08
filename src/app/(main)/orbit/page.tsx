@@ -478,12 +478,6 @@ export default function OrbitPage() {
     toast.error(scan.error);
   }, [scan.error]);
 
-  useEffect(() => {
-    if (!scan.plan) {
-      setScanContextAtLastRun(null);
-    }
-  }, [scan.plan]);
-
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     startTransition(() => {
@@ -584,6 +578,11 @@ export default function OrbitPage() {
     setReviewSessionId((current) => current + 1);
     setReviewOpen(true);
   }, [scan.plan]);
+
+  const handleClearScanPlan = useCallback(() => {
+    scan.clearPlan();
+    setScanContextAtLastRun(null);
+  }, [scan]);
 
   const handleOpenBookmarkReview = useCallback((bookmarkId: string) => {
     setActiveBookmarkId(bookmarkId);
@@ -863,7 +862,7 @@ export default function OrbitPage() {
                     size="sm"
                     variant="outline"
                     className="h-9 shrink-0 border-sky-200/35 bg-sky-950/20 text-sky-100 hover:bg-sky-950/35"
-                    onClick={() => scan.clearPlan()}
+                    onClick={handleClearScanPlan}
                   >
                     Dismiss plan
                   </Button>

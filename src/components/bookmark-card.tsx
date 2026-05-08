@@ -167,6 +167,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   };
   const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isInteractive) return;
+    if (event.target !== event.currentTarget) return;
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();

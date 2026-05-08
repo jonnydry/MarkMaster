@@ -283,9 +283,9 @@ export async function GET(req: NextRequest) {
     sortField === "retweets" ||
     sortField === "replies";
 
-  const needsInMemoryMedia = mediaFilter === "images" || mediaFilter === "video";
+  const needsSqlMediaFilter = mediaFilter !== "all";
 
-  if (!needsInMemorySort && !needsInMemoryMedia) {
+  if (!needsInMemorySort && !needsSqlMediaFilter) {
     let orderBy: Prisma.BookmarkOrderByWithRelationInput;
     switch (sortField) {
       case "tweetCreatedAt":

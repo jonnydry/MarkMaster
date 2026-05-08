@@ -50,14 +50,12 @@ export async function POST(
     tweetText: item.bookmark.tweetText,
   }));
 
-  const origin = req.headers.get("origin") || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-
   const shareContent = generateShareContent(
     collection.name,
     collection.description,
     bookmarks,
     collection.shareSlug,
-    origin
+    req.nextUrl.origin
   );
 
   return NextResponse.json(shareContent);
