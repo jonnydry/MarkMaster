@@ -479,7 +479,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 title="Post from X"
               />
             </div>
-            <div className="flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto sm:opacity-0 sm:group-hover:opacity-100">
+            <div className="flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               {onAddTag && (
                 <ActionButton
                   icon={Tags}

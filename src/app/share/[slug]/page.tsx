@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   Bookmark,
@@ -17,13 +18,47 @@ import { MarkMasterLogo } from "@/components/markmaster-logo";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 
-const getPublicCollection = cache(async (slug: string) => {
+const PUBLIC_SHARE_PAGE_SIZE = 50;
+const MAX_PUBLIC_SHARE_PAGE = 200;
+
+function parsePublicSharePage(value: string | string[] | undefined) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const page = Number(rawValue);
+  if (!Number.isInteger(page) || page < 1) return 1;
+  return Math.min(page, MAX_PUBLIC_SHARE_PAGE);
+}
+
+const publicBookmarkSelect = {
+  id: true,
+  tweetId: true,
+  authorUsername: true,
+  authorDisplayName: true,
+  authorProfileImage: true,
+  tweetText: true,
+  tweetCreatedAt: true,
+  tags: {
+    select: {
+      tag: {
+        select: {
+          id: true,
+          name: true,
+          color: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.BookmarkSelect;
+
+const getPublicCollectionShell = cache(async (slug: string) => {
   return prisma.collection.findFirst({
     where: {
       shareSlug: slug,
       isPublic: true,
     },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
       user: {
         select: {
           username: true,
@@ -31,17 +66,81 @@ const getPublicCollection = cache(async (slug: string) => {
           profileImageUrl: true,
         },
       },
-      items: {
-        include: {
-          bookmark: {
-            include: { tags: { include: { tag: true } } },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
+      _count: {
+        select: { items: true },
       },
     },
   });
 });
+
+const getPublicCollectionStats = cache(async (collectionId: string) => {
+  const [authorRows, tagRows] = await Promise.all([
+    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(DISTINCT b."authorUsername")::bigint AS count
+      FROM "CollectionItem" ci
+      INNER JOIN "Bookmark" b ON b."id" = ci."bookmarkId"
+      WHERE ci."collectionId" = ${collectionId}
+    `),
+    prisma.$queryRaw<
+      { id: string; name: string; color: string; count: bigint }[]
+    >(Prisma.sql`
+      SELECT t."id", t."name", t."color", COUNT(*)::bigint AS count
+      FROM "CollectionItem" ci
+      INNER JOIN "BookmarkTag" bt ON bt."bookmarkId" = ci."bookmarkId"
+      INNER JOIN "Tag" t ON t."id" = bt."tagId"
+      WHERE ci."collectionId" = ${collectionId}
+      GROUP BY t."id", t."name", t."color"
+      ORDER BY count DESC, t."name" ASC
+      LIMIT 6
+    `),
+  ]);
+
+  return {
+    authorCount: Number(authorRows[0]?.count ?? 0),
+    topTags: tagRows.map((tag) => ({
+      ...tag,
+      count: Number(tag.count),
+    })),
+  };
+});
+
+async function getPublicCollectionPage(slug: string, requestedPage: number) {
+  const collection = await getPublicCollectionShell(slug);
+  if (!collection) return null;
+
+  const totalItems = collection._count.items;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PUBLIC_SHARE_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+
+  const [stats, items] = await Promise.all([
+    getPublicCollectionStats(collection.id),
+    prisma.collectionItem.findMany({
+      where: { collectionId: collection.id },
+      select: {
+        id: true,
+        bookmark: {
+          select: publicBookmarkSelect,
+        },
+      },
+      orderBy: { sortOrder: "asc" },
+      skip: (page - 1) * PUBLIC_SHARE_PAGE_SIZE,
+      take: PUBLIC_SHARE_PAGE_SIZE,
+    }),
+  ]);
+
+  return {
+    ...collection,
+    ...stats,
+    items,
+    pagination: {
+      page,
+      totalPages,
+      totalItems,
+      hasPrevious: page > 1,
+      hasNext: page < totalPages,
+    },
+  };
+}
 
 export async function generateMetadata({
   params,
@@ -49,7 +148,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const collection = await getPublicCollection(slug);
+  const collection = await getPublicCollectionShell(slug);
 
   if (!collection) {
     return {
@@ -63,7 +162,7 @@ export async function generateMetadata({
 
   const description =
     collection.description ||
-    `Public MarkMaster collection from ${collection.user.displayName} with ${collection.items.length} bookmarks.`;
+    `Public MarkMaster collection from ${collection.user.displayName} with ${collection._count.items} bookmarks.`;
   const title = `${collection.name} | MarkMaster`;
 
   return {
@@ -84,37 +183,22 @@ export async function generateMetadata({
 
 export default async function PublicSharePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ page?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const query = await searchParams;
+  const requestedPage = parsePublicSharePage(query?.page);
 
-  const collection = await getPublicCollection(slug);
+  const collection = await getPublicCollectionPage(slug, requestedPage);
 
   if (!collection) {
     notFound();
   }
 
-  const topTags = Array.from(
-    collection.items
-      .flatMap((item) => item.bookmark.tags.map(({ tag }) => tag))
-      .reduce((acc, tag) => {
-        const current = acc.get(tag.id);
-        acc.set(tag.id, {
-          id: tag.id,
-          name: tag.name,
-          color: tag.color,
-          count: (current?.count ?? 0) + 1,
-        });
-        return acc;
-      }, new Map<string, { id: string; name: string; color: string; count: number }>())
-      .values()
-  )
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-  const authorCount = new Set(
-    collection.items.map((item) => item.bookmark.authorUsername)
-  ).size;
+  const { pagination, topTags, authorCount } = collection;
 
   return (
     <div className="app-min-viewport bg-background">
@@ -177,21 +261,21 @@ export default async function PublicSharePage({
           </div>
 
           <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            <ShareStat
-              icon={Bookmark}
-              label="Bookmarks"
-              value={collection.items.length.toLocaleString()}
-            />
+              <ShareStat
+                icon={Bookmark}
+                label="Bookmarks"
+                value={pagination.totalItems.toLocaleString()}
+              />
             <ShareStat
               icon={Users}
               label="Authors"
               value={authorCount.toLocaleString()}
             />
-            <ShareStat
-              icon={TagIcon}
-              label="Tags"
-              value={topTags.length.toLocaleString()}
-            />
+              <ShareStat
+                icon={TagIcon}
+                label="Top tags"
+                value={topTags.length.toLocaleString()}
+              />
           </div>
 
           {topTags.length > 0 ? (
@@ -290,6 +374,16 @@ export default async function PublicSharePage({
             );
           })}
         </div>
+
+        {pagination.totalPages > 1 ? (
+          <SharePagination
+            slug={slug}
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            hasPrevious={pagination.hasPrevious}
+            hasNext={pagination.hasNext}
+          />
+        ) : null}
       </main>
 
       <footer className="border-t border-border py-8 px-6 mt-12">
@@ -316,7 +410,7 @@ function ShareStat({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-secondary/50 px-3 py-2.5">
+    <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="size-3.5" aria-hidden />
         {label}
@@ -325,5 +419,52 @@ function ShareStat({
         {value}
       </p>
     </div>
+  );
+}
+
+function SharePagination({
+  slug,
+  page,
+  totalPages,
+  hasPrevious,
+  hasNext,
+}: {
+  slug: string;
+  page: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}) {
+  return (
+    <nav
+      aria-label="Shared collection pagination"
+      className="mt-6 flex items-center justify-between border-t border-border pt-4"
+    >
+      {hasPrevious ? (
+        <Link
+          href={`/share/${slug}?page=${page - 1}`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Previous
+        </Link>
+      ) : (
+        <span aria-hidden className="h-9 w-20" />
+      )}
+
+      <span className="text-xs text-muted-foreground">
+        Page {page.toLocaleString()} of {totalPages.toLocaleString()}
+      </span>
+
+      {hasNext ? (
+        <Link
+          href={`/share/${slug}?page=${page + 1}`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Next
+        </Link>
+      ) : (
+        <span aria-hidden className="h-9 w-20" />
+      )}
+    </nav>
   );
 }

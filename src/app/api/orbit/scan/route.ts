@@ -92,12 +92,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
+    console.error("[orbit] scan failed unexpectedly:", error);
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Orbit scan failed unexpectedly.",
+        error: "Orbit scan failed unexpectedly.",
       },
       { status: 500 }
     );

@@ -481,7 +481,7 @@ export default function CollectionDetailPage({
                 )}
               >
                 {!isSyncedFromX && (
-                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 sm:px-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 sm:px-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                     <Button
                       type="button"
                       variant="ghost"

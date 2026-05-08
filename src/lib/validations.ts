@@ -1,17 +1,78 @@
 import { z } from "zod";
 
+export const MAX_BOOKMARK_TARGETS = 100;
+export const MAX_REORDER_ITEMS = 500;
+export const MAX_BOOKMARK_QUERY_PAGE = 500;
+export const MAX_BOOKMARK_QUERY_LENGTH = 240;
+export const MAX_BOOKMARK_FILTER_LENGTH = 120;
+export const MAX_TAG_FILTER_IDS = 100;
+
 const booleanQueryFlagSchema = z
   .enum(["true", "false"])
   .default("false")
   .transform((value) => value === "true");
 
+const idSchema = z.string().trim().min(1, "ID is required").max(128, "ID is too long");
+
 const bookmarkIdsSchema = z
-  .array(z.string().min(1, "Bookmark ID is required"))
-  .min(1, "At least one bookmark is required");
+  .array(idSchema)
+  .min(1, "At least one bookmark is required")
+  .max(MAX_BOOKMARK_TARGETS, `At most ${MAX_BOOKMARK_TARGETS} bookmarks are allowed`)
+  .transform((ids) => Array.from(new Set(ids)));
+
+function isValidDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function getDateOnlyTime(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+const dateOnlySchema = z
+  .string()
+  .trim()
+  .refine(isValidDateOnly, "Date must use YYYY-MM-DD format");
+
+const tagFilterSchema = z
+  .string()
+  .trim()
+  .max(4096, "Tag filter is too long")
+  .default("")
+  .superRefine((value, ctx) => {
+    if (!value) return;
+
+    const ids = value.split(",").map((id) => id.trim()).filter(Boolean);
+    if (ids.length > MAX_TAG_FILTER_IDS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `At most ${MAX_TAG_FILTER_IDS} tags can be filtered at once`,
+      });
+    }
+
+    if (ids.some((id) => id.length > 128)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Tag filter contains an ID that is too long",
+      });
+    }
+  });
 
 const bookmarkTargetSchema = z
   .object({
-    bookmarkId: z.string().min(1, "Bookmark ID is required").optional(),
+    bookmarkId: idSchema.optional(),
     bookmarkIds: bookmarkIdsSchema.optional(),
   })
   .refine((value) => value.bookmarkId || value.bookmarkIds?.length, {
@@ -25,18 +86,18 @@ export const createTagSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format")
     .optional(),
-  bookmarkId: z.string().min(1).optional(),
+  bookmarkId: idSchema.optional(),
   bookmarkIds: bookmarkIdsSchema.optional(),
 });
 
 export const deleteTagSchema = z.object({
-  tagId: z.string().min(1, "Tag ID is required"),
-  bookmarkId: z.string().min(1).optional(),
+  tagId: idSchema,
+  bookmarkId: idSchema.optional(),
   bookmarkIds: bookmarkIdsSchema.optional(),
 });
 
 export const patchTagSchema = z.object({
-  tagId: z.string().min(1, "Tag ID is required"),
+  tagId: idSchema,
   name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long").optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format").optional(),
 }).refine((value) => value.name || value.color, {
@@ -45,12 +106,12 @@ export const patchTagSchema = z.object({
 });
 
 export const createNoteSchema = z.object({
-  bookmarkId: z.string().min(1, "Bookmark ID is required"),
+  bookmarkId: idSchema,
   content: z.string().min(1, "Content is required").max(10000, "Note too long"),
 });
 
 export const deleteNoteSchema = z.object({
-  noteId: z.string().min(1, "Note ID is required"),
+  noteId: idSchema,
 });
 
 export const createCollectionSchema = z.object({
@@ -72,33 +133,59 @@ export const deleteCollectionItemSchema = bookmarkTargetSchema;
 export const reorderCollectionItemsSchema = z.object({
   items: z.array(
     z.object({
-      bookmarkId: z.string().min(1),
-      sortOrder: z.number().int().min(0),
+      bookmarkId: idSchema,
+      sortOrder: z.number().int().min(0).max(10000),
     })
-  ).min(1, "Items array is required"),
+  )
+    .min(1, "Items array is required")
+    .max(MAX_REORDER_ITEMS, `At most ${MAX_REORDER_ITEMS} items can be reordered at once`),
+}).superRefine((value, ctx) => {
+  const seen = new Set<string>();
+  for (const [index, item] of value.items.entries()) {
+    if (seen.has(item.bookmarkId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["items", index, "bookmarkId"],
+        message: "Duplicate bookmark ID in reorder request",
+      });
+    }
+    seen.add(item.bookmarkId);
+  }
 });
 
 export const deleteBookmarkSchema = bookmarkTargetSchema;
 
 export const bookmarksQuerySchema = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
+    page: z.coerce.number().int().min(1).max(MAX_BOOKMARK_QUERY_PAGE).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
-    search: z.string().default(""),
+    search: z.string().trim().max(MAX_BOOKMARK_QUERY_LENGTH).default(""),
     sortField: z
       .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "authorUsername"])
       .default("bookmarkedAt"),
     sortDirection: z.enum(["asc", "desc"]).default("desc"),
     mediaFilter: z.enum(["all", "images", "video", "links", "text-only"]).default("all"),
-    authorFilter: z.string().default(""),
-    tagFilter: z.string().default(""),
-    dateFrom: z.string().optional(),
-    dateTo: z.string().optional(),
-    bookmarkId: z.string().optional(),
-    collectionId: z.string().optional(),
+    authorFilter: z.string().trim().max(MAX_BOOKMARK_FILTER_LENGTH).default(""),
+    tagFilter: tagFilterSchema,
+    dateFrom: dateOnlySchema.optional(),
+    dateTo: dateOnlySchema.optional(),
+    bookmarkId: idSchema.optional(),
+    collectionId: idSchema.optional(),
     unaffiliated: booleanQueryFlagSchema,
   })
   .superRefine((value, ctx) => {
+    if (
+      value.dateFrom &&
+      value.dateTo &&
+      getDateOnlyTime(value.dateFrom) > getDateOnlyTime(value.dateTo)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dateTo"],
+        message: "dateTo must be on or after dateFrom",
+      });
+    }
+
     if (!value.unaffiliated) return;
 
     const hasTagFilter = value.tagFilter.split(",").some((id) => id.trim().length > 0);

@@ -223,7 +223,9 @@ export async function GET(req: NextRequest) {
     unaffiliated,
   } = parsed.data;
 
-  const tagIds = tagFilter ? tagFilter.split(",").filter(Boolean) : [];
+  const tagIds = tagFilter
+    ? tagFilter.split(",").map((id) => id.trim()).filter(Boolean)
+    : [];
   const searchTerms = tokenizeBookmarkSearch(search);
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };

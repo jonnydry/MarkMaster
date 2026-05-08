@@ -89,11 +89,8 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function Providers({
   children,
-  session,
 }: {
   children: React.ReactNode;
-  /** From `auth()` in the root layout so client `useSession` matches SSR and avoids hydration mismatches. */
-  session: Session | null;
 }) {
   const [queryClient] = useState(
     () =>
@@ -105,14 +102,26 @@ export function Providers({
   );
 
   return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>{children}</ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+export function AuthSessionProvider({
+  children,
+  session,
+}: {
+  children: React.ReactNode;
+  session: Session | null;
+}) {
+  return (
     <SessionProvider
       session={session ?? null}
       refetchOnWindowFocus={false}
       refetchWhenOffline={false}
     >
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>{children}</ThemeProvider>
-      </QueryClientProvider>
+      {children}
     </SessionProvider>
   );
 }

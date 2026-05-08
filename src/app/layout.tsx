@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { auth } from "@/lib/auth";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,8 +31,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = (await auth()) ?? null;
-
   return (
     <html
       lang="en"
@@ -48,7 +45,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <Providers session={session}>
+        <Providers>
           {children}
           <Toaster />
         </Providers>

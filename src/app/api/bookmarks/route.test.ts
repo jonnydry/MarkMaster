@@ -58,4 +58,23 @@ describe("/api/bookmarks", () => {
       expect(prisma.bookmark.count).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    "dateFrom=2026-02-31",
+    "dateFrom=2026-05-02&dateTo=2026-05-01",
+    "page=501",
+    `search=${"x".repeat(241)}`,
+  ])("rejects invalid or expensive query parameters: %s", async (query) => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    const response = await GET(
+      new NextRequest(`http://localhost/api/bookmarks?${query}`)
+    );
+
+    expect(response.status).toBe(400);
+    expect(prisma.bookmark.findMany).not.toHaveBeenCalled();
+    expect(prisma.bookmark.count).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
 });

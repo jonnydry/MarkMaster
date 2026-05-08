@@ -176,19 +176,50 @@ export async function PATCH(
     );
   }
 
-  await prisma.$transaction(
-    parsed.data.items.map((item) =>
-      prisma.collectionItem.update({
-        where: {
-          collectionId_bookmarkId: {
-            collectionId,
-            bookmarkId: item.bookmarkId,
+  const reorderResult = await prisma.$transaction(async (tx) => {
+    const existingItems = await tx.collectionItem.findMany({
+      where: {
+        collectionId,
+        bookmarkId: { in: parsed.data.items.map((item) => item.bookmarkId) },
+      },
+      select: { bookmarkId: true },
+    });
+
+    const existingIds = new Set(existingItems.map((item) => item.bookmarkId));
+    const missingIds = parsed.data.items
+      .map((item) => item.bookmarkId)
+      .filter((id) => !existingIds.has(id));
+
+    if (missingIds.length > 0) {
+      return { missingIds } as const;
+    }
+
+    await Promise.all(
+      parsed.data.items.map((item) =>
+        tx.collectionItem.update({
+          where: {
+            collectionId_bookmarkId: {
+              collectionId,
+              bookmarkId: item.bookmarkId,
+            },
           },
-        },
-        data: { sortOrder: item.sortOrder },
-      })
-    )
-  );
+          data: { sortOrder: item.sortOrder },
+        })
+      )
+    );
+
+    return { missingIds: [] } as const;
+  });
+
+  if (reorderResult.missingIds.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Reorder request includes bookmarks that are not in this collection.",
+        missingIds: reorderResult.missingIds,
+      },
+      { status: 400 }
+    );
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDbUser } from "@/lib/auth";
 import { syncBookmarks } from "@/lib/sync";
-import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { getRetryAfterSeconds, getSyncRetryUntil } from "@/lib/sync-throttle";
 
 const STALE_SYNC_WINDOW_MS = 30 * 60 * 1000;
 
@@ -22,6 +23,8 @@ const syncRunSelect = {
   completedAt: true,
 } as const;
 
+type SyncRunSnapshot = Prisma.SyncRunGetPayload<{ select: typeof syncRunSelect }>;
+
 async function expireStaleSyncRuns(userId: string) {
   await prisma.syncRun.updateMany({
     where: {
@@ -37,6 +40,25 @@ async function expireStaleSyncRuns(userId: string) {
       errorMessage: "Sync did not finish.",
     },
   });
+}
+
+function syncCooldownResponse(
+  retryUntil: Date,
+  latestRun: SyncRunSnapshot
+) {
+  return NextResponse.json(
+    {
+      error: "Sync is cooling down. Please try again shortly.",
+      retryUntil: retryUntil.toISOString(),
+      latestRun,
+    },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": getRetryAfterSeconds(retryUntil).toString(),
+      },
+    }
+  );
 }
 
 export async function GET() {
@@ -70,29 +92,23 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rate = checkRateLimit(`sync:${user.id}`);
-  if (!rate.allowed) {
-    return rateLimitResponse(rate.resetAt);
-  }
-
-  // Check for a resume token from the most recent rate-limited/paused sync
-  const lastRun = await prisma.syncRun.findFirst({
-    where: {
-      userId: user.id,
-      status: { in: ["COMPLETED", "RATE_LIMITED"] },
-      resumeToken: { not: null },
-    },
-    orderBy: { startedAt: "desc" },
-    select: { resumeToken: true },
-  });
-
-  const resumeToken = lastRun?.resumeToken ?? undefined;
-
   const syncRun = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`
-      UPDATE "SyncRun" SET status = 'FAILED', "completedAt" = NOW(), "errorMessage" = 'Superseded by new sync'
-      WHERE "userId" = ${user.id} AND status = 'RUNNING' AND "startedAt" < NOW() - INTERVAL '5 minutes'
-    `;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`sync:${user.id}`}))`;
+
+    await tx.syncRun.updateMany({
+      where: {
+        userId: user.id,
+        status: "RUNNING",
+        startedAt: {
+          lt: new Date(Date.now() - STALE_SYNC_WINDOW_MS),
+        },
+      },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        errorMessage: "Sync did not finish.",
+      },
+    });
 
     const running = await tx.syncRun.findFirst({
       where: { userId: user.id, status: "RUNNING" },
@@ -103,7 +119,39 @@ export async function POST() {
       return { conflict: running } as const;
     }
 
-    return { created: await tx.syncRun.create({ data: { userId: user.id }, select: { id: true } }) } as const;
+    const latestRun = await tx.syncRun.findFirst({
+      where: { userId: user.id, status: { in: ["COMPLETED", "RATE_LIMITED"] } },
+      orderBy: { startedAt: "desc" },
+      select: syncRunSelect,
+    });
+
+    if (latestRun) {
+      const retryUntil = getSyncRetryUntil(latestRun);
+      if (retryUntil) {
+        return { cooldown: { retryUntil, latestRun } } as const;
+      }
+    }
+
+    const resumeRun =
+      latestRun?.resumeToken
+        ? latestRun
+        : await tx.syncRun.findFirst({
+            where: {
+              userId: user.id,
+              status: { in: ["COMPLETED", "RATE_LIMITED"] },
+              resumeToken: { not: null },
+            },
+            orderBy: { startedAt: "desc" },
+            select: syncRunSelect,
+          });
+
+    return {
+      created: await tx.syncRun.create({
+        data: { userId: user.id },
+        select: { id: true },
+      }),
+      resumeToken: resumeRun?.resumeToken ?? undefined,
+    } as const;
   });
 
   if ("conflict" in syncRun && syncRun.conflict) {
@@ -113,7 +161,15 @@ export async function POST() {
     );
   }
 
+  if ("cooldown" in syncRun && syncRun.cooldown) {
+    return syncCooldownResponse(
+      syncRun.cooldown.retryUntil,
+      syncRun.cooldown.latestRun
+    );
+  }
+
   const effectiveId = "created" in syncRun ? syncRun.created.id : "";
+  const resumeToken = "resumeToken" in syncRun ? syncRun.resumeToken : undefined;
 
   try {
     const result = await syncBookmarks(user.id, resumeToken);
