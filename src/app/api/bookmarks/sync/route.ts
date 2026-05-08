@@ -93,7 +93,7 @@ export async function POST() {
   }
 
   const syncRun = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`sync:${user.id}`}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sync:${user.id}`}))`;
 
     await tx.syncRun.updateMany({
       where: {

@@ -17,6 +17,9 @@ const MAX_PAGES_PER_SYNC = 10;
 /** Delay in ms between API pages to stay under X rate limits (~180 req/15min). */
 const PAGE_THROTTLE_MS = 5_000;
 
+/** Keep serverless/Postgres poolers from getting a burst of hundreds of updates. */
+const BOOKMARK_UPDATE_BATCH_SIZE = 10;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -70,6 +73,35 @@ function buildBookmarkUpdateData(data: BookmarkData) {
     tweetCreatedAt: new Date(data.tweet.created_at),
     syncedAt: new Date(),
   };
+}
+
+type BookmarkSyncEntry = {
+  tweetId: string;
+  data: BookmarkData;
+};
+
+async function updateBookmarksInBatches(
+  userId: string,
+  entries: BookmarkSyncEntry[]
+) {
+  let updated = 0;
+
+  for (let i = 0; i < entries.length; i += BOOKMARK_UPDATE_BATCH_SIZE) {
+    const batch = entries.slice(i, i + BOOKMARK_UPDATE_BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map((entry) => {
+        const bookmarkData = buildBookmarkUpdateData(entry.data);
+        return prisma.bookmark.updateMany({
+          where: { userId, tweetId: entry.tweetId },
+          data: bookmarkData,
+        });
+      })
+    );
+
+    updated += results.reduce((sum, result) => sum + result.count, 0);
+  }
+
+  return updated;
 }
 
 async function syncFolderCollection(
@@ -283,16 +315,10 @@ export async function syncBookmarks(userId: string, resumeToken?: string): Promi
           result.totalFetched += newBookmarks.length;
         }
 
-        const updateResults = await Promise.all(
-          updateBookmarks.map((entry) => {
-            const bookmarkData = buildBookmarkUpdateData(entry.data);
-            return prisma.bookmark.updateMany({
-              where: { userId, tweetId: entry.tweetId },
-              data: bookmarkData,
-            });
-          })
+        result.updatedBookmarks += await updateBookmarksInBatches(
+          userId,
+          updateBookmarks
         );
-        result.updatedBookmarks += updateResults.reduce((sum, r) => sum + r.count, 0);
         result.hitExisting = updateBookmarks.length > 0;
         result.totalFetched += updateBookmarks.length;
       }
@@ -404,16 +430,10 @@ export async function syncBookmarks(userId: string, resumeToken?: string): Promi
           result.totalFetched += folderNewBookmarks.length;
         }
 
-        const folderUpdateResults = await Promise.all(
-          folderUpdateBookmarks.map((entry) => {
-            const bookmarkData = buildBookmarkUpdateData(entry.data);
-            return prisma.bookmark.updateMany({
-              where: { userId, tweetId: entry.tweetId },
-              data: bookmarkData,
-            });
-          })
+        result.updatedBookmarks += await updateBookmarksInBatches(
+          userId,
+          folderUpdateBookmarks
         );
-        result.updatedBookmarks += folderUpdateResults.reduce((sum, r) => sum + r.count, 0);
         result.totalFetched += folderUpdateBookmarks.length;
 
         await syncFolderCollection(userId, folder, folderTweetIds);
