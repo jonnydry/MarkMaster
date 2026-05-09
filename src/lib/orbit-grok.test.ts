@@ -5,7 +5,90 @@ import {
   extractXaiResponsesOutputText,
   normalizeOrbitScanPlan,
   orbitScanPlanSchema,
+  parseXaiOrbitScanPlanJson,
 } from "@/lib/orbit-grok";
+
+describe("parseXaiOrbitScanPlanJson", () => {
+  it("accepts recoverable provider drift so normalization can repair it", () => {
+    const longReason = "Grok sometimes writes a longer rationale. ".repeat(8);
+    const raw = {
+      overview: {
+        summary: "Provider pass",
+        taggingStrategy: "Reuse clear tags",
+        collectionStrategy: "Only clear homes",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "HIGH",
+          reasoning: longReason,
+          tags: [
+            {
+              name: "AI",
+              color: "blue",
+              reason: longReason,
+              reuseExisting: "false",
+            },
+          ],
+          collection: null,
+        },
+      ],
+    };
+
+    expect(orbitScanPlanSchema.safeParse(raw).success).toBe(false);
+
+    const parsed = parseXaiOrbitScanPlanJson(raw);
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0]).toMatchObject({
+      bookmarkId: "b1",
+      confidence: "high",
+      tags: [
+        {
+          name: "AI",
+          reuseExisting: false,
+        },
+      ],
+      collection: null,
+    });
+    expect(normalized.suggestions[0].tags[0].color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(normalized.suggestions[0].reasoning.length).toBeLessThanOrEqual(240);
+    expect(normalized.suggestions[0].tags[0].reason.length).toBeLessThanOrEqual(
+      180
+    );
+  });
+
+  it("unwraps common scan plan envelopes from provider output", () => {
+    const parsed = parseXaiOrbitScanPlanJson({
+      plan: {
+        overview: {
+          summary: "Wrapped pass",
+          taggingStrategy: "Use topics",
+          collectionStrategy: "No collections",
+        },
+        suggestions: [
+          {
+            bookmarkId: "b1",
+            confidence: "medium",
+            reasoning: "Topic is inferable.",
+            tags: [],
+            collection: null,
+          },
+        ],
+      },
+    });
+
+    expect(parsed.suggestions).toHaveLength(1);
+    expect(parsed.suggestions[0]).toMatchObject({
+      bookmarkId: "b1",
+      confidence: "medium",
+    });
+  });
+});
 
 describe("normalizeOrbitScanPlan", () => {
   it("reuses existing tag and collection names and fills missing bookmarks", () => {

@@ -184,6 +184,70 @@ export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
 
 type OrbitScanPlan = z.infer<typeof orbitScanPlanSchema>;
 
+const looseStringSchema = z.preprocess((value) => {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+}, z.string());
+
+const looseBooleanSchema = z.preprocess((value) => {
+  if (value === true || value === 1) return true;
+  if (typeof value === "string") return value.trim().toLowerCase() === "true";
+  return false;
+}, z.boolean());
+
+const looseConfidenceSchema = z.preprocess((value) => {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return normalized === "high" || normalized === "medium" || normalized === "low"
+    ? normalized
+    : "low";
+}, orbitConfidenceSchema);
+
+const looseOrbitTagSuggestionSchema = z.object({
+  name: looseStringSchema,
+  color: looseStringSchema,
+  reason: looseStringSchema,
+  reuseExisting: looseBooleanSchema,
+});
+
+const looseOrbitCollectionSuggestionSchema = z.object({
+  name: looseStringSchema,
+  description: looseStringSchema,
+  reason: looseStringSchema,
+  reuseExisting: looseBooleanSchema,
+});
+
+const looseOrbitScanOverviewSchema = z.preprocess(
+  (value) => (value && typeof value === "object" ? value : {}),
+  z.object({
+    summary: looseStringSchema,
+    taggingStrategy: looseStringSchema,
+    collectionStrategy: looseStringSchema,
+  })
+);
+
+const looseOrbitBookmarkSuggestionSchema = z.object({
+  bookmarkId: looseStringSchema,
+  confidence: looseConfidenceSchema,
+  reasoning: looseStringSchema,
+  tags: z.preprocess(
+    (value) => (Array.isArray(value) ? value : []),
+    z.array(looseOrbitTagSuggestionSchema)
+  ),
+  collection: z.preprocess(
+    (value) => (value && typeof value === "object" ? value : null),
+    z.union([looseOrbitCollectionSuggestionSchema, z.null()])
+  ),
+});
+
+const looseOrbitScanPlanSchema = z.object({
+  overview: looseOrbitScanOverviewSchema,
+  suggestions: z.array(looseOrbitBookmarkSuggestionSchema),
+});
+
 const ORBIT_SCAN_PLAN_JSON_SCHEMA = {
   type: "object",
   properties: {
@@ -567,6 +631,55 @@ function buildOrbitSystemPrompt() {
   ].join(" ");
 }
 
+function unwrapOrbitScanPlanJson(value: unknown) {
+  if (!value || typeof value !== "object") return value;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ["plan", "scanPlan", "orbitScanPlan", "orbit_scan_plan"]) {
+    const candidate = record[key];
+    if (candidate && typeof candidate === "object") {
+      const nested = candidate as Record<string, unknown>;
+      if ("suggestions" in nested || "overview" in nested) {
+        return candidate;
+      }
+    }
+  }
+
+  return value;
+}
+
+function formatZodIssues(error: z.ZodError) {
+  return error.issues
+    .slice(0, 8)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "<root>";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
+}
+
+export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlan {
+  const candidate = unwrapOrbitScanPlanJson(parsedJson);
+  const parsedPlan = orbitScanPlanSchema.safeParse(candidate);
+  if (parsedPlan.success) {
+    return parsedPlan.data;
+  }
+
+  const parsedLoosePlan = looseOrbitScanPlanSchema.safeParse(candidate);
+  if (parsedLoosePlan.success) {
+    return parsedLoosePlan.data;
+  }
+
+  console.warn(
+    "[orbit] xAI scan plan failed schema validation:",
+    formatZodIssues(parsedPlan.error),
+    "loose:",
+    formatZodIssues(parsedLoosePlan.error)
+  );
+
+  throw new OrbitGrokError("xAI returned a scan plan in an unexpected format.", 502);
+}
+
 /** Parses xAI Responses API JSON bodies (message / output_text shape). Exported for tests. */
 export function extractXaiResponsesOutputText(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -929,12 +1042,8 @@ export async function scanOrbitBookmarksWithXai(args: {
     throw new OrbitGrokError("xAI returned invalid JSON for the Orbit scan.", 502);
   }
 
-  const parsedPlan = orbitScanPlanSchema.safeParse(parsedJson);
-  if (!parsedPlan.success) {
-    throw new OrbitGrokError("xAI returned a scan plan in an unexpected format.", 502);
-  }
-
-  const plan = normalizeOrbitScanPlan(parsedPlan.data, {
+  const rawPlan = parseXaiOrbitScanPlanJson(parsedJson);
+  const plan = normalizeOrbitScanPlan(rawPlan, {
     bookmarkIds: args.bookmarks.map((bookmark) => bookmark.id),
     existingTags: args.existingTags,
     existingCollections: args.existingCollections,
