@@ -751,7 +751,7 @@ export default function OrbitPage() {
 
           <div className="space-y-4 px-4 pb-6 pt-3 sm:px-5">
             <section className={cn(bookmarkFeedColumnClassName, "pt-1")}>
-              <div className="flex flex-col gap-4 border-b border-hairline-soft pb-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-4 border-b border-hairline-soft pb-4">
                 <div className="min-w-0">
                   <h1 className="text-base font-semibold text-foreground">
                     Categorize unsorted bookmarks
@@ -771,7 +771,7 @@ export default function OrbitPage() {
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2">
                   <Button
                     size="sm"
                     className="h-9 rounded-lg border-white/80 bg-foreground px-3 text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
@@ -831,7 +831,7 @@ export default function OrbitPage() {
                         ? `/orbit/map?focus=${resolvedActiveBookmarkId}`
                         : "/orbit/map"
                     }
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-white/[0.045] px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+                    className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-white/15 bg-white/[0.045] px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
                   >
                     <MapIcon className="size-4 text-sky-200" aria-hidden />
                     Open graph
