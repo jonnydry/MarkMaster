@@ -160,7 +160,9 @@ function buildSlowPathWhereSql({
       NOT EXISTS (
         SELECT 1
         FROM "CollectionItem" ci
+        INNER JOIN "Collection" c ON c."id" = ci."collectionId"
         WHERE ci."bookmarkId" = b."id"
+          AND c."type" = 'user_collection'::"CollectionType"
       )
     `);
   }
@@ -266,7 +268,11 @@ export async function GET(req: NextRequest) {
 
   if (unaffiliated) {
     relationFilters.push({ tags: { none: {} } });
-    relationFilters.push({ collectionItems: { none: {} } });
+    relationFilters.push({
+      collectionItems: {
+        none: { collection: { type: "user_collection" } },
+      },
+    });
   }
 
   if (relationFilters.length > 0) {

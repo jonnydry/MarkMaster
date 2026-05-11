@@ -37,6 +37,73 @@ describe("/api/bookmarks", () => {
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
+  it("keeps X-folder-only bookmarks in the unaffiliated fast path", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/bookmarks?unaffiliated=true")
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.bookmark.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { tags: { none: {} } },
+            {
+              collectionItems: {
+                none: { collection: { type: "user_collection" } },
+              },
+            },
+          ]),
+        }),
+      })
+    );
+    expect(prisma.bookmark.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              collectionItems: {
+                none: { collection: { type: "user_collection" } },
+              },
+            },
+          ]),
+        }),
+      })
+    );
+  });
+
+  it("keeps X-folder-only bookmarks in the unaffiliated SQL media path", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.$queryRaw)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ count: 0n }]);
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost/api/bookmarks?unaffiliated=true&mediaFilter=images"
+      )
+    );
+
+    const pageQuery = vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as
+      | { strings?: readonly string[] }
+      | undefined;
+    const sql = pageQuery?.strings?.join(" ") ?? "";
+
+    expect(response.status).toBe(200);
+    expect(sql).toContain('INNER JOIN "Collection" c ON c."id" = ci."collectionId"');
+    expect(sql).toContain(
+      'c."type" = \'user_collection\'::"CollectionType"'
+    );
+  });
+
   it.each(["images", "video", "links", "text-only"] as const)(
     "uses SQL media predicates for %s filters",
     async (mediaFilter) => {

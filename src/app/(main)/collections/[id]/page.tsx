@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { toast } from "sonner";
+import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import {
@@ -115,7 +116,7 @@ export default function CollectionDetailPage({
   const handleCopyAsCollection = async () => {
     if (!collection) return;
     try {
-      await sendJson(`/api/collections/${id}/copy`, { method: "POST" });
+      await copyCollectionAsUserCollection(id, queryClient);
       toast.success("Copied as a new collection");
       router.push("/collections");
     } catch (error) {

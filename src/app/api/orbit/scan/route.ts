@@ -10,6 +10,17 @@ import {
 
 const orbitScanBookmarkInclude = {
   notes: { select: { id: true, content: true } },
+  collectionItems: {
+    select: {
+      collection: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+  },
 } as const;
 
 export async function POST(req: NextRequest) {
@@ -71,8 +82,19 @@ export async function POST(req: NextRequest) {
           (bookmarkOrder.get(b.id) ?? Number.POSITIVE_INFINITY)
       );
 
+      const bookmarksWithFolderHints = bookmarks.map(
+        ({ collectionItems, ...bookmark }) => ({
+          ...bookmark,
+          xFolderHints: collectionItems.flatMap(({ collection }) =>
+            collection.type === "x_folder"
+              ? [{ id: collection.id, name: collection.name }]
+              : []
+          ),
+        })
+      );
+
       const scan = await scanOrbitBookmarksWithXai({
-        bookmarks,
+        bookmarks: bookmarksWithFolderHints,
         existingTags: tags,
         existingCollections: collections,
       });

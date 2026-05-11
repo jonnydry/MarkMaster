@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildOrbitPromptPayload,
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
   extractXaiResponsesOutputText,
@@ -408,6 +409,90 @@ describe("normalizeOrbitScanPlan", () => {
         reuseExisting: true,
       },
     ]);
+    expect(normalized.suggestions[2].tags).toEqual([
+      {
+        name: "Garden Ideas",
+        color: expect.stringMatching(/^#[0-9a-f]{6}$/),
+        reason: "Singleton theme",
+        reuseExisting: false,
+      },
+    ]);
+  });
+
+  it("does not salvage low-confidence generic collection labels as tags", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Weak pass",
+        taggingStrategy: "Only clear topics",
+        collectionStrategy: "Avoid generic homes",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "low",
+          reasoning: "No clear topic.",
+          tags: [],
+          collection: {
+            name: "Interesting Posts",
+            description: "Interesting saved posts.",
+            reason: "Generic collection.",
+            reuseExisting: false,
+          },
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0]).toMatchObject({
+      tags: [],
+      collection: null,
+    });
+  });
+});
+
+describe("buildOrbitPromptPayload", () => {
+  it("includes synced X folder names as source-folder hints", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "Sparse note about a benchmark paper.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+          xFolderHints: [
+            { id: "folder-1", name: "AI Papers" },
+            { id: "folder-duplicate", name: " ai papers " },
+          ],
+        },
+      ],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(payload.signalPriority).toEqual(
+      expect.arrayContaining([expect.stringContaining("sourceFolders")])
+    );
+    expect(payload.collectionRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("read-only X folders")])
+    );
+    expect(payload.bookmarks[0]).toMatchObject({
+      id: "b1",
+      sourceFolders: [{ name: "AI Papers" }],
+    });
   });
 });
 

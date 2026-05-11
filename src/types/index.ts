@@ -111,6 +111,7 @@ export interface AnalyticsData {
   totalCollections: number;
   untaggedCount: number;
   untaggedOldestAt: string | null;
+  orbitQueueCount: number;
   notedCount: number;
   last30dCount: number;
   previous30dCount: number;

@@ -14,6 +14,7 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { sendJson } from "@/lib/fetch-json";
 import {
   invalidateCollectionsQuery,
@@ -84,8 +85,7 @@ export default function CollectionsPage() {
   const handleCopy = useCallback(
     async (id: string) => {
       try {
-        await sendJson(`/api/collections/${id}/copy`, { method: "POST" });
-        await invalidateCollectionsQuery(queryClient);
+        await copyCollectionAsUserCollection(id, queryClient);
         toast.success("Copied as a new collection");
       } catch (error) {
         toast.error(

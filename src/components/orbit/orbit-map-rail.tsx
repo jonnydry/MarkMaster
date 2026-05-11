@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import {
+  Copy,
   Crosshair,
   ExternalLink,
   Folder,
   FolderOpen,
   LayoutGrid,
+  Loader2,
   Orbit as OrbitIcon,
   Tag as TagIcon,
 } from "lucide-react";
@@ -16,6 +18,7 @@ import { GrokMark } from "@/components/brands/grok-mark";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getOrbitCollectionActionState } from "@/lib/orbit-map-actions";
 import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas";
 import type {
@@ -34,8 +37,10 @@ interface OrbitMapRailProps {
   onAssign: () => void;
   onAddTag: () => void;
   onAddToCollection: () => void;
+  onCopyAsCollection: (collectionId: string) => void;
   onOpenBookmark: (bookmarkId: string) => void;
   onClearSelection: () => void;
+  copyingCollectionId?: string | null;
   variant?: "rail" | "overlay";
   className?: string;
   showLegend?: boolean;
@@ -102,8 +107,10 @@ export function OrbitMapRail({
   onAssign,
   onAddTag,
   onAddToCollection,
+  onCopyAsCollection,
   onOpenBookmark,
   onClearSelection,
+  copyingCollectionId,
   variant = "rail",
   className,
   showLegend = true,
@@ -143,8 +150,10 @@ export function OrbitMapRail({
           onAssign={onAssign}
           onAddTag={onAddTag}
           onAddToCollection={onAddToCollection}
+          onCopyAsCollection={onCopyAsCollection}
           onOpenBookmark={onOpenBookmark}
           onClearSelection={onClearSelection}
+          copyingCollectionId={copyingCollectionId}
           isOverlay={isOverlay}
         />
       </section>
@@ -206,8 +215,10 @@ interface SelectedClusterBodyProps {
   onAssign: () => void;
   onAddTag: () => void;
   onAddToCollection: () => void;
+  onCopyAsCollection: (collectionId: string) => void;
   onOpenBookmark: (bookmarkId: string) => void;
   onClearSelection: () => void;
+  copyingCollectionId?: string | null;
   isOverlay: boolean;
 }
 
@@ -222,8 +233,10 @@ function SelectedClusterBody({
   onAssign,
   onAddTag,
   onAddToCollection,
+  onCopyAsCollection,
   onOpenBookmark,
   onClearSelection,
+  copyingCollectionId,
   isOverlay,
 }: SelectedClusterBodyProps) {
   if (!node) {
@@ -342,6 +355,11 @@ function SelectedClusterBody({
 
   if (node.kind === "collection") {
     const Icon = node.variant === "x_folder" ? FolderOpen : Folder;
+    const actionState = getOrbitCollectionActionState(
+      node,
+      selectedBookmarkId
+    );
+    const isCopying = copyingCollectionId === node.id;
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
@@ -360,32 +378,51 @@ function SelectedClusterBody({
         <p className="text-sm text-white/65">
           {pluralize(node.count, "bookmark")}
         </p>
+        {actionState.readOnlyReason && (
+          <p className="text-xs leading-5 text-white/55">
+            {actionState.readOnlyReason}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
-            onClick={onAssign}
-            disabled={!selectedBookmarkId || node.variant === "x_folder"}
-            title={
-              node.variant === "x_folder"
-                ? "X folders are read-only"
-                : undefined
-            }
-          >
-            <Crosshair className="size-4" />
-            Assign
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
-            onClick={onAddToCollection}
-            disabled={!selectedBookmarkId || node.variant === "x_folder"}
-          >
-            <Folder className="size-4" />
-            Collect
-          </Button>
+          {actionState.canCopyAsCollection ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
+              onClick={() => onCopyAsCollection(node.id)}
+              disabled={isCopying}
+            >
+              {isCopying ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+              Copy as collection
+            </Button>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
+                onClick={onAssign}
+                disabled={!actionState.canAssign}
+              >
+                <Crosshair className="size-4" />
+                Assign
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+                onClick={onAddToCollection}
+                disabled={!actionState.canCollect}
+              >
+                <Folder className="size-4" />
+                Collect
+              </Button>
+            </>
+          )}
           {node.variant !== "x_folder" && (
             <Link
               href={`/dashboard?collection=${encodeURIComponent(node.id)}`}

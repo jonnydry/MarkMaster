@@ -66,7 +66,12 @@ export async function GET(req: NextRequest) {
           authorDisplayName: true,
           bookmarkedAt: true,
           tags: { select: { tagId: true } },
-          collectionItems: { select: { collectionId: true } },
+          collectionItems: {
+            select: {
+              collectionId: true,
+              collection: { select: { type: true } },
+            },
+          },
         },
         orderBy: { bookmarkedAt: "desc" },
         take: nodeCap,
@@ -85,8 +90,10 @@ export async function GET(req: NextRequest) {
   for (const bookmark of bookmarksRaw) {
     renderedBookmarkIds.add(bookmark.id);
 
-    const affiliated =
-      bookmark.tags.length > 0 || bookmark.collectionItems.length > 0;
+    const hasUserCollection = bookmark.collectionItems.some(
+      ({ collection }) => collection.type === "user_collection"
+    );
+    const affiliated = bookmark.tags.length > 0 || hasUserCollection;
     const bookmarkedAtMs = new Date(bookmark.bookmarkedAt).getTime();
     const recent = now - bookmarkedAtMs <= RECENT_WINDOW_MS;
 
@@ -203,7 +210,9 @@ export async function GET(req: NextRequest) {
     where: {
       userId: user.id,
       tags: { none: {} },
-      collectionItems: { none: {} },
+      collectionItems: {
+        none: { collection: { type: "user_collection" } },
+      },
     },
   });
 

@@ -98,15 +98,38 @@ export async function GET() {
         WHERE "userId" = ${user.id}
       ) bookmark_stats
     `,
-    prisma.$queryRaw<{ untaggedCount: bigint; oldestAt: Date | null }[]>`
+    prisma.$queryRaw<
+      {
+        untaggedCount: bigint;
+        oldestAt: Date | null;
+        orbitQueueCount: bigint;
+      }[]
+    >`
       SELECT
-        COUNT(*)::bigint AS "untaggedCount",
-        MIN("bookmarkedAt") AS "oldestAt"
-      FROM "Bookmark" b
-      WHERE b."userId" = ${user.id}
-        AND NOT EXISTS (
-          SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b.id
-        )
+        COUNT(*) FILTER (WHERE NOT has_tags)::bigint AS "untaggedCount",
+        MIN("bookmarkedAt") FILTER (WHERE NOT has_tags) AS "oldestAt",
+        COUNT(*) FILTER (
+          WHERE NOT has_tags AND NOT has_user_collection
+        )::bigint AS "orbitQueueCount"
+      FROM (
+        SELECT
+          b."id",
+          b."bookmarkedAt",
+          EXISTS (
+            SELECT 1
+            FROM "BookmarkTag" bt
+            WHERE bt."bookmarkId" = b."id"
+          ) AS has_tags,
+          EXISTS (
+            SELECT 1
+            FROM "CollectionItem" ci
+            INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+            WHERE ci."bookmarkId" = b."id"
+              AND c."type" = 'user_collection'::"CollectionType"
+          ) AS has_user_collection
+        FROM "Bookmark" b
+        WHERE b."userId" = ${user.id}
+      ) bookmark_triage
     `,
     prisma.$queryRaw<{ notedCount: bigint }[]>`
       SELECT COUNT(DISTINCT n."bookmarkId")::bigint AS "notedCount"
@@ -163,7 +186,11 @@ export async function GET() {
     .filter((t) => t.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  const untagged = untaggedRows[0] ?? { untaggedCount: BigInt(0), oldestAt: null };
+  const untagged = untaggedRows[0] ?? {
+    untaggedCount: BigInt(0),
+    oldestAt: null,
+    orbitQueueCount: BigInt(0),
+  };
   const noted = notedRows[0] ?? { notedCount: BigInt(0) };
   const velocity = velocityRows[0] ?? { last30d: BigInt(0), previous30d: BigInt(0) };
 
@@ -184,6 +211,7 @@ export async function GET() {
     totalCollections: collections,
     untaggedCount: Number(untagged.untaggedCount),
     untaggedOldestAt: untagged.oldestAt ? untagged.oldestAt.toISOString() : null,
+    orbitQueueCount: Number(untagged.orbitQueueCount),
     notedCount: Number(noted.notedCount),
     last30dCount: Number(velocity.last30d),
     previous30dCount: Number(velocity.previous30d),

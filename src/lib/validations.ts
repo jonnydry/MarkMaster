@@ -203,7 +203,7 @@ export const bookmarksQuerySchema = z
         code: z.ZodIssueCode.custom,
         path: ["collectionId"],
         message:
-          "unaffiliated=true cannot be combined with collectionId (unaffiliated bookmarks are not in any collection).",
+          "unaffiliated=true cannot be combined with collectionId (Orbit queue bookmarks are outside editable collections).",
       });
     }
   });

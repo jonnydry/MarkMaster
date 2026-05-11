@@ -18,6 +18,8 @@ const DEFAULT_XAI_MODEL = "grok-4.3";
 const MAX_TEXT_LENGTH = 1_200;
 const MAX_NOTE_LENGTH = 400;
 const MAX_URLS_PER_BOOKMARK = 3;
+const MAX_X_FOLDER_HINTS_PER_BOOKMARK = 5;
+const MAX_X_FOLDER_HINT_LENGTH = 80;
 const FALLBACK_TAG_COLOR = PRESET_COLORS[0];
 const GENERIC_COLLECTION_NAMES = new Set([
   "bookmark",
@@ -110,6 +112,7 @@ export interface OrbitBookmarkForScan {
   urls: unknown;
   quotedTweet: unknown;
   notes: Array<{ id: string; content: string }>;
+  xFolderHints?: Array<{ id?: string; name: string }>;
 }
 
 export interface OrbitTagContext {
@@ -488,6 +491,20 @@ function asQuotedTweet(input: unknown) {
   };
 }
 
+function asXFolderHints(input: OrbitBookmarkForScan["xFolderHints"]) {
+  if (!Array.isArray(input)) return [];
+
+  const deduped = new Map<string, { name: string }>();
+  for (const folder of input) {
+    const name = truncateText(folder.name, MAX_X_FOLDER_HINT_LENGTH);
+    const key = normalizeKey(name);
+    if (!key || deduped.has(key)) continue;
+    deduped.set(key, { name });
+  }
+
+  return Array.from(deduped.values()).slice(0, MAX_X_FOLDER_HINTS_PER_BOOKMARK);
+}
+
 function buildBookmarkPayload(bookmark: OrbitBookmarkForScan) {
   return {
     id: bookmark.id,
@@ -503,11 +520,12 @@ function buildBookmarkPayload(bookmark: OrbitBookmarkForScan) {
     mediaTypes: asMediaTypes(bookmark.media),
     urls: asUrls(bookmark.urls),
     quotedTweet: asQuotedTweet(bookmark.quotedTweet),
+    sourceFolders: asXFolderHints(bookmark.xFolderHints),
     metrics: asPublicMetrics(bookmark.publicMetrics),
   };
 }
 
-function buildPromptPayload(args: {
+export function buildOrbitPromptPayload(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
@@ -518,6 +536,7 @@ function buildPromptPayload(args: {
 
     signalPriority: [
       "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
+      "Use sourceFolders as weak-but-useful context because they are synced X folder names for that bookmark.",
       "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
       "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
       "Sparse titles, bare URLs, previews, engagement copy, and boilerplate excerpts are weak signals. Do not tag from metadata noise alone.",
@@ -527,6 +546,8 @@ function buildPromptPayload(args: {
     taggingRules: [
       "Reuse an existingTag exactly (case-insensitive name match) whenever it clearly fits. Set reuseExisting=true and keep that tag's exact color.",
       "Otherwise create a new tag: a short, reusable topic or content-type label, 1-3 words, Title Case (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
+      "Unless the bookmark has no topical signal, return at least one useful tag. Tags are the default fallback when no collection fits.",
+      "If you propose any collection, also include at least one tag that captures the same topic or content type.",
       "For new tags pick a color from the palette. Use the SAME color for semantically related new tags when reasonable.",
       "Max 3 tags per bookmark. No near-duplicates or parent/child duplicates (e.g. don't pair 'LLM' and 'LLMs', 'AI' and 'Artificial Intelligence', or 'TypeScript' and 'Programming' unless both add clear recall value).",
       "Prefer topic or content-type tags over stylistic or sentiment tags.",
@@ -536,6 +557,7 @@ function buildPromptPayload(args: {
 
     collectionRules: [
       "A collection is a durable, themed home for multiple related bookmarks — not a tag alias.",
+      "sourceFolders are read-only X folders, not editable existingCollections. Use them as hints only; do not mark them reuseExisting unless they match an existingCollection.",
       "Reuse an existingCollection (reuseExisting=true) for any bookmark that clearly belongs there, even if it's the only one in this batch.",
       "Only propose a NEW collection (reuseExisting=false) when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
       "Do not create a collection from overlapping but different topics. If bookmarks only share a broad parent theme, use tags and leave collection null.",
@@ -547,13 +569,13 @@ function buildPromptPayload(args: {
     confidenceRubric: {
       high: "Content explicitly signals a specific topic; an obvious reusable tag applies.",
       medium: "Topic is inferable but not explicit; tags are reasonable defaults.",
-      low: "Content is vague, personal, or off-topic for any clean tag. Return empty tags and null collection.",
+      low: "Content is weakly inferable. Use one broad-but-useful tag if there is a real topic; return empty tags only when no clean topic is present.",
     },
 
     outputContract: [
       "For every bookmark id in `bookmarks`, return exactly one suggestion with the same id.",
       "Never invent bookmark ids that were not provided.",
-      "If uncertain, return { confidence: 'low', reasoning: '<short>', tags: [], collection: null } instead of guessing.",
+      "Only return { confidence: 'low', reasoning: '<short>', tags: [], collection: null } when tweetText, quotedTweet, note, and url context do not support any clean topic.",
       "Keep `reason` and `reasoning` strings short and practical (under 180 characters).",
     ],
 
@@ -735,6 +757,10 @@ export function normalizeOrbitScanPlan(
       collection,
     ])
   );
+  const resolveExistingTag = (normalizedName: string, key: string) =>
+    existingTagMap.get(normalizeKey(normalizedName)) ??
+    existingTagAliasMap.get(key) ??
+    existingTagMap.get(key);
   const collectionSuggestionBookmarkIds = new Map<string, Set<string>>();
   for (const suggestion of rawPlan.suggestions) {
     if (!bookmarkIdSet.has(suggestion.bookmarkId) || !suggestion.collection) continue;
@@ -767,10 +793,7 @@ export function normalizeOrbitScanPlan(
         if (seenTagKeys.has(key)) return null;
         seenTagKeys.add(key);
 
-        const existingTag =
-          existingTagMap.get(normalizeKey(normalizedName)) ??
-          existingTagAliasMap.get(key) ??
-          existingTagMap.get(key);
+        const existingTag = resolveExistingTag(normalizedName, key);
         return {
           name: existingTag?.name ?? normalizedName.slice(0, 50),
           color: existingTag?.color ?? normalizeColor(normalizedName, tag.color),
@@ -788,10 +811,14 @@ export function normalizeOrbitScanPlan(
       );
       const key = normalizeKey(normalizedName);
       const existingCollection = existingCollectionMap.get(key);
+      const hasSpecificCollectionName = Boolean(
+        normalizedName &&
+          !GENERIC_COLLECTION_NAMES.has(key) &&
+          normalizedName.length <= 100
+      );
 
       if (
-        normalizedName &&
-        !GENERIC_COLLECTION_NAMES.has(key) &&
+        hasSpecificCollectionName &&
         (existingCollection ||
           (collectionSuggestionBookmarkIds.get(key)?.size ?? 0) >= 2) &&
         normalizedName.length <= 100
@@ -809,6 +836,27 @@ export function normalizeOrbitScanPlan(
             "Suggested from bookmark content.",
           reuseExisting: Boolean(existingCollection),
         };
+      } else if (
+        hasSpecificCollectionName &&
+        normalizedTags.length === 0 &&
+        suggestion.confidence !== "low" &&
+        normalizedName.length <= 50 &&
+        !isUrlLikeLabel(normalizedName)
+      ) {
+        const tagKey = normalizeTagKey(normalizedName);
+        if (!GENERIC_TAG_NAMES.has(tagKey) && !seenTagKeys.has(tagKey)) {
+          seenTagKeys.add(tagKey);
+          const existingTag = resolveExistingTag(normalizedName, tagKey);
+          normalizedTags.push({
+            name: existingTag?.name ?? normalizedName,
+            color:
+              existingTag?.color ?? normalizeColor(normalizedName, undefined),
+            reason:
+              truncateText(suggestion.collection.reason, 180) ||
+              "Preserved from a one-off collection suggestion.",
+            reuseExisting: Boolean(existingTag),
+          });
+        }
       }
     }
 
@@ -964,7 +1012,7 @@ export async function scanOrbitBookmarksWithXai(args: {
     ""
   );
   const model = process.env.XAI_ORBIT_MODEL?.trim() || DEFAULT_XAI_MODEL;
-  const promptPayload = buildPromptPayload(args);
+  const promptPayload = buildOrbitPromptPayload(args);
 
   const response = await fetch(`${baseUrl}/responses`, {
     method: "POST",

@@ -206,7 +206,7 @@ export default function AnalyticsPage() {
 
                   <LibraryControlCenter
                     totalBookmarks={analytics.totalBookmarks}
-                    untriagedCount={analytics.untaggedCount}
+                    untriagedCount={analytics.orbitQueueCount}
                     totalTags={analytics.totalTags}
                     totalCollections={analytics.totalCollections}
                     notedCount={analytics.notedCount}

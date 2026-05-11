@@ -8,10 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Folder,
@@ -22,6 +24,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -84,6 +87,7 @@ const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> = new Set([
 
 export default function OrbitMapPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const focusBookmarkIdParam = searchParams?.get("focus") ?? null;
   const focusAnchorIdParam = searchParams?.get("anchor") ?? null;
@@ -141,6 +145,9 @@ export default function OrbitMapPage() {
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [pendingBookmarkIds, setPendingBookmarkIds] = useState<string[]>([]);
+  const [copyingCollectionId, setCopyingCollectionId] = useState<string | null>(
+    null
+  );
   const [search, setSearch] = useState("");
   const searchDeferred = useDeferredValue(search.trim().toLowerCase());
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
@@ -288,6 +295,36 @@ export default function OrbitMapPage() {
       setCollectionDialogOpen(true);
     }
   }, [selectedBookmarkId]);
+
+  const handleCopyAsCollection = useCallback(
+    async (collectionId: string) => {
+      setCopyingCollectionId(collectionId);
+      try {
+        const copied = await copyCollectionAsUserCollection(
+          collectionId,
+          queryClient
+        );
+        await refetch();
+
+        const nextSelection: OrbitMapSelection = {
+          kind: "collection",
+          id: copied.id,
+        };
+        handleSelectionChange(nextSelection);
+        window.setTimeout(() => {
+          canvasRef.current?.focusOn(nextSelection);
+        }, 60);
+        toast.success("Copied as a new collection");
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not copy as collection"
+        );
+      } finally {
+        setCopyingCollectionId(null);
+      }
+    },
+    [handleSelectionChange, queryClient, refetch]
+  );
 
   const stats = graph?.stats;
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
@@ -524,8 +561,10 @@ export default function OrbitMapPage() {
                     onAssign={handleAssign}
                     onAddTag={openTagDialog}
                     onAddToCollection={openCollectionDialog}
+                    onCopyAsCollection={handleCopyAsCollection}
                     onOpenBookmark={handleOpenBookmark}
                     onClearSelection={() => handleSelectionChange(null)}
+                    copyingCollectionId={copyingCollectionId}
                     variant="overlay"
                   />
                 </div>
@@ -541,8 +580,10 @@ export default function OrbitMapPage() {
                     onAssign={handleAssign}
                     onAddTag={openTagDialog}
                     onAddToCollection={openCollectionDialog}
+                    onCopyAsCollection={handleCopyAsCollection}
                     onOpenBookmark={handleOpenBookmark}
                     onClearSelection={() => handleSelectionChange(null)}
+                    copyingCollectionId={copyingCollectionId}
                     variant="overlay"
                     className="max-h-[30dvh] w-full"
                     showLegend={false}

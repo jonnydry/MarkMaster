@@ -1105,7 +1105,7 @@ function QueueHeader({
             <p className="mt-1 text-sm font-semibold text-white">
               {orbitView === "recent"
                 ? "Freshest bookmarks still in orbit"
-                : "All unaffiliated bookmarks"}
+                : "All unsorted bookmarks"}
             </p>
           </div>
 
