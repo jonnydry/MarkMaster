@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRESET_COLORS } from "@/lib/constants";
@@ -51,6 +51,10 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
+  const colorOptions = useMemo(
+    () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
+    [color]
+  );
 
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
@@ -83,7 +87,7 @@ export const TagEditRow = React.memo(function TagEditRow({
       }`}
     >
       <div className="flex flex-wrap gap-1.5">
-        {PRESET_COLORS.map((c) => (
+        {colorOptions.map((c) => (
           <ColorSwatch
             key={c}
             color={c}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,8 @@ import {
   LogOut,
   BrainCircuit,
   KeyRound,
+  Loader2,
+  Palette,
   ShieldCheck,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -31,6 +33,7 @@ import {
   invalidateLibraryQueries,
   invalidateTagsQuery,
 } from "@/lib/query-invalidation";
+import { assignBalancedTagColors } from "@/lib/tag-colors";
 import { toast } from "sonner";
 import { TagRow } from "./tag-row";
 import { TagEditRow } from "./tag-edit-row";
@@ -69,6 +72,13 @@ export default function SettingsPage() {
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editTagName, setEditTagName] = useState("");
   const [editTagColor, setEditTagColor] = useState("");
+  const [balancingTagColors, setBalancingTagColors] = useState(false);
+  const balancedTags = useMemo(() => assignBalancedTagColors(tags), [tags]);
+  const balancedTagColorUpdates = useMemo(
+    () =>
+      balancedTags.filter((tag, index) => tag.color !== tags[index]?.color),
+    [balancedTags, tags]
+  );
 
   const handleDeleteTag = useCallback(async (tagId: string) => {
     if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
@@ -111,6 +121,38 @@ export default function SettingsPage() {
   const handleCancelEdit = useCallback(() => {
     setEditingTag(null);
   }, []);
+
+  const handleBalanceTagColors = useCallback(async () => {
+    if (balancedTagColorUpdates.length === 0) {
+      toast.message("Tag colors already look balanced");
+      return;
+    }
+
+    setBalancingTagColors(true);
+    try {
+      await Promise.all(
+        balancedTagColorUpdates.map((tag) =>
+          sendJson("/api/tags", {
+            method: "PATCH",
+            body: { tagId: tag.id, color: tag.color },
+          })
+        )
+      );
+      await invalidateTagsQuery(queryClient);
+      setEditingTag(null);
+      toast.success(
+        `Balanced ${balancedTagColorUpdates.length} tag color${
+          balancedTagColorUpdates.length === 1 ? "" : "s"
+        }`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not balance tag colors"
+      );
+    } finally {
+      setBalancingTagColors(false);
+    }
+  }, [balancedTagColorUpdates, queryClient]);
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
@@ -313,9 +355,30 @@ export default function SettingsPage() {
             </div>
 
               <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold heading-font">Manage Tags</h2>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-primary" />
+                    <h2 className="font-semibold heading-font">Manage Tags</h2>
+                  </div>
+                  {tags.length > 1 ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-hairline-soft bg-surface-2 shadow-sm"
+                      onClick={handleBalanceTagColors}
+                      disabled={
+                        balancingTagColors ||
+                        balancedTagColorUpdates.length === 0
+                      }
+                    >
+                      {balancingTagColors ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Palette className="size-3.5" />
+                      )}
+                      Balance colors
+                    </Button>
+                  ) : null}
                 </div>
                 {tagsLoading ? (
                   <div className="space-y-2">

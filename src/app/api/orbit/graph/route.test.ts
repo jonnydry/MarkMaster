@@ -138,4 +138,40 @@ describe("/api/orbit/graph", () => {
       })
     );
   });
+
+  it("preserves expanded-spectrum tag colors in graph nodes", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([
+      {
+        id: "tag-generated-color",
+        name: "History",
+        color: "#1569cb",
+        _count: { bookmarks: 3 },
+      },
+    ]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph")
+    );
+    const payload = (await response.json()) as OrbitGraphPayload;
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe(
+      "private, max-age=0, must-revalidate"
+    );
+    expect(payload.nodes).toContainEqual({
+      kind: "tag",
+      id: "tag-generated-color",
+      name: "History",
+      color: "#1569cb",
+      count: 3,
+    });
+  });
 });

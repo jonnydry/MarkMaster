@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getBalancedTagColor } from "@/lib/tag-colors";
 import { createTagSchema, deleteTagSchema, patchTagSchema } from "@/lib/validations";
 
 export async function GET() {
@@ -47,10 +48,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const resolvedColor =
+    color ??
+    getBalancedTagColor(
+      name,
+      await prisma.tag.findMany({
+        where: { userId: user.id },
+        select: { name: true, color: true },
+      })
+    );
+
   const tag = await prisma.tag.upsert({
     where: { userId_name: { userId: user.id, name } },
     update: { color: color || undefined },
-    create: { userId: user.id, name, color: color || "#1d9bf0" },
+    create: { userId: user.id, name, color: resolvedColor },
   });
 
   if (targetBookmarkIds.length > 0) {

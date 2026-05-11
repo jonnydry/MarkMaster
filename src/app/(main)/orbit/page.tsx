@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type ElementType,
 } from "react";
 import dynamic from "next/dynamic";
@@ -104,12 +105,19 @@ const MONO_STYLE: React.CSSProperties = {
 function OrbitHeaderEtching() {
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[360px] overflow-hidden sm:block"
+      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[380px] overflow-hidden sm:block"
       aria-hidden
+      style={
+        {
+          "--orbit-etch-dark": "rgba(3, 7, 18, 0.5)",
+          "--orbit-etch-light": "rgba(255, 255, 255, 0.52)",
+          "--orbit-etch-blue": "rgba(125, 211, 252, 0.5)",
+        } as CSSProperties
+      }
     >
       <svg
-        viewBox="0 0 360 88"
-        className="absolute right-0 top-1/2 h-24 w-[360px] -translate-y-1/2 opacity-80 [mask-image:linear-gradient(90deg,transparent,black_18%,black_82%,transparent)]"
+        viewBox="0 0 380 88"
+        className="absolute right-0 top-1/2 h-24 w-[380px] -translate-y-1/2 opacity-95 [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]"
         fill="none"
       >
         <defs>
@@ -121,51 +129,115 @@ function OrbitHeaderEtching() {
             height="160%"
             colorInterpolationFilters="sRGB"
           >
-            <feGaussianBlur stdDeviation="0.35" />
+            <feGaussianBlur stdDeviation="0.18" />
           </filter>
         </defs>
-        <g filter="url(#orbit-header-etching-soften)">
+        <g
+          filter="url(#orbit-header-etching-soften)"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <g opacity="0.9">
+            <ellipse
+              cx="260"
+              cy="44"
+              rx="92"
+              ry="18"
+              stroke="var(--orbit-etch-dark)"
+              strokeWidth="2.4"
+            />
+            <ellipse
+              cx="260"
+              cy="44"
+              rx="92"
+              ry="18"
+              stroke="var(--orbit-etch-dark)"
+              strokeWidth="2"
+              transform="rotate(58 260 44)"
+            />
+            <ellipse
+              cx="260"
+              cy="44"
+              rx="92"
+              ry="18"
+              stroke="var(--orbit-etch-dark)"
+              strokeWidth="2"
+              transform="rotate(-58 260 44)"
+            />
+            <path
+              d="M138 44H358"
+              stroke="var(--orbit-etch-dark)"
+              strokeWidth="1.5"
+              strokeDasharray="2 14"
+              opacity="0.58"
+            />
+          </g>
           <ellipse
-            cx="240"
+            cx="260"
             cy="44"
             rx="92"
             ry="18"
-            stroke="rgba(255,255,255,0.18)"
+            stroke="var(--orbit-etch-light)"
             strokeWidth="1"
           />
           <ellipse
-            cx="240"
+            cx="260"
             cy="44"
             rx="92"
             ry="18"
-            stroke="rgba(15,23,42,0.46)"
+            stroke="var(--orbit-etch-blue)"
             strokeWidth="1"
-            transform="rotate(58 240 44)"
+            transform="rotate(58 260 44)"
           />
           <ellipse
-            cx="240"
+            cx="260"
             cy="44"
             rx="92"
             ry="18"
-            stroke="rgba(147,197,253,0.22)"
+            stroke="var(--orbit-etch-blue)"
             strokeWidth="1"
-            transform="rotate(-58 240 44)"
+            transform="rotate(-58 260 44)"
           />
           <circle
-            cx="240"
+            cx="260"
             cy="44"
-            r="5.5"
-            fill="rgba(255,255,255,0.08)"
-            stroke="rgba(15,23,42,0.62)"
+            r="6"
+            fill="rgba(255,255,255,0.1)"
+            stroke="var(--orbit-etch-dark)"
+            strokeWidth="1.5"
           />
-          <circle cx="156" cy="30" r="2.5" fill="rgba(191,219,254,0.34)" />
-          <circle cx="310" cy="62" r="2" fill="rgba(255,255,255,0.22)" />
+          <circle
+            cx="260"
+            cy="44"
+            r="4.8"
+            stroke="var(--orbit-etch-light)"
+            strokeWidth="0.8"
+          />
+          <circle cx="176" cy="30" r="2.7" fill="var(--orbit-etch-light)" />
+          <circle
+            cx="176"
+            cy="30"
+            r="3.4"
+            stroke="var(--orbit-etch-dark)"
+            strokeWidth="1"
+            opacity="0.6"
+          />
+          <circle cx="330" cy="62" r="2.2" fill="var(--orbit-etch-light)" />
+          <circle
+            cx="330"
+            cy="62"
+            r="2.9"
+            stroke="var(--orbit-etch-dark)"
+            strokeWidth="1"
+            opacity="0.55"
+          />
         </g>
         <path
-          d="M118 44H338"
-          stroke="rgba(255,255,255,0.08)"
+          d="M138 44H358"
+          stroke="var(--orbit-etch-light)"
           strokeWidth="1"
           strokeDasharray="2 14"
+          opacity="0.4"
         />
       </svg>
     </div>

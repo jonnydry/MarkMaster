@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRESET_COLORS } from "@/lib/constants";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import { getTagColorSpectrum } from "@/lib/tag-colors";
 import type {
   OrbitApplyResult,
   OrbitCollectionRollup,
@@ -20,6 +21,7 @@ const MAX_NOTE_LENGTH = 400;
 const MAX_URLS_PER_BOOKMARK = 3;
 const MAX_X_FOLDER_HINTS_PER_BOOKMARK = 5;
 const MAX_X_FOLDER_HINT_LENGTH = 80;
+const MAX_PROMPT_TAG_COLORS = 160;
 const FALLBACK_TAG_COLOR = PRESET_COLORS[0];
 const GENERIC_COLLECTION_NAMES = new Set([
   "bookmark",
@@ -385,7 +387,11 @@ function truncateText(value: string | null | undefined, maxLength: number) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-function normalizeColor(name: string, input: string | null | undefined) {
+function normalizeColor(
+  name: string,
+  input: string | null | undefined,
+  palette: readonly string[] = PRESET_COLORS
+) {
   if (input && /^#[0-9a-fA-F]{6}$/.test(input)) {
     return input.toLowerCase();
   }
@@ -395,7 +401,7 @@ function normalizeColor(name: string, input: string | null | undefined) {
     hash = (hash * 31 + char.charCodeAt(0)) | 0;
   }
 
-  return PRESET_COLORS[Math.abs(hash) % PRESET_COLORS.length] ?? FALLBACK_TAG_COLOR;
+  return palette[Math.abs(hash) % palette.length] ?? FALLBACK_TAG_COLOR;
 }
 
 function buildDefaultSuggestion(bookmarkId: string) {
@@ -530,6 +536,16 @@ export function buildOrbitPromptPayload(args: {
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
 }) {
+  const palette = getTagColorSpectrum(
+    Math.min(
+      MAX_PROMPT_TAG_COLORS,
+      Math.max(
+        PRESET_COLORS.length,
+        args.existingTags.length + args.bookmarks.length * 3
+      )
+    )
+  );
+
   return {
     goal:
       "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
@@ -579,7 +595,7 @@ export function buildOrbitPromptPayload(args: {
       "Keep `reason` and `reasoning` strings short and practical (under 180 characters).",
     ],
 
-    palette: PRESET_COLORS,
+    palette,
 
     existingTags: args.existingTags.map((tag) => ({
       name: tag.name,
@@ -757,6 +773,12 @@ export function normalizeOrbitScanPlan(
       collection,
     ])
   );
+  const palette = getTagColorSpectrum(
+    Math.max(
+      PRESET_COLORS.length,
+      context.existingTags.length + rawPlan.suggestions.length * 3
+    )
+  );
   const resolveExistingTag = (normalizedName: string, key: string) =>
     existingTagMap.get(normalizeKey(normalizedName)) ??
     existingTagAliasMap.get(key) ??
@@ -796,7 +818,9 @@ export function normalizeOrbitScanPlan(
         const existingTag = resolveExistingTag(normalizedName, key);
         return {
           name: existingTag?.name ?? normalizedName.slice(0, 50),
-          color: existingTag?.color ?? normalizeColor(normalizedName, tag.color),
+          color:
+            existingTag?.color ??
+            normalizeColor(normalizedName, tag.color, palette),
           reason: truncateText(tag.reason, 180) || "Suggested from bookmark content.",
           reuseExisting: Boolean(existingTag),
         };
@@ -850,7 +874,8 @@ export function normalizeOrbitScanPlan(
           normalizedTags.push({
             name: existingTag?.name ?? normalizedName,
             color:
-              existingTag?.color ?? normalizeColor(normalizedName, undefined),
+              existingTag?.color ??
+              normalizeColor(normalizedName, undefined, palette),
             reason:
               truncateText(suggestion.collection.reason, 180) ||
               "Preserved from a one-off collection suggestion.",

@@ -11,6 +11,8 @@ export function useOrbitGraphQuery() {
     queryKey: ORBIT_GRAPH_QUERY_KEY,
     queryFn: () => fetchJson("/api/orbit/graph"),
     placeholderData: keepPreviousData,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }

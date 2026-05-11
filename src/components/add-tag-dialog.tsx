@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { PRESET_COLORS } from "@/lib/constants";
+import { getBalancedTagColor } from "@/lib/tag-colors";
 import type { TagWithCount } from "@/types";
 
 interface AddTagDialogProps {
@@ -34,7 +35,16 @@ export function AddTagDialog({
   bookmarkTags,
 }: AddTagDialogProps) {
   const [name, setName] = useState("");
-  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const suggestedColor = useMemo(
+    () => getBalancedTagColor(name, existingTags),
+    [existingTags, name]
+  );
+  const [manualColor, setManualColor] = useState<string | null>(null);
+  const color = manualColor ?? suggestedColor;
+  const colorOptions = useMemo(
+    () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
+    [color]
+  );
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
   const [addingNew, setAddingNew] = useState(false);
   const isBulk = bookmarkIds.length > 1;
@@ -42,7 +52,7 @@ export function AddTagDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setName("");
-      setColor(PRESET_COLORS[0]);
+      setManualColor(null);
       setPendingTagId(null);
       setAddingNew(false);
     }
@@ -55,6 +65,7 @@ export function AddTagDialog({
     try {
       await onAddTag(bookmarkIds, name.trim(), color);
       setName("");
+      setManualColor(null);
     } finally {
       setAddingNew(false);
     }
@@ -138,7 +149,7 @@ export function AddTagDialog({
               </Button>
             </div>
             <div className="flex gap-1.5 mt-2">
-              {PRESET_COLORS.map((c) => (
+              {colorOptions.map((c) => (
                 <button
                   key={c}
                   type="button"
@@ -148,7 +159,9 @@ export function AddTagDialog({
                     color === c ? "scale-125 ring-2 ring-foreground ring-offset-2 ring-offset-background" : ""
                   }`}
                   style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
+                  onClick={() => {
+                    setManualColor(c);
+                  }}
                 />
               ))}
             </div>

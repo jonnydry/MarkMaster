@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PRESET_COLORS } from "@/lib/constants";
 import {
   buildOrbitPromptPayload,
   buildOrbitCollectionRollups,
@@ -493,6 +494,36 @@ describe("buildOrbitPromptPayload", () => {
       id: "b1",
       sourceFolders: [{ name: "AI Papers" }],
     });
+  });
+
+  it("expands the color palette as the existing tag list grows", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "A saved post.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: Array.from({ length: PRESET_COLORS.length + 5 }, (_, index) => ({
+        name: `Existing ${index}`,
+        color: PRESET_COLORS[index % PRESET_COLORS.length],
+      })),
+      existingCollections: [],
+    });
+
+    expect(payload.palette.length).toBeGreaterThan(PRESET_COLORS.length);
+    expect(new Set(payload.palette).size).toBe(payload.palette.length);
   });
 });
 
