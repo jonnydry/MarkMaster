@@ -8,6 +8,7 @@ import { getTagColorSpectrum } from "@/lib/tag-colors";
 import type {
   OrbitApplyResult,
   OrbitCollectionRollup,
+  OrbitScanFailureCode,
   OrbitScanResponsePayload,
   OrbitScanSummary,
   OrbitTagRollup,
@@ -92,11 +93,20 @@ const DOTTED_TECH_TAG_NAMES = new Set([
 
 export class OrbitGrokError extends Error {
   status: number;
+  code: OrbitScanFailureCode;
+  retryAfterSeconds?: number;
 
-  constructor(message: string, status = 500) {
+  constructor(
+    message: string,
+    status = 500,
+    code: OrbitScanFailureCode = "unknown",
+    opts?: { retryAfterSeconds?: number }
+  ) {
     super(message);
     this.name = "OrbitGrokError";
     this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = opts?.retryAfterSeconds;
   }
 }
 
@@ -715,7 +725,11 @@ export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlan {
     formatZodIssues(parsedLoosePlan.error)
   );
 
-  throw new OrbitGrokError("xAI returned a scan plan in an unexpected format.", 502);
+  throw new OrbitGrokError(
+    "xAI returned a scan plan in an unexpected format.",
+    502,
+    "xai_response"
+  );
 }
 
 /** Parses xAI Responses API JSON bodies (message / output_text shape). Exported for tests. */
@@ -1008,19 +1022,55 @@ export function buildOrbitScanSummary(plan: OrbitScanPlan): OrbitScanSummary {
   };
 }
 
+function parseRetryAfterSeconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.ceil(seconds);
+  }
+
+  const resetTime = Date.parse(value);
+  if (!Number.isNaN(resetTime)) {
+    const resetSeconds = Math.ceil((resetTime - Date.now()) / 1000);
+    return resetSeconds > 0 ? resetSeconds : undefined;
+  }
+
+  return undefined;
+}
+
+function extractXaiErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object" || !("error" in body)) {
+    return fallback;
+  }
+
+  const error = (body as { error: unknown }).error;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+
+  return fallback;
+}
+
 export async function scanOrbitBookmarksWithXai(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
-    throw new OrbitGrokError("Select at least one bookmark to scan.", 400);
+    throw new OrbitGrokError(
+      "Select at least one bookmark to scan.",
+      400,
+      "scan_request"
+    );
   }
 
   if (args.bookmarks.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
     throw new OrbitGrokError(
       `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
-      400
+      400,
+      "scan_request"
     );
   }
 
@@ -1028,7 +1078,8 @@ export async function scanOrbitBookmarksWithXai(args: {
   if (!apiKey) {
     throw new OrbitGrokError(
       "Set XAI_API_KEY before scanning Orbit with Grok.",
-      503
+      503,
+      "xai_auth"
     );
   }
 
@@ -1039,80 +1090,105 @@ export async function scanOrbitBookmarksWithXai(args: {
   const model = process.env.XAI_ORBIT_MODEL?.trim() || DEFAULT_XAI_MODEL;
   const promptPayload = buildOrbitPromptPayload(args);
 
-  const response = await fetch(`${baseUrl}/responses`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content: buildOrbitSystemPrompt(),
-        },
-        {
-          role: "user",
-          content: JSON.stringify(promptPayload),
-        },
-      ],
-      store: false,
-      text: {
-        format: {
-          type: "json_schema",
-          name: "orbit_scan_plan",
-          schema: ORBIT_SCAN_PLAN_JSON_SCHEMA,
-          strict: true,
-        },
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: "system",
+            content: buildOrbitSystemPrompt(),
+          },
+          {
+            role: "user",
+            content: JSON.stringify(promptPayload),
+          },
+        ],
+        store: false,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "orbit_scan_plan",
+            schema: ORBIT_SCAN_PLAN_JSON_SCHEMA,
+            strict: true,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch {
+    throw new OrbitGrokError(
+      "xAI could not be reached. Try the scan again in a moment.",
+      503,
+      "xai_unavailable"
+    );
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const message =
-      body && typeof body === "object" && "error" in body
-        ? String((body as { error: unknown }).error)
-        : `xAI request failed with status ${response.status}`;
+    const message = extractXaiErrorMessage(
+      body,
+      `xAI request failed with status ${response.status}`
+    );
 
     if (response.status === 401 || response.status === 403) {
       throw new OrbitGrokError(
         "xAI rejected the request. Confirm your API key and model access.",
-        502
+        502,
+        "xai_auth"
       );
     }
 
     if (response.status === 404) {
       throw new OrbitGrokError(
         "xAI could not find the configured Grok model.",
-        502
+        502,
+        "xai_model"
       );
     }
 
     if (response.status === 429) {
       throw new OrbitGrokError(
         "xAI rate limit reached. Try the scan again in a moment.",
-        429
+        429,
+        "xai_rate_limited",
+        {
+          retryAfterSeconds: parseRetryAfterSeconds(
+            response.headers.get("retry-after")
+          ),
+        }
       );
     }
 
-    throw new OrbitGrokError(message, 502);
+    throw new OrbitGrokError(message, 502, "xai_unavailable");
   }
 
   const payload = await response.json().catch(() => null);
   const rawText = extractXaiResponsesOutputText(payload);
 
   if (!rawText) {
-    throw new OrbitGrokError("xAI returned an empty Orbit scan.", 502);
+    throw new OrbitGrokError(
+      "xAI returned an empty Orbit scan.",
+      502,
+      "xai_response"
+    );
   }
 
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(rawText);
   } catch {
-    throw new OrbitGrokError("xAI returned invalid JSON for the Orbit scan.", 502);
+    throw new OrbitGrokError(
+      "xAI returned invalid JSON for the Orbit scan.",
+      502,
+      "xai_response"
+    );
   }
 
   const rawPlan = parseXaiOrbitScanPlanJson(parsedJson);
@@ -1151,7 +1227,11 @@ export async function applyOrbitScanPlan(args: {
   );
 
   if (bookmarkIds.length === 0) {
-    throw new OrbitGrokError("The scan plan does not contain any bookmarks.", 400);
+    throw new OrbitGrokError(
+      "The scan plan does not contain any bookmarks.",
+      400,
+      "scan_request"
+    );
   }
 
   const bookmarks = await prisma.bookmark.findMany({
@@ -1163,7 +1243,11 @@ export async function applyOrbitScanPlan(args: {
   });
 
   if (bookmarks.length !== bookmarkIds.length) {
-    throw new OrbitGrokError("One or more bookmarks in the scan plan no longer exist.", 404);
+    throw new OrbitGrokError(
+      "One or more bookmarks in the scan plan no longer exist.",
+      404,
+      "bookmark_not_found"
+    );
   }
 
   const [existingTags, existingCollections] = await Promise.all([

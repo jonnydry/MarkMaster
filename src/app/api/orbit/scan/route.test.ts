@@ -31,6 +31,45 @@ vi.mock("@/lib/orbit-grok", async (importOriginal) => {
   };
 });
 
+async function mockScanData() {
+  const { prisma } = await import("@/lib/prisma");
+
+  vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+    {
+      id: "bookmark-1",
+      tweetId: "tweet-1",
+      authorId: "author-1",
+      authorUsername: "researcher",
+      authorDisplayName: "Researcher",
+      authorProfileImage: null,
+      authorVerified: false,
+      tweetText: "Sparse saved post",
+      publicMetrics: null,
+      media: null,
+      urls: null,
+      quotedTweet: null,
+      tweetCreatedAt: new Date("2026-05-01T00:00:00.000Z"),
+      bookmarkedAt: new Date("2026-05-02T00:00:00.000Z"),
+      syncedAt: new Date("2026-05-02T00:00:00.000Z"),
+      userId: "user-1",
+      notes: [],
+      collectionItems: [],
+    },
+  ]);
+  vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+}
+
+function createScanRequest() {
+  return new NextRequest("http://localhost/api/orbit/scan", {
+    method: "POST",
+    body: JSON.stringify({
+      mode: "scan",
+      bookmarkIds: ["bookmark-1"],
+    }),
+  });
+}
+
 describe("/api/orbit/scan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -161,4 +200,43 @@ describe("/api/orbit/scan", () => {
       })
     );
   });
+
+  it.each([
+    {
+      code: "xai_auth",
+      status: 502,
+      message: "xAI rejected the request. Confirm your API key and model access.",
+    },
+    {
+      code: "xai_model",
+      status: 502,
+      message: "xAI could not find the configured Grok model.",
+    },
+    {
+      code: "xai_rate_limited",
+      status: 429,
+      message: "xAI rate limit reached. Try the scan again in a moment.",
+      retryAfterSeconds: 45,
+    },
+  ] as const)(
+    "returns structured $code failures from xAI scans",
+    async ({ code, status, message, retryAfterSeconds }) => {
+      const { POST } = await import("./route");
+      const { OrbitGrokError } = await import("@/lib/orbit-grok");
+
+      await mockScanData();
+      scanOrbitBookmarksWithXaiMock.mockRejectedValueOnce(
+        new OrbitGrokError(message, status, code, { retryAfterSeconds })
+      );
+
+      const response = await POST(createScanRequest());
+
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toMatchObject({
+        error: message,
+        code,
+        ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
+      });
+    }
+  );
 });

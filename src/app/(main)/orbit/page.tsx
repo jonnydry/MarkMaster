@@ -17,18 +17,23 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import {
   AlignJustify,
+  AlertTriangle,
   BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Folder,
+  Gauge,
   Grid3x3,
+  KeyRound,
   LayoutList,
   ListChecks,
   Loader2,
   Map as MapIcon,
   Orbit as OrbitIcon,
+  RefreshCw,
   TagIcon,
   Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,7 +50,7 @@ import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-s
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
-import { useOrbitScan } from "@/hooks/use-orbit-scan";
+import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
@@ -68,6 +73,12 @@ type BookmarkResponse = {
   totalPages: number;
 };
 
+type OrbitScanRequest = {
+  targetIds: string[];
+  scanningSelection: boolean;
+  contextKey: string;
+};
+
 const RECENT_PAGE_SIZE = 12;
 const ALL_PAGE_SIZE = 20;
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
@@ -86,6 +97,12 @@ function buildOrbitScanContextKey(args: {
     args.queryString,
     args.scanningSelection ? `sel:${sortedTargets}` : "queue",
   ].join("::");
+}
+
+function sameBookmarkIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const bIds = new Set(b);
+  return a.every((id) => bIds.has(id));
 }
 
 const VIEW_MODE_OPTIONS: Array<{
@@ -363,6 +380,9 @@ export default function OrbitPage() {
   const [scanContextAtLastRun, setScanContextAtLastRun] = useState<string | null>(
     null
   );
+  const [lastScanRequest, setLastScanRequest] = useState<OrbitScanRequest | null>(
+    null
+  );
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
@@ -494,10 +514,34 @@ export default function OrbitPage() {
     [orbitView, page, queryString, scanningSelection, scanTargetIds]
   );
 
+  const buildScanRequest = useCallback(
+    (targetIds: string[], scanSelection: boolean): OrbitScanRequest => ({
+      targetIds,
+      scanningSelection: scanSelection,
+      contextKey: buildOrbitScanContextKey({
+        orbitView,
+        page,
+        queryString,
+        scanningSelection: scanSelection,
+        scanTargetIds: targetIds,
+      }),
+    }),
+    [orbitView, page, queryString]
+  );
+
   const staleScanPlan = Boolean(
     scan.plan &&
       scanContextAtLastRun &&
       scanContextAtLastRun !== currentScanContextKey
+  );
+
+  const canRescanCurrentSelection = Boolean(
+    scan.error &&
+      selectedScanTargetIds.length > 0 &&
+      !(
+        lastScanRequest?.scanningSelection &&
+        sameBookmarkIds(lastScanRequest.targetIds, selectedScanTargetIds)
+      )
   );
 
   const canApplyStrongMatches = useMemo(() => {
@@ -544,11 +588,6 @@ export default function OrbitPage() {
       setPage(totalPages);
     });
   }, [orbitView, page, totalPages]);
-
-  useEffect(() => {
-    if (!scan.error) return;
-    toast.error(scan.error);
-  }, [scan.error]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -602,40 +641,54 @@ export default function OrbitPage() {
     setCollectionDialogOpen(true);
   }, []);
 
-  const handleScan = useCallback(async () => {
-    if (scanTargetIds.length === 0) return;
-    const contextKey = buildOrbitScanContextKey({
-      orbitView,
-      page,
-      queryString,
-      scanningSelection,
-      scanTargetIds,
-    });
-    toast.info(
-      "Grok is categorizing your queue — large batches can take a minute."
-    );
-    try {
-      const result = await scan.scanNow(scanTargetIds);
-      if (result) {
-        setScanContextAtLastRun(contextKey);
-        const scopeLabel = scanningSelection ? "selected" : "Orbit";
-        toast.success(
-          `Grok categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
-            result.plan.suggestions.length === 1 ? "" : "s"
-          }`
-        );
+  const runOrbitScan = useCallback(
+    async (request: OrbitScanRequest) => {
+      if (request.targetIds.length === 0) return;
+
+      setLastScanRequest(request);
+
+      toast.info(
+        request.scanningSelection
+          ? "Grok is categorizing your selection — this should be quicker."
+          : "Grok is categorizing your queue — large batches can take a minute."
+      );
+      try {
+        const result = await scan.scanNow(request.targetIds);
+        if (result) {
+          setScanContextAtLastRun(request.contextKey);
+          const scopeLabel = request.scanningSelection ? "selected" : "Orbit";
+          toast.success(
+            `Grok categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
+              result.plan.suggestions.length === 1 ? "" : "s"
+            }`
+          );
+        }
+      } catch {
+        // Inline failure state is rendered near the Orbit scan controls.
       }
-    } catch {
-      // Error state is surfaced via scan.error effect.
-    }
+    },
+    [scan]
+  );
+
+  const handleScan = useCallback(async () => {
+    await runOrbitScan(buildScanRequest(scanTargetIds, scanningSelection));
+  }, [buildScanRequest, runOrbitScan, scanTargetIds, scanningSelection]);
+
+  const handleRetryScan = useCallback(async () => {
+    await runOrbitScan(
+      lastScanRequest ?? buildScanRequest(scanTargetIds, scanningSelection)
+    );
   }, [
-    orbitView,
-    page,
-    queryString,
-    scan,
+    buildScanRequest,
+    lastScanRequest,
+    runOrbitScan,
     scanTargetIds,
     scanningSelection,
   ]);
+
+  const handleRescanCurrentSelection = useCallback(async () => {
+    await runOrbitScan(buildScanRequest(selectedScanTargetIds, true));
+  }, [buildScanRequest, runOrbitScan, selectedScanTargetIds]);
 
   const handleReviewOpenChange = useCallback((open: boolean) => {
     setReviewOpen(open);
@@ -654,6 +707,7 @@ export default function OrbitPage() {
   const handleClearScanPlan = useCallback(() => {
     scan.clearPlan();
     setScanContextAtLastRun(null);
+    setLastScanRequest(null);
   }, [scan]);
 
   const handleOpenBookmarkReview = useCallback((bookmarkId: string) => {
@@ -675,7 +729,7 @@ export default function OrbitPage() {
         }
         return applied;
       } catch {
-        // handled by scan.error effect
+        // Inline failure state is rendered near the Orbit scan controls.
         return null;
       }
     },
@@ -698,7 +752,7 @@ export default function OrbitPage() {
           toast.success(`Applied alternative · ${formatAppliedToast(applied)}`);
         }
       } catch {
-        // handled by scan.error effect
+        // Inline failure state is rendered near the Orbit scan controls.
       }
     },
     [scan]
@@ -713,7 +767,7 @@ export default function OrbitPage() {
         toast.message("No strong matches left to apply in this pass.");
       }
     } catch {
-      // handled by scan.error effect
+      // Inline failure state is rendered near the Orbit scan controls.
     }
   }, [scan]);
 
@@ -909,6 +963,20 @@ export default function OrbitPage() {
                     Open graph
                   </Link>
                 </div>
+
+                {scan.error ? (
+                  <OrbitScanFailureNotice
+                    error={scan.error}
+                    retryTargetCount={
+                      lastScanRequest?.targetIds.length ?? scanTargetCount
+                    }
+                    selectionTargetCount={selectedScanTargetIds.length}
+                    canRescanCurrentSelection={canRescanCurrentSelection}
+                    scanning={scan.scanning}
+                    onRetry={handleRetryScan}
+                    onRescanCurrentSelection={handleRescanCurrentSelection}
+                  />
+                ) : null}
               </div>
             </section>
 
@@ -1138,6 +1206,167 @@ export default function OrbitPage() {
         reviewSessionId={reviewSessionId}
         onApply={handleApplyReviewedPlan}
       />
+    </div>
+  );
+}
+
+function formatRetryAfter(seconds: number | undefined) {
+  if (!seconds) return null;
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes}m`;
+}
+
+function getScanFailurePresentation(error: OrbitScanFailure): {
+  Icon: LucideIcon;
+  label: string;
+  badgeClassName: string;
+  panelClassName: string;
+  iconClassName: string;
+  helper: string;
+} {
+  const retryAfter = formatRetryAfter(error.retryAfterSeconds);
+
+  switch (error.kind) {
+    case "auth":
+      return {
+        Icon: KeyRound,
+        label: "Auth",
+        badgeClassName: "border-amber-300/30 bg-amber-300/10 text-amber-100",
+        panelClassName: "border-amber-300/25 bg-amber-300/10",
+        iconClassName: "text-amber-200",
+        helper: "Check the server xAI key and model access, then retry.",
+      };
+    case "model":
+      return {
+        Icon: OrbitIcon,
+        label: "Model",
+        badgeClassName: "border-sky-300/30 bg-sky-300/10 text-sky-100",
+        panelClassName: "border-sky-300/25 bg-sky-300/10",
+        iconClassName: "text-sky-200",
+        helper: "Update XAI_ORBIT_MODEL or enable the configured model for this key.",
+      };
+    case "rate-limit":
+      return {
+        Icon: Gauge,
+        label: "Rate limit",
+        badgeClassName: "border-orange-300/30 bg-orange-300/10 text-orange-100",
+        panelClassName: "border-orange-300/25 bg-orange-300/10",
+        iconClassName: "text-orange-200",
+        helper: retryAfter
+          ? `xAI asked MarkMaster to wait about ${retryAfter}. A smaller selected pass may clear sooner.`
+          : "xAI asked MarkMaster to slow down. A smaller selected pass may clear sooner.",
+      };
+    case "request":
+      return {
+        Icon: AlertTriangle,
+        label: "Request",
+        badgeClassName: "border-white/20 bg-white/[0.08] text-white/80",
+        panelClassName: "border-white/14 bg-white/[0.055]",
+        iconClassName: "text-white/75",
+        helper: "Refresh the page scope or scan a selected subset.",
+      };
+    case "provider":
+    case "unknown":
+    default:
+      return {
+        Icon: AlertTriangle,
+        label: "Provider",
+        badgeClassName: "border-rose-300/30 bg-rose-300/10 text-rose-100",
+        panelClassName: "border-rose-300/25 bg-rose-300/10",
+        iconClassName: "text-rose-200",
+        helper: "Retry the pass, or scan a smaller selected set while xAI recovers.",
+      };
+  }
+}
+
+function OrbitScanFailureNotice({
+  error,
+  retryTargetCount,
+  selectionTargetCount,
+  canRescanCurrentSelection,
+  scanning,
+  onRetry,
+  onRescanCurrentSelection,
+}: {
+  error: OrbitScanFailure;
+  retryTargetCount: number;
+  selectionTargetCount: number;
+  canRescanCurrentSelection: boolean;
+  scanning: boolean;
+  onRetry: () => void;
+  onRescanCurrentSelection: () => void;
+}) {
+  const presentation = getScanFailurePresentation(error);
+  const Icon = presentation.Icon;
+
+  return (
+    <div
+      role="alert"
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+        presentation.panelClassName
+      )}
+    >
+      <div className="flex min-w-0 gap-3">
+        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/15">
+          <Icon className={cn("size-4", presentation.iconClassName)} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.2em]",
+                presentation.badgeClassName
+              )}
+              style={MONO_STYLE}
+            >
+              {presentation.label}
+            </span>
+            <p className="text-sm font-semibold text-white">{error.title}</p>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-white/80">{error.message}</p>
+          <p className="mt-1 text-xs leading-5 text-white/58">
+            {presentation.helper}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-9 rounded-lg border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+          disabled={scanning || retryTargetCount === 0}
+          onClick={onRetry}
+        >
+          {scanning ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
+          Retry last scan
+        </Button>
+
+        {canRescanCurrentSelection ? (
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 rounded-lg bg-white text-slate-950 hover:bg-white/90"
+            disabled={scanning || selectionTargetCount === 0}
+            onClick={onRescanCurrentSelection}
+          >
+            {scanning ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <GrokMark className="size-3.5" title="Grok" />
+            )}
+            Rescan selection
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

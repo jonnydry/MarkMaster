@@ -142,6 +142,22 @@ export interface SyncStatusResponse {
 
 export type OrbitScanConfidence = "high" | "medium" | "low";
 
+export type OrbitScanFailureCode =
+  | "scan_request"
+  | "bookmark_not_found"
+  | "xai_auth"
+  | "xai_model"
+  | "xai_rate_limited"
+  | "xai_unavailable"
+  | "xai_response"
+  | "unknown";
+
+export interface OrbitScanErrorPayload {
+  error: string;
+  code: OrbitScanFailureCode;
+  retryAfterSeconds?: number;
+}
+
 export interface OrbitTagSuggestion {
   name: string;
   color: string;

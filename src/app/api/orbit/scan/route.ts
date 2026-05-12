@@ -7,6 +7,7 @@ import {
   orbitScanRequestSchema,
   scanOrbitBookmarksWithXai,
 } from "@/lib/orbit-grok";
+import type { OrbitScanErrorPayload } from "@/types";
 
 const orbitScanBookmarkInclude = {
   notes: { select: { id: true, content: true } },
@@ -111,7 +112,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ applied });
   } catch (error) {
     if (error instanceof OrbitGrokError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      const payload: OrbitScanErrorPayload = {
+        error: error.message,
+        code: error.code,
+      };
+      if (error.retryAfterSeconds !== undefined) {
+        payload.retryAfterSeconds = error.retryAfterSeconds;
+      }
+
+      return NextResponse.json(payload, { status: error.status });
     }
 
     console.error("[orbit] scan failed unexpectedly:", error);

@@ -8,6 +8,18 @@ export type JsonRequestInit<TBody extends JsonValue = JsonValue> = Omit<
   body?: TBody;
 };
 
+export class FetchJsonError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "FetchJsonError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const res = await fetch(input, init);
 
@@ -23,7 +35,7 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit)
           ? body
           : `Request failed with status ${res.status}`;
 
-    throw new Error(message);
+    throw new FetchJsonError(message, res.status, body);
   }
 
   return body as T;

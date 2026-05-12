@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { sendJson, type JsonValue } from "@/lib/fetch-json";
+import { FetchJsonError, sendJson, type JsonValue } from "@/lib/fetch-json";
 import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
@@ -15,11 +15,28 @@ import type {
   OrbitApplyResult,
   OrbitBookmarkDecision,
   OrbitScanConfidence,
+  OrbitScanErrorPayload,
+  OrbitScanFailureCode,
   OrbitScanPlan,
   OrbitScanResponsePayload,
 } from "@/types";
 
 export type OrbitScanApplyVariant = "primary" | "alt" | "batch";
+export type OrbitScanFailureKind =
+  | "auth"
+  | "model"
+  | "rate-limit"
+  | "provider"
+  | "request"
+  | "unknown";
+
+export interface OrbitScanFailure {
+  kind: OrbitScanFailureKind;
+  code: OrbitScanFailureCode;
+  title: string;
+  message: string;
+  retryAfterSeconds?: number;
+}
 
 export interface OrbitScanState {
   plan: OrbitScanResponsePayload | null;
@@ -28,7 +45,7 @@ export interface OrbitScanState {
   scanning: boolean;
   applyingBookmarkId: string | null;
   applyingBatch: boolean;
-  error: string | null;
+  error: OrbitScanFailure | null;
 }
 
 export interface OrbitScanHandle extends OrbitScanState {
@@ -53,6 +70,85 @@ export interface OrbitScanHandle extends OrbitScanState {
   clearPlan: () => void;
 }
 
+function isOrbitScanErrorPayload(value: unknown): value is OrbitScanErrorPayload {
+  if (!value || typeof value !== "object") return false;
+
+  return (
+    "error" in value &&
+    typeof (value as { error: unknown }).error === "string" &&
+    "code" in value &&
+    typeof (value as { code: unknown }).code === "string" &&
+    (!("retryAfterSeconds" in value) ||
+      typeof (value as { retryAfterSeconds: unknown }).retryAfterSeconds ===
+        "number" ||
+      typeof (value as { retryAfterSeconds: unknown }).retryAfterSeconds ===
+        "undefined")
+  );
+}
+
+function classifyOrbitScanFailure(code: OrbitScanFailureCode): {
+  kind: OrbitScanFailureKind;
+  title: string;
+} {
+  switch (code) {
+    case "xai_auth":
+      return {
+        kind: "auth",
+        title: "xAI credentials need attention",
+      };
+    case "xai_model":
+      return {
+        kind: "model",
+        title: "Configured Grok model is unavailable",
+      };
+    case "xai_rate_limited":
+      return {
+        kind: "rate-limit",
+        title: "xAI rate limit reached",
+      };
+    case "scan_request":
+    case "bookmark_not_found":
+      return {
+        kind: "request",
+        title: "Orbit scan request needs a refresh",
+      };
+    case "xai_unavailable":
+    case "xai_response":
+      return {
+        kind: "provider",
+        title: "Grok scan could not finish",
+      };
+    case "unknown":
+    default:
+      return {
+        kind: "unknown",
+        title: "Orbit scan could not finish",
+      };
+  }
+}
+
+export function buildOrbitScanFailure(
+  err: unknown,
+  fallbackMessage: string
+): OrbitScanFailure {
+  const payload =
+    err instanceof FetchJsonError && isOrbitScanErrorPayload(err.body)
+      ? err.body
+      : null;
+  const code = payload?.code ?? "unknown";
+  const { kind, title } = classifyOrbitScanFailure(code);
+  const message =
+    payload?.error ?? (err instanceof Error ? err.message : fallbackMessage);
+
+  return {
+    kind,
+    code,
+    title,
+    message,
+    retryAfterSeconds: payload?.retryAfterSeconds,
+  };
+}
+
 export function useOrbitScan(): OrbitScanHandle {
   const queryClient = useQueryClient();
 
@@ -63,7 +159,7 @@ export function useOrbitScan(): OrbitScanHandle {
     null
   );
   const [applyingBatch, setApplyingBatch] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<OrbitScanFailure | null>(null);
 
   const decisionsByBookmarkId = useMemo(() => {
     if (!plan) return new Map<string, OrbitBookmarkDecision>();
@@ -85,9 +181,12 @@ export function useOrbitScan(): OrbitScanHandle {
       const unique = Array.from(new Set(bookmarkIds));
       if (unique.length === 0) return null;
       if (unique.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
-        setError(
-          `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`
-        );
+        setError({
+          kind: "request",
+          code: "scan_request",
+          title: "Orbit scan request needs a refresh",
+          message: `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
+        });
         return null;
       }
 
@@ -106,9 +205,7 @@ export function useOrbitScan(): OrbitScanHandle {
         setDismissed(new Set());
         return result;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not scan Orbit with Grok";
-        setError(message);
+        setError(buildOrbitScanFailure(err, "Could not scan Orbit with Grok"));
         throw err;
       } finally {
         setScanning(false);
@@ -153,9 +250,7 @@ export function useOrbitScan(): OrbitScanHandle {
 
         return response.applied;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not apply suggestion";
-        setError(message);
+        setError(buildOrbitScanFailure(err, "Could not apply suggestion"));
         throw err;
       } finally {
         setApplyingBookmarkId(null);
@@ -201,9 +296,7 @@ export function useOrbitScan(): OrbitScanHandle {
 
         return response.applied;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not apply plan";
-        setError(message);
+        setError(buildOrbitScanFailure(err, "Could not apply plan"));
         throw err;
       } finally {
         setApplyingBatch(false);
@@ -275,9 +368,7 @@ export function useOrbitScan(): OrbitScanHandle {
 
         return response.applied;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not apply plan subset";
-        setError(message);
+        setError(buildOrbitScanFailure(err, "Could not apply plan subset"));
         throw err;
       } finally {
         setApplyingBatch(false);
@@ -308,7 +399,12 @@ export function useOrbitScan(): OrbitScanHandle {
         (bookmarkId) => !scannedBookmarkIdsForPlan.has(bookmarkId)
       );
       if (hasUnscannedBookmark) {
-        setError("Review only the bookmarks from the current Orbit scan.");
+        setError({
+          kind: "request",
+          code: "scan_request",
+          title: "Orbit scan request needs a refresh",
+          message: "Review only the bookmarks from the current Orbit scan.",
+        });
         return null;
       }
 
@@ -340,9 +436,7 @@ export function useOrbitScan(): OrbitScanHandle {
 
         return response.applied;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Could not apply reviewed plan";
-        setError(message);
+        setError(buildOrbitScanFailure(err, "Could not apply reviewed plan"));
         throw err;
       } finally {
         setApplyingBatch(false);
