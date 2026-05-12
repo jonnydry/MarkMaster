@@ -5,14 +5,15 @@ import {
   CheckCircle2,
   Folder,
   Loader2,
+  Orbit as OrbitIcon,
   Tag as TagIcon,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -30,7 +31,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -42,7 +42,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   buildReviewedOrbitPlan,
   createOrbitReviewDraft,
+  orbitReviewDecisionUsesCollection,
+  orbitReviewDecisionUsesTags,
   splitTagNames,
+  type OrbitReviewDecision,
   type OrbitReviewSuggestionDraft,
 } from "@/lib/orbit-review";
 import { cn } from "@/lib/utils";
@@ -68,13 +71,31 @@ interface OrbitReviewDialogProps {
   reviewSessionId: number;
   onApply: (
     reviewedPlan: OrbitScanPlan,
-    opts: { createCollections: boolean }
+    opts: { createCollections: boolean; keptBookmarkIds: string[] }
   ) => Promise<OrbitApplyResult | null>;
 }
 
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
+
+const REVIEW_DECISION_OPTIONS: Array<{
+  value: OrbitReviewDecision;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { value: "keep", label: "Keep", icon: OrbitIcon },
+  { value: "tags", label: "Tags", icon: TagIcon },
+  { value: "collection", label: "Collect", icon: Folder },
+  { value: "tags_collection", label: "Both", icon: CheckCircle2 },
+];
+
+function getDecisionLabel(decision: OrbitReviewDecision): string {
+  return (
+    REVIEW_DECISION_OPTIONS.find((option) => option.value === decision)?.label ??
+    "Manual"
+  );
+}
 
 function draftTagKey(name: string): string {
   return name.replace(/\s+/g, " ").trim().toLowerCase();
@@ -347,6 +368,44 @@ function OrbitReviewCollectionField({
   );
 }
 
+function OrbitReviewDecisionControl({
+  value,
+  onChange,
+}: {
+  value: OrbitReviewDecision;
+  onChange: (decision: OrbitReviewDecision) => void;
+}) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/10 p-1 sm:inline-grid sm:grid-cols-4"
+      role="radiogroup"
+      aria-label="Review decision"
+    >
+      {REVIEW_DECISION_OPTIONS.map(({ value: option, label, icon: Icon }) => {
+        const active = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            className={cn(
+              "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors",
+              active
+                ? "bg-white text-slate-950 shadow-sm"
+                : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+            )}
+            onClick={() => onChange(option)}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function getPreviewText(bookmark: BookmarkWithRelations | null): string {
   if (!bookmark) return "Bookmark is outside the current page.";
   return bookmark.tweetText.replace(/\s+/g, " ").trim();
@@ -425,7 +484,8 @@ export function OrbitReviewDialog({
   }, [drafts, existingCollections, existingTags, sourcePlan]);
 
   const reviewStats = useMemo(() => {
-    const includedDrafts = drafts.filter((draft) => draft.included).length;
+    const keptBookmarks = drafts.filter((draft) => draft.decision === "keep")
+      .length;
     const tagAssignments =
       reviewedPlan?.suggestions.reduce(
         (total, suggestion) => total + suggestion.tags.length,
@@ -436,12 +496,20 @@ export function OrbitReviewDialog({
         .length ?? 0;
 
     return {
-      includedDrafts,
       applyableBookmarks: reviewedPlan?.suggestions.length ?? 0,
+      keptBookmarks,
       tagAssignments,
       collectionMoves,
     };
   }, [drafts, reviewedPlan]);
+
+  const keptBookmarkIds = useMemo(
+    () =>
+      drafts
+        .filter((draft) => draft.decision === "keep")
+        .map((draft) => draft.bookmarkId),
+    [drafts]
+  );
 
   const updateDraft = useCallback(
     (bookmarkId: string, patch: Partial<OrbitReviewSuggestionDraft>) => {
@@ -463,15 +531,26 @@ export function OrbitReviewDialog({
   );
 
   const handleApply = useCallback(async () => {
-    if (!reviewedPlan || reviewedPlan.suggestions.length === 0) return;
-    const applied = await onApply(reviewedPlan, { createCollections });
+    if (
+      !reviewedPlan ||
+      (reviewedPlan.suggestions.length === 0 && keptBookmarkIds.length === 0)
+    ) {
+      return;
+    }
+    const applied = await onApply(reviewedPlan, {
+      createCollections,
+      keptBookmarkIds,
+    });
     if (applied) {
       onOpenChange(false);
     }
-  }, [createCollections, onApply, onOpenChange, reviewedPlan]);
+  }, [createCollections, keptBookmarkIds, onApply, onOpenChange, reviewedPlan]);
 
   const title = focusBookmarkId ? "Review bookmark move" : "Review Orbit pass";
-  const canApply = Boolean(reviewedPlan && reviewedPlan.suggestions.length > 0);
+  const canApply = Boolean(
+    reviewedPlan &&
+      (reviewedPlan.suggestions.length > 0 || keptBookmarkIds.length > 0)
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -484,7 +563,8 @@ export function OrbitReviewDialog({
             <div className="min-w-0">
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription className="mt-1 text-white/60">
-                Adjust suggested tags and destinations before applying.
+                Choose what to do with each suggestion, then adjust the tags and
+                destinations that will be applied.
               </DialogDescription>
             </div>
           </div>
@@ -501,51 +581,48 @@ export function OrbitReviewDialog({
                 drafts.map((draft) => {
                   const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
                   const preview = getPreviewText(bookmark);
-                  const checkboxId = `orbit-review-include-${draft.bookmarkId}`;
+                  const usesTags = orbitReviewDecisionUsesTags(draft.decision);
+                  const usesCollection = orbitReviewDecisionUsesCollection(
+                    draft.decision
+                  );
 
                   return (
                     <div
                       key={draft.bookmarkId}
                       className={cn(
                         "rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm",
-                        !draft.included && "opacity-60"
+                        draft.decision === "keep" && "opacity-70"
                       )}
                     >
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          id={checkboxId}
-                          checked={draft.included}
-                          onCheckedChange={(checked) =>
-                            updateDraft(draft.bookmarkId, {
-                              included: checked === true,
-                            })
-                          }
-                          aria-label="Include suggestion"
-                          className="mt-1"
-                        />
-                        <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Label
-                              htmlFor={checkboxId}
-                              className="min-w-0 text-sm text-white"
-                            >
-                              <span className="truncate">
-                                {bookmark
-                                  ? `@${bookmark.authorUsername}`
-                                  : draft.bookmarkId}
-                              </span>
-                            </Label>
+                            <p className="min-w-0 truncate text-sm font-medium text-white">
+                              {bookmark
+                                ? `@${bookmark.authorUsername}`
+                                : draft.bookmarkId}
+                            </p>
                             <Badge
                               variant="outline"
                               className="border-white/12 bg-white/5 text-[10px] uppercase tracking-[0.16em] text-white/60"
                             >
-                              {draft.included ? "Included" : "Skipped"}
+                              {getDecisionLabel(draft.decision)}
                             </Badge>
                           </div>
                           <p className="mt-1 line-clamp-2 text-xs leading-snug text-white/55">
                             {preview}
                           </p>
                         </div>
+
+                        <OrbitReviewDecisionControl
+                          value={draft.decision}
+                          onChange={(decision) =>
+                            updateDraft(draft.bookmarkId, {
+                              decision,
+                              included: decision !== "keep",
+                            })
+                          }
+                        />
                       </div>
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2 md:items-start">
@@ -556,7 +633,7 @@ export function OrbitReviewDialog({
                           </p>
                           <OrbitReviewTagField
                             tagNames={draft.tagNames}
-                            included={draft.included}
+                            included={usesTags}
                             existingTags={existingTags}
                             onTagNamesChange={(next) =>
                               updateDraft(draft.bookmarkId, {
@@ -574,7 +651,7 @@ export function OrbitReviewDialog({
                           <OrbitReviewCollectionField
                             collectionName={draft.collectionName}
                             collectionDescription={draft.collectionDescription}
-                            included={draft.included}
+                            included={usesCollection}
                             namePlaceholder="No collection move"
                             existingCollections={existingCollections}
                             onCollectionNameChange={(name) =>
@@ -606,11 +683,11 @@ export function OrbitReviewDialog({
                 Review summary
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <SummaryStat label="Included" value={reviewStats.includedDrafts} />
                 <SummaryStat
-                  label="Applied"
+                  label="Apply"
                   value={reviewStats.applyableBookmarks}
                 />
+                <SummaryStat label="Keep" value={reviewStats.keptBookmarks} />
                 <SummaryStat label="Tags" value={reviewStats.tagAssignments} />
                 <SummaryStat
                   label="Moves"
@@ -657,7 +734,7 @@ export function OrbitReviewDialog({
             ) : (
               <CheckCircle2 className="size-4" />
             )}
-            Apply reviewed plan
+            Apply decisions
           </Button>
         </DialogFooter>
       </DialogContent>

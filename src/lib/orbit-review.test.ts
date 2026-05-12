@@ -74,13 +74,15 @@ describe("createOrbitReviewDraft", () => {
       {
         bookmarkId: "b1",
         included: true,
+        decision: "tags_collection",
         tagNames: "AI, Tools",
         collectionName: "AI Research",
         collectionDescription: "Research papers and references.",
       },
       {
         bookmarkId: "b2",
-        included: true,
+        included: false,
+        decision: "keep",
         tagNames: "",
         collectionName: "",
         collectionDescription: "",
@@ -95,6 +97,7 @@ describe("buildReviewedOrbitPlan", () => {
       {
         bookmarkId: "b1",
         included: true,
+        decision: "tags_collection",
         tagNames: "Research, AI, Research",
         collectionName: "Design Systems",
         collectionDescription: "",
@@ -136,6 +139,7 @@ describe("buildReviewedOrbitPlan", () => {
       {
         bookmarkId: "b1",
         included: false,
+        decision: "tags_collection",
         tagNames: "AI",
         collectionName: "AI Research",
         collectionDescription: "Research papers and references.",
@@ -143,6 +147,7 @@ describe("buildReviewedOrbitPlan", () => {
       {
         bookmarkId: "b2",
         included: true,
+        decision: "keep",
         tagNames: "",
         collectionName: "",
         collectionDescription: "",
@@ -157,5 +162,45 @@ describe("buildReviewedOrbitPlan", () => {
     });
 
     expect(reviewed.suggestions).toEqual([]);
+  });
+
+  it("wires manual tag-only and collection-only decisions into the reviewed plan", () => {
+    const drafts: OrbitReviewSuggestionDraft[] = [
+      {
+        bookmarkId: "b1",
+        included: true,
+        decision: "tags",
+        tagNames: "Research",
+        collectionName: "Design Systems",
+        collectionDescription: "",
+      },
+      {
+        bookmarkId: "b2",
+        included: true,
+        decision: "collection",
+        tagNames: "Research",
+        collectionName: "Design Systems",
+        collectionDescription: "",
+      },
+    ];
+
+    const reviewed = buildReviewedOrbitPlan({
+      sourcePlan,
+      drafts,
+      existingTags,
+      existingCollections,
+    });
+
+    expect(reviewed.suggestions).toHaveLength(2);
+    expect(reviewed.suggestions[0]).toMatchObject({
+      bookmarkId: "b1",
+      tags: [{ name: "Research" }],
+      collection: null,
+    });
+    expect(reviewed.suggestions[1]).toMatchObject({
+      bookmarkId: "b2",
+      tags: [],
+      collection: { name: "Design Systems" },
+    });
   });
 });

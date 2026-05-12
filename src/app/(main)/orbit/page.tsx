@@ -349,6 +349,19 @@ function formatAppliedToast(applied: OrbitApplyResult): string {
   return parts.join(" • ");
 }
 
+function buildNoOpApplyResult(bookmarkCount: number): OrbitApplyResult {
+  return {
+    bookmarkCount,
+    createdTags: 0,
+    reusedTags: 0,
+    tagAssignments: 0,
+    createdCollections: 0,
+    reusedCollections: 0,
+    collectionAssignments: 0,
+    skippedNewCollectionSingletons: 0,
+  };
+}
+
 export default function OrbitPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -720,14 +733,36 @@ export default function OrbitPage() {
   const handleApplyReviewedPlan = useCallback(
     async (
       reviewedPlan: OrbitScanPlan,
-      opts: { createCollections: boolean }
+      opts: { createCollections: boolean; keptBookmarkIds: string[] }
     ) => {
       try {
-        const applied = await scan.applyReviewedPlan(reviewedPlan, opts);
-        if (applied) {
-          toast.success(`Applied review · ${formatAppliedToast(applied)}`);
+        const hasMutations = reviewedPlan.suggestions.length > 0;
+        const applied = hasMutations
+          ? await scan.applyReviewedPlan(reviewedPlan, {
+              createCollections: opts.createCollections,
+            })
+          : null;
+
+        if (hasMutations && !applied) return null;
+
+        for (const bookmarkId of opts.keptBookmarkIds) {
+          scan.dismiss(bookmarkId);
         }
-        return applied;
+
+        const keptMessage =
+          opts.keptBookmarkIds.length > 0
+            ? `Kept ${opts.keptBookmarkIds.length} in Orbit`
+            : null;
+        const appliedMessage = applied
+          ? `Applied review · ${formatAppliedToast(applied)}`
+          : null;
+        const message = [appliedMessage, keptMessage].filter(Boolean).join(" · ");
+
+        if (message) {
+          toast.success(message);
+        }
+
+        return applied ?? buildNoOpApplyResult(opts.keptBookmarkIds.length);
       } catch {
         // Inline failure state is rendered near the Orbit scan controls.
         return null;

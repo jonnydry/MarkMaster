@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
+  ArrowRight,
   ArchiveX,
   Copy,
   FolderOpen,
@@ -18,6 +19,7 @@ const collectionDateFormatter = new Intl.DateTimeFormat(undefined, {
 
 interface UserCollectionCardProps {
   collection: CollectionWithCount;
+  maxItems: number;
   onNavigate: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -31,7 +33,12 @@ function itemLabel(count: number) {
 }
 
 const compactCardClassName =
-  "group flex min-h-[4.75rem] cursor-pointer items-center gap-3 rounded-sm border border-hairline-soft bg-surface-1/70 px-3 py-2.5 text-left transition-colors hover:border-primary/25 hover:bg-accent-soft/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:76px]";
+  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/75 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]";
+
+function getScaleWidth(itemCount: number, maxItems: number) {
+  if (itemCount <= 0 || maxItems <= 0) return 0;
+  return Math.max(8, Math.round((itemCount / maxItems) * 100));
+}
 
 function handleRowKeyDown(
   event: React.KeyboardEvent<HTMLElement>,
@@ -47,21 +54,24 @@ function handleRowKeyDown(
 
 export const UserCollectionCard = React.memo(function UserCollectionCard({
   collection,
+  maxItems,
   onNavigate,
   onDelete,
 }: UserCollectionCardProps) {
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
+  const scaleWidth = getScaleWidth(itemCount, maxItems);
 
   return (
     <article
       className={compactCardClassName}
       role="button"
       tabIndex={0}
+      aria-label={`Open collection ${collection.name}`}
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-primary">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
         <Layers2 className="h-4 w-4" aria-hidden="true" />
       </div>
 
@@ -98,9 +108,25 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
             </>
           ) : null}
         </div>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
+            style={{ width: `${scaleWidth}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
+        <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
+          {itemCount.toLocaleString()}
+        </p>
+        <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+          saved
+        </p>
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        <ArrowRight className="hidden h-4 w-4 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -120,27 +146,31 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
 
 interface XFolderCardProps {
   collection: CollectionWithCount;
+  maxItems: number;
   onNavigate: (id: string) => void;
   onCopy: (id: string) => void;
 }
 
 export const XFolderCard = React.memo(function XFolderCard({
   collection,
+  maxItems,
   onNavigate,
   onCopy,
 }: XFolderCardProps) {
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
+  const scaleWidth = getScaleWidth(itemCount, maxItems);
 
   return (
     <article
       className={compactCardClassName}
       role="button"
       tabIndex={0}
+      aria-label={`Open collection ${collection.name}`}
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-transparent text-muted-foreground">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-note/15 bg-note/10 text-note">
         <FolderOpen className="h-4 w-4" aria-hidden="true" />
       </div>
 
@@ -169,6 +199,21 @@ export const XFolderCard = React.memo(function XFolderCard({
             </>
           ) : null}
         </div>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
+          <div
+            className="h-full rounded-full bg-note transition-all duration-700 ease-out"
+            style={{ width: `${scaleWidth}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
+        <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
+          {itemCount.toLocaleString()}
+        </p>
+        <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+          synced
+        </p>
       </div>
 
       <div className="shrink-0">

@@ -14,9 +14,16 @@ const DEFAULT_REVIEW_TAG_COLORS = [
   "#71717a",
 ] as const;
 
+export type OrbitReviewDecision =
+  | "keep"
+  | "tags"
+  | "collection"
+  | "tags_collection";
+
 export interface OrbitReviewSuggestionDraft {
   bookmarkId: string;
   included: boolean;
+  decision: OrbitReviewDecision;
   tagNames: string;
   collectionName: string;
   collectionDescription: string;
@@ -54,16 +61,45 @@ export function splitTagNames(value: string): string[] {
   return Array.from(deduped.values()).slice(0, 3);
 }
 
+export function orbitReviewDecisionUsesTags(
+  decision: OrbitReviewDecision
+): boolean {
+  return decision === "tags" || decision === "tags_collection";
+}
+
+export function orbitReviewDecisionUsesCollection(
+  decision: OrbitReviewDecision
+): boolean {
+  return decision === "collection" || decision === "tags_collection";
+}
+
+function deriveReviewDecision(
+  suggestion: OrbitScanPlan["suggestions"][number]
+): OrbitReviewDecision {
+  const hasTags = suggestion.tags.length > 0;
+  const hasCollection = Boolean(suggestion.collection);
+
+  if (hasTags && hasCollection) return "tags_collection";
+  if (hasTags) return "tags";
+  if (hasCollection) return "collection";
+  return "keep";
+}
+
 export function createOrbitReviewDraft(
   plan: OrbitScanPlan
 ): OrbitReviewSuggestionDraft[] {
-  return plan.suggestions.map((suggestion) => ({
-    bookmarkId: suggestion.bookmarkId,
-    included: true,
-    tagNames: suggestion.tags.map((tag) => tag.name).join(", "),
-    collectionName: suggestion.collection?.name ?? "",
-    collectionDescription: suggestion.collection?.description ?? "",
-  }));
+  return plan.suggestions.map((suggestion) => {
+    const decision = deriveReviewDecision(suggestion);
+
+    return {
+      bookmarkId: suggestion.bookmarkId,
+      included: decision !== "keep",
+      decision,
+      tagNames: suggestion.tags.map((tag) => tag.name).join(", "),
+      collectionName: suggestion.collection?.name ?? "",
+      collectionDescription: suggestion.collection?.description ?? "",
+    };
+  });
 }
 
 export function buildReviewedOrbitPlan({
@@ -86,7 +122,7 @@ export function buildReviewedOrbitPlan({
   );
 
   const suggestions = drafts.flatMap((draft) => {
-    if (!draft.included) return [];
+    if (!draft.included || draft.decision === "keep") return [];
 
     const sourceSuggestion = sourceSuggestionById.get(draft.bookmarkId);
     if (!sourceSuggestion) return [];
@@ -94,28 +130,30 @@ export function buildReviewedOrbitPlan({
     const sourceTagByKey = new Map(
       sourceSuggestion.tags.map((tag) => [normalizeKey(tag.name), tag])
     );
-    const tags: OrbitTagSuggestion[] = splitTagNames(draft.tagNames).map(
-      (tagName, index) => {
-        const tagKey = normalizeKey(tagName);
-        const existingTag = existingTagByKey.get(tagKey);
-        const sourceTag = sourceTagByKey.get(tagKey);
+    const tags: OrbitTagSuggestion[] = orbitReviewDecisionUsesTags(
+      draft.decision
+    )
+      ? splitTagNames(draft.tagNames).map((tagName, index) => {
+          const tagKey = normalizeKey(tagName);
+          const existingTag = existingTagByKey.get(tagKey);
+          const sourceTag = sourceTagByKey.get(tagKey);
 
-        return {
-          name: existingTag?.name ?? tagName,
-          color:
-            existingTag?.color ??
-            sourceTag?.color ??
-            DEFAULT_REVIEW_TAG_COLORS[index % DEFAULT_REVIEW_TAG_COLORS.length],
-          reason: sourceTag?.reason ?? "Edited during Orbit review.",
-          reuseExisting: Boolean(existingTag) || sourceTag?.reuseExisting === true,
-        };
-      }
-    );
+          return {
+            name: existingTag?.name ?? tagName,
+            color:
+              existingTag?.color ??
+              sourceTag?.color ??
+              DEFAULT_REVIEW_TAG_COLORS[index % DEFAULT_REVIEW_TAG_COLORS.length],
+            reason: sourceTag?.reason ?? "Edited during Orbit review.",
+            reuseExisting: Boolean(existingTag) || sourceTag?.reuseExisting === true,
+          };
+        })
+      : [];
 
     const collectionName = truncate(draft.collectionName, 100);
     let collection: OrbitCollectionSuggestion | null = null;
 
-    if (collectionName) {
+    if (orbitReviewDecisionUsesCollection(draft.decision) && collectionName) {
       const collectionKey = normalizeKey(collectionName);
       const existingCollection = existingCollectionByKey.get(collectionKey);
       const sourceCollection =
