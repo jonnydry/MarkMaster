@@ -6,13 +6,14 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ElementType,
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import {
@@ -53,6 +54,13 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
+import {
+  ORBIT_ALL_PAGE_SIZE,
+  ORBIT_RECENT_PAGE_SIZE,
+  parseOrbitUrlState,
+  type OrbitSortDirection,
+  type OrbitView,
+} from "@/lib/orbit-navigation";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { getStaggerClass } from "@/lib/stagger";
@@ -64,8 +72,6 @@ import type {
   OrbitScanPlan,
   ViewMode,
 } from "@/types";
-
-type OrbitView = "recent" | "all";
 
 type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -79,8 +85,6 @@ type OrbitScanRequest = {
   contextKey: string;
 };
 
-const RECENT_PAGE_SIZE = 12;
-const ALL_PAGE_SIZE = 20;
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
 
 function buildOrbitScanContextKey(args: {
@@ -364,7 +368,13 @@ function buildNoOpApplyResult(bookmarkCount: number): OrbitApplyResult {
 
 export default function OrbitPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const orbitSearch = searchParams?.toString() ?? "";
+  const orbitUrlState = useMemo(
+    () => parseOrbitUrlState(orbitSearch),
+    [orbitSearch]
+  );
   const { data: session } = useSession() as {
     data: { dbUser?: DbUser } | null;
   };
@@ -372,11 +382,13 @@ export default function OrbitPage() {
   const { createCollection, createCollectionQuick } = useCreateCollection();
   const scan = useOrbitScan();
 
-  const [orbitView, setOrbitView] = useState<OrbitView>("recent");
+  const [orbitView, setOrbitView] = useState<OrbitView>(orbitUrlState.view);
+  const [queueSortDirection, setQueueSortDirection] =
+    useState<OrbitSortDirection>(orbitUrlState.sortDirection);
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(orbitUrlState.page);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
@@ -396,17 +408,19 @@ export default function OrbitPage() {
   const [lastScanRequest, setLastScanRequest] = useState<OrbitScanRequest | null>(
     null
   );
+  const appliedOrbitUrlStateKeyRef = useRef(orbitUrlState.stateKey);
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
 
-  const pageSize = orbitView === "recent" ? RECENT_PAGE_SIZE : ALL_PAGE_SIZE;
+  const pageSize =
+    orbitView === "recent" ? ORBIT_RECENT_PAGE_SIZE : ORBIT_ALL_PAGE_SIZE;
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
       page: orbitView === "recent" ? "1" : page.toString(),
       limit: pageSize.toString(),
       sortField: "bookmarkedAt",
-      sortDirection: "desc",
+      sortDirection: queueSortDirection,
       unaffiliated: "true",
     });
 
@@ -415,7 +429,7 @@ export default function OrbitPage() {
     }
 
     return params.toString();
-  }, [deferredSearch, orbitView, page, pageSize]);
+  }, [deferredSearch, orbitView, page, pageSize, queueSortDirection]);
 
   const {
     data: orbitData,
@@ -471,6 +485,8 @@ export default function OrbitPage() {
   const hasSearchQuery = search.trim().length > 0;
   const hasSelectionOverflow =
     selectedBookmarkIds.size > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN;
+  const queueOrderLabel =
+    queueSortDirection === "asc" ? "oldest" : "newest";
   const scanHelperText = queueIsLoading
     ? "Loading the current Orbit queue."
     : scanningSelection
@@ -478,7 +494,7 @@ export default function OrbitPage() {
         ? `Grok will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
         : `Grok will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
       : queueBatchCount > 0
-        ? `Grok suggests tags and destinations for ${queueBatchCount} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"}. Review each suggestion or apply the whole pass at once.`
+        ? `Grok suggests tags and destinations for the ${queueBatchCount} ${queueOrderLabel} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"}. Review each suggestion or apply the whole pass at once.`
         : hasSearchQuery
           ? "No bookmarks match the current Orbit filter."
           : "Orbit is clear.";
@@ -509,7 +525,9 @@ export default function OrbitPage() {
       ? hasSearchQuery
         ? "No matches in current filter"
         : "No pending bookmarks"
-      : `${scanTargetCount} ${scanningSelection ? "selected" : "visible"} bookmark${
+      : `${scanTargetCount} ${
+          scanningSelection ? "selected" : queueOrderLabel
+        } bookmark${
           scanTargetCount === 1 ? "" : "s"
         }`;
   const showQueueTools =
@@ -594,6 +612,21 @@ export default function OrbitPage() {
   const allQueueCountLabel = total.toLocaleString();
 
   useEffect(() => {
+    if (orbitUrlState.stateKey === appliedOrbitUrlStateKeyRef.current) return;
+
+    appliedOrbitUrlStateKeyRef.current = orbitUrlState.stateKey;
+    startTransition(() => {
+      setOrbitView(orbitUrlState.view);
+      setQueueSortDirection(orbitUrlState.sortDirection);
+      setPage(orbitUrlState.page);
+      setSearch("");
+      setActiveBookmarkId(null);
+      setSelectionMode(false);
+      setSelectedBookmarkIds(new Set());
+    });
+  }, [orbitUrlState]);
+
+  useEffect(() => {
     if (orbitView !== "all") return;
     if (page <= totalPages) return;
 
@@ -619,6 +652,18 @@ export default function OrbitPage() {
       });
     },
     [orbitView]
+  );
+
+  const handleQueueSortDirectionChange = useCallback(
+    (value: OrbitSortDirection) => {
+      if (value === queueSortDirection) return;
+
+      startTransition(() => {
+        setQueueSortDirection(value);
+        setPage(1);
+      });
+    },
+    [queueSortDirection]
   );
 
   const handlePageChange = useCallback((nextPage: number) => {
@@ -857,9 +902,13 @@ export default function OrbitPage() {
       return `${visible} match${visible === 1 ? "" : "es"}`;
     }
     if (orbitView === "recent") {
-      return `${visible} of ${allQueueCountLabel} most recent`;
+      return `${visible} of ${allQueueCountLabel} ${
+        queueSortDirection === "asc" ? "oldest" : "most recent"
+      }`;
     }
-    return `${visible} on page ${page} · ${allQueueCountLabel} total`;
+    return `${visible} on page ${page} · ${allQueueCountLabel} total · ${
+      queueSortDirection === "asc" ? "oldest first" : "newest first"
+    }`;
   })();
 
   return (
@@ -1047,7 +1096,9 @@ export default function OrbitPage() {
               <QueueHeader
                 orbitView={orbitView}
                 total={total}
+                sortDirection={queueSortDirection}
                 onChangeView={handleOrbitViewChange}
+                onChangeSortDirection={handleQueueSortDirectionChange}
                 viewMode={viewMode}
                 onChangeViewMode={setViewMode}
                 selectionMode={selectionMode}
@@ -1409,8 +1460,10 @@ function OrbitScanFailureNotice({
 interface QueueHeaderProps {
   orbitView: OrbitView;
   total: number;
+  sortDirection: OrbitSortDirection;
   viewMode: ViewMode;
   onChangeView: (view: OrbitView) => void;
+  onChangeSortDirection: (direction: OrbitSortDirection) => void;
   onChangeViewMode: (mode: ViewMode) => void;
   selectionMode: boolean;
   canSelect: boolean;
@@ -1420,8 +1473,10 @@ interface QueueHeaderProps {
 function QueueHeader({
   orbitView,
   total,
+  sortDirection,
   viewMode,
   onChangeView,
+  onChangeSortDirection,
   onChangeViewMode,
   selectionMode,
   canSelect,
@@ -1440,8 +1495,12 @@ function QueueHeader({
             </p>
             <p className="mt-1 text-sm font-semibold text-white">
               {orbitView === "recent"
-                ? "Freshest bookmarks still in orbit"
-                : "All unsorted bookmarks"}
+                ? sortDirection === "asc"
+                  ? "Oldest bookmarks still in orbit"
+                  : "Freshest bookmarks still in orbit"
+                : sortDirection === "asc"
+                  ? "All unsorted bookmarks, oldest first"
+                  : "All unsorted bookmarks, newest first"}
             </p>
           </div>
 
@@ -1468,7 +1527,7 @@ function QueueHeader({
                         : "bg-muted text-muted-foreground"
                     )}
                   >
-                    {Math.min(total, RECENT_PAGE_SIZE).toLocaleString()}
+                    {Math.min(total, ORBIT_RECENT_PAGE_SIZE).toLocaleString()}
                   </span>
                 </button>
                 <button
@@ -1493,6 +1552,35 @@ function QueueHeader({
                   >
                     {total.toLocaleString()}
                   </span>
+                </button>
+              </div>
+
+              <div className="inline-flex items-center gap-1 rounded-xl border border-hairline-soft bg-surface-2/70 p-1 shadow-sm">
+                <button
+                  type="button"
+                  aria-pressed={sortDirection === "desc"}
+                  onClick={() => onChangeSortDirection("desc")}
+                  className={cn(
+                    "inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors",
+                    sortDirection === "desc"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Newest
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={sortDirection === "asc"}
+                  onClick={() => onChangeSortDirection("asc")}
+                  className={cn(
+                    "inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors",
+                    sortDirection === "asc"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Oldest
                 </button>
               </div>
 

@@ -24,6 +24,7 @@ import { LibraryControlCenter } from "@/components/library-control-center";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson } from "@/lib/fetch-json";
+import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
@@ -88,6 +89,19 @@ export default function AnalyticsPage() {
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
+  const oldestOrbitHref = analytics
+    ? buildOrbitIntentHref({
+        intent: "oldest",
+        orbitQueueCount: analytics.orbitQueueCount,
+        untaggedOldestAt: analytics.untaggedOldestAt,
+      })
+    : "/orbit";
+  const backlogOrbitHref = analytics
+    ? buildOrbitIntentHref({
+        intent: "backlog",
+        orbitQueueCount: analytics.orbitQueueCount,
+      })
+    : "/orbit";
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
@@ -187,9 +201,11 @@ export default function AnalyticsPage() {
                   <section className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                     <LibraryHealthCard
                       untaggedCount={analytics.untaggedCount}
+                      orbitQueueCount={analytics.orbitQueueCount}
                       totalBookmarks={analytics.totalBookmarks}
                       triagedPct={triagedPct}
                       oldestAt={analytics.untaggedOldestAt}
+                      orbitHref={oldestOrbitHref}
                     />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
                       <VelocityCard
@@ -211,6 +227,7 @@ export default function AnalyticsPage() {
                     totalCollections={analytics.totalCollections}
                     notedCount={analytics.notedCount}
                     lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
+                    orbitHref={backlogOrbitHref}
                     onSyncComplete={() => {
                       void invalidateLibraryQueries(queryClient);
                       void queryClient.invalidateQueries({ queryKey: ["analytics"] });
@@ -250,14 +267,18 @@ export default function AnalyticsPage() {
 
 function LibraryHealthCard({
   untaggedCount,
+  orbitQueueCount,
   totalBookmarks,
   triagedPct,
   oldestAt,
+  orbitHref,
 }: {
   untaggedCount: number;
+  orbitQueueCount: number;
   totalBookmarks: number;
   triagedPct: number;
   oldestAt: string | null;
+  orbitHref: string;
 }) {
   const untaggedPct = 100 - triagedPct;
   const oldestLabel = oldestAt
@@ -296,9 +317,9 @@ function LibraryHealthCard({
           ) : null}
         </div>
 
-        {!allTriaged ? (
+        {!allTriaged && orbitQueueCount > 0 ? (
           <Link
-            href="/orbit"
+            href={orbitHref}
             className={`${buttonVariants({ size: "sm" })} shrink-0`}
           >
             Triage now

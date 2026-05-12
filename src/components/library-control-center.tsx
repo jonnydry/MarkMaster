@@ -14,6 +14,7 @@ import {
 
 import { buttonVariants } from "@/components/ui/button";
 import { SyncButton } from "@/components/sync-button";
+import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { cn } from "@/lib/utils";
 
 type LibraryControlCenterProps = {
@@ -26,6 +27,7 @@ type LibraryControlCenterProps = {
   onSyncComplete?: () => void;
   className?: string;
   compact?: boolean;
+  orbitHref?: string;
 };
 
 function toDate(value: Date | string | null | undefined) {
@@ -43,14 +45,21 @@ export function LibraryControlCenter({
   onSyncComplete,
   className,
   compact = false,
+  orbitHref,
 }: LibraryControlCenterProps) {
   const hasBookmarks = totalBookmarks > 0;
   const allOrganized = hasBookmarks && untriagedCount === 0;
   const syncDate = toDate(lastSyncAt);
+  const resolvedOrbitHref =
+    orbitHref ??
+    buildOrbitIntentHref({
+      intent: "backlog",
+      orbitQueueCount: untriagedCount,
+    });
   const primaryHref = !hasBookmarks
     ? "/dashboard"
     : untriagedCount > 0
-      ? "/orbit"
+      ? resolvedOrbitHref
       : totalCollections > 0
         ? "/collections"
         : "/dashboard";
@@ -134,7 +143,7 @@ export function LibraryControlCenter({
                 label="Search across posts, authors, and notes"
               />
               <ActionLink
-                href="/orbit"
+                href={resolvedOrbitHref}
                 icon={Orbit}
                 label="Use Orbit for unsorted saves"
               />
