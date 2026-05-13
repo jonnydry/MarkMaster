@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
+  AlertTriangle,
   Download,
   Sun,
   Moon,
@@ -15,7 +17,10 @@ import {
   KeyRound,
   Loader2,
   Palette,
+  ServerCog,
   ShieldCheck,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,15 +33,17 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useTheme } from "@/components/providers";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
-import { sendJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
 import {
   invalidateLibraryQueries,
   invalidateTagsQuery,
 } from "@/lib/query-invalidation";
 import { assignBalancedTagColors } from "@/lib/tag-colors";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TagRow } from "./tag-row";
 import { TagEditRow } from "./tag-edit-row";
+import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -48,11 +55,13 @@ const CreateCollectionDialog = dynamic(
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
+  const orbitIssue = parseOrbitIssue(searchParams.get("orbitIssue"));
 
   const {
     data: tags = [],
@@ -79,6 +88,12 @@ export default function SettingsPage() {
       balancedTags.filter((tag, index) => tag.color !== tags[index]?.color),
     [balancedTags, tags]
   );
+  const orbitStatusQuery = useQuery({
+    queryKey: ["orbit", "xai-status", orbitIssue],
+    queryFn: () =>
+      fetchJson<OrbitXaiStatusPayload>(buildOrbitStatusUrl(orbitIssue)),
+    staleTime: 30_000,
+  });
 
   const handleDeleteTag = useCallback(async (tagId: string) => {
     if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
@@ -267,6 +282,25 @@ export default function SettingsPage() {
                 </div>
               </Card>
 
+              <Card
+                id="orbit-grok"
+                className="scroll-mt-24 border-hairline-soft bg-surface-1 p-5 shadow-sm"
+              >
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <BrainCircuit className="w-4 h-4 text-primary" />
+                    <h2 className="font-semibold heading-font">Orbit Grok</h2>
+                  </div>
+                  <OrbitStatusBadge status={orbitStatusQuery.data} />
+                </div>
+                <OrbitGrokStatusPanel
+                  status={orbitStatusQuery.data}
+                  loading={orbitStatusQuery.isLoading}
+                  error={orbitStatusQuery.error}
+                  onRetry={() => void orbitStatusQuery.refetch()}
+                />
+              </Card>
+
               <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   {theme === "dark" ? (
@@ -446,7 +480,7 @@ function TrustItem({
   label,
   copy,
 }: {
-  icon: typeof ShieldCheck;
+  icon: LucideIcon;
   label: string;
   copy: string;
 }) {
@@ -457,6 +491,186 @@ function TrustItem({
         <p className="text-sm font-medium text-foreground">{label}</p>
       </div>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy}</p>
+    </div>
+  );
+}
+
+function parseOrbitIssue(value: string | null): OrbitScanFailureCode | null {
+  return value === "xai_auth" || value === "xai_model" ? value : null;
+}
+
+function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
+  if (!issue) return "/api/orbit/status";
+  const params = new URLSearchParams({ lastFailure: issue });
+  return `/api/orbit/status?${params.toString()}`;
+}
+
+function OrbitStatusBadge({
+  status,
+}: {
+  status: OrbitXaiStatusPayload | undefined;
+}) {
+  if (!status) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-hairline-soft bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground">
+        Checking
+      </span>
+    );
+  }
+
+  const ready = status.state === "ready";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+        ready
+          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-100"
+      )}
+    >
+      {ready ? "Ready" : "Misconfigured"}
+    </span>
+  );
+}
+
+function OrbitGrokStatusPanel({
+  status,
+  loading,
+  error,
+  onRetry,
+}: {
+  status: OrbitXaiStatusPayload | undefined;
+  loading: boolean;
+  error: Error | null;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-12 rounded-2xl border border-hairline-soft bg-surface-2 skeleton-shimmer"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (error || !status) {
+    return (
+      <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Orbit status could not be checked
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {error?.message ?? "Please try again."}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const privacyLabel = status.privacy.storeDisabled
+    ? "Response storage disabled"
+    : "Response storage enabled";
+  const zeroDataRetentionLabel =
+    status.privacy.zeroDataRetention === true
+      ? "Zero data retention confirmed"
+      : status.privacy.zeroDataRetention === false
+        ? "Zero data retention not active"
+        : "Zero data retention not reported";
+
+  return (
+    <div className="space-y-3">
+      {status.issues.length > 0 ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" />
+            <div className="space-y-2">
+              {status.issues.map((issue) => (
+                <div key={issue.code}>
+                  <p className="text-sm font-medium text-foreground">
+                    {issue.title}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {issue.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-2">
+        <OrbitStatusItem
+          icon={Sparkles}
+          label="Grok model"
+          value={`${status.model} ${
+            status.modelSource === "environment" ? "from env" : "default"
+          }`}
+        />
+        <OrbitStatusItem
+          icon={ShieldCheck}
+          label="Privacy"
+          value={`${privacyLabel} · ${zeroDataRetentionLabel}`}
+        />
+        <OrbitStatusItem
+          icon={KeyRound}
+          label="xAI key"
+          value={status.apiKeyConfigured ? "Configured" : "Missing"}
+        />
+        <OrbitStatusItem
+          icon={ServerCog}
+          label="Endpoint"
+          value={`${status.baseUrl} ${
+            status.baseUrlSource === "environment" ? "from env" : "default"
+          }`}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Refresh status
+        </Button>
+        <Link
+          href="/orbit"
+          className="inline-flex h-7 items-center justify-center rounded-md border border-hairline-soft bg-transparent px-2.5 text-[0.8rem] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft"
+        >
+          Return to Orbit
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function OrbitStatusItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-hairline-soft bg-surface-2 p-3">
+      <Icon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-1 break-words text-sm font-medium text-foreground">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }

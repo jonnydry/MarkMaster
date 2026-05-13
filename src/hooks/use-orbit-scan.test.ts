@@ -10,12 +10,14 @@ describe("buildOrbitScanFailure", () => {
       kind: "auth",
       title: "xAI credentials need attention",
       message: "xAI rejected the request. Confirm your API key and model access.",
+      recoveryHref: "/settings?orbitIssue=xai_auth#orbit-grok",
     },
     {
       code: "xai_model",
       kind: "model",
       title: "Configured Grok model is unavailable",
       message: "xAI could not find the configured Grok model.",
+      recoveryHref: "/settings?orbitIssue=xai_model#orbit-grok",
     },
     {
       code: "xai_rate_limited",
@@ -41,5 +43,6 @@ describe("buildOrbitScanFailure", () => {
       message: payload.message,
       retryAfterSeconds: payload.retryAfterSeconds,
     });
+    expect(failure.recoveryHref).toBe(payload.recoveryHref);
   });
 });

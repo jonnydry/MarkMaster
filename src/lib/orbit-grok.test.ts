@@ -1,14 +1,86 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { PRESET_COLORS } from "@/lib/constants";
 import {
   buildOrbitPromptPayload,
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
   extractXaiResponsesOutputText,
+  getOrbitXaiRuntimeStatus,
   normalizeOrbitScanPlan,
   orbitScanPlanSchema,
   parseXaiOrbitScanPlanJson,
 } from "@/lib/orbit-grok";
+
+const ORIGINAL_XAI_ENV = {
+  XAI_API_KEY: process.env.XAI_API_KEY,
+  XAI_API_BASE_URL: process.env.XAI_API_BASE_URL,
+  XAI_ORBIT_MODEL: process.env.XAI_ORBIT_MODEL,
+};
+
+function restoreEnvValue(key: keyof typeof ORIGINAL_XAI_ENV) {
+  const value = ORIGINAL_XAI_ENV[key];
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+
+  process.env[key] = value;
+}
+
+afterEach(() => {
+  restoreEnvValue("XAI_API_KEY");
+  restoreEnvValue("XAI_API_BASE_URL");
+  restoreEnvValue("XAI_ORBIT_MODEL");
+});
+
+describe("getOrbitXaiRuntimeStatus", () => {
+  it("reports a missing xAI key before Orbit retries", () => {
+    delete process.env.XAI_API_KEY;
+    delete process.env.XAI_API_BASE_URL;
+    delete process.env.XAI_ORBIT_MODEL;
+
+    const status = getOrbitXaiRuntimeStatus();
+
+    expect(status).toMatchObject({
+      state: "misconfigured",
+      apiKeyConfigured: false,
+      model: "grok-4.3",
+      modelSource: "default",
+      baseUrl: "https://api.x.ai/v1",
+      baseUrlSource: "default",
+      privacy: {
+        storeDisabled: true,
+        zeroDataRetention: null,
+      },
+      issues: [
+        {
+          code: "missing_api_key",
+        },
+      ],
+    });
+  });
+
+  it("surfaces active model and last model failure", () => {
+    process.env.XAI_API_KEY = "xai-test";
+    process.env.XAI_ORBIT_MODEL = "grok-custom";
+    process.env.XAI_API_BASE_URL = "https://api.x.ai/v1/";
+
+    const status = getOrbitXaiRuntimeStatus({ lastFailureCode: "xai_model" });
+
+    expect(status).toMatchObject({
+      state: "misconfigured",
+      apiKeyConfigured: true,
+      model: "grok-custom",
+      modelSource: "environment",
+      baseUrl: "https://api.x.ai/v1",
+      issues: [
+        {
+          code: "xai_model",
+        },
+      ],
+    });
+  });
+});
 
 describe("parseXaiOrbitScanPlanJson", () => {
   it("accepts recoverable provider drift so normalization can repair it", () => {

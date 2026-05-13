@@ -32,6 +32,7 @@ import {
   Map as MapIcon,
   Orbit as OrbitIcon,
   RefreshCw,
+  Settings2,
   TagIcon,
   Trash2,
   type LucideIcon,
@@ -1435,6 +1436,19 @@ function OrbitScanFailureNotice({
           )}
           Retry last scan
         </Button>
+
+        {error.recoveryHref ? (
+          <Link
+            href={error.recoveryHref}
+            className={cn(
+              buttonVariants({ size: "sm", variant: "outline" }),
+              "h-9 rounded-lg border-white/25 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+            )}
+          >
+            <Settings2 className="size-3.5" />
+            {error.recoveryLabel ?? "Open Settings"}
+          </Link>
+        ) : null}
 
         {canRescanCurrentSelection ? (
           <Button

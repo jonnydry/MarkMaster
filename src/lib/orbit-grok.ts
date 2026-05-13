@@ -12,6 +12,7 @@ import type {
   OrbitScanResponsePayload,
   OrbitScanSummary,
   OrbitTagRollup,
+  OrbitXaiStatusPayload,
 } from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
@@ -108,6 +109,54 @@ export class OrbitGrokError extends Error {
     this.code = code;
     this.retryAfterSeconds = opts?.retryAfterSeconds;
   }
+}
+
+export function getOrbitXaiRuntimeStatus(args?: {
+  lastFailureCode?: OrbitScanFailureCode | null;
+}): OrbitXaiStatusPayload {
+  const configuredApiKey = process.env.XAI_API_KEY?.trim();
+  const configuredBaseUrl = process.env.XAI_API_BASE_URL?.trim();
+  const configuredModel = process.env.XAI_ORBIT_MODEL?.trim();
+  const issues: OrbitXaiStatusPayload["issues"] = [];
+
+  if (!configuredApiKey) {
+    issues.push({
+      code: "missing_api_key",
+      title: "xAI API key is missing",
+      message: "Set XAI_API_KEY on the server, then restart MarkMaster.",
+    });
+  } else if (args?.lastFailureCode === "xai_auth") {
+    issues.push({
+      code: "xai_auth",
+      title: "xAI rejected the last Orbit scan",
+      message:
+        "Confirm the server key is valid and has access to the configured Grok model.",
+    });
+  }
+
+  if (args?.lastFailureCode === "xai_model") {
+    issues.push({
+      code: "xai_model",
+      title: "Configured Grok model was not found",
+      message:
+        "Update XAI_ORBIT_MODEL or enable this model for the current xAI key.",
+    });
+  }
+
+  return {
+    state: issues.length > 0 ? "misconfigured" : "ready",
+    checkedAt: new Date().toISOString(),
+    apiKeyConfigured: Boolean(configuredApiKey),
+    model: configuredModel || DEFAULT_XAI_MODEL,
+    modelSource: configuredModel ? "environment" : "default",
+    baseUrl: (configuredBaseUrl || DEFAULT_XAI_BASE_URL).replace(/\/$/, ""),
+    baseUrlSource: configuredBaseUrl ? "environment" : "default",
+    privacy: {
+      storeDisabled: true,
+      zeroDataRetention: null,
+    },
+    issues,
+  };
 }
 
 export interface OrbitBookmarkForScan {
@@ -1083,11 +1132,9 @@ export async function scanOrbitBookmarksWithXai(args: {
     );
   }
 
-  const baseUrl = (process.env.XAI_API_BASE_URL?.trim() || DEFAULT_XAI_BASE_URL).replace(
-    /\/$/,
-    ""
-  );
-  const model = process.env.XAI_ORBIT_MODEL?.trim() || DEFAULT_XAI_MODEL;
+  const runtimeStatus = getOrbitXaiRuntimeStatus();
+  const baseUrl = runtimeStatus.baseUrl;
+  const model = runtimeStatus.model;
   const promptPayload = buildOrbitPromptPayload(args);
 
   let response: Response;

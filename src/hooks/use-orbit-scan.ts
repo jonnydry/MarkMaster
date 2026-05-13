@@ -36,6 +36,8 @@ export interface OrbitScanFailure {
   title: string;
   message: string;
   retryAfterSeconds?: number;
+  recoveryHref?: string;
+  recoveryLabel?: string;
 }
 
 export interface OrbitScanState {
@@ -127,6 +129,17 @@ function classifyOrbitScanFailure(code: OrbitScanFailureCode): {
   }
 }
 
+function buildOrbitScanRecovery(code: OrbitScanFailureCode):
+  | { recoveryHref: string; recoveryLabel: string }
+  | undefined {
+  if (code !== "xai_auth" && code !== "xai_model") return undefined;
+
+  return {
+    recoveryHref: `/settings?orbitIssue=${encodeURIComponent(code)}#orbit-grok`,
+    recoveryLabel: "Fix in Settings",
+  };
+}
+
 export function buildOrbitScanFailure(
   err: unknown,
   fallbackMessage: string
@@ -146,6 +159,7 @@ export function buildOrbitScanFailure(
     title,
     message,
     retryAfterSeconds: payload?.retryAfterSeconds,
+    ...buildOrbitScanRecovery(code),
   };
 }
 

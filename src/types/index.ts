@@ -158,6 +158,34 @@ export interface OrbitScanErrorPayload {
   retryAfterSeconds?: number;
 }
 
+export type OrbitXaiStatusState = "ready" | "misconfigured";
+
+export type OrbitXaiStatusIssueCode =
+  | "missing_api_key"
+  | "xai_auth"
+  | "xai_model";
+
+export interface OrbitXaiStatusIssue {
+  code: OrbitXaiStatusIssueCode;
+  title: string;
+  message: string;
+}
+
+export interface OrbitXaiStatusPayload {
+  state: OrbitXaiStatusState;
+  checkedAt: string;
+  apiKeyConfigured: boolean;
+  model: string;
+  modelSource: "default" | "environment";
+  baseUrl: string;
+  baseUrlSource: "default" | "environment";
+  privacy: {
+    storeDisabled: boolean;
+    zeroDataRetention: boolean | null;
+  };
+  issues: OrbitXaiStatusIssue[];
+}
+
 export interface OrbitTagSuggestion {
   name: string;
   color: string;
