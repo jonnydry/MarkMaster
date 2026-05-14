@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { CheckSquare, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -117,6 +118,111 @@ function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
   }
 
   return Array.from(shared);
+}
+
+function formatCompactMetric(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
+}
+
+function getHighlightLabel(bookmark: BookmarkWithRelations) {
+  const firstTag = bookmark.tags[0]?.tag.name;
+  if (bookmark.notes.length > 0) return "Note attached";
+  if (bookmark.collectionItems.length > 0) return "In collection";
+  if (firstTag) return `#${firstTag}`;
+  if (bookmark.media?.length) return "Media save";
+  return "Bookmark";
+}
+
+function getHighlightMetric(bookmark: BookmarkWithRelations) {
+  const metrics = bookmark.publicMetrics;
+  if (!metrics) return `@${bookmark.authorUsername}`;
+  if (metrics.like_count > 0) return `${formatCompactMetric(metrics.like_count)} likes`;
+  if (metrics.retweet_count > 0) return `${formatCompactMetric(metrics.retweet_count)} reposts`;
+  if (metrics.reply_count > 0) return `${formatCompactMetric(metrics.reply_count)} replies`;
+  return `@${bookmark.authorUsername}`;
+}
+
+function DashboardHighlights({
+  bookmarks,
+  activeBookmarkId,
+  onSelect,
+}: {
+  bookmarks: BookmarkWithRelations[];
+  activeBookmarkId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const highlightBookmarks = bookmarks.slice(0, 4);
+  if (highlightBookmarks.length === 0) return null;
+
+  return (
+    <section className="mx-auto w-full max-w-[960px] px-4 pb-2 pt-2 sm:px-5">
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+          Highlights
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+          {bookmarks.length.toLocaleString()} in view
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {highlightBookmarks.map((bookmark, index) => {
+          const active = activeBookmarkId === bookmark.id;
+          const label = getHighlightLabel(bookmark);
+          return (
+            <button
+              key={bookmark.id}
+              type="button"
+              onClick={() => onSelect(bookmark.id)}
+              className={cn(
+                "group flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                active
+                  ? "border-primary/45 bg-accent-soft/60"
+                  : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1"
+              )}
+              aria-label={`Open highlighted bookmark ${index + 1} from ${bookmark.authorDisplayName}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
+                  {label}
+                </span>
+                <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground/55">
+                  #{index + 1}
+                </span>
+              </div>
+              <p className="mt-2 line-clamp-3 font-mono text-sm font-bold leading-5 text-foreground">
+                {bookmark.tweetText}
+              </p>
+              <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  {bookmark.authorProfileImage ? (
+                    <Image
+                      src={bookmark.authorProfileImage}
+                      alt={`${bookmark.authorDisplayName} avatar`}
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 shrink-0 rounded-full border border-background/70"
+                    />
+                  ) : (
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 font-mono text-[10px] font-bold text-muted-foreground">
+                      {bookmark.authorDisplayName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                    @{bookmark.authorUsername}
+                  </span>
+                </div>
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.05em] text-muted-foreground/75">
+                  {getHighlightMetric(bookmark)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function DashboardContent() {
@@ -581,7 +687,7 @@ function DashboardContent() {
             <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
               <div
                 className={cn(
-                  "relative z-10 overflow-hidden rounded-2xl border border-hairline-strong shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
+                  "relative z-10 overflow-hidden rounded-sm border border-hairline-strong shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
                   bookmarkFeedColumnClassName,
                   appChromeFrostedClassName
                 )}
@@ -596,6 +702,14 @@ function DashboardContent() {
               </div>
             </div>
           </div>
+
+          {!isLoading && !isError && bookmarks.length > 0 && (
+            <DashboardHighlights
+              bookmarks={bookmarks}
+              activeBookmarkId={activeBookmarkIdForView}
+              onSelect={setActiveBookmarkId}
+            />
+          )}
 
           {isLoading ? (
             <DashboardSkeleton viewMode={viewMode} />

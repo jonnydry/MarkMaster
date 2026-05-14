@@ -74,6 +74,7 @@ export function BookmarkList({
           bookmark={bookmark}
           viewMode={viewMode}
           searchQuery={searchQuery}
+          rank={i + 1}
           priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
           selected={
             selectionMode

@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ElementType,
 } from "react";
 import dynamic from "next/dynamic";
@@ -30,17 +29,16 @@ import {
   ListChecks,
   Loader2,
   Map as MapIcon,
-  Orbit as OrbitIcon,
   RefreshCw,
   Settings2,
   TagIcon,
   Trash2,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -124,144 +122,15 @@ const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
 
-function OrbitHeaderEtching() {
+function OrbitHeaderLogoAccent() {
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[380px] overflow-hidden sm:block"
+      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[240px] overflow-hidden sm:block"
       aria-hidden
-      style={
-        {
-          "--orbit-etch-dark": "rgba(3, 7, 18, 0.5)",
-          "--orbit-etch-light": "rgba(255, 255, 255, 0.52)",
-          "--orbit-etch-blue": "rgba(125, 211, 252, 0.5)",
-        } as CSSProperties
-      }
     >
-      <svg
-        viewBox="0 0 380 88"
-        className="absolute right-0 top-1/2 h-24 w-[380px] -translate-y-1/2 opacity-95 [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]"
-        fill="none"
-      >
-        <defs>
-          <filter
-            id="orbit-header-etching-soften"
-            x="-20%"
-            y="-30%"
-            width="140%"
-            height="160%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feGaussianBlur stdDeviation="0.18" />
-          </filter>
-        </defs>
-        <g
-          filter="url(#orbit-header-etching-soften)"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <g opacity="0.9">
-            <ellipse
-              cx="260"
-              cy="44"
-              rx="92"
-              ry="18"
-              stroke="var(--orbit-etch-dark)"
-              strokeWidth="2.4"
-            />
-            <ellipse
-              cx="260"
-              cy="44"
-              rx="92"
-              ry="18"
-              stroke="var(--orbit-etch-dark)"
-              strokeWidth="2"
-              transform="rotate(58 260 44)"
-            />
-            <ellipse
-              cx="260"
-              cy="44"
-              rx="92"
-              ry="18"
-              stroke="var(--orbit-etch-dark)"
-              strokeWidth="2"
-              transform="rotate(-58 260 44)"
-            />
-            <path
-              d="M138 44H358"
-              stroke="var(--orbit-etch-dark)"
-              strokeWidth="1.5"
-              strokeDasharray="2 14"
-              opacity="0.58"
-            />
-          </g>
-          <ellipse
-            cx="260"
-            cy="44"
-            rx="92"
-            ry="18"
-            stroke="var(--orbit-etch-light)"
-            strokeWidth="1"
-          />
-          <ellipse
-            cx="260"
-            cy="44"
-            rx="92"
-            ry="18"
-            stroke="var(--orbit-etch-blue)"
-            strokeWidth="1"
-            transform="rotate(58 260 44)"
-          />
-          <ellipse
-            cx="260"
-            cy="44"
-            rx="92"
-            ry="18"
-            stroke="var(--orbit-etch-blue)"
-            strokeWidth="1"
-            transform="rotate(-58 260 44)"
-          />
-          <circle
-            cx="260"
-            cy="44"
-            r="6"
-            fill="rgba(255,255,255,0.1)"
-            stroke="var(--orbit-etch-dark)"
-            strokeWidth="1.5"
-          />
-          <circle
-            cx="260"
-            cy="44"
-            r="4.8"
-            stroke="var(--orbit-etch-light)"
-            strokeWidth="0.8"
-          />
-          <circle cx="176" cy="30" r="2.7" fill="var(--orbit-etch-light)" />
-          <circle
-            cx="176"
-            cy="30"
-            r="3.4"
-            stroke="var(--orbit-etch-dark)"
-            strokeWidth="1"
-            opacity="0.6"
-          />
-          <circle cx="330" cy="62" r="2.2" fill="var(--orbit-etch-light)" />
-          <circle
-            cx="330"
-            cy="62"
-            r="2.9"
-            stroke="var(--orbit-etch-dark)"
-            strokeWidth="1"
-            opacity="0.55"
-          />
-        </g>
-        <path
-          d="M138 44H358"
-          stroke="var(--orbit-etch-light)"
-          strokeWidth="1"
-          strokeDasharray="2 14"
-          opacity="0.4"
-        />
-      </svg>
+      <div className="absolute right-3 top-1/2 size-28 -translate-y-1/2 rounded-full bg-primary/15 blur-2xl" />
+      <OrbitLogoMark className="absolute right-0 top-1/2 size-28 -translate-y-1/2 opacity-[0.12]" />
+      <OrbitLogoMark className="absolute right-12 top-1/2 size-16 -translate-y-1/2 opacity-80 drop-shadow-[0_0_22px_rgba(37,99,235,0.42)]" />
     </div>
   );
 }
@@ -934,7 +803,7 @@ export default function OrbitPage() {
               bodyClassName="relative overflow-hidden"
               title={
                 <span className="flex items-center gap-2">
-                  <OrbitIcon className="size-5 text-primary" />
+                  <OrbitLogoMark className="size-5" />
                   Orbit
                 </span>
               }
@@ -956,7 +825,7 @@ export default function OrbitPage() {
               }
               actions={dbUser ? <UserNavDynamic user={dbUser} /> : null}
             >
-              <OrbitHeaderEtching />
+              <OrbitHeaderLogoAccent />
             </PageHeader>
           </div>
 
@@ -1306,7 +1175,7 @@ function formatRetryAfter(seconds: number | undefined) {
 }
 
 function getScanFailurePresentation(error: OrbitScanFailure): {
-  Icon: LucideIcon;
+  Icon: ElementType<{ className?: string }>;
   label: string;
   badgeClassName: string;
   panelClassName: string;
@@ -1327,7 +1196,7 @@ function getScanFailurePresentation(error: OrbitScanFailure): {
       };
     case "model":
       return {
-        Icon: OrbitIcon,
+        Icon: OrbitLogoMark,
         label: "Model",
         badgeClassName: "border-sky-300/30 bg-sky-300/10 text-sky-100",
         panelClassName: "border-sky-300/25 bg-sky-300/10",
@@ -1697,7 +1566,7 @@ function QueueEmptyState({
 }) {
   return (
     <div className="border-y border-hairline-soft py-10 text-center">
-      <OrbitIcon className="mx-auto mb-4 size-8 text-primary/70" />
+      <OrbitLogoMark className="mx-auto mb-4 size-8" />
       <p className="text-base font-semibold text-foreground">
         {searching ? "Nothing in Orbit matches this search" : "Orbit is clear"}
       </p>

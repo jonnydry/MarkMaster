@@ -10,11 +10,11 @@ import {
   FolderOpen,
   LayoutGrid,
   Loader2,
-  Orbit as OrbitIcon,
   Tag as TagIcon,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -256,7 +256,7 @@ function SelectedClusterBody({
       <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
-            <OrbitIcon className="size-4" />
+            <OrbitLogoMark className="size-4" />
           </span>
           <div>
             <p className="text-sm font-medium text-white">Orbit index</p>

@@ -18,10 +18,10 @@ import {
   ArrowLeft,
   Folder,
   Loader2,
-  Orbit as OrbitIcon,
   Search,
 } from "lucide-react";
 
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
@@ -347,7 +347,7 @@ export default function OrbitMapPage() {
         <PageHeader
           title={
             <span className="flex items-center gap-2">
-              <OrbitIcon className="size-5 text-primary" />
+              <OrbitLogoMark className="size-5" />
               Graph
             </span>
           }

@@ -7,7 +7,6 @@ import {
   BarChart3,
   Bookmark,
   FolderOpen,
-  Orbit,
   Settings,
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
@@ -15,6 +14,7 @@ import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
@@ -44,7 +44,7 @@ export interface SidebarProps {
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
-  { href: "/orbit", icon: Orbit, label: "Orbit" },
+  { href: "/orbit", icon: OrbitLogoMark, label: "Orbit" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },

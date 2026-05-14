@@ -21,6 +21,7 @@ import {
 } from "@/components/brands/x-post-metric-icons";
 import { Button } from "@/components/ui/button";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
+import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
@@ -39,6 +40,7 @@ interface BookmarkCardProps {
   selectionMode?: boolean;
   onSelectionChange?: (bookmarkId: string, selected: boolean) => void;
   className?: string;
+  rank?: number;
   /** First above-the-fold card with media: set so the hero image is not lazy-loaded (LCP). */
   priorityMedia?: boolean;
 }
@@ -63,10 +65,40 @@ function TagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="border-b border-primary/35 bg-transparent px-0.5 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+      className="rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
     >
       {name}
     </button>
+  );
+}
+
+function BookmarkRank({
+  rank,
+  compact = false,
+}: {
+  rank?: number;
+  compact?: boolean;
+}) {
+  if (typeof rank !== "number") return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "flex shrink-0 flex-col items-center font-mono tabular-nums",
+        compact ? "w-7 pt-0.5" : "w-8 pt-1"
+      )}
+    >
+      <span
+        className={cn(
+          "font-bold text-muted-foreground/55",
+          compact ? "text-xs leading-4" : "text-sm leading-4"
+        )}
+      >
+        {rank}
+      </span>
+      <span className="mt-1 h-1.5 w-1.5 rounded-[2px] border border-hairline-soft bg-surface-2" />
+    </div>
   );
 }
 
@@ -146,6 +178,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   selectionMode = false,
   onSelectionChange,
   className,
+  rank,
   priorityMedia = false,
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
@@ -195,7 +228,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact") {
     return (
       <div
-        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 hover:bg-accent-soft/40 ${
+        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:80px] hover:bg-accent-soft/40 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
           selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
@@ -211,6 +244,7 @@ export const BookmarkCard = memo(function BookmarkCard({
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
+        <BookmarkRank rank={rank} compact />
         {selectionMode && (
           <SelectionToggle
             selected={selected}
@@ -409,7 +443,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 hover:bg-accent-soft/35 ${
+      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
         isInteractive ? "cursor-pointer" : ""
       } ${
         selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
@@ -426,6 +460,7 @@ export const BookmarkCard = memo(function BookmarkCard({
       onKeyDown={handleCardKeyDown}
     >
       <div className="flex gap-3">
+        <BookmarkRank rank={rank} />
         {selectionMode && (
           <SelectionToggle
             selected={selected}

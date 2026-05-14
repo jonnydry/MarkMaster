@@ -1,17 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ElementType } from "react";
 import {
   CheckCircle2,
   Folder,
   Loader2,
-  Orbit as OrbitIcon,
   Tag as TagIcon,
   X,
-  type LucideIcon,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -82,9 +81,9 @@ const MONO_STYLE: React.CSSProperties = {
 const REVIEW_DECISION_OPTIONS: Array<{
   value: OrbitReviewDecision;
   label: string;
-  icon: LucideIcon;
+  icon: ElementType<{ className?: string }>;
 }> = [
-  { value: "keep", label: "Keep", icon: OrbitIcon },
+  { value: "keep", label: "Keep", icon: OrbitLogoMark },
   { value: "tags", label: "Tags", icon: TagIcon },
   { value: "collection", label: "Collect", icon: Folder },
   { value: "tags_collection", label: "Both", icon: CheckCircle2 },
