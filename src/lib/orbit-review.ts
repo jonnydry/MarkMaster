@@ -1,5 +1,6 @@
 import type {
   CollectionWithCount,
+  OrbitBookmarkSuggestion,
   OrbitCollectionSuggestion,
   OrbitScanPlan,
   OrbitTagSuggestion,
@@ -85,21 +86,26 @@ function deriveReviewDecision(
   return "keep";
 }
 
+export function createOrbitReviewDraftFromSuggestion(
+  suggestion: OrbitBookmarkSuggestion
+): OrbitReviewSuggestionDraft {
+  const decision = deriveReviewDecision(suggestion);
+  return {
+    bookmarkId: suggestion.bookmarkId,
+    included: decision !== "keep",
+    decision,
+    tagNames: suggestion.tags.map((tag) => tag.name).join(", "),
+    collectionName: suggestion.collection?.name ?? "",
+    collectionDescription: suggestion.collection?.description ?? "",
+  };
+}
+
 export function createOrbitReviewDraft(
   plan: OrbitScanPlan
 ): OrbitReviewSuggestionDraft[] {
-  return plan.suggestions.map((suggestion) => {
-    const decision = deriveReviewDecision(suggestion);
-
-    return {
-      bookmarkId: suggestion.bookmarkId,
-      included: decision !== "keep",
-      decision,
-      tagNames: suggestion.tags.map((tag) => tag.name).join(", "),
-      collectionName: suggestion.collection?.name ?? "",
-      collectionDescription: suggestion.collection?.description ?? "",
-    };
-  });
+  return plan.suggestions.map((suggestion) =>
+    createOrbitReviewDraftFromSuggestion(suggestion)
+  );
 }
 
 export function buildReviewedOrbitPlan({

@@ -13,6 +13,7 @@ import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { OrbitReviewEditSheet } from "@/components/orbit/orbit-review-edit-sheet";
 import {
   Command,
   CommandEmpty,
@@ -432,6 +433,9 @@ export function OrbitReviewDialog({
     value: boolean;
   }>(() => ({ key: "empty", value: true }));
 
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const [sheetBookmarkId, setSheetBookmarkId] = useState<string | null>(null);
+
   const bookmarkById = useMemo(
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
@@ -567,152 +571,238 @@ export function OrbitReviewDialog({
               </DialogDescription>
             </div>
           </div>
-        </DialogHeader>
+        {/* Refined Native-First Orbit Review — vertical list of native-style cards + Impact Bar */}
+        <div className="min-h-0 overflow-hidden px-4 py-3">
+          {/* Global Impact Bar (styled like rail metrics) */}
+          {drafts.length > 0 && (
+            <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-4 text-[11px]">
+                  <div><span className="text-white/45">Apply</span> <span className="font-medium tabular-nums">{reviewStats.applyableBookmarks}</span></div>
+                  <div><span className="text-white/45">Keep</span> <span className="font-medium tabular-nums">{reviewStats.keptBookmarks}</span></div>
+                  <div><span className="text-sky-300/80">+{impact.newTags.length} tags</span></div>
+                  <div><span className="text-sky-300/80">+{impact.newCollections.length} cols</span></div>
+                </div>
 
-        <div className="grid min-h-0 gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
-          <ScrollArea className="max-h-[60vh] min-h-0 pr-3">
-            <div className="space-y-3">
-              {drafts.length === 0 ? (
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5 text-sm text-white/60">
+                <div className="flex items-center gap-2">
+                  <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={handleBulkApplySuggested} disabled={applying}>
+                    <RotateCcw className="mr-1 size-3" /> Restore all
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkKeepAll} disabled={applying}>
+                    Keep all
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkTagOnly} disabled={applying}>
+                    Tag all
+                  </Button>
+
+                  <div className="ml-2 flex items-center gap-2 border-l border-white/10 pl-3">
+                    <span className="text-xs text-white/60">New collections</span>
+                    <Switch checked={createCollections} onCheckedChange={handleCreateCollectionsChange} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <ScrollArea className="h-[58vh]">
+            <div className="space-y-3 pb-6">
+              {drafts.length === 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
                   No suggestions are waiting for review.
                 </div>
-              ) : (
-                drafts.map((draft) => {
-                  const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
-                  const preview = getPreviewText(bookmark);
-                  const usesTags = orbitReviewDecisionUsesTags(draft.decision);
-                  const usesCollection = orbitReviewDecisionUsesCollection(
-                    draft.decision
-                  );
-
-                  return (
-                    <div
-                      key={draft.bookmarkId}
-                      className={cn(
-                        "rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm",
-                        draft.decision === "keep" && "opacity-70"
-                      )}
-                    >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="min-w-0 truncate text-sm font-medium text-white">
-                              {bookmark
-                                ? `@${bookmark.authorUsername}`
-                                : draft.bookmarkId}
-                            </p>
-                            <Badge
-                              variant="outline"
-                              className="border-white/12 bg-white/5 text-[10px] uppercase tracking-[0.16em] text-white/60"
-                            >
-                              {getDecisionLabel(draft.decision)}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-xs leading-snug text-white/55">
-                            {preview}
-                          </p>
-                        </div>
-
-                        <OrbitReviewDecisionControl
-                          value={draft.decision}
-                          onChange={(decision) =>
-                            updateDraft(draft.bookmarkId, {
-                              decision,
-                              included: decision !== "keep",
-                            })
-                          }
-                        />
-                      </div>
-
-                      <div className="mt-4 grid gap-4 md:grid-cols-2 md:items-start">
-                        <div className="space-y-1.5">
-                          <p className="flex items-center gap-1.5 text-xs text-white/70">
-                            <TagIcon className="size-3.5 shrink-0" />
-                            Tags
-                          </p>
-                          <OrbitReviewTagField
-                            tagNames={draft.tagNames}
-                            included={usesTags}
-                            existingTags={existingTags}
-                            onTagNamesChange={(next) =>
-                              updateDraft(draft.bookmarkId, {
-                                tagNames: next,
-                              })
-                            }
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <p className="flex items-center gap-1.5 text-xs text-white/70">
-                            <Folder className="size-3.5 shrink-0" />
-                            Collection
-                          </p>
-                          <OrbitReviewCollectionField
-                            collectionName={draft.collectionName}
-                            collectionDescription={draft.collectionDescription}
-                            included={usesCollection}
-                            namePlaceholder="No collection move"
-                            existingCollections={existingCollections}
-                            onCollectionNameChange={(name) =>
-                              updateDraft(draft.bookmarkId, {
-                                collectionName: name,
-                              })
-                            }
-                            onCollectionDescriptionChange={(description) =>
-                              updateDraft(draft.bookmarkId, {
-                                collectionDescription: description,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
               )}
+
+              {drafts.map((draft) => {
+                const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
+                const preview = getPreviewText(bookmark);
+                const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
+
+                const origDecisionLabel = original
+                  ? (original.tags.length && original.collection ? "Both" : original.tags.length ? "Tags" : original.collection ? "Collect" : "Keep")
+                  : "—";
+
+                const currDecisionLabel = getDecisionLabel(draft.decision);
+
+                const origTagNames = original ? original.tags.map((t) => t.name) : [];
+                const currTagNames = splitTagNames(draft.tagNames);
+
+                const origTagSet = new Set(origTagNames);
+                const currTagSet = new Set(currTagNames);
+
+                const addedTags = currTagNames.filter((t) => !origTagSet.has(t));
+                const removedTags = origTagNames.filter((t) => !currTagSet.has(t));
+
+                const origCol = original?.collection?.name || null;
+                const currCol = draft.collectionName.trim() || null;
+
+                const hasChanges = draft.decision !== (original ? (original.tags.length && original.collection ? "tags_collection" : original.tags.length ? "tags" : original.collection ? "collection" : "keep") : "keep")
+                  || draft.tagNames !== origTagNames.join(", ")
+                  || draft.collectionName !== (origCol || "");
+
+                return (
+                  <div
+                    key={draft.bookmarkId}
+                    className={cn(
+                      "group relative rounded-2xl border border-hairline-soft bg-surface-1 shadow-sm transition-all",
+                      draft.decision === "keep" && "opacity-75",
+                      sheetBookmarkId === draft.bookmarkId && "border-sky-400/50 bg-surface-2/70",
+                      "hover:border-white/20 hover:bg-surface-2/50"
+                    )}
+                  >
+                    {/* Header — native to triage card + focus strip */}
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium text-white/90">
+                          @{bookmark?.authorUsername || draft.bookmarkId}
+                        </span>
+                        {original && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
+                              original.confidence === "high" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+                              original.confidence === "medium" && "border-sky-400/30 bg-sky-400/10 text-sky-200",
+                              original.confidence === "low" && "border-blue-500/30 bg-blue-500/10 text-blue-200"
+                            )}
+                            title={formatConfidence(original.confidence)}
+                          >
+                            {confidenceLabel(original.confidence).split(" ")[0]}
+                          </span>
+                        )}
+                      </div>
+
+                      {hasChanges && (
+                        <span className="rounded bg-amber-400/15 px-1.5 py-px text-[10px] text-amber-300">edited</span>
+                      )}
+                    </div>
+
+                    {/* Preview */}
+                    <div className="px-4 pb-2 text-[13px] leading-snug text-white/80 line-clamp-2">
+                      {preview}
+                    </div>
+
+                    {/* Grok reasoning — native meta label */}
+                    {original?.reasoning && (
+                      <div className="px-4 pb-2 text-xs leading-snug text-white/65">
+                        {original.reasoning}
+                      </div>
+                    )}
+
+                    {/* Compact change summary — elegant native treatment */}
+                    {hasChanges && (
+                      <div className="px-4 pb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                        {currDecisionLabel !== origDecisionLabel && (
+                          <span className="rounded bg-amber-400/15 px-1.5 py-px text-amber-300">
+                            Decision changed
+                          </span>
+                        )}
+                        {addedTags.length > 0 && (
+                          <span className="rounded bg-emerald-400/15 px-1.5 py-px text-emerald-300">
+                            +{addedTags.length} tags
+                          </span>
+                        )}
+                        {removedTags.length > 0 && (
+                          <span className="rounded bg-rose-400/15 px-1.5 py-px text-rose-300">
+                            −{removedTags.length} tags
+                          </span>
+                        )}
+                        {origCol !== currCol && (
+                          <span className="rounded bg-amber-400/15 px-1.5 py-px text-amber-300">
+                            Collection changed
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action footer — exact triage card treatment for native cohesion */}
+                    <div className="relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-md border border-white/10 bg-black/20 p-px">
+                          <OrbitReviewDecisionControl
+                            value={draft.decision}
+                            size="default"
+                            onChange={(decision) => updateDraft(draft.bookmarkId, { decision, included: decision !== "keep" })}
+                          />
+                        </div>
+
+                        <div className="ml-auto flex items-center gap-1.5">
+                          {hasChanges && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1 text-[10px] text-white/70 hover:text-white"
+                              onClick={() => handleResetOne(draft.bookmarkId)}
+                              disabled={applying}
+                            >
+                              <RotateCcw className="size-3" /> Reset
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={cn(
+                              "h-7 gap-1 border-white/20 bg-white/5 text-[10px] text-white/80 hover:bg-white/10",
+                              sheetBookmarkId === draft.bookmarkId && "border-sky-400/60 bg-sky-400/10 text-sky-200"
+                            )}
+                            onClick={() => {
+                              setSheetBookmarkId(draft.bookmarkId);
+                              setIsEditSheetOpen(true);
+                            }}
+                          >
+                            Details
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Inline editors — refined native treatment inside the action footer */}
+                      {draft.decision !== "keep" && (
+                        <div className="grid gap-4 pt-2 md:grid-cols-2">
+                          <div className="rounded-lg bg-white/[0.02] p-2.5">
+                            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                              Tags
+                            </div>
+                            <OrbitReviewTagField
+                              tagNames={draft.tagNames}
+                              included={orbitReviewDecisionUsesTags(draft.decision)}
+                              existingTags={existingTags}
+                              onTagNamesChange={(n) => updateDraft(draft.bookmarkId, { tagNames: n })}
+                            />
+                          </div>
+                          <div className="rounded-lg bg-white/[0.02] p-2.5">
+                            <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                              Collection
+                            </div>
+                            <OrbitReviewCollectionField
+                              collectionName={draft.collectionName}
+                              collectionDescription={draft.collectionDescription}
+                              included={orbitReviewDecisionUsesCollection(draft.decision)}
+                              namePlaceholder="No collection move"
+                              existingCollections={existingCollections}
+                              onCollectionNameChange={(n) => updateDraft(draft.bookmarkId, { collectionName: n })}
+                              onCollectionDescriptionChange={(d) => updateDraft(draft.bookmarkId, { collectionDescription: d })}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </ScrollArea>
-
-          <aside className="space-y-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-              <p
-                className="text-[10px] font-medium uppercase tracking-[0.22em] text-sky-200/80"
-                style={MONO_STYLE}
-              >
-                Review summary
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                <SummaryStat
-                  label="Apply"
-                  value={reviewStats.applyableBookmarks}
-                />
-                <SummaryStat label="Keep" value={reviewStats.keptBookmarks} />
-                <SummaryStat label="Tags" value={reviewStats.tagAssignments} />
-                <SummaryStat
-                  label="Moves"
-                  value={reviewStats.collectionMoves}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-white">
-                    New collections
-                  </p>
-                  <p className="mt-0.5 text-xs text-white/50">
-                    {createCollections ? "Allowed" : "Existing only"}
-                  </p>
-                </div>
-                <Switch
-                  checked={createCollections}
-                  onCheckedChange={handleCreateCollectionsChange}
-                />
-              </div>
-            </div>
-          </aside>
         </div>
+
+        {/* Right-side rich editing sheet */}
+        <OrbitReviewEditSheet
+          open={isEditSheetOpen}
+          onOpenChange={setIsEditSheetOpen}
+          draft={drafts.find((d) => d.bookmarkId === sheetBookmarkId) ?? null}
+          original={sheetBookmarkId ? originalSuggestionById.get(sheetBookmarkId) ?? null : null}
+          bookmark={sheetBookmarkId ? bookmarkById.get(sheetBookmarkId) ?? null : null}
+          existingTags={existingTags}
+          existingCollections={existingCollections}
+          onDraftChange={(id, patch) => updateDraft(id, patch)}
+          onReset={(id) => handleResetOne(id)}
+        />
 
         <DialogFooter className="border-white/10 bg-slate-950/95 px-5 py-4">
           <Button
