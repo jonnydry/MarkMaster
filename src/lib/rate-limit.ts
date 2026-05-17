@@ -1,48 +1,306 @@
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+import { Redis } from "@upstash/redis";
+import { Ratelimit } from "@upstash/ratelimit";
+import { NextResponse } from "next/server";
 
-const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 60;
+/**
+ * Rate Limiting Configuration
+ *
+ * Conservative limits designed for a tool that may eventually be open-sourced
+ * or offered to others. Sync is the most expensive operation (X API cost),
+ * so it is heavily restricted. Orbit scans are more generous.
+ */
 
-function evictExpired(): void {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
+export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write";
+
+interface RateLimitPolicy {
+  requests: number;
+  window: `${number} ${"s" | "m" | "h" | "d"}`;
+  description: string;
 }
 
-export function checkRateLimit(identifier: string): {
-  allowed: boolean;
+/**
+ * Centralized rate limit policies.
+ * Easy to adjust as the project evolves.
+ */
+const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
+  sync: {
+    requests: 1,
+    window: "30 m",
+    description: "Bookmark sync - very expensive (X API + processing)",
+  },
+  orbit: {
+    requests: 10,
+    window: "1 d",
+    description: "Orbit scans - more generous than syncs",
+  },
+  "api:read": {
+    requests: 100,
+    window: "5 m",
+    description: "General read operations (bookmarks, tags, collections, etc.)",
+  },
+  "api:write": {
+    requests: 30,
+    window: "5 m",
+    description: "General write operations (creating/updating tags, collections, etc.)",
+  },
+};
+
+// Development safety net: disable rate limiting when Upstash is not configured
+const isRateLimitingEnabled = !!process.env.UPSTASH_REDIS_REST_URL;
+
+// Lazy Redis + Ratelimit initialization
+// Only created when Upstash credentials are actually present.
+// This prevents noisy "[Upstash Redis] Unable to find environment variable" warnings.
+let _redis: ReturnType<typeof Redis.fromEnv> | null = null;
+let _ratelimiters: Record<RateLimitAction, Ratelimit> | null = null;
+
+function getRedis() {
+  if (!_redis && isRateLimitingEnabled) {
+    _redis = Redis.fromEnv();
+  }
+  return _redis;
+}
+
+function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
+  if (!_ratelimiters && getRedis()) {
+    const r = getRedis()!;
+    _ratelimiters = {
+      sync: new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES.sync.requests,
+          POLICIES.sync.window
+        ),
+        analytics: true,
+        prefix: "ratelimit:sync",
+      }),
+      orbit: new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES.orbit.requests,
+          POLICIES.orbit.window
+        ),
+        analytics: true,
+        prefix: "ratelimit:orbit",
+      }),
+      "api:read": new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES["api:read"].requests,
+          POLICIES["api:read"].window
+        ),
+        analytics: true,
+        prefix: "ratelimit:api-read",
+      }),
+      "api:write": new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES["api:write"].requests,
+          POLICIES["api:write"].window
+        ),
+        analytics: true,
+        prefix: "ratelimit:api-write",
+      }),
+    };
+  }
+  return _ratelimiters;
+}
+
+// === Global Safety Limits ===
+// These protect the entire system (important once the app has multiple users)
+const GLOBAL_SYNC_LIMIT = { requests: 50, window: "1 h" as const };
+const GLOBAL_ORBIT_LIMIT = { requests: 200, window: "1 d" as const };
+
+let _globalSyncLimiter: Ratelimit | null = null;
+let _globalOrbitLimiter: Ratelimit | null = null;
+
+function getGlobalSyncLimiter() {
+  if (!_globalSyncLimiter && getRedis()) {
+    _globalSyncLimiter = new Ratelimit({
+      redis: getRedis()!,
+      limiter: Ratelimit.slidingWindow(GLOBAL_SYNC_LIMIT.requests, GLOBAL_SYNC_LIMIT.window),
+      analytics: true,
+      prefix: "ratelimit:global-sync",
+    });
+  }
+  return _globalSyncLimiter;
+}
+
+function getGlobalOrbitLimiter() {
+  if (!_globalOrbitLimiter && getRedis()) {
+    _globalOrbitLimiter = new Ratelimit({
+      redis: getRedis()!,
+      limiter: Ratelimit.slidingWindow(GLOBAL_ORBIT_LIMIT.requests, GLOBAL_ORBIT_LIMIT.window),
+      analytics: true,
+      prefix: "ratelimit:global-orbit",
+    });
+  }
+  return _globalOrbitLimiter;
+}
+
+/**
+ * Development safety net: If Redis is not configured, disable rate limiting
+ * so local development isn't blocked.
+ */
+
+
+export interface RateLimitResult {
+  success: boolean;
+  limit: number;
   remaining: number;
-  resetAt: number;
-} {
-  evictExpired();
-
-  const now = Date.now();
-  const entry = rateLimitMap.get(identifier);
-
-  if (!entry || now > entry.resetAt) {
-    const resetAt = now + WINDOW_MS;
-    rateLimitMap.set(identifier, { count: 1, resetAt });
-    return { allowed: true, remaining: MAX_REQUESTS - 1, resetAt };
-  }
-
-  entry.count++;
-  const remaining = Math.max(0, MAX_REQUESTS - entry.count);
-  const allowed = entry.count <= MAX_REQUESTS;
-
-  return { allowed, remaining, resetAt: entry.resetAt };
+  reset: number; // Unix timestamp (ms) when the limit resets
+  retryAfter?: number; // Seconds until user can retry
 }
 
-export function rateLimitResponse(resetAt: number) {
-  return new Response(
-    JSON.stringify({ error: "Too many requests. Please try again later." }),
+/**
+ * Checks if a user has exceeded their rate limit for a specific action.
+ *
+ * @param action - The type of action being rate limited
+ * @param userId - The user's ID (from the database)
+ * @returns RateLimitResult with success status and metadata
+ */
+export async function checkRateLimit(
+  action: RateLimitAction,
+  userId: string
+): Promise<RateLimitResult> {
+  // In development without Upstash configured, always allow requests
+  if (!isRateLimitingEnabled) {
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+
+  const ratelimitersMap = getRatelimiters();
+  const ratelimiter = ratelimitersMap ? ratelimitersMap[action] : null;
+
+  if (!ratelimiter) {
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+
+  try {
+    const { success, limit, remaining, reset } = await ratelimiter.limit(userId);
+
+    const result: RateLimitResult = {
+      success,
+      limit,
+      remaining,
+      reset,
+    };
+
+    if (!success) {
+      const now = Date.now();
+      result.retryAfter = Math.max(0, Math.ceil((reset - now) / 1000));
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`[RateLimit] checkRateLimit failed for action "${action}" (failing open):`, error);
+    // Fail open — never let rate limiting break the application
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+}
+
+/**
+ * Helper to get a human-readable description of a rate limit policy.
+ * Useful for error messages or admin UIs.
+ */
+export function getRateLimitDescription(action: RateLimitAction): string {
+  return POLICIES[action].description;
+}
+
+/**
+ * Checks global (system-wide) rate limits for expensive operations.
+ * This is a safety net when the app has multiple users.
+ */
+export async function checkGlobalRateLimit(
+  action: "sync" | "orbit"
+): Promise<RateLimitResult> {
+  // If rate limiting is disabled (no Upstash creds), always allow
+  if (!isRateLimitingEnabled) {
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+
+  const limiter = action === "sync" ? getGlobalSyncLimiter() : getGlobalOrbitLimiter();
+
+  if (!limiter) {
+    // Redis not available — fail open
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+
+  try {
+    const { success, limit, remaining, reset } = await limiter.limit("global");
+
+    const result: RateLimitResult = {
+      success,
+      limit,
+      remaining,
+      reset,
+    };
+
+    if (!success) {
+      const now = Date.now();
+      result.retryAfter = Math.max(0, Math.ceil((reset - now) / 1000));
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`[RateLimit] checkGlobalRateLimit failed for "${action}" (failing open):`, error);
+    return {
+      success: true,
+      limit: 999,
+      remaining: 999,
+      reset: Date.now() + 60_000,
+    };
+  }
+}
+
+/**
+ * Creates a standardized 429 "Too Many Requests" response.
+ * Includes Retry-After header and a helpful error message.
+ */
+export function createRateLimitResponse(result: RateLimitResult): NextResponse {
+  const message = result.retryAfter
+    ? `Rate limit exceeded. Please try again in ${result.retryAfter} seconds.`
+    : "Rate limit exceeded. Please try again later.";
+
+  return NextResponse.json(
+    {
+      error: "Too Many Requests",
+      message,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    },
     {
       status: 429,
       headers: {
-        "Content-Type": "application/json",
-        "Retry-After": Math.ceil((resetAt - Date.now()) / 1000).toString(),
+        "Retry-After": String(result.retryAfter ?? 60),
+        "X-RateLimit-Limit": String(result.limit),
+        "X-RateLimit-Remaining": String(result.remaining),
+        "X-RateLimit-Reset": String(result.reset),
       },
     }
   );

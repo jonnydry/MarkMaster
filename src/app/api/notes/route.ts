@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNoteSchema, deleteNoteSchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit note writes
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await req.json().catch(() => ({}));
@@ -41,6 +48,12 @@ export async function DELETE(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit note deletes
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await req.json().catch(() => ({}));

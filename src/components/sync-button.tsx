@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson, FetchJsonError } from "@/lib/fetch-json";
 import type { SyncRunSummary, SyncStatusResponse } from "@/types";
 
 interface SyncButtonProps {
@@ -24,6 +24,9 @@ export function SyncButton({
   detail = "compact",
 }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
+  const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<string>("");
+
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
     useQuery<SyncStatusResponse>({
       queryKey: ["sync-status"],
@@ -35,7 +38,29 @@ export function SyncButton({
 
   const currentRun = syncStatus?.currentRun;
   const latestRun = syncStatus?.recentRuns[0] ?? null;
-  const isAnySyncRunning = syncing || Boolean(currentRun);
+  const isRateLimited = rateLimitedUntil ? Date.now() < rateLimitedUntil : false;
+  const isAnySyncRunning = syncing || Boolean(currentRun) || isRateLimited;
+
+  // Live countdown for rate limit
+  useEffect(() => {
+    if (!rateLimitedUntil) return;
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((rateLimitedUntil - Date.now()) / 1000));
+
+      if (remaining <= 0) {
+        setRateLimitedUntil(null);
+        setCountdown("");
+        clearInterval(interval);
+      } else {
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+        setCountdown(`${minutes}:${seconds.toString().padStart(2, "0")}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [rateLimitedUntil]);
 
   const statusCopy = getSyncStatusCopy(currentRun, latestRun, lastSyncAt);
 
@@ -67,13 +92,27 @@ export function SyncButton({
       void refetchSyncStatus();
       onSyncComplete?.();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Failed to sync bookmarks";
-      toast.error(message || "Failed to sync bookmarks");
+      if (error instanceof FetchJsonError && error.status === 429) {
+        // Try to extract retry time from body or message
+        const retryAfter =
+          (error.body as any)?.retryAfter ??
+          parseInt(error.message.match(/(\d+)\s*seconds?/i)?.[1] || "60", 10);
+
+        const until = Date.now() + retryAfter * 1000;
+        setRateLimitedUntil(until);
+
+        toast.error("Rate limit reached", {
+          description: `Please wait ${Math.ceil(retryAfter / 60)} minute(s) before syncing again.`,
+        });
+        return;
+      }
+
+      if (error instanceof Error) {
+        toast.error(error.message || "Failed to sync bookmarks");
+        return;
+      }
+
+      toast.error("Failed to sync bookmarks");
     } finally {
       setSyncing(false);
     }
@@ -86,12 +125,17 @@ export function SyncButton({
         onClick={handleSync}
         aria-busy={isAnySyncRunning}
         variant="outline"
-        className="h-9 w-full gap-2 border-primary/45 bg-primary/10 text-sm font-semibold text-foreground hover:border-primary/70 hover:bg-primary/15"
+        disabled={isRateLimited}
+        className="h-9 w-full gap-2 border-primary/45 bg-primary/10 text-sm font-semibold text-foreground hover:border-primary/70 hover:bg-primary/15 disabled:opacity-70"
       >
         <RefreshCw
           className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
         />
-        {isAnySyncRunning ? "Syncing..." : "Sync"}
+        {isRateLimited
+          ? `Rate limited (${countdown})`
+          : isAnySyncRunning
+            ? "Syncing..."
+            : "Sync"}
       </Button>
 
       {syncStatusError ? (

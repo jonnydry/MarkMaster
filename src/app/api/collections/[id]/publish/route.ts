@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateShareContent } from "@/lib/share-content";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(
   req: NextRequest,
@@ -11,6 +12,12 @@ export async function POST(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit collection publish/share operations
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const collection = await prisma.collection.findUnique({

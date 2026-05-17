@@ -114,3 +114,21 @@ describe("syncBookmarks", () => {
     expect(maxActiveUpdates).toBeLessThanOrEqual(10);
   });
 });
+
+describe("refactored sync path (smoke test)", () => {
+  it("exercises the refactored implementation without crashing when USE_REFACTORED_SYNC=true", async () => {
+    vi.stubEnv("USE_REFACTORED_SYNC", "true");
+
+    // Dynamic import so the module picks up the new env var
+    const { syncBookmarks: refactoredSync } = await import("./sync");
+
+    // Basic happy-path call using the existing mock setup
+    const result = await refactoredSync("user-1");
+
+    // We mainly care that it didn't throw and returned a plausible result shape
+    expect(result).toHaveProperty("newBookmarks");
+    expect(result).toHaveProperty("updatedBookmarks");
+    expect(result).toHaveProperty("totalFetched");
+    expect(typeof result.newBookmarks).toBe("number");
+  });
+});

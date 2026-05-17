@@ -28,12 +28,20 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit)
   const body = isJson ? await res.json().catch(() => null) : await res.text();
 
   if (!res.ok) {
-    const message =
+    let message =
       typeof body === "object" && body && "error" in body
         ? String(body.error)
         : typeof body === "string" && body
           ? body
           : `Request failed with status ${res.status}`;
+
+    // Special handling for rate limits
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("Retry-After");
+      message = retryAfter
+        ? `Rate limit exceeded. Please try again in ${retryAfter} seconds.`
+        : "Rate limit exceeded. Please slow down and try again later.";
+    }
 
     throw new FetchJsonError(message, res.status, body);
   }

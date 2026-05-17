@@ -211,3 +211,17 @@ export const bookmarksQuerySchema = z
 export const exportQuerySchema = z.object({
   format: z.enum(["json", "csv"]).default("json"),
 });
+
+// Orbit Graph query parameters
+export const MAX_ORBIT_GRAPH_NODE_CAP = 4000;
+export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1500;
+
+export const orbitGraphQuerySchema = z.object({
+  nodeCap: z.coerce
+    .number()
+    .int()
+    .min(1, "nodeCap must be at least 1")
+    .max(MAX_ORBIT_GRAPH_NODE_CAP, `nodeCap cannot exceed ${MAX_ORBIT_GRAPH_NODE_CAP}`)
+    .default(DEFAULT_ORBIT_GRAPH_NODE_CAP)
+    .optional(),
+});

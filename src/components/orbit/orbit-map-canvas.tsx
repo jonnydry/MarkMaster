@@ -31,6 +31,10 @@ import type {
   OrbitGraphPayload,
 } from "@/types";
 
+import type { GraphFilter } from "./orbit-map-canvas-host";
+
+// Local interfaces for the legacy component (kept for its own API and backward compatibility).
+// These should stay in sync with the ones in the protocol / host.
 export interface OrbitMapSelection {
   kind: "tag" | "collection" | "bookmark" | "core" | "overflow";
   id: string;
@@ -46,6 +50,9 @@ export interface OrbitMapCanvasHandle {
   animateAssign: (bookmarkId: string, anchorId: string) => Promise<void>;
   resetView: () => void;
 }
+
+// Re-export GraphFilter from the new system
+export type { GraphFilter } from "./orbit-map-canvas-host";
 
 interface OrbitMapCanvasProps {
   data: OrbitGraphPayload;
@@ -185,8 +192,6 @@ function hexToRgb(hex: string): [number, number, number] {
 const POSITIONS_STORAGE_KEY = "orbit-map-positions-v3";
 const MAX_B2B_EDGES = 400;
 const MAX_BOOKMARKS_PER_SHARED_TAG_EDGE_PASS = 80;
-
-type GraphFilter = "all" | "loose" | "recent";
 
 function isNodeVisibleForFilter(
   node: OrbitGraphNode,
@@ -1473,6 +1478,7 @@ export const OrbitMapCanvas = forwardRef<
           setTimeout(resolve, 540);
         });
       },
+      getLatestPositions: () => ({}), // Legacy canvas does not participate in the new position sync
     }),
     [fitViewToNodes, focusViewOnSelection]
   );

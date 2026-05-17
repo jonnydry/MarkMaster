@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getDbUser } from "@/lib/auth";
 import { syncBookmarks } from "@/lib/sync";
 import { getRetryAfterSeconds, getSyncRetryUntil } from "@/lib/sync-throttle";
+import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const STALE_SYNC_WINDOW_MS = 30 * 60 * 1000;
 
@@ -90,6 +91,18 @@ export async function POST() {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit syncs (most expensive operation)
+  const rateLimitResult = await checkRateLimit("sync", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
+  // Global safety limit (protects the whole system)
+  const globalResult = await checkGlobalRateLimit("sync");
+  if (!globalResult.success) {
+    return createRateLimitResponse(globalResult);
   }
 
   const syncRun = await prisma.$transaction(async (tx) => {

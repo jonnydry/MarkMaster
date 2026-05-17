@@ -27,5 +27,14 @@ if (ok) {
       "Optional: XAI_API_KEY is unset — Grok Orbit scan stays disabled until you add it (see README)."
     );
   }
+
+  // Rate limiting (Phase 0 remediation)
+  if (process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
+    console.log("Production: UPSTASH_REDIS_REST_* vars detected — using distributed rate limiting.");
+  } else {
+    console.log(
+      "Rate limiting: Using in-memory fallback (fine for development). For production / multi-instance deploys, set UPSTASH_REDIS_REST_URL + TOKEN (or use Vercel KV)."
+    );
+  }
 }
 process.exit(ok ? 0 : 1);

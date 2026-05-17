@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  orbitGraphQuerySchema,
+  DEFAULT_ORBIT_GRAPH_NODE_CAP,
+} from "@/lib/validations";
 import type {
   OrbitGraphEdge,
   OrbitGraphNode,
   OrbitGraphPayload,
   OrbitGraphStats,
 } from "@/types";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
-const DEFAULT_NODE_CAP = 1_500;
-const MAX_NODE_CAP = 4_000;
 const RECENT_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
 const TITLE_LENGTH = 140;
 
@@ -19,20 +22,25 @@ function truncateTitle(text: string) {
   return `${normalized.slice(0, TITLE_LENGTH - 1).trimEnd()}…`;
 }
 
-function parseNodeCap(value: string | null): number {
-  if (!value) return DEFAULT_NODE_CAP;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_NODE_CAP;
-  return Math.min(parsed, MAX_NODE_CAP);
-}
-
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const nodeCap = parseNodeCap(req.nextUrl.searchParams.get("nodeCap"));
+  // Rate limit graph generation (can be expensive for large libraries)
+  const rateLimitResult = await checkRateLimit("api:read", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
+  // Validate query parameters with Zod
+  const queryParams = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const parsed = orbitGraphQuerySchema.safeParse(queryParams);
+
+  const nodeCap = parsed.success
+    ? (parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP)
+    : DEFAULT_ORBIT_GRAPH_NODE_CAP;
 
   const [tagsRaw, collectionsRaw, totalBookmarks, bookmarksRaw] =
     await Promise.all([

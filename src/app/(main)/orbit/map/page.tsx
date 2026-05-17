@@ -38,11 +38,11 @@ import type {
   OrbitMapCanvasHandle,
   OrbitMapFocus,
   OrbitMapSelection,
-} from "@/components/orbit/orbit-map-canvas";
+} from "@/components/orbit/orbit-map-canvas-host";
 
 const OrbitMapCanvas = dynamic(
   () =>
-    import("@/components/orbit/orbit-map-canvas").then((m) => m.OrbitMapCanvas),
+    import("@/components/orbit/orbit-map-canvas-host").then((m) => m.default),
   {
     ssr: false,
     loading: () => (

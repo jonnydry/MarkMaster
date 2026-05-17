@@ -1,39 +1,78 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+import crypto from "node:crypto";
+import { THEME_INIT_SCRIPT } from "./src/lib/theme-init";
 
 // Avoid wrong workspace root when a parent directory also has a lockfile.
 const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
 
+// Compute SHA-256 hash of the theme initialization script for CSP
+// This allows us to remove 'unsafe-inline' from script-src while keeping the FOUC-prevention script.
+const THEME_SCRIPT_HASH =
+  "sha256-" + crypto.createHash("sha256").update(THEME_INIT_SCRIPT).digest("base64");
+
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  // 'unsafe-inline' removed from script-src by using a hash for the single known inline script.
+  // 'unsafe-eval' is only allowed in development (Turbopack + React Refresh).
+  `script-src 'self' '${THEME_SCRIPT_HASH}'${isDev ? " 'unsafe-eval'" : ""}`,
+  // 'unsafe-inline' for styles is still required due to Tailwind v4 + shadcn/ui.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https://pbs.twimg.com https://abs.twimg.com",
   "font-src 'self' data:",
+  // API connections needed for X (Twitter) and xAI (Grok/Orbit)
   `connect-src 'self' https://api.x.ai https://api.twitter.com https://x.com https://twitter.com${
     isDev ? " http: ws:" : ""
   }`,
+  // Required for the high-performance PixiJS Orbit Map Web Worker (blob: workers)
+  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://x.com https://twitter.com",
   "frame-ancestors 'none'",
   "upgrade-insecure-requests",
+  // Report violations to our endpoint (see /api/csp-report)
+  "report-to default;",
 ].join("; ");
 
 const securityHeaders = [
+  // === CSP Strategy (Security Hardening Phase) ===
+  //
+  // We use Content-Security-Policy-Report-Only as the primary tool during hardening.
+  // This allows us to collect real violation data via /debug/rate-limits without breaking the app.
+  //
+  // The enforcing Content-Security-Policy is currently DISABLED by default during this phase.
+  // It can be re-enabled once we have clean reports and are ready to enforce.
   {
-    key: "Content-Security-Policy",
+    key: "Content-Security-Policy-Report-Only",
     value: contentSecurityPolicy,
   },
+  // Required for modern Reporting API (pairs with report-to in CSP)
+  {
+    key: "Reporting-Endpoints",
+    value: 'default="/api/csp-report"',
+  },
+  // Enforcing CSP (disabled during hardening phase for safety)
+  // Uncomment the block below when ready to enforce:
+  // {
+  //   key: "Content-Security-Policy",
+  //   value: contentSecurityPolicy,
+  // },
+
   {
     key: "Referrer-Policy",
     value: "strict-origin-when-cross-origin",
   },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=()",
+    value:
+      "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), bluetooth=(), camera=(), " +
+      "display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), gamepad=(), " +
+      "geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), " +
+      "midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), " +
+      "serial=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()",
   },
   {
     key: "X-Content-Type-Options",
@@ -42,6 +81,20 @@ const securityHeaders = [
   {
     key: "X-Frame-Options",
     value: "DENY",
+  },
+  // HSTS - Force HTTPS for 1 year (only in production)
+  ...(process.env.NODE_ENV === "production"
+    ? [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=31536000; includeSubDomains; preload",
+        },
+      ]
+    : []),
+  // Helps mitigate some cross-origin attacks and Spectre-class issues
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin",
   },
 ];
 

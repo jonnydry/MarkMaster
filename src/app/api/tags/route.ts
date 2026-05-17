@@ -4,6 +4,7 @@ import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBalancedTagColor } from "@/lib/tag-colors";
 import { createTagSchema, deleteTagSchema, patchTagSchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function GET() {
   const user = await getDbUser();
@@ -24,6 +25,12 @@ export async function POST(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit tag creation/updates
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await req.json().catch(() => ({}));

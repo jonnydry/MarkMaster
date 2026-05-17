@@ -4,12 +4,12 @@ import { useMemo, useRef } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 
-import {
-  OrbitMapCanvas,
-  type OrbitMapCanvasHandle,
-  type OrbitMapFocus,
-  type OrbitMapSelection,
-} from "@/components/orbit/orbit-map-canvas";
+import { OrbitMapCanvas } from "@/components/orbit/orbit-map-canvas"; // legacy component
+import type {
+  OrbitMapCanvasHandle,
+  OrbitMapFocus,
+  OrbitMapSelection,
+} from "@/components/orbit/orbit-map-canvas-host";
 import { cn } from "@/lib/utils";
 import type { OrbitDecision, OrbitGraphPayload } from "@/types";
 

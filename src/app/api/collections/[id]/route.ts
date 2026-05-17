@@ -3,6 +3,7 @@ import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 import { patchCollectionSchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function GET(
   _req: NextRequest,
@@ -46,6 +47,12 @@ export async function PATCH(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit collection metadata updates
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await req.json().catch(() => ({}));

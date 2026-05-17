@@ -8,6 +8,7 @@ import {
   scanOrbitBookmarksWithXai,
 } from "@/lib/orbit-grok";
 import type { OrbitScanErrorPayload } from "@/types";
+import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const orbitScanBookmarkInclude = {
   notes: { select: { id: true, content: true } },
@@ -28,6 +29,18 @@ export async function POST(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit Orbit scans (more generous than syncs)
+  const rateLimitResult = await checkRateLimit("orbit", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
+  // Global safety limit
+  const globalResult = await checkGlobalRateLimit("orbit");
+  if (!globalResult.success) {
+    return createRateLimitResponse(globalResult);
   }
 
   const body = await req.json().catch(() => ({}));

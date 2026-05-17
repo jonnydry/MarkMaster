@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exportQuerySchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const EXPORT_LIMIT = 10_000;
 
@@ -23,6 +24,12 @@ export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit exports (can be expensive)
+  const rateLimitResult = await checkRateLimit("api:read", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const rawParams = Object.fromEntries(req.nextUrl.searchParams.entries());

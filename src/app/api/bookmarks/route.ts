@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { tokenizeBookmarkSearch } from "@/lib/bookmark-search";
 import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const bookmarkInclude = {
   tags: { include: { tag: true } },
@@ -382,6 +383,12 @@ export async function DELETE(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit bookmark deletions
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await req.json().catch(() => ({}));
