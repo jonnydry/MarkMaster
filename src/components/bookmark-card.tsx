@@ -43,6 +43,8 @@ interface BookmarkCardProps {
   rank?: number;
   /** First above-the-fold card with media: set so the hero image is not lazy-loaded (LCP). */
   priorityMedia?: boolean;
+  /** The card is the currently focused performance highlight (single-item triage view). */
+  isPerformanceHighlight?: boolean;
 }
 
 function formatCount(n: number): string {
@@ -180,6 +182,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   className,
   rank,
   priorityMedia = false,
+  isPerformanceHighlight = false,
 }: BookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
@@ -276,6 +279,11 @@ export const BookmarkCard = memo(function BookmarkCard({
               title="Post from X"
             />
           </div>
+          {isPerformanceHighlight && (
+            <div className="-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-mono font-semibold uppercase tracking-[0.08em] text-primary">
+              Performance highlight • Top engagement unsorted
+            </div>
+          )}
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
             {highlightedText}
           </p>
@@ -318,7 +326,11 @@ export const BookmarkCard = memo(function BookmarkCard({
         className={`group relative overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/70 transition-colors duration-150 hover:border-primary/30 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
-          selected ? "border-primary/45 ring-1 ring-primary/35" : ""
+          selected || isPerformanceHighlight
+            ? isPerformanceHighlight
+              ? "border-primary/70 ring-2 ring-primary/40 shadow-sm"
+              : "border-primary/45 ring-1 ring-primary/35"
+            : ""
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -446,7 +458,11 @@ export const BookmarkCard = memo(function BookmarkCard({
       className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
         isInteractive ? "cursor-pointer" : ""
       } ${
-        selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
+        selected || isPerformanceHighlight
+          ? isPerformanceHighlight
+            ? "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
+            : "border-l-2 border-l-primary bg-primary/[0.04]"
+          : ""
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
@@ -27,14 +27,16 @@ import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { sendJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
 import {
   invalidateCollectionsQuery,
   invalidateLibraryQueries,
 } from "@/lib/query-invalidation";
 import { toast } from "sonner";
 import { UserCollectionCard, XFolderCard } from "./collection-card";
-import type { CollectionWithCount } from "@/types";
+import type { CollectionWithCount, BookmarkWithRelations } from "@/types";
+import { PerformanceHighlights } from "@/components/performance-highlights";
+import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -112,6 +114,13 @@ export default function CollectionsPage() {
   } = useCollectionsQuery();
 
   const { data: tags = [] } = useTagsQuery();
+
+  // Broad performance highlights across the entire library (not limited to raw/unsorted).
+  // This is the "overall engagement" view we discussed for the collections area.
+  const { data: libraryHighlightData } = usePerformanceHighlightsHook(false);
+
+  const libraryHighlights = libraryHighlightData?.bookmarks ?? [];
+  const libraryTotal = libraryHighlightData?.total ?? 0;
 
   const { userCollections, xFolders } = useMemo(
     () => splitCollections(collections),
@@ -313,6 +322,20 @@ export default function CollectionsPage() {
                   maxItems={collectionStats.maxItems}
                   onCreateCollection={() => setCreateOpen(true)}
                   onOpenCollection={handleNavigate}
+                />
+
+                <PerformanceHighlights
+                  title="Library Highlights"
+                  subtitle={
+                    libraryTotal > 0
+                      ? `${libraryTotal.toLocaleString()} bookmarks by X engagement`
+                      : undefined
+                  }
+                  bookmarks={libraryHighlights}
+                  total={libraryTotal}
+                  onSelect={(id) =>
+                    router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
+                  }
                 />
 
                 <CollectionsControlBar

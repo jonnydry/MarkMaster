@@ -74,7 +74,7 @@ export function orbitReviewDecisionUsesCollection(
   return decision === "collection" || decision === "tags_collection";
 }
 
-function deriveReviewDecision(
+export function deriveReviewDecision(
   suggestion: OrbitScanPlan["suggestions"][number]
 ): OrbitReviewDecision {
   const hasTags = suggestion.tags.length > 0;

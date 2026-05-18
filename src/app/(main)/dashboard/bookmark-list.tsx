@@ -18,6 +18,7 @@ interface BookmarkListProps {
   onAddToCollection: (id: string) => void;
   onAddNote: (id: string) => void;
   onDelete: (bookmarkIds: string | string[]) => void;
+  performanceHighlightId?: string | null;
 }
 
 export function BookmarkList({
@@ -35,6 +36,7 @@ export function BookmarkList({
   onAddToCollection,
   onAddNote,
   onDelete,
+  performanceHighlightId,
 }: BookmarkListProps) {
   if (viewMode === "grid") {
     return (
@@ -60,6 +62,7 @@ export function BookmarkList({
             onAddNote={onAddNote}
             onDelete={(id) => onDelete(id)}
             className={getStaggerClass(i, "animate-fade-in-up")}
+            isPerformanceHighlight={performanceHighlightId === bookmark.id}
           />
         ))}
       </div>
@@ -90,6 +93,7 @@ export function BookmarkList({
           onAddNote={onAddNote}
           onDelete={(id) => onDelete(id)}
           className={getStaggerClass(i, "animate-fade-in")}
+          isPerformanceHighlight={performanceHighlightId === bookmark.id}
         />
       ))}
     </div>

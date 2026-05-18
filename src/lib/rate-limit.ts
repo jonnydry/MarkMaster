@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
  * so it is heavily restricted. Orbit scans are more generous.
  */
 
-export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write";
+export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write" | "csp-report";
 
 interface RateLimitPolicy {
   requests: number;
@@ -42,6 +42,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 30,
     window: "5 m",
     description: "General write operations (creating/updating tags, collections, etc.)",
+  },
+  "csp-report": {
+    requests: 200,
+    window: "5 m",
+    description: "CSP violation reports (public ingestion endpoint - abuse protection)",
   },
 };
 
@@ -100,6 +105,15 @@ function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
         ),
         analytics: true,
         prefix: "ratelimit:api-write",
+      }),
+      "csp-report": new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES["csp-report"].requests,
+          POLICIES["csp-report"].window
+        ),
+        analytics: true,
+        prefix: "ratelimit:csp-report",
       }),
     };
   }

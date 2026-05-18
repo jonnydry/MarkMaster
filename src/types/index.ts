@@ -4,6 +4,7 @@ export type SortField =
   | "likes"
   | "retweets"
   | "replies"
+  | "performance"
   | "authorUsername";
 
 export type SortDirection = "asc" | "desc";
@@ -38,6 +39,7 @@ export interface BookmarkWithRelations {
     like_count: number;
     quote_count: number;
     bookmark_count: number;
+    impression_count?: number;
   } | null;
   media: Array<{
     type: string;

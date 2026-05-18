@@ -38,13 +38,14 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const securityHeaders = [
-  // === CSP Strategy (Security Hardening Phase) ===
+  // === CSP Strategy ===
   //
-  // We use Content-Security-Policy-Report-Only as the primary tool during hardening.
-  // This allows us to collect real violation data via /debug/rate-limits without breaking the app.
+  // We run in Report-Only mode by default so we can observe real violation data
+  // (via the protected /api/csp-report and /debug/rate-limits tools) without
+  // breaking the application during development and early production rollout.
   //
-  // The enforcing Content-Security-Policy is currently DISABLED by default during this phase.
-  // It can be re-enabled once we have clean reports and are ready to enforce.
+  // The enforcing Content-Security-Policy can be enabled by uncommenting the block below
+  // once violation reports are clean.
   {
     key: "Content-Security-Policy-Report-Only",
     value: contentSecurityPolicy,
@@ -54,8 +55,8 @@ const securityHeaders = [
     key: "Reporting-Endpoints",
     value: 'default="/api/csp-report"',
   },
-  // Enforcing CSP (disabled during hardening phase for safety)
-  // Uncomment the block below when ready to enforce:
+  // Enforcing CSP (commented out by default for safe rollout).
+  // Uncomment when violation reports via the protected debug tools are clean:
   // {
   //   key: "Content-Security-Policy",
   //   value: contentSecurityPolicy,

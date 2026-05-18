@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getDbUser } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 interface CspReport {
   "blocked-uri"?: string;
@@ -24,11 +26,20 @@ export const recentCspViolations: Array<{
 /**
  * CSP Violation Reporting Endpoint
  *
- * Receives Content-Security-Policy violation reports from the browser.
- * Logs them in a human-readable format and stores the last 50 for debugging.
+ * - POST: Receives reports from the browser (public, as browsers send these unauthenticated).
+ * - GET:  Returns recent violations for the internal debug UI.
+ *         Requires authentication. If OWNER_USER_ID is set in the environment,
+ *         access is further restricted to that specific user (recommended for shared dev/staging).
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit public CSP report ingestion to prevent abuse / log flooding
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const rate = await checkRateLimit("csp-report", `csp:${ip}`);
+    if (!rate.success) {
+      return NextResponse.json({ error: "Too many reports" }, { status: 429 });
+    }
+
     const contentType = req.headers.get("content-type") || "";
     let rawBody: any;
 
@@ -80,7 +91,18 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  // Return recent CSP violations for the debug page
+  const user = await getDbUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Restrict to owner only when OWNER_USER_ID is configured (works in both dev and prod)
+  const ownerUserId = process.env.OWNER_USER_ID;
+  if (ownerUserId && user.id !== ownerUserId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Return recent CSP violations for the debug page (authenticated users only)
   return NextResponse.json({
     violations: recentCspViolations,
     count: recentCspViolations.length,

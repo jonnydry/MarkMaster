@@ -5,9 +5,12 @@ import { RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetClose } from "@/components/ui/sheet";
-import { OrbitReviewTagField } from "@/components/orbit/orbit-review-dialog"; // reuse existing
-import { OrbitReviewCollectionField } from "@/components/orbit/orbit-review-dialog";
-import { OrbitReviewDecisionControl } from "@/components/orbit/orbit-review-dialog";
+import {
+  OrbitReviewTagField,
+  OrbitReviewCollectionField,
+  OrbitReviewDecisionControl,
+  getDecisionLabel,
+} from "@/components/orbit/orbit-review-fields";
 
 import { cn } from "@/lib/utils";
 import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
@@ -17,7 +20,13 @@ import type {
   OrbitBookmarkSuggestion,
   TagWithCount,
 } from "@/types";
-import type { OrbitReviewSuggestionDraft } from "@/lib/orbit-review";
+import {
+  deriveReviewDecision,
+  orbitReviewDecisionUsesCollection,
+  orbitReviewDecisionUsesTags,
+  splitTagNames,
+  type OrbitReviewSuggestionDraft,
+} from "@/lib/orbit-review";
 
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
@@ -55,8 +64,12 @@ export function OrbitReviewEditSheet({
 
   const hasChanges =
     original &&
-    (draft.decision !== (original.tags.length && original.collection ? "tags_collection" : original.tags.length ? "tags" : original.collection ? "collection" : "keep") ||
-      draft.tagNames !== original.tags.map((t) => t.name).join(", ") ||
+    (draft.decision !== deriveReviewDecision(original) ||
+      (() => {
+        const o = new Set(original.tags.map((t) => t.name));
+        const c = new Set(splitTagNames(draft.tagNames));
+        return o.size !== c.size || [...o].some((x) => !c.has(x));
+      })() ||
       draft.collectionName !== (original.collection?.name || ""));
 
   return (
@@ -135,8 +148,8 @@ export function OrbitReviewEditSheet({
                   <div className="space-y-2 text-xs text-white/75">
                     {/* Decision */}
                     {(() => {
-                      const origDec = original.tags.length && original.collection ? "Both" : original.tags.length ? "Tags" : original.collection ? "Collect" : "Keep";
-                      const currDec = (draft.decision === "tags_collection" ? "Both" : draft.decision === "tags" ? "Tags" : draft.decision === "collection" ? "Collect" : "Keep");
+                      const origDec = getDecisionLabel(deriveReviewDecision(original));
+                      const currDec = getDecisionLabel(draft.decision);
                       if (origDec === currDec) return null;
                       return <div>Decision: <span className="text-white/50 line-through">{origDec}</span> → <span className="font-medium text-amber-300">{currDec}</span></div>;
                     })()}
@@ -144,7 +157,7 @@ export function OrbitReviewEditSheet({
                     {/* Tags */}
                     {(() => {
                       const origTags = original.tags.map((t) => t.name);
-                      const currTags = draft.tagNames ? draft.tagNames.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                      const currTags = splitTagNames(draft.tagNames);
                       const added = currTags.filter((t) => !origTags.includes(t));
                       const removed = origTags.filter((t) => !currTags.includes(t));
                       if (added.length === 0 && removed.length === 0) return null;
@@ -182,13 +195,12 @@ export function OrbitReviewEditSheet({
                 </div>
                 <OrbitReviewDecisionControl
                   value={draft.decision}
-                  size="default"
                   onChange={(d) => update({ decision: d, included: d !== "keep" })}
                 />
               </div>
 
               {/* Tags */}
-              {draft.decision !== "keep" && (
+              {orbitReviewDecisionUsesTags(draft.decision) && (
                 <div>
                   <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
                     Tags
@@ -205,7 +217,7 @@ export function OrbitReviewEditSheet({
               )}
 
               {/* Collection */}
-              {draft.decision !== "keep" && (
+              {orbitReviewDecisionUsesCollection(draft.decision) && (
                 <div>
                   <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
                     Collection

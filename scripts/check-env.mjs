@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 
 const required = [
   "DATABASE_URL",
@@ -35,6 +36,24 @@ if (ok) {
     console.log(
       "Rate limiting: Using in-memory fallback (fine for development). For production / multi-instance deploys, set UPSTASH_REDIS_REST_URL + TOKEN (or use Vercel KV)."
     );
+  }
+
+  // Local security hygiene: warn if .env has overly permissive permissions (Unix/macOS only)
+  try {
+    if (process.platform !== "win32" && fs.existsSync(".env")) {
+      const stats = fs.statSync(".env");
+      const mode = stats.mode & 0o777; // last 9 bits
+      if (mode & 0o077) {
+        // group or others have any permission
+        console.warn(
+          "\n⚠️  Security warning: .env file permissions are too open (" +
+            mode.toString(8) +
+            ").\n   Run: chmod 600 .env   (recommended for local development)"
+        );
+      }
+    }
+  } catch (e) {
+    // Non-fatal
   }
 }
 process.exit(ok ? 0 : 1);

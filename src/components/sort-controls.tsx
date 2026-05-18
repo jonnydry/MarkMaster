@@ -51,6 +51,7 @@ export function SortControls({
           <SelectItem value="likes">Most Liked</SelectItem>
           <SelectItem value="retweets">Most Retweeted</SelectItem>
           <SelectItem value="replies">Most Replied</SelectItem>
+          <SelectItem value="performance">Performance</SelectItem>
           <SelectItem value="authorUsername">Author</SelectItem>
         </SelectContent>
       </Select>

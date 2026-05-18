@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
       upsert: vi.fn(),
       deleteMany: vi.fn(),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     $transaction: vi.fn((fn: any) => fn(mocks.prisma)),
   },
 }));
@@ -118,7 +118,7 @@ class SyncTestHarness {
   // === New stateful X-mock configuration (best practice for multi-step / resume testing) ===
 
   // Current list of bookmark pages to serve (in order)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   private currentBookmarkPages: Array<{ bookmarks: any[]; nextToken?: string }> = [];
 
   // Rate-limit configuration (if active)
@@ -131,17 +131,17 @@ class SyncTestHarness {
   private fetchBookmarksCallCountThisStep = 0;
 
   // Legacy storage (kept for backward compatibility with existing single-run tests)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   private xResponses: {
     bookmarks?: Array<{ bookmarks: any[]; nextToken?: string }>;
     folders?: Array<{ id: string; name: string; bookmarks: any[] }>;
   } = {};
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   recordedCreates: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   recordedUpdates: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   recordedFolderCollections: any[] = [];
 
   /**
@@ -214,7 +214,7 @@ class SyncTestHarness {
     mocks.prisma.user.update.mockResolvedValue({});
 
     // bookmark.findMany — supports both legacy full preload and new targeted queries
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     mocks.prisma.bookmark.findMany.mockImplementation(async (args: any) => {
       const where = args?.where || {};
       const tweetIdFilter = where.tweetId?.in;

@@ -5,6 +5,7 @@ export const ORBIT_GRAPH_QUERY_KEY = ["orbit", "graph"] as const;
 export function invalidateLibraryQueries(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+    queryClient.invalidateQueries({ queryKey: ["performance-highlights"] }),
     queryClient.invalidateQueries({ queryKey: ["tags"] }),
     queryClient.invalidateQueries({ queryKey: ["collections"] }),
     invalidateOrbitGraphQuery(queryClient),

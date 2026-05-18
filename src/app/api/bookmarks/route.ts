@@ -82,6 +82,7 @@ function buildSlowPathWhereSql({
   bookmarkId,
   mediaFilter,
   unaffiliated,
+  raw,
 }: {
   userId: string;
   searchTerms: string[];
@@ -93,6 +94,7 @@ function buildSlowPathWhereSql({
   bookmarkId?: string;
   mediaFilter: "all" | "images" | "video" | "links" | "text-only";
   unaffiliated: boolean;
+  raw: boolean;
 }) {
   const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
 
@@ -168,6 +170,25 @@ function buildSlowPathWhereSql({
     `);
   }
 
+  if (raw) {
+    // Strict "completely untouched" filter (for dashboard Library Highlights).
+    // Excludes bookmarks that have any tags or any CollectionItem (x_folder or user_collection).
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "BookmarkTag" bt
+        WHERE bt."bookmarkId" = b."id"
+      )
+    `);
+    conditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1
+        FROM "CollectionItem" ci
+        WHERE ci."bookmarkId" = b."id"
+      )
+    `);
+  }
+
   const mediaCondition = buildMediaFilterCondition(mediaFilter);
   if (mediaCondition) {
     conditions.push(mediaCondition);
@@ -177,7 +198,7 @@ function buildSlowPathWhereSql({
 }
 
 function getSlowPathOrderSql(
-  sortField: Prisma.BookmarkScalarFieldEnum | "likes" | "retweets" | "replies"
+  sortField: Prisma.BookmarkScalarFieldEnum | "likes" | "retweets" | "replies" | "performance" | "tweetCreatedAt" | "authorUsername" | "bookmarkedAt"
 ) {
   switch (sortField) {
     case "likes":
@@ -186,6 +207,17 @@ function getSlowPathOrderSql(
       return Prisma.sql`COALESCE((b."publicMetrics"->>'retweet_count')::int, 0)`;
     case "replies":
       return Prisma.sql`COALESCE((b."publicMetrics"->>'reply_count')::int, 0)`;
+    case "performance":
+      // Log-scaled weighted engagement score (official X public_metrics).
+      // Used for "Library Highlights" on collections page and any performance-sorted views.
+      // Higher weights on bookmark_count (strongest signal) and replies.
+      return Prisma.sql`(
+        1.0 * LN(1 + COALESCE((b."publicMetrics"->>'like_count')::int, 0)) +
+        2.0 * LN(1 + COALESCE((b."publicMetrics"->>'retweet_count')::int, 0)) +
+        3.5 * LN(1 + COALESCE((b."publicMetrics"->>'reply_count')::int, 0)) +
+        2.0 * LN(1 + COALESCE((b."publicMetrics"->>'quote_count')::int, 0)) +
+        6.0 * LN(1 + COALESCE((b."publicMetrics"->>'bookmark_count')::int, 0))
+      )`;
     case "tweetCreatedAt":
       return Prisma.sql`b."tweetCreatedAt"`;
     case "authorUsername":
@@ -224,6 +256,7 @@ export async function GET(req: NextRequest) {
     bookmarkId,
     collectionId,
     unaffiliated,
+    raw,
   } = parsed.data;
 
   const tagIds = tagFilter
@@ -276,6 +309,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  if (raw) {
+    // Strict "completely untouched" filter for performance highlights / triage.
+    // No tags at all, and no CollectionItems of any kind (x_folders or user collections).
+    relationFilters.push({ tags: { none: {} } });
+    relationFilters.push({ collectionItems: { none: {} } });
+  }
+
   if (relationFilters.length > 0) {
     where.AND = relationFilters;
   }
@@ -287,14 +327,14 @@ export async function GET(req: NextRequest) {
     where.urls = { equals: Prisma.JsonNull };
   }
 
-  const needsInMemorySort =
+  const needsSlowPath =
     sortField === "likes" ||
     sortField === "retweets" ||
-    sortField === "replies";
+    sortField === "replies" ||
+    sortField === "performance" ||
+    mediaFilter !== "all";
 
-  const needsSqlMediaFilter = mediaFilter !== "all";
-
-  if (!needsInMemorySort && !needsSqlMediaFilter) {
+  if (!needsSlowPath) {
     let orderBy: Prisma.BookmarkOrderByWithRelationInput;
     switch (sortField) {
       case "tweetCreatedAt":
@@ -337,6 +377,7 @@ export async function GET(req: NextRequest) {
     bookmarkId,
     mediaFilter,
     unaffiliated,
+    raw,
   });
   const orderSql = getSlowPathOrderSql(sortField);
   const directionSql = Prisma.raw(sortDirection.toUpperCase());

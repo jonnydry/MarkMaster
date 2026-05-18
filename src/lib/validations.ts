@@ -161,7 +161,7 @@ export const bookmarksQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().trim().max(MAX_BOOKMARK_QUERY_LENGTH).default(""),
     sortField: z
-      .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "authorUsername"])
+      .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "performance", "authorUsername"])
       .default("bookmarkedAt"),
     sortDirection: z.enum(["asc", "desc"]).default("desc"),
     mediaFilter: z.enum(["all", "images", "video", "links", "text-only"]).default("all"),
@@ -172,6 +172,7 @@ export const bookmarksQuerySchema = z
     bookmarkId: idSchema.optional(),
     collectionId: idSchema.optional(),
     unaffiliated: booleanQueryFlagSchema,
+    raw: booleanQueryFlagSchema,
   })
   .superRefine((value, ctx) => {
     if (
@@ -186,25 +187,46 @@ export const bookmarksQuerySchema = z
       });
     }
 
-    if (!value.unaffiliated) return;
+    if (value.unaffiliated) {
+      const hasTagFilter = value.tagFilter.split(",").some((id) => id.trim().length > 0);
+      if (hasTagFilter) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tagFilter"],
+          message:
+            "unaffiliated=true cannot be combined with tagFilter (unaffiliated bookmarks have no tags by definition).",
+        });
+      }
 
-    const hasTagFilter = value.tagFilter.split(",").some((id) => id.trim().length > 0);
-    if (hasTagFilter) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["tagFilter"],
-        message:
-          "unaffiliated=true cannot be combined with tagFilter (unaffiliated bookmarks have no tags by definition).",
-      });
+      if (value.collectionId && value.collectionId.trim().length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collectionId"],
+          message:
+            "unaffiliated=true cannot be combined with collectionId (Orbit queue bookmarks are outside editable collections).",
+        });
+      }
     }
 
-    if (value.collectionId && value.collectionId.trim().length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["collectionId"],
-        message:
-          "unaffiliated=true cannot be combined with collectionId (Orbit queue bookmarks are outside editable collections).",
-      });
+    if (value.raw) {
+      const hasTagFilter = value.tagFilter.split(",").some((id) => id.trim().length > 0);
+      if (hasTagFilter) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["tagFilter"],
+          message:
+            "raw=true cannot be combined with tagFilter (raw highlights are strictly untouched bookmarks with no tags).",
+        });
+      }
+
+      if (value.collectionId && value.collectionId.trim().length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collectionId"],
+          message:
+            "raw=true cannot be combined with collectionId (raw highlights target completely unaffiliated bookmarks outside any collections).",
+        });
+      }
     }
   });
 
