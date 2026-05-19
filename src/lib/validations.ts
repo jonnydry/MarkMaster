@@ -173,6 +173,7 @@ export const bookmarksQuerySchema = z
     collectionId: idSchema.optional(),
     unaffiliated: booleanQueryFlagSchema,
     raw: booleanQueryFlagSchema,
+    personalBoost: booleanQueryFlagSchema,
   })
   .superRefine((value, ctx) => {
     if (

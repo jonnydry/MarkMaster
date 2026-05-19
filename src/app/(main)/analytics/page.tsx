@@ -191,10 +191,12 @@ export default function AnalyticsPage() {
                   totalCollections={analytics.totalCollections}
                   notedCount={analytics.notedCount}
                   lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
+                  pendingHighlightsCount={0}
                   onSyncComplete={() => {
                     void invalidateLibraryQueries(queryClient);
                     void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                   }}
+                  // pendingHighlightsCount=0 for empty state (item 8 wiring to orbitQueueCount)
                 />
               ) : (
                 <>
@@ -220,6 +222,10 @@ export default function AnalyticsPage() {
                     </div>
                   </section>
 
+                  {/* Phase 3 Item 12 Slice 2: time-aware signals (via range filter) + two high-value ratios (restrained presentation).
+                      Attribution captured at source. Still zero-weight when no signals. Elegant and calm by design. */}
+                  <FlywheelSignalsCard analytics={analytics} />
+
                   <LibraryControlCenter
                     totalBookmarks={analytics.totalBookmarks}
                     untriagedCount={analytics.orbitQueueCount}
@@ -228,10 +234,12 @@ export default function AnalyticsPage() {
                     notedCount={analytics.notedCount}
                     lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
                     orbitHref={backlogOrbitHref}
+                    pendingHighlightsCount={analytics.orbitQueueCount}
                     onSyncComplete={() => {
                       void invalidateLibraryQueries(queryClient);
                       void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                     }}
+                    // pendingHighlightsCount wired to orbitQueueCount (includes high-value raw Highlights pool for item 8)
                   />
 
                   <TopVoicesCard
@@ -410,6 +418,134 @@ function AnnotationCard({
           <StickyNote className="h-4 w-4" />
         </span>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Phase 3 Item 12 Slice 3 — Per-Source Effectiveness + Quick Pass Outcome (builds on Slice 2)
+ * All data time-filtered server-side via range. Per-source: lightweight top-3 entry sources (review CTAs + digest sessions)
+ * grouped from payload->>'source' — shows which origins drive Orbit traffic (secondary, inline % only).
+ * Quick Pass outcome: keep rate after quick (from minimal quick.keep instrumentation on decision sets; % of quick activity).
+ * Everything remains ultra-restrained: appended to the *existing* ratios footer using identical tokens (no new card sections,
+ * no charts, no visual weight, no extra labels). Zero-state and empty still perfectly calm. Elegance preserved at every layer.
+ */
+function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
+  const cta = analytics.flywheelCtaReviewInOrbit ?? 0;
+  const digestCta = analytics.flywheelDigestReviewTogether ?? 0;
+  const good = analytics.flywheelFeedbackGood ?? 0;
+  const notRel = analytics.flywheelFeedbackNotRelevant ?? 0;
+  const quick = analytics.flywheelQuickModeToggles ?? 0;
+  const deep = analytics.flywheelDeepModeToggles ?? 0;
+  const sessions = analytics.flywheelDigestSessions ?? 0;
+
+  // Slice 2 ratios (0–1, pre-clamped and time-filtered on server)
+  const digestRate = analytics.flywheelDigestCtaToSessionRate ?? 0;
+  const quickShare = analytics.flywheelQuickPassShare ?? 0;
+
+  // Slice 3 additions (server-computed, may be empty arrays/0 when no data yet)
+  const topEntrySources = analytics.flywheelTopEntrySources ?? [];
+  const quickKeeps = analytics.flywheelQuickKeepCount ?? 0;
+  const quickKeepRate = analytics.flywheelQuickPassKeepRate ?? 0;
+
+  // Ultra-light, view-only label map for per-source display (Slice 3).
+  // Keeps raw keys for grouping/aggregation on server; only humanizes here for calm, premium readability.
+  // No new state, no weight — just friendlier nouns in the existing inline footer.
+  const SOURCE_LABELS: Record<string, string> = {
+    highlights: "Highlights",
+    library_highlights: "Library",
+    library_control: "Control",
+    digest: "Digest",
+    "weekly-gems": "Gems",
+    direct: "Direct",
+  };
+  const sourceLabel = (src: string): string => SOURCE_LABELS[src] || src;
+
+  const totalSignals = cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps;
+  if (totalSignals === 0) return null;
+
+  return (
+    <Card className="relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Flywheel Signals
+        </h2>
+        <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground/60">
+          (early)
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Highlights → Orbit</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{cta}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Digest “Review together”</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{digestCta}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Good feedback</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-emerald-400/90">{good}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Not relevant feedback</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-amber-400/90">{notRel}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Quick Pass toggles</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{quick}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Deep Review toggles</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{deep}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Digest sessions started</div>
+          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{sessions}</div>
+        </div>
+      </div>
+
+      {/* Slice 2 ratios + Slice 3 per-source + Quick Pass keep outcome — all in ONE ultra-light footer row.
+          Uses identical classes, hairline, opacity, mono nums, wrap. Never dominates; purely additive clarity when data exists.
+          "Top sources" only for Orbit entry drivers (best/worst visible via relative %). Keep rate is the high-value Quick Pass outcome.
+          Total visual delta from Slice 2: a few extra spans in the existing flex. Feels lighter and more useful, never heavier. */}
+      {(digestCta > 0 || quick + deep > 0 || topEntrySources.length > 0 || quickKeeps > 0) && (
+        <div className="mt-2.5 border-t border-hairline-soft/60 pt-2 text-[10px] text-muted-foreground/70 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+          {digestCta > 0 && (
+            <span>
+              Digest CTA → session rate{" "}
+              <span className="font-mono tabular-nums text-foreground/80">{Math.round(digestRate * 100)}%</span>
+            </span>
+          )}
+          {quick + deep > 0 && (
+            <span>
+              Quick Pass share of modes{" "}
+              <span className="font-mono tabular-nums text-foreground/80">{Math.round(quickShare * 100)}%</span>
+            </span>
+          )}
+          {topEntrySources.length > 0 && (
+            <span>
+              Top sources{" "}
+              <span className="font-mono tabular-nums text-foreground/80">
+                {topEntrySources
+                  .map((s) => `${sourceLabel(s.source)} ${Math.round(s.pct * 100)}%`)
+                  .join(" · ")}
+              </span>
+            </span>
+          )}
+          {quickKeeps > 0 && (
+            <span>
+              Quick Pass keep rate{" "}
+              <span className="font-mono tabular-nums text-foreground/80">{Math.round(quickKeepRate * 100)}%</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      <p className="mt-3 text-[11px] text-muted-foreground/60">
+        Reliable early signal: do the rituals feed Orbit? Quick Pass adoption? Feedback loops active?
+      </p>
     </Card>
   );
 }

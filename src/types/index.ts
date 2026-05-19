@@ -117,6 +117,23 @@ export interface AnalyticsData {
   notedCount: number;
   last30dCount: number;
   previous30dCount: number;
+
+  // Phase 3 Item 12 Slice 2: time-aware flywheel signals (respect analytics range filter) + high-value conversion ratios + light attribution payloads
+  flywheelCtaReviewInOrbit: number;
+  flywheelDigestReviewTogether: number;
+  flywheelFeedbackGood: number;
+  flywheelFeedbackNotRelevant: number;
+  flywheelQuickModeToggles: number;
+  flywheelDeepModeToggles: number;
+  flywheelDigestSessions: number;
+  flywheelDigestCtaToSessionRate: number;
+  flywheelQuickPassShare: number;
+
+  // Phase 3 Item 12 Slice 3: per-source effectiveness (top entry sources for Orbit CTAs/sessions) + Quick Pass keep outcome rate
+  // (lightweight; only meaningful data surfaces, always secondary and calm)
+  flywheelTopEntrySources: Array<{ source: string; count: number; pct: number }>;
+  flywheelQuickKeepCount: number;
+  flywheelQuickPassKeepRate: number;
 }
 
 export type SyncRunStatus = "RUNNING" | "COMPLETED" | "RATE_LIMITED" | "FAILED";

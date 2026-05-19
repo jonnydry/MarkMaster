@@ -1,34 +1,32 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ElementType } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
-  Folder,
   Loader2,
   RotateCcw,
-  Tag as TagIcon,
-  X,
+  Sparkles,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
-import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { OrbitReviewEditSheet } from "@/components/orbit/orbit-review-edit-sheet";
+import type {
+  AuthorDecisionHistory,
+  AuthorDecisionHistoryData,
+} from "@/lib/orbit-author-history";
+import type {
+  SimilarCollections,
+  SimilarCollectionsData,
+} from "@/lib/orbit-similar-collections";
 import {
   OrbitReviewTagField,
   OrbitReviewCollectionField,
   OrbitReviewDecisionControl,
   getDecisionLabel,
 } from "@/components/orbit/orbit-review-fields";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+
 import {
   Dialog,
   DialogContent,
@@ -37,20 +35,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
   buildReviewedOrbitPlan,
   createOrbitReviewDraft,
   createOrbitReviewDraftFromSuggestion,
   deriveReviewDecision,
+  getQuickSmartPatch,
   orbitReviewDecisionUsesCollection,
   orbitReviewDecisionUsesTags,
   splitTagNames,
@@ -59,6 +51,10 @@ import {
 } from "@/lib/orbit-review";
 import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import { cn } from "@/lib/utils";
+import { fetchJson } from "@/lib/fetch-json";
+import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
+import { trackFlywheelEvent } from "@/lib/flywheel";
+import { toast } from "sonner";
 import type {
   BookmarkWithRelations,
   CollectionWithCount,
@@ -84,15 +80,17 @@ interface OrbitReviewDialogProps {
     reviewedPlan: OrbitScanPlan,
     opts: { createCollections: boolean; keptBookmarkIds: string[] }
   ) => Promise<OrbitApplyResult | null>;
+
+  // Phase 2: When the user clicked "Review all" from a Highlights Digest
+  digestBookmarkIds?: string[] | null;
+
+  // Phase 2: User feedback from the queue (good / not_relevant)
+  feedbackById?: Record<string, 'good' | 'not_relevant'>;
 }
 
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
-
-
-
-
 
 function getPreviewText(bookmark: BookmarkWithRelations | null): string {
   if (!bookmark) return "Bookmark is outside the current page.";
@@ -111,6 +109,8 @@ export function OrbitReviewDialog({
   focusBookmarkId,
   reviewSessionId,
   onApply,
+  digestBookmarkIds,
+  feedbackById = {},
 }: OrbitReviewDialogProps) {
   const [draftState, setDraftState] = useState<{
     key: string;
@@ -123,6 +123,31 @@ export function OrbitReviewDialog({
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [sheetBookmarkId, setSheetBookmarkId] = useState<string | null>(null);
+  const [, setFeedbackTick] = useState(0); // for refreshing per-draft history IIFEs after batch Mark Good
+
+  // reviewMode uses the same keyed-state pattern as draftState / createCollectionsState
+  // (keyed by reviewSessionId). This guarantees:
+  // - Fresh "deep" default for every new review session (when parent bumps reviewSessionId
+  //   before opening the dialog, or on first mount).
+  // - Toggled value persists for the duration of the current reviewSessionId (while dialog open).
+  // - No setState-in-effect needed; derivation handles reset automatically.
+  // Slice 2: within-session memory means once user picks Quick Pass, all subsequent
+  // card previews + Details sheets in this review respect quick visuals/defaults (no retoggle).
+  // (assuming parent bumped reviewSessionId on open, as the primary handlers do)
+  // Matches "default to 'deep' to preserve current behavior" + reset on new session/close+reopen.
+  const [reviewModeState, setReviewModeState] = useState<{
+    key: string;
+    mode: "quick" | "deep";
+  }>(() => ({ key: "empty", mode: "deep" }));
+
+  const reviewMode: "quick" | "deep" =
+    reviewModeState.key === String(reviewSessionId) ? reviewModeState.mode : "deep";
+  const isQuick = reviewMode === "quick";
+
+  // For reading cached Item 9 author/similar data (populated only on-demand by the sheet queries).
+  // Enables getQuickSmartPatch to return history-aware patches in list cards *without any new API calls*.
+  // If an author/bookmark was never opened in Details during this session, cache miss -> pure original fallback.
+  const queryClient = useQueryClient();
 
   const bookmarkById = useMemo(
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
@@ -160,6 +185,22 @@ export function OrbitReviewDialog({
     return createOrbitReviewDraft(sourcePlan);
   }, [draftKey, draftState, sourcePlan]);
 
+  // Phase 2: Filter for Digest mode + user feedback
+  const effectiveDrafts = useMemo(() => {
+    let result = drafts;
+
+    // 1. Filter to only the gems from the current Digest (if any)
+    if (digestBookmarkIds && digestBookmarkIds.length > 0) {
+      const digestSet = new Set(digestBookmarkIds);
+      result = result.filter((d) => digestSet.has(d.bookmarkId));
+    }
+
+    // 2. Respect inline feedback from the queue (hide "not relevant")
+    result = result.filter((d) => feedbackById[d.bookmarkId] !== 'not_relevant');
+
+    return result;
+  }, [drafts, digestBookmarkIds, feedbackById]);
+
   const createCollections =
     createCollectionsState.key === draftKey ? createCollectionsState.value : true;
 
@@ -168,14 +209,14 @@ export function OrbitReviewDialog({
 
     return buildReviewedOrbitPlan({
       sourcePlan,
-      drafts,
+      drafts: effectiveDrafts,   // only the filtered gems when in digest mode
       existingTags,
       existingCollections,
     });
-  }, [drafts, existingCollections, existingTags, sourcePlan]);
+  }, [effectiveDrafts, existingCollections, existingTags, sourcePlan]);
 
   const reviewStats = useMemo(() => {
-    const keptBookmarks = drafts.filter((draft) => draft.decision === "keep")
+    const keptBookmarks = effectiveDrafts.filter((draft) => draft.decision === "keep")
       .length;
     const tagAssignments =
       reviewedPlan?.suggestions.reduce(
@@ -187,23 +228,29 @@ export function OrbitReviewDialog({
         .length ?? 0;
 
     return {
-      applyableBookmarks: reviewedPlan?.suggestions.length ?? 0,
+      applyableBookmarks: effectiveDrafts.length, // only count what the user is actually reviewing right now
       keptBookmarks,
       tagAssignments,
       collectionMoves,
     };
-  }, [drafts, reviewedPlan]);
+  }, [effectiveDrafts, reviewedPlan]);
 
   const keptBookmarkIds = useMemo(
     () =>
-      drafts
+      effectiveDrafts
         .filter((draft) => draft.decision === "keep")
         .map((draft) => draft.bookmarkId),
-    [drafts]
+    [effectiveDrafts]
   );
 
   const updateDraft = useCallback(
     (bookmarkId: string, patch: Partial<OrbitReviewSuggestionDraft>) => {
+      // Phase 3 Item 12 Slice 3: lightweight outcome instrumentation for Quick Pass keep decisions.
+      // Fires only on explicit keep while Quick Pass active (follows all existing trackFlywheelEvent patterns).
+      // Zero UI, zero perf, zero user-visible impact — pure measurement for the elegant keep-rate signal.
+      if (patch.decision === "keep" && isQuick) {
+        trackFlywheelEvent("quick.keep", { via: "decision" });
+      }
       setDraftState((prev) => {
         const activeDrafts =
           prev.key === draftKey && prev.drafts.length > 0
@@ -217,7 +264,7 @@ export function OrbitReviewDialog({
         };
       });
     },
-    [draftKey, drafts]
+    [draftKey, drafts, isQuick]
   );
 
   const handleCreateCollectionsChange = useCallback(
@@ -275,6 +322,106 @@ export function OrbitReviewDialog({
     return { addedTagCount, addedCollectionCount };
   }, [drafts, originalSuggestionById]);
 
+  // Real historical author decision context (Phase 3 Item 9 Slice 2, Approach A).
+  // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
+  // opens for a bookmark. Delivers highest-quality library signals (real tags +
+  // user collections from prior bookmarks by same author, ordered by freq+recency
+  // in the DB aggregation). Loading state handled for graceful UX. No heavy
+  // pre-caching; natural react-query staleTime provides light reuse.
+  const sheetAuthor = useMemo(() => {
+    if (!sheetBookmarkId) return null;
+    return bookmarkById.get(sheetBookmarkId)?.authorUsername ?? null;
+  }, [sheetBookmarkId, bookmarkById]);
+
+  const { data, isLoading, isFetching } = useQuery<AuthorDecisionHistoryData>({
+    queryKey: ["orbit", "author-history", sheetAuthor],
+    queryFn: async () => {
+      if (!sheetAuthor) return null;
+      return fetchJson<AuthorDecisionHistoryData>(
+        `/api/orbit/author-history?authorUsername=${encodeURIComponent(sheetAuthor)}`
+      );
+    },
+    enabled: isEditSheetOpen && !!sheetAuthor,
+    staleTime: 5 * 60 * 1000, // 5 min — light natural reuse across quick re-opens
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const authorHistoryForSheet = useMemo<AuthorDecisionHistory>(() => {
+    if (!sheetAuthor) return null;
+    if (isLoading || isFetching) {
+      return { authorUsername: sheetAuthor, loading: true };
+    }
+    return data ?? null;
+  }, [sheetAuthor, data, isLoading, isFetching]);
+
+  // Similar high-performers context (Phase 3 Item 9 Slice 3, Approach A).
+  // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
+  // opens for a bookmark. Delivers real high-signal overlaps on the current
+  // bookmark's collections (primary) + tags (secondary), weighted by the
+  // established performance score + overlap strength. Small limit for quality.
+  // Loading state handled for graceful UX. Reuses exact same on-demand + staleTime
+  // pattern as author history (no pre-compute, no scan changes).
+  const { data: similarData, isLoading: similarLoading, isFetching: similarFetching } =
+    useQuery<SimilarCollectionsData>({
+      queryKey: ["orbit", "similar-collections", sheetBookmarkId],
+      queryFn: async () => {
+        if (!sheetBookmarkId) return null;
+        return fetchJson<SimilarCollectionsData>(
+          `/api/orbit/similar-collections?bookmarkId=${encodeURIComponent(sheetBookmarkId)}`
+        );
+      },
+      enabled: isEditSheetOpen && !!sheetBookmarkId,
+      staleTime: 5 * 60 * 1000, // 5 min — light natural reuse across quick re-opens
+      gcTime: 10 * 60 * 1000,
+    });
+
+  const similarCollectionsForSheet = useMemo<SimilarCollections>(() => {
+    if (!sheetBookmarkId) return null;
+    if (similarLoading || similarFetching) {
+      return { loading: true };
+    }
+    return similarData ?? null;
+  }, [sheetBookmarkId, similarData, similarLoading, similarFetching]);
+
+  // Keyboard shortcut for Quick Pass / Deep Review toggle (Q). Scoped to when the
+  // dialog is open (prevents silent mutations while viewing orbit map/list outside the review).
+  // Also guards BUTTON (decision controls etc.) + INPUT/TEXTAREA/contentEditable.
+  // Uses reviewSessionId for the keyed setter so Q inside an open dialog respects the
+  // current session (reset happens on new reviewSessionId).
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!open) return;
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "BUTTON" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+      if (e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        setReviewModeState((prev) => {
+          const currMode =
+            prev.key === String(reviewSessionId) ? prev.mode : "deep";
+          const next = currMode === "quick" ? "deep" : "quick";
+          // Phase 3 Item 12: track Quick Pass / Deep Review keyboard toggle for adoption signal
+          trackFlywheelEvent(next === "quick" ? "mode.quick" : "mode.deep", { via: "keyboard" });
+          return {
+            key: String(reviewSessionId),
+            mode: next,
+          };
+        });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, reviewSessionId]);
+
   const handleBulkApplySuggested = useCallback(() => {
     if (!sourcePlan) return;
     const fresh = createOrbitReviewDraft(sourcePlan);
@@ -320,20 +467,146 @@ export function OrbitReviewDialog({
     [createOrbitReviewDraftFromSuggestion, originalSuggestionById, updateDraft]
   );
 
+  // Slice 3: explicit one-click handler for the prominent Quick Pass "Accept Orbit suggestion" button.
+  // Computes smart patch at click time by reading react-query cache (populated by the existing
+  // on-demand sheet queries for author-history / similar-collections). Zero additional network.
+  // - With no cache hit: falls back to original Grok suggestion (pure "Accept Orbit").
+  // - With cache hit (user opened Details for author/item before): applies conservative
+  //   history/similar-derived patch (e.g. preferred tags/collections from past decisions).
+  // Patch applied exactly like manual edits or Reset; downstream reviewedPlan / Apply unchanged.
+  // Smart is *never* auto-applied on render or draft creation — only on this explicit click.
+  const handleAcceptOrbitSuggestion = useCallback(
+    (bookmarkId: string) => {
+      const orig = originalSuggestionById.get(bookmarkId);
+      if (!orig) return;
+
+      // Read caches at click time (safe, never triggers fetch; undefined => treat as no signal)
+      const bm = bookmarkById.get(bookmarkId);
+      const auth = bm?.authorUsername ?? null;
+
+      let h: AuthorDecisionHistory | null = null;
+      if (auth) {
+        const cached = queryClient.getQueryData<AuthorDecisionHistoryData>([
+          "orbit",
+          "author-history",
+          auth,
+        ]);
+        if (cached !== undefined) {
+          h = cached; // Data | null (non-loading)
+        }
+      }
+
+      const cachedSim = queryClient.getQueryData<SimilarCollectionsData>([
+        "orbit",
+        "similar-collections",
+        bookmarkId,
+      ]);
+      const s: SimilarCollections | null =
+        cachedSim !== undefined ? cachedSim : null;
+
+      const patch = getQuickSmartPatch(orig, h, s);
+      const baseFromOrig = createOrbitReviewDraftFromSuggestion(orig);
+      const finalPatch = patch ?? baseFromOrig;
+
+      updateDraft(bookmarkId, {
+        decision: finalPatch.decision,
+        included: finalPatch.decision !== "keep",
+        tagNames: finalPatch.tagNames ?? "",
+        collectionName: finalPatch.collectionName ?? "",
+        collectionDescription: finalPatch.collectionDescription ?? "",
+      });
+    },
+    [
+      bookmarkById,
+      originalSuggestionById,
+      queryClient,
+      updateDraft,
+    ]
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] gap-0 overflow-hidden border border-white/10 bg-slate-950 p-0 text-white sm:max-w-5xl">
         <DialogHeader className="border-b border-white/10 px-5 py-4">
+          {digestBookmarkIds && digestBookmarkIds.length > 0 && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-sky-500/10 px-3 py-1.5 text-sm text-sky-200">
+              <Sparkles className="h-4 w-4" />
+              <span>
+                Reviewing your Weekly Gems from Highlights ({digestBookmarkIds.length} items)
+              </span>
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-300/10 text-sky-100">
               <GrokMark className="size-4" title="Grok" />
             </span>
-            <div className="min-w-0">
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription className="mt-1 text-white/60">
-                Choose what to do with each suggestion, then adjust the tags and
-                destinations that will be applied.
-              </DialogDescription>
+            <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription className="mt-1 text-white/60">
+                  Choose what to do with each suggestion, then adjust the tags and
+                  destinations that will be applied.
+                </DialogDescription>
+              </div>
+
+              {/* Quick Pass / Deep Review mode toggle + keyboard hint (Phase 3 Item 10 Slice 1).
+                   Title+desc flex keeps toggle right-aligned without overlap (handles long titles + digest banner). */}
+              <div className="shrink-0 pt-0.5">
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className={cn(
+                      "inline-flex items-center rounded-lg border border-white/10 bg-black/10 p-0.5 text-[10px]",
+                      isQuick && "border-sky-400/30"
+                    )}
+                    role="group"
+                    aria-label="Review mode"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={isQuick}
+                      onClick={() => {
+                        // Phase 3 Item 12: track explicit Quick Pass toggle (adoption + dominance signal)
+                        trackFlywheelEvent("mode.quick", { via: "click" });
+                        setReviewModeState({ key: String(reviewSessionId), mode: "quick" });
+                      }}
+                      className={cn(
+                        "rounded-md px-2.5 py-0.5 font-medium transition-colors",
+                        isQuick
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      )}
+                      title="Quick Pass: light path from standouts into Orbit (press Q)"
+                    >
+                      Quick Pass ⚡
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!isQuick}
+                      onClick={() => {
+                        // Phase 3 Item 12: track explicit Deep Review toggle
+                        trackFlywheelEvent("mode.deep", { via: "click" });
+                        setReviewModeState({ key: String(reviewSessionId), mode: "deep" });
+                      }}
+                      className={cn(
+                        "rounded-md px-2.5 py-0.5 font-medium transition-colors",
+                        !isQuick
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+                      )}
+                      title="Deep Review: full reasoning with context panels (press Q)"
+                    >
+                      Deep Review
+                    </button>
+                  </div>
+                  <kbd
+                    className="rounded border border-white/20 bg-white/5 px-1 py-px font-mono text-[9px] text-white/50"
+                    aria-hidden="true"
+                    title="Keyboard shortcut"
+                  >
+                    Q
+                  </kbd>
+                </div>
+              </div>
             </div>
           </div>
         </DialogHeader>
@@ -341,7 +614,7 @@ export function OrbitReviewDialog({
         {/* Refined Native-First Orbit Review — vertical list of native-style cards + Impact Bar */}
         <div className="min-h-0 overflow-hidden px-4 py-3">
           {/* Global Impact Bar (styled like rail metrics) */}
-          {drafts.length > 0 && (
+          {effectiveDrafts.length > 0 && (
             <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-4 text-[11px]">
@@ -352,15 +625,72 @@ export function OrbitReviewDialog({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={handleBulkApplySuggested} disabled={applying}>
-                    <RotateCcw className="mr-1 size-3" /> Restore all
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkKeepAll} disabled={applying}>
-                    Keep all
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkTagOnly} disabled={applying}>
-                    Tag all
-                  </Button>
+                  {/* Optimized batch actions (incl. "Mark remaining as Good") when reviewing a curated set from Highlights (Phase 2 + B polish) */}
+                  {digestBookmarkIds && digestBookmarkIds.length > 0 ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={handleBulkKeepAll}
+                        disabled={applying}
+                      >
+                        Keep remaining
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs bg-white text-slate-950 hover:bg-white/90"
+                        onClick={() => {
+                          // Accept all currently suggested decisions for the digest set
+                          effectiveDrafts.forEach((draft) => {
+                            if (draft.decision !== "keep") {
+                              updateDraft(draft.bookmarkId, { decision: draft.decision });
+                            }
+                          });
+                        }}
+                        disabled={applying}
+                      >
+                        Accept strong suggestions
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={() => {
+                          let marked = 0;
+                          effectiveDrafts.forEach((draft) => {
+                            const id = draft.bookmarkId;
+                            if (getHighlightFeedback(id) !== "not_relevant") {
+                              addLikedHighlightId(id);
+                              marked++;
+                            }
+                          });
+                          if (marked > 0) {
+                            toast.success(`Marked ${marked} as Good — boosts future Highlights`);
+                          }
+                          setFeedbackTick((t) => t + 1);
+                        }}
+                        disabled={applying}
+                      >
+                        Mark remaining as Good
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={handleBulkApplySuggested} disabled={applying}>
+                        <RotateCcw className="mr-1 size-3" /> Restore all
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkKeepAll} disabled={applying}>
+                        Keep all
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkTagOnly} disabled={applying}>
+                        Tag all
+                      </Button>
+                    </>
+                  )}
 
                   <div className="ml-2 flex items-center gap-2 border-l border-white/10 pl-3">
                     <span className="text-xs text-white/60">New collections</span>
@@ -372,14 +702,14 @@ export function OrbitReviewDialog({
           )}
 
           <ScrollArea className="h-[58vh]">
-            <div className="space-y-3 pb-6">
-              {drafts.length === 0 && (
+            <div className={cn("space-y-3 pb-6", isQuick && "space-y-2 pb-4")}>
+              {effectiveDrafts.length === 0 && (
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
                   No suggestions are waiting for review.
                 </div>
               )}
 
-              {drafts.map((draft) => {
+              {effectiveDrafts.map((draft) => {
                 const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
                 const preview = getPreviewText(bookmark);
                 const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
@@ -421,13 +751,17 @@ export function OrbitReviewDialog({
                     key={draft.bookmarkId}
                     className={cn(
                       "group relative rounded-2xl border border-hairline-soft bg-surface-1 shadow-sm transition-all",
+                      isQuick && "rounded-xl shadow-none border-white/5",
                       draft.decision === "keep" && "opacity-75",
                       sheetBookmarkId === draft.bookmarkId && "border-sky-400/50 bg-surface-2/70",
                       "hover:border-white/20 hover:bg-surface-2/50"
                     )}
                   >
                     {/* Header — native to triage card + focus strip */}
-                    <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
+                    <div className={cn(
+                      "flex items-center justify-between px-4 pt-3 pb-1.5",
+                      isQuick && "px-3 pt-2 pb-1"
+                    )}>
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-sm font-medium text-white/90">
                           @{bookmark?.authorUsername || draft.bookmarkId}
@@ -453,12 +787,29 @@ export function OrbitReviewDialog({
                     </div>
 
                     {/* Preview */}
-                    <div className="px-4 pb-2 text-[13px] leading-snug text-white/80 line-clamp-2">
+                    <div className={cn(
+                      "px-4 pb-2 text-[13px] leading-snug text-white/80 line-clamp-2",
+                      isQuick && "px-3 pb-1 text-[12px] leading-snug line-clamp-1 text-white/75"
+                    )}>
                       {preview}
                     </div>
 
-                    {/* Grok reasoning — native meta label */}
-                    {original?.reasoning && (
+                    {/* B: surface prior feedback history for digest gems (closed loop) */}
+                    {(() => {
+                      const prior = getHighlightFeedback(draft.bookmarkId) || feedbackById[draft.bookmarkId];
+                      if (prior) {
+                        const label = prior === "good" ? "You marked this Great" : "You marked Not relevant";
+                        return (
+                          <div className={cn("px-4 pb-1 text-[10px] text-emerald-300/80", isQuick && "px-3")}>
+                            {label}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Grok reasoning — native meta label (de-emphasized/hidden in Quick Pass for density) */}
+                    {original?.reasoning && !isQuick && (
                       <div className="px-4 pb-2 text-xs leading-snug text-white/65">
                         {original.reasoning}
                       </div>
@@ -466,7 +817,7 @@ export function OrbitReviewDialog({
 
                     {/* Compact change summary — elegant native treatment */}
                     {hasChanges && (
-                      <div className="px-4 pb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                      <div className={cn("px-4 pb-2 flex flex-wrap items-center gap-1.5 text-[10px]", isQuick && "px-3")}>
                         {currDecisionLabel !== origDecisionLabel && (
                           <span className="rounded bg-amber-400/15 px-1.5 py-px text-amber-300">
                             Decision changed
@@ -491,9 +842,34 @@ export function OrbitReviewDialog({
                     )}
 
                     {/* Action footer — exact triage card treatment for native cohesion */}
-                    <div className="relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl">
+                    <div className={cn(
+                      "relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl",
+                      isQuick && "gap-2 px-3 py-2 rounded-b-xl"
+                    )}>
                       <div className="flex items-center gap-2">
-                        <div className="rounded-md border border-white/10 bg-black/20 p-px">
+                        {/* Slice 3 Quick Pass: prominent primary one-click action.
+                            "Accept Orbit suggestion" is the fast path — applies conservative smart patch
+                            (Grok original, or history/similar-steered values if context cached from Details).
+                            Only fires on explicit click (no auto on render). Most visually lifted control
+                            in quick cards. Decision control remains for quick manual tweaks; Details for full
+                            override + to load richer signals for future smart patches on this author. */}
+                        {isQuick && (
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1.5 border-emerald-400/30 bg-emerald-500/10 text-[10px] text-emerald-200 hover:bg-emerald-500/20"
+                            onClick={() => handleAcceptOrbitSuggestion(draft.bookmarkId)}
+                            disabled={applying}
+                            title="One-click accept of Orbit suggestion (uses your author history + similar high-performers for smart defaults when you have opened Details for this item). Stays in Quick Pass fast path."
+                          >
+                            <Sparkles className="size-3" />
+                            Accept Orbit suggestion
+                          </Button>
+                        )}
+
+                        <div className={cn(
+                          "rounded-md border border-white/10 bg-black/20 p-px",
+                          isQuick && "ring-1 ring-white/25 bg-black/30"
+                        )}>
                           <OrbitReviewDecisionControl
                             value={draft.decision}
                             onChange={(decision) => updateDraft(draft.bookmarkId, { decision, included: decision !== "keep" })}
@@ -574,7 +950,10 @@ export function OrbitReviewDialog({
         {/* Right-side rich editing sheet */}
         <OrbitReviewEditSheet
           open={isEditSheetOpen}
-          onOpenChange={setIsEditSheetOpen}
+          onOpenChange={(nextOpen) => {
+            setIsEditSheetOpen(nextOpen);
+            if (!nextOpen) setSheetBookmarkId(null);
+          }}
           draft={drafts.find((d) => d.bookmarkId === sheetBookmarkId) ?? null}
           original={sheetBookmarkId ? originalSuggestionById.get(sheetBookmarkId) ?? null : null}
           bookmark={sheetBookmarkId ? bookmarkById.get(sheetBookmarkId) ?? null : null}
@@ -582,6 +961,10 @@ export function OrbitReviewDialog({
           existingCollections={existingCollections}
           onDraftChange={(id, patch) => updateDraft(id, patch)}
           onReset={(id) => handleResetOne(id)}
+          authorHistory={authorHistoryForSheet}
+          similarCollections={similarCollectionsForSheet}
+          reviewMode={reviewMode}
+          reviewSessionId={reviewSessionId}
         />
 
         <DialogFooter className="border-white/10 bg-slate-950/95 px-5 py-4">
@@ -611,15 +994,3 @@ export function OrbitReviewDialog({
   );
 }
 
-function SummaryStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.16em] text-white/45">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-white">
-        {value}
-      </p>
-    </div>
-  );
-}

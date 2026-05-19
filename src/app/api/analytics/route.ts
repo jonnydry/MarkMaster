@@ -1,10 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildMediaBreakdown } from "@/lib/analytics";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { Prisma } from "@prisma/client";
 
-export async function GET() {
+/**
+ * Minimal time filter for flywheel events only (Slice 2).
+ * Uses existing range semantics from the client selector. "all" means no time bound.
+ * Silent: no UI labels added anywhere; the range control already communicates scope.
+ */
+function getFlywheelCreatedAtFilter(range: string): Prisma.Sql {
+  switch (range) {
+    case "30d":
+      return Prisma.sql`AND "createdAt" >= NOW() - INTERVAL '30 days'`;
+    case "90d":
+      return Prisma.sql`AND "createdAt" >= NOW() - INTERVAL '90 days'`;
+    case "12m":
+      return Prisma.sql`AND "createdAt" >= NOW() - INTERVAL '12 months'`;
+    case "all":
+    default:
+      return Prisma.sql``;
+  }
+}
+
+export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,6 +36,15 @@ export async function GET() {
     return createRateLimitResponse(rateLimitResult);
   }
 
+  // Slice 2: parse range (defaults to 90d to match client initial state); used only for flywheel query.
+  const rangeParam = req.nextUrl.searchParams.get("range") ?? "90d";
+  const allowedRanges = ["30d", "90d", "12m", "all"] as const;
+  const range: "30d" | "90d" | "12m" | "all" =
+    allowedRanges.includes(rangeParam as (typeof allowedRanges)[number])
+      ? (rangeParam as "30d" | "90d" | "12m" | "all")
+      : "90d";
+  const fwTimeFilter = getFlywheelCreatedAtFilter(range);
+
   const [
     authorRows,
     monthRows,
@@ -26,6 +55,7 @@ export async function GET() {
     untaggedRows,
     notedRows,
     velocityRows,
+    flywheelRows,
   ] = await Promise.all([
     prisma.$queryRaw<
       {
@@ -153,6 +183,17 @@ export async function GET() {
       FROM "Bookmark"
       WHERE "userId" = ${user.id}
     `,
+    // Phase 3 Item 12 Slice 3: aggregate flywheel events with source extraction from payload (for per-source effectiveness).
+    // Reuses the same time-range filter (fwTimeFilter) and GROUP for cleanliness + performance.
+    // Source from payload->>'source' (populated on cta.review_in_orbit, digest.session_start, etc.).
+    // Also captures new quick.keep outcome events for Quick Pass keep-rate derivation.
+    prisma.$queryRaw<{ eventType: string; source: string | null; count: bigint }[]>`
+      SELECT "eventType", COALESCE("payload"->>'source', '') AS source, COUNT(*)::bigint as count
+      FROM "FlywheelEvent"
+      WHERE "userId" = ${user.id}
+      ${fwTimeFilter}
+      GROUP BY "eventType", source
+    `,
   ]);
 
   const mediaCounts = mediaCountsRows[0] ?? {
@@ -201,6 +242,53 @@ export async function GET() {
   const noted = notedRows[0] ?? { notedCount: BigInt(0) };
   const velocity = velocityRows[0] ?? { last30d: BigInt(0), previous30d: BigInt(0) };
 
+  // Phase 3 Item 12 Slice 3: map event counts (time-filtered) + source-grouped data for per-source effectiveness,
+  // plus derivation of the two Slice 2 ratios + the new Quick Pass keep-rate outcome signal (minimal, from quick.keep events).
+  // All server-side; client only renders with extreme restraint.
+  const fwCounts: Record<string, number> = {};
+  const fwSourceData: Record<string, Record<string, number>> = {};
+  for (const r of flywheelRows) {
+    const et = r.eventType;
+    const src = r.source || "";
+    const n = Number(r.count);
+    fwCounts[et] = (fwCounts[et] || 0) + n;
+    if (!fwSourceData[et]) fwSourceData[et] = {};
+    const key = src || "direct";
+    fwSourceData[et][key] = (fwSourceData[et][key] || 0) + n;
+  }
+
+  const digestCta = fwCounts["cta.digest_review_together"] ?? 0;
+  const sessions = fwCounts["digest.session_start"] ?? 0;
+  const quick = fwCounts["mode.quick"] ?? 0;
+  const deep = fwCounts["mode.deep"] ?? 0;
+  const modeTotal = quick + deep;
+
+  const digestCtaToSessionRate = digestCta > 0 ? Math.min(1, sessions / digestCta) : 0;
+  const quickPassShare = modeTotal > 0 ? Math.min(1, quick / modeTotal) : 0;
+
+  // Slice 3 per-source: aggregate entry drivers (review CTAs + digest sessions) by originating source for effectiveness insight
+  const entryBySource: Record<string, number> = {};
+  for (const [src, c] of Object.entries(fwSourceData["cta.review_in_orbit"] || {})) {
+    entryBySource[src] = (entryBySource[src] || 0) + c;
+  }
+  for (const [src, c] of Object.entries(fwSourceData["digest.session_start"] || {})) {
+    entryBySource[src] = (entryBySource[src] || 0) + c;
+  }
+  const totalEntry = Object.values(entryBySource).reduce((a, b) => a + b, 0);
+  const topEntrySources = Object.entries(entryBySource)
+    .filter(([source]) => source && source !== "direct")
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([source, count]) => ({
+      source,
+      count,
+      pct: totalEntry > 0 ? count / totalEntry : 0,
+    }));
+
+  // Slice 3 Quick Pass outcome: % of quick activity that recorded a keep decision (simple high-signal proxy from lightweight instrumentation)
+  const quickKeeps = fwCounts["quick.keep"] ?? 0;
+  const quickPassKeepRate = quick > 0 ? Math.min(1, quickKeeps / quick) : 0;
+
   return NextResponse.json({
     topAuthors,
     mediaBreakdown: buildMediaBreakdown({
@@ -222,5 +310,18 @@ export async function GET() {
     notedCount: Number(noted.notedCount),
     last30dCount: Number(velocity.last30d),
     previous30dCount: Number(velocity.previous30d),
+    flywheelCtaReviewInOrbit: fwCounts["cta.review_in_orbit"] ?? 0,
+    flywheelDigestReviewTogether: fwCounts["cta.digest_review_together"] ?? 0,
+    flywheelFeedbackGood: fwCounts["feedback.good"] ?? 0,
+    flywheelFeedbackNotRelevant: fwCounts["feedback.not_relevant"] ?? 0,
+    flywheelQuickModeToggles: fwCounts["mode.quick"] ?? 0,
+    flywheelDeepModeToggles: fwCounts["mode.deep"] ?? 0,
+    flywheelDigestSessions: fwCounts["digest.session_start"] ?? 0,
+    flywheelDigestCtaToSessionRate: digestCtaToSessionRate,
+    flywheelQuickPassShare: quickPassShare,
+    // Phase 3 Item 12 Slice 3: per-source + quick outcome (only populated when signals exist; zero-weight otherwise)
+    flywheelTopEntrySources: topEntrySources,
+    flywheelQuickKeepCount: quickKeeps,
+    flywheelQuickPassKeepRate: quickPassKeepRate,
   });
 }

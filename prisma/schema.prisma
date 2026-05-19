@@ -26,6 +26,7 @@ model User {
   collections     Collection[]
   notes           Note[]
   syncRuns        SyncRun[]
+  flywheelEvents  FlywheelEvent[]
 }
 
 enum CollectionType {
@@ -169,4 +170,23 @@ model SyncRun {
 
   @@index([userId, startedAt(sort: Desc)])
   @@index([userId, status, startedAt(sort: Desc)])
+}
+
+/**
+ * Phase 3 Item 12 Slice 1: Lightweight event log for core flywheel instrumentation.
+ * Tracks high-signal transitions (CTAs from Highlights/Digest/Library, mode toggles,
+ * feedback usage) so we can measure Highlights → Orbit conversion without heavy UI or over-collection.
+ * Aggregates queried from /api/analytics for the elegant basic view.
+ */
+model FlywheelEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, eventType, createdAt(sort: Desc)])
 }

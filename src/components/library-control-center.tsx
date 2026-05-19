@@ -9,12 +9,14 @@ import {
   FolderOpen,
   Orbit,
   Search,
+  Sparkles,
   Tags,
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { SyncButton } from "@/components/sync-button";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
+import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 
 type LibraryControlCenterProps = {
@@ -28,6 +30,9 @@ type LibraryControlCenterProps = {
   className?: string;
   compact?: boolean;
   orbitHref?: string;
+  /** Phase 2 item 8: count of high-value untouched items (the raw Highlights pool / orbitQueueCount).
+   *  When >0, renders a prominent pending signal + direct CTA to reinforce the Highlights→Orbit flywheel. */
+  pendingHighlightsCount?: number;
 };
 
 function toDate(value: Date | string | null | undefined) {
@@ -46,6 +51,7 @@ export function LibraryControlCenter({
   className,
   compact = false,
   orbitHref,
+  pendingHighlightsCount = 0,
 }: LibraryControlCenterProps) {
   const hasBookmarks = totalBookmarks > 0;
   const allOrganized = hasBookmarks && untriagedCount === 0;
@@ -75,7 +81,7 @@ export function LibraryControlCenter({
     : untriagedCount > 0
       ? `${untriagedCount.toLocaleString()} bookmark${
           untriagedCount === 1 ? "" : "s"
-        } still need a tag or collection.`
+        } still need a tag or collection — including high-performers from your Highlights.`
       : "Every visible bookmark has a home. Keep the loop healthy with search, notes, and shareable collections.";
 
   return (
@@ -134,6 +140,29 @@ export function LibraryControlCenter({
               icon={FolderOpen}
             />
           </div>
+
+          {/* Phase 2 item 8: prominent persistent "pending high-value Highlights" signal.
+              Uses orbitQueueCount (broader untriaged pool that includes the raw Highlights candidates).
+              The UX intent ("high-value surfaced items ready for Orbit") is preserved; see analytics wiring. */}
+          {pendingHighlightsCount > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-sm border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[12px] text-amber-700">
+              <Sparkles className="size-3.5 shrink-0" aria-hidden />
+              <span className="font-medium">
+                {pendingHighlightsCount.toLocaleString()} untriaged items (incl. high-value Highlights)
+                {lastSyncAt ? " since last sync" : ""} — ready for review
+              </span>
+              <Link
+                href={resolvedOrbitHref}
+                onClick={() => {
+                  // Phase 3 Item 12 Slice 1: instrument explicit "Review in Orbit" from Library Control Center pending banner
+                  trackFlywheelEvent("cta.review_in_orbit", { source: "library_control" });
+                }}
+                className="ml-auto shrink-0 text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+              >
+                Review in Orbit →
+              </Link>
+            </div>
+          )}
 
           {!compact ? (
             <div className="mt-4 grid gap-2 sm:grid-cols-3">

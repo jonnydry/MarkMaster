@@ -6,6 +6,8 @@ import type {
   OrbitTagSuggestion,
   TagWithCount,
 } from "@/types";
+import type { AuthorDecisionHistory } from "@/lib/orbit-author-history";
+import type { SimilarCollectionItem, SimilarCollections } from "@/lib/orbit-similar-collections";
 
 const DEFAULT_REVIEW_TAG_COLORS = [
   "#1d9bf0",
@@ -201,5 +203,111 @@ export function buildReviewedOrbitPlan({
   return {
     overview: sourcePlan.overview,
     suggestions,
+  };
+}
+
+/**
+ * Pure client-side helper for Slice 3 (Item 10).
+ * Derives a conservative patch for Quick Pass one-click "Accept Orbit suggestion".
+ *
+ * Always falls back to the original Grok suggestion fields.
+ * When real (non-loading) authorHistory or similarCollections are supplied,
+ * applies repeatable signals conservatively:
+ * - Strong author history (priorCount >= 2) steers tagNames (and decision if not high-conf keep).
+ * - History collections or most-common from similar high-performers steer collectionName (never on high-conf keep).
+ * - Never overrides a high-confidence "keep" from the original suggestion.
+ * - Never introduces new API/Grok work; pure derivation from already-fetched Item 9 data.
+ *
+ * Returns null only on bad input; otherwise a partial draft patch (decision + tagNames + collection*).
+ * The caller applies via updateDraft + sets `included` appropriately.
+ */
+export function getQuickSmartPatch(
+  original: OrbitBookmarkSuggestion,
+  authorHistory: AuthorDecisionHistory | null | undefined,
+  similarCollections: SimilarCollections | null | undefined
+): Partial<OrbitReviewSuggestionDraft> | null {
+  if (!original) return null;
+
+  const baseDecision = deriveReviewDecision(original);
+  const base: Partial<OrbitReviewSuggestionDraft> = {
+    decision: baseDecision,
+    tagNames: original.tags.map((t) => t.name).join(", "),
+    collectionName: original.collection?.name ?? "",
+    collectionDescription: original.collection?.description ?? "",
+  };
+
+  // Real non-loading signals only (loading sentinels or null produce pure original fallback)
+  const realHistory =
+    authorHistory && !("loading" in authorHistory)
+      ? (authorHistory as {
+          authorUsername: string;
+          priorCount: number;
+          tags: string[];
+          collections: string[];
+        })
+      : null;
+
+  const realSimilar = Array.isArray(similarCollections) ? similarCollections : null;
+
+  if (!realHistory && !realSimilar) {
+    return base;
+  }
+
+  let decision = baseDecision;
+  let tagNames = base.tagNames ?? "";
+  let collectionName = base.collectionName ?? "";
+  const collectionDescription = base.collectionDescription ?? "";
+
+  const priorCount = realHistory?.priorCount ?? 0;
+  const hasStrongHistory = priorCount >= 2;
+  const origConf = original.confidence;
+
+  // History tag steering (conservative: no override of high-conf keep)
+  if (hasStrongHistory && realHistory && realHistory.tags.length > 0) {
+    const topTags = realHistory.tags.slice(0, 3).join(", ");
+    const canSteerToTags =
+      orbitReviewDecisionUsesTags(decision) || origConf !== "high";
+    if (canSteerToTags) {
+      tagNames = topTags;
+      if (!orbitReviewDecisionUsesTags(decision) && origConf !== "high") {
+        decision = realHistory.collections && realHistory.collections.length > 0
+          ? "tags_collection"
+          : "tags";
+      }
+    }
+  }
+
+  // Collection preference: author history first (if strong), else most-frequent from similar high-performers
+  let preferredCollection: string | null = null;
+  if (realHistory && realHistory.collections.length > 0 && priorCount >= 2) {
+    preferredCollection = realHistory.collections[0];
+  } else if (realSimilar && realSimilar.length > 0) {
+    const collCounts = new Map<string, number>();
+    for (const item of realSimilar as SimilarCollectionItem[]) {
+      for (const c of item.sharedCollections ?? []) {
+        collCounts.set(c, (collCounts.get(c) || 0) + 1);
+      }
+    }
+    if (collCounts.size > 0) {
+      preferredCollection = Array.from(collCounts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+    }
+  }
+
+  if (preferredCollection) {
+    const canSteerToCol =
+      orbitReviewDecisionUsesCollection(decision) || origConf !== "high";
+    if (canSteerToCol) {
+      collectionName = preferredCollection;
+      if (!orbitReviewDecisionUsesCollection(decision)) {
+        decision = orbitReviewDecisionUsesTags(decision) ? "tags_collection" : "collection";
+      }
+    }
+  }
+
+  return {
+    decision,
+    tagNames,
+    collectionName,
+    collectionDescription,
   };
 }

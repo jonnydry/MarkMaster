@@ -13,7 +13,7 @@ import {
 } from "@/components/orbit/orbit-review-fields";
 
 import { cn } from "@/lib/utils";
-import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
+import { confidenceLabel } from "@/lib/orbit-decision";
 import type {
   BookmarkWithRelations,
   CollectionWithCount,
@@ -22,15 +22,26 @@ import type {
 } from "@/types";
 import {
   deriveReviewDecision,
+  getQuickSmartPatch,
   orbitReviewDecisionUsesCollection,
   orbitReviewDecisionUsesTags,
   splitTagNames,
   type OrbitReviewSuggestionDraft,
 } from "@/lib/orbit-review";
+import type { AuthorDecisionHistory } from "@/lib/orbit-author-history";
+import type {
+  SimilarCollections,
+  SimilarCollectionItem,
+} from "@/lib/orbit-similar-collections";
 
 const MONO_STYLE: React.CSSProperties = {
   fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
 };
+
+// Truncation constants for the "Other high-performers..." panel preview text.
+// Keeps the list dense while showing enough of the tweet to be recognizable.
+const SIMILAR_PREVIEW_MAX_CHARS = 72;
+const SIMILAR_PREVIEW_SLICE_CHARS = 69;
 
 interface OrbitReviewEditSheetProps {
   open: boolean;
@@ -42,6 +53,11 @@ interface OrbitReviewEditSheetProps {
   existingCollections: CollectionWithCount[];
   onDraftChange: (bookmarkId: string, patch: Partial<OrbitReviewSuggestionDraft>) => void;
   onReset: (bookmarkId: string) => void;
+  authorHistory?: AuthorDecisionHistory;
+  similarCollections?: SimilarCollections;
+  reviewMode?: "quick" | "deep";
+  /** Controls default open/locked state for the three heavy panels (resets on new reviewSessionId). */
+  reviewSessionId?: number;
 }
 
 export function OrbitReviewEditSheet({
@@ -54,8 +70,60 @@ export function OrbitReviewEditSheet({
   existingCollections,
   onDraftChange,
   onReset,
+  authorHistory = null,
+  similarCollections = null,
+  reviewMode = "deep",
+  reviewSessionId = 0,
 }: OrbitReviewEditSheetProps) {
-  const [reasoningOpen, setReasoningOpen] = useState(true);
+  const isQuick = reviewMode === "quick";
+  // Panel UI state (opens + locks) is keyed by reviewSessionId using the exact same
+  // pattern as draftState/createCollectionsState in the parent dialog. This guarantees
+  // fresh unlocked + mode-derived defaults for every new review session (when parent
+  // bumps reviewSessionId on "Review all" or per-bookmark review start, and on close/reopen).
+  // Within one session, manual locks persist across mode flips and across different
+  // bookmarks' "Details" sheets (until the user interacts with a given panel).
+  // No setState-in-effect; derivation + key check handles reset. Lint-safe.
+  const [panelUIState, setPanelUIState] = useState<{
+    key: number;
+    locked: { reasoning: boolean; authorHistory: boolean; similar: boolean };
+    open: { reasoning: boolean; authorHistory: boolean; similar: boolean };
+  }>(() => ({
+    key: -1,
+    locked: { reasoning: false, authorHistory: false, similar: false },
+    open: { reasoning: true, authorHistory: true, similar: true },
+  }));
+
+  const isCurrentSession = panelUIState.key === reviewSessionId;
+  const locked = isCurrentSession
+    ? panelUIState.locked
+    : { reasoning: false, authorHistory: false, similar: false };
+  const openVals = isCurrentSession
+    ? panelUIState.open
+    : { reasoning: true, authorHistory: true, similar: true };
+
+  const effectiveReasoningOpen = locked.reasoning
+    ? openVals.reasoning
+    : reviewMode === "deep";
+  const effectiveAuthorHistoryOpen = locked.authorHistory
+    ? openVals.authorHistory
+    : reviewMode === "deep";
+  const effectiveSimilarOpen = locked.similar
+    ? openVals.similar
+    : reviewMode === "deep";
+
+  const updatePanel = (
+    name: "reasoning" | "authorHistory" | "similar",
+    nextOpen: boolean
+  ) => {
+    const currKey = reviewSessionId;
+    const currLocked = isCurrentSession ? panelUIState.locked : { reasoning: false, authorHistory: false, similar: false };
+    const currOpen = isCurrentSession ? panelUIState.open : { reasoning: true, authorHistory: true, similar: true };
+    setPanelUIState({
+      key: currKey,
+      locked: { ...currLocked, [name]: true },
+      open: { ...currOpen, [name]: nextOpen },
+    });
+  };
 
   if (!draft) return null;
 
@@ -116,19 +184,21 @@ export function OrbitReviewEditSheet({
           </div>
 
           <div className="flex-1 overflow-auto">
-            <div className="space-y-6 p-5">
+            <div className={cn("space-y-6 p-5", isQuick && "space-y-3 p-4")}>
               {/* Full Grok Reasoning */}
               <div>
                 <button
-                  onClick={() => setReasoningOpen(!reasoningOpen)}
+                  // Lock + invert the *current render's effective* value (mode default if first click)
+                  // so the manual choice is captured against what the user actually saw.
+                  onClick={() => updatePanel("reasoning", !effectiveReasoningOpen)}
                   className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
                   style={MONO_STYLE}
                 >
                   Why Grok suggested this
-                  {reasoningOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  {effectiveReasoningOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                 </button>
 
-                {reasoningOpen && (
+                {effectiveReasoningOpen && (
                   <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-snug text-white/75">
                     {original?.reasoning || "No detailed reasoning provided."}
                   </div>
@@ -188,15 +258,172 @@ export function OrbitReviewEditSheet({
                 </div>
               )}
 
+              {/* Author decision history panel — now powered by real cross-library
+                  historical decisions (tags + user collections applied to prior bookmarks
+                  by the same author). Shows while loading (graceful) or when high-signal
+                  history exists. Keeps exact same collapsible UI, placement, and styling. */}
+              {authorHistory &&
+                ("loading" in authorHistory ||
+                  (authorHistory.priorCount > 0 &&
+                    (authorHistory.tags.length > 0 || authorHistory.collections.length > 0))) && (
+                <div>
+                  <button
+                    // Lock + invert the *current render's effective* value (mode default if first click)
+                    // so the manual choice is captured against what the user actually saw.
+                    onClick={() => updatePanel("authorHistory", !effectiveAuthorHistoryOpen)}
+                    className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
+                    style={MONO_STYLE}
+                  >
+                    Your past decisions on @{authorHistory.authorUsername}
+                    {effectiveAuthorHistoryOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  </button>
+
+                  {effectiveAuthorHistoryOpen && (
+                    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/70">
+                      {"loading" in authorHistory ? (
+                        <div className="text-white/50">Loading your past decisions for this author…</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {authorHistory.tags.length > 0 && (
+                            <div>
+                              <span className="text-white/50">Tags: </span>
+                              <span className="text-emerald-300">{authorHistory.tags.join(", ")}</span>
+                            </div>
+                          )}
+                          {authorHistory.collections.length > 0 && (
+                            <div>
+                              <span className="text-white/50">Collections: </span>
+                              <span className="text-sky-300">{authorHistory.collections.join(", ")}</span>
+                            </div>
+                          )}
+                          <div className="pt-0.5 text-[10px] text-white/40">
+                            from {authorHistory.priorCount} bookmark{authorHistory.priorCount === 1 ? "" : "s"} by this author in your library
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Other high-performers in similar collections panel — powered by real
+                  cross-library data (Phase 3 Item 9 Slice 3). Shows performance-weighted
+                  overlaps on collections (primary) or tags, with overlap explanation.
+                  Same collapsible MONO styling, placement, loading/empty handling as
+                  author panel. Only rendered when high-signal results exist. */}
+              {similarCollections &&
+                ("loading" in similarCollections ||
+                  (Array.isArray(similarCollections) && similarCollections.length > 0)) && (
+                <div>
+                  <button
+                    // Lock + invert the *current render's effective* value (mode default if first click)
+                    // so the manual choice is captured against what the user actually saw.
+                    onClick={() => updatePanel("similar", !effectiveSimilarOpen)}
+                    className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
+                    style={MONO_STYLE}
+                  >
+                    Other high-performers in similar collections
+                    {effectiveSimilarOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  </button>
+
+                  {effectiveSimilarOpen && (
+                    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/70">
+                      {"loading" in similarCollections ? (
+                        <div className="text-white/50">Loading other high-performers in similar collections…</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {(similarCollections as SimilarCollectionItem[]).map((item) => (
+                            <div key={item.bookmarkId}>
+                              <div className="text-white/80">
+                                @{item.authorUsername}:{" "}
+                                {/* Slice 2: more aggressive truncation in Quick Pass while preserving original consts for Deep Review */}
+                                {item.tweetText.length > (isQuick ? 50 : SIMILAR_PREVIEW_MAX_CHARS)
+                                  ? item.tweetText.slice(0, (isQuick ? 47 : SIMILAR_PREVIEW_SLICE_CHARS)) + "…"
+                                  : item.tweetText}
+                              </div>
+                              <div className="text-[10px] text-white/50">
+                                {item.sharedCollections.length > 0 && (
+                                  <span>
+                                    Collections: <span className="text-sky-300">{item.sharedCollections.join(", ")}</span>
+                                  </span>
+                                )}
+                                {item.sharedCollections.length > 0 && item.sharedTags.length > 0 && " • "}
+                                {item.sharedTags.length > 0 && (
+                                  <span>
+                                    Tags: <span className="text-emerald-300">{item.sharedTags.join(", ")}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Decision */}
               <div>
-                <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                <div className="mb-1.5 flex items-center text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
                   Decision
+                  {/* Slice 3: tiny non-intrusive "why smart" note in Quick Pass sheet.
+                      Uses native title tooltip (subtle floating, zero visual noise until hover).
+                      Explains source only when real history/similar data is present (i.e. after opening
+                      this item's Details at least once). Does not auto-apply; only documents that the
+                      Accept Orbit suggestion button (in list) may have used these signals. */}
+                  {isQuick && (() => {
+                    const realHist = authorHistory && !("loading" in authorHistory) ? authorHistory : null;
+                    const realSim = Array.isArray(similarCollections) ? similarCollections : null;
+                    const hasSignal = !!(realHist || realSim);
+                    if (!hasSignal || !original) return null;
+                    // Actually invoke the helper (ensures import is used; determines if a true smart enhancement exists)
+                    const smartPatch = getQuickSmartPatch(original, realHist, realSim);
+                    // Show the note only when helper produced a patch that actually differs from plain original (real smarts applied or available)
+                    const baseDecision = deriveReviewDecision(original);
+                    const baseTags = original.tags.map((t) => t.name).join(", ");
+                    const baseCol = original.collection?.name ?? "";
+                    const isEnhanced =
+                      smartPatch &&
+                      (smartPatch.decision !== baseDecision ||
+                        smartPatch.tagNames !== baseTags ||
+                        smartPatch.collectionName !== baseCol);
+                    if (!isEnhanced) return null;
+                    const sp = smartPatch!;
+                    const draftMatchesSmart =
+                      draft.decision === sp.decision &&
+                      (draft.tagNames ?? "") === (sp.tagNames ?? "") &&
+                      (draft.collectionName ?? "") === (sp.collectionName ?? "");
+                    if (!draftMatchesSmart) return null;
+                    const prior = (realHist as { priorCount?: number } | null)?.priorCount ?? 0;
+                    const username = (realHist as { authorUsername?: string } | null)?.authorUsername ?? "";
+                    const why = [
+                      realHist ? `your ${prior} prior decision${prior === 1 ? "" : "s"} on @${username}` : "",
+                      realSim ? "similar high-performers" : "",
+                    ].filter(Boolean).join(" + ");
+                    return (
+                      <span
+                        className="ml-1.5 normal-case tracking-normal text-emerald-300/60 text-[9px]"
+                        title={`Smart suggestion source: ${why}. Values derived client-side by getQuickSmartPatch (conservative history-aware patch) and reflected in your current draft.`}
+                      >
+                        from your history
+                      </span>
+                    );
+                  })()}
                 </div>
-                <OrbitReviewDecisionControl
-                  value={draft.decision}
-                  onChange={(d) => update({ decision: d, included: d !== "keep" })}
-                />
+                {isQuick ? (
+                  <div className="rounded-xl border border-white/20 bg-white/[0.04] p-2 shadow-sm">
+                    <OrbitReviewDecisionControl
+                      value={draft.decision}
+                      onChange={(d) => update({ decision: d, included: d !== "keep" })}
+                    />
+                  </div>
+                ) : (
+                  <OrbitReviewDecisionControl
+                    value={draft.decision}
+                    onChange={(d) => update({ decision: d, included: d !== "keep" })}
+                  />
+                )}
               </div>
 
               {/* Tags */}

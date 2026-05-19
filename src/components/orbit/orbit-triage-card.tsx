@@ -33,6 +33,7 @@ interface OrbitTriageCardProps {
   onReviewSuggestion?: (bookmarkId: string) => void;
   onApplyAlternative?: (bookmarkId: string) => void;
   onKeepInOrbit?: (bookmarkId: string) => void;
+  onFeedback?: (bookmarkId: string, type: 'good' | 'not_relevant') => void; // Phase 2 inline feedback
   className?: string;
 }
 
@@ -65,6 +66,7 @@ export function OrbitTriageCard({
   const primary = decision?.primary ?? null;
   const alternative = decision?.alternative ?? null;
   const confidenceText = decision ? confidenceLabel(decision.confidence) : null;
+  const reasoning = decision?.reasoning;
 
   const confidenceTone = useMemo(() => {
     if (!decision) return "";
@@ -102,6 +104,14 @@ export function OrbitTriageCard({
         onAddToCollection={onAddToCollection}
         onDelete={onDelete}
       />
+
+      {/* Phase 1 polish: Make Grok reasoning more prominent in primary triage cards */}
+      {decision?.reasoning && (
+        <div className="px-4 pb-2 text-[11px] leading-snug text-white/70 border-t border-white/5">
+          <span className="font-medium text-sky-200/80">Grok: </span>
+          {decision.reasoning}
+        </div>
+      )}
 
       {decision && (
         <div className="relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl sm:px-5">
@@ -145,11 +155,7 @@ export function OrbitTriageCard({
                 </p>
               </div>
 
-              {decision.reasoning && (
-                <p className="text-xs leading-snug text-white/65">
-                  {decision.reasoning}
-                </p>
-              )}
+              {/* Reasoning now shown prominently above the decision section for better visibility in primary cards */}
 
               {decision.suggestedTags.length > 0 ? (
                 <div>

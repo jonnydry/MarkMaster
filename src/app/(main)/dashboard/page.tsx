@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useRef, useMemo, useCallback } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { CheckSquare, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
@@ -19,8 +19,8 @@ import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import { fetchJson } from "@/lib/fetch-json";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries, invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import { cn } from "@/lib/utils";
 import type {
   ViewMode,
@@ -29,6 +29,10 @@ import type {
 } from "@/types";
 import { PerformanceHighlights } from "@/components/performance-highlights";
 import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
+import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
+import { trackFlywheelEvent } from "@/lib/flywheel";
+import { HighlightsDigest } from "@/components/highlights-digest";
+import { toast } from "sonner";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
@@ -123,12 +127,32 @@ function getSharedCollectionIds(bookmarks: BookmarkWithRelations[]) {
 
 function DashboardContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
 
   const filters = useBookmarkFilters();
   const actions = useBookmarkActions();
   const { createCollectionQuick, createCollection } = useCreateCollection();
+
+  const handleSaveGemsAsCollection = async (bookmarks: BookmarkWithRelations[], suggestedName: string) => {
+    try {
+      const newCollectionId = await createCollectionQuick(suggestedName);
+
+      // Add all the gems to the newly created collection
+      for (const b of bookmarks) {
+        await sendJson(`/api/collections/${newCollectionId}/items`, {
+          method: "POST",
+          body: { bookmarkIds: [b.id] },
+        });
+      }
+
+      await invalidateCollectionsQuery(queryClient);
+      toast.success(`Created "${suggestedName}" with ${bookmarks.length} gems`);
+    } catch (e) {
+      toast.error("Could not save the gems as a collection");
+    }
+  };
 
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [showFilters, setShowFilters] = useState(false);
@@ -162,7 +186,12 @@ function DashboardContent() {
   const { data: collections = [] } = useCollectionsQuery();
 
   // Shared performance highlights (raw / untouched only for the dashboard strip)
-  const { data: highlightData } = usePerformanceHighlightsHook(true);
+  const dislikedIds = getDislikedHighlightIds();
+  const likedIds = getLikedHighlightIds();
+  const { data: highlightData } = usePerformanceHighlightsHook(true, {
+    dislikedIds,
+    likedIds,
+  });
 
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
@@ -399,6 +428,12 @@ function DashboardContent() {
 
   const dbUser = session?.dbUser;
 
+  // Compute temporal freshness for Highlights using last sync (Phase 1, still powers 8 signals)
+  const lastSyncAtForHighlights = dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null;
+  const newSinceLastSync = lastSyncAtForHighlights
+    ? highlightBookmarks.filter((b) => new Date(b.bookmarkedAt) > lastSyncAtForHighlights).length
+    : 0;
+
   const handleCommandPaletteFilter = useCallback(
     (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
       if (filter.mediaFilter) {
@@ -623,7 +658,7 @@ function DashboardContent() {
               title="Highlights"
               subtitle={
                 typeof unsortedTotal === "number"
-                  ? `${unsortedTotal.toLocaleString()} unsorted`
+                  ? `${unsortedTotal.toLocaleString()} untouched high-performers${newSinceLastSync > 0 ? ` • ${newSinceLastSync} new since last sync` : ''}`
                   : undefined
               }
               bookmarks={highlightBookmarks}
@@ -631,7 +666,18 @@ function DashboardContent() {
               activeBookmarkId={activeBookmarkIdForView}
               onSelect={setActiveBookmarkId}
               onFocusForTriage={focusPerformanceHighlight}
+              onOrbitReview={(id) => {
+                // Phase 3 Item 12 Slice 1: instrument "Review in Orbit" CTA from main Highlights strip
+                trackFlywheelEvent("cta.review_in_orbit", { source: "highlights", bookmarkId: id });
+                router.push(`/orbit?highlightId=${id}`);
+              }}
+              isRawMode={true}
             />
+          )}
+
+          {/* Phase 2: Habit-forming "This Week's Gems" / Orbit Digest recap */}
+          {!isLoading && !isError && bookmarks.length > 0 && (
+            <HighlightsDigest onSaveAsCollection={handleSaveGemsAsCollection} />
           )}
 
           {isLoading ? (

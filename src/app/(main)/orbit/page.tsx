@@ -51,6 +51,8 @@ import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
+import { addDislikedHighlightId, addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
+import { trackFlywheelEvent } from "@/lib/flywheel";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
 import {
@@ -239,6 +241,11 @@ function buildNoOpApplyResult(bookmarkCount: number): OrbitApplyResult {
 export default function OrbitPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Flywheel support (Phase 1+): if coming from Highlights/Digest, pre-focus the review dialog on that item
+  const highlightIdFromUrl = searchParams.get("highlightId");
+  const digestIdsFromUrl = searchParams.get("digestIds"); // from HighlightsDigest "Review all in Orbit"
+  const sourceFromUrl = searchParams.get("source"); // Slice 2 light attribution (e.g. "weekly-gems" when from Digest CTA)
   const queryClient = useQueryClient();
   const orbitSearch = searchParams?.toString() ?? "";
   const orbitUrlState = useMemo(
@@ -271,7 +278,43 @@ export default function OrbitPage() {
   );
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewBookmarkId, setReviewBookmarkId] = useState<string | null>(null);
+  const [feedbackById, setFeedbackById] = useState<Record<string, 'good' | 'not_relevant'>>({}); // Phase 2 persisted feedback for the session
   const [reviewSessionId, setReviewSessionId] = useState(0);
+
+  // Digest mode: Track the current set of bookmarks coming from a Highlights Digest ("Review all") (Phase 2)
+  const [activeDigestBookmarkIds, setActiveDigestBookmarkIds] = useState<string[] | null>(null);
+
+  // Refs to guard one-time URL-intent handling (prevents sync setState lint + re-entrancy)
+  const hasHandledHighlightRef = useRef(false);
+  const hasHandledDigestRef = useRef(false);
+
+  // Flywheel support (Phase 1+): if coming from Highlights/Digest, pre-focus the review dialog on that item
+  useEffect(() => {
+    if (highlightIdFromUrl && !reviewBookmarkId && !hasHandledHighlightRef.current) {
+      hasHandledHighlightRef.current = true;
+      setReviewBookmarkId(highlightIdFromUrl);
+      setReviewOpen(true);
+    }
+  }, [highlightIdFromUrl, reviewBookmarkId]);
+
+  // Digest mode: Support "Review all from Digest" flow (the important flywheel piece)
+  useEffect(() => {
+    if (digestIdsFromUrl && !reviewOpen && !hasHandledDigestRef.current) {
+      const ids = digestIdsFromUrl.split(",").filter(Boolean);
+      if (ids.length > 0) {
+        hasHandledDigestRef.current = true;
+        // Phase 3 Item 12 Slice 2: record session start + light originating source (captured only when from Digest CTA via ?source=; enables future attribution with zero extra cost today)
+        const sessionStartPayload: { size: number; source?: string } = { size: ids.length };
+        if (sourceFromUrl) sessionStartPayload.source = sourceFromUrl;
+        trackFlywheelEvent("digest.session_start", sessionStartPayload);
+        // Intentional one-time URL bootstrap for digest review flow (guarded by ref; matches pre-existing highlight intent pattern in this file)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setActiveDigestBookmarkIds(ids);
+        setReviewBookmarkId(ids[0]); // focus the first one
+        setReviewOpen(true);
+      }
+    }
+  }, [digestIdsFromUrl, reviewOpen, sourceFromUrl]);
   const [scanContextAtLastRun, setScanContextAtLastRun] = useState<string | null>(
     null
   );
@@ -622,6 +665,8 @@ export default function OrbitPage() {
     setReviewOpen(open);
     if (!open) {
       setReviewBookmarkId(null);
+      setActiveDigestBookmarkIds(null);
+      setFeedbackById({});
     }
   }, []);
 
@@ -664,6 +709,15 @@ export default function OrbitPage() {
           scan.dismiss(bookmarkId);
         }
 
+        // B: after digest review session, auto-boost kept gems as implicit Good (if no prior feedback)
+        if (activeDigestBookmarkIds && opts.keptBookmarkIds.length > 0) {
+          for (const id of opts.keptBookmarkIds) {
+            if (getHighlightFeedback(id) === null) {
+              addLikedHighlightId(id);
+            }
+          }
+        }
+
         const keptMessage =
           opts.keptBookmarkIds.length > 0
             ? `Kept ${opts.keptBookmarkIds.length} in Orbit`
@@ -683,7 +737,7 @@ export default function OrbitPage() {
         return null;
       }
     },
-    [scan]
+    [scan, activeDigestBookmarkIds]
   );
 
   const handleKeepInOrbit = useCallback(
@@ -1093,6 +1147,19 @@ export default function OrbitPage() {
                       onReviewSuggestion={handleOpenBookmarkReview}
                       onApplyAlternative={handleApplyAlternative}
                       onKeepInOrbit={handleKeepInOrbit}
+                      onFeedback={(id, type) => {
+                        setFeedbackById(prev => ({ ...prev, [id]: type }));
+                        if (type === 'not_relevant') {
+                          addDislikedHighlightId(id);
+                        } else if (type === 'good') {
+                          addLikedHighlightId(id);
+                        }
+                        toast.success(
+                          type === 'good'
+                            ? 'Thanks! This helps improve future suggestions.'
+                            : 'Got it — we\'ll deprioritize similar items in future Highlights.'
+                        );
+                      }}
                       className={getStaggerClass(index, "animate-fade-in-up")}
                     />
                   ))}
@@ -1161,6 +1228,9 @@ export default function OrbitPage() {
         focusBookmarkId={reviewBookmarkId}
         reviewSessionId={reviewSessionId}
         onApply={handleApplyReviewedPlan}
+        // Phase 2: Pass the set of bookmarks that came from a Highlights Digest
+        digestBookmarkIds={activeDigestBookmarkIds}
+        feedbackById={feedbackById}
       />
     </div>
   );
@@ -1568,12 +1638,12 @@ function QueueEmptyState({
     <div className="border-y border-hairline-soft py-10 text-center">
       <OrbitLogoMark className="mx-auto mb-4 size-8" />
       <p className="text-base font-semibold text-foreground">
-        {searching ? "Nothing in Orbit matches this search" : "Orbit is clear"}
+        {searching ? "No matches in Orbit" : "Orbit is clear"}
       </p>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
         {searching
-          ? "Try a different search term or clear the query."
-          : "Every bookmark has at least one tag, collection, or synced folder. This is a good moment to search, share, or inspect the graph."}
+          ? "Try a different term or clear the query."
+          : "Library organized. Highlights will surface the next standouts for Orbit review."}
       </p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {searching ? (

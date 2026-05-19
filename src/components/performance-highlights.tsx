@@ -1,7 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { toast } from "sonner";
+import {
+  addDislikedHighlightId,
+  addLikedHighlightId,
+  getHighlightFeedback,
+  removeDislikedHighlightId,
+  removeLikedHighlightId,
+} from "@/lib/highlight-feedback";
 import type { BookmarkWithRelations } from "@/types";
 
 function formatCompactMetric(value: number) {
@@ -36,7 +45,11 @@ interface PerformanceHighlightsProps {
   activeBookmarkId?: string | null;
   onSelect?: (id: string) => void;
   onFocusForTriage?: (id: string) => void;
+  onOrbitReview?: (id: string) => void;
   className?: string;
+  isRawMode?: boolean;
+  /** Optional per-item labels (e.g. { [bookmarkId]: "Resurfaced" }) for the Digest */
+  itemLabels?: Record<string, string>;
 }
 
 export function PerformanceHighlights({
@@ -47,8 +60,12 @@ export function PerformanceHighlights({
   activeBookmarkId,
   onSelect,
   onFocusForTriage,
+  onOrbitReview,
   className,
+  isRawMode = false,
+  itemLabels = {},
 }: PerformanceHighlightsProps) {
+  const [, setFeedbackTick] = useState(0);
   const highlightBookmarks = bookmarks.slice(0, 4);
   if (highlightBookmarks.length === 0) return null;
 
@@ -78,15 +95,23 @@ export function PerformanceHighlights({
           const active = activeBookmarkId === bookmark.id;
           const label = getHighlightLabel(bookmark);
           return (
-            <button
+            <div
               key={bookmark.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 onSelect?.(bookmark.id);
                 onFocusForTriage?.(bookmark.id);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect?.(bookmark.id);
+                  onFocusForTriage?.(bookmark.id);
+                }
+              }}
               className={cn(
-                "group flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                "group flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
                 active
                   ? "border-primary/45 bg-accent-soft/60"
                   : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1"
@@ -94,9 +119,19 @@ export function PerformanceHighlights({
               aria-label={`Open highlighted bookmark ${index + 1} from ${bookmark.authorDisplayName}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
-                  {label}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
+                    {label}
+                  </span>
+                  {itemLabels[bookmark.id] && (
+                    <span
+                      className="font-mono text-[9px] px-1.5 py-px rounded bg-amber-400/10 text-amber-200 border border-amber-400/20"
+                      title={itemLabels[bookmark.id].includes("Resurfaced") ? "Forgotten high-performer from >30d ago — resurfaced for review" : undefined}
+                    >
+                      {itemLabels[bookmark.id]}
+                    </span>
+                  )}
+                </div>
                 <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground/55">
                   #{index + 1}
                 </span>
@@ -104,6 +139,14 @@ export function PerformanceHighlights({
               <p className="mt-2 line-clamp-3 font-mono text-sm font-bold leading-5 text-foreground">
                 {bookmark.tweetText}
               </p>
+
+              {/* "Why this?" rationale (Phase 1) + personalization now active via hook (7) */}
+              <div className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
+                {isRawMode 
+                  ? "High X engagement • untouched — strong triage candidate"
+                  : "Top performer across your library by X saves & discussion"}
+              </div>
+
               <div className="mt-auto flex items-end justify-between gap-3 pt-3">
                 <div className="flex min-w-0 items-center gap-2">
                   {bookmark.authorProfileImage ? (
@@ -127,7 +170,96 @@ export function PerformanceHighlights({
                   {getHighlightMetric(bookmark)}
                 </span>
               </div>
-            </button>
+
+              {/* Phase 1 Flywheel CTA: Direct bridge to Orbit */}
+              {onOrbitReview && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOrbitReview(bookmark.id);
+                  }}
+                  className="mt-1 self-start text-[10px] font-mono uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none"
+                >
+                  Review in Orbit →
+                </button>
+              )}
+
+              {/* B: Inline feedback (Good boost / Not relevant deboost) + history indicator; uses tick for LS reactivity */}
+              <div
+                className="mt-1.5 flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.05em] text-muted-foreground/70"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(() => {
+                  const fb = getHighlightFeedback(bookmark.id);
+                  if (fb === "good") {
+                    return (
+                      <span className="text-emerald-400/90">
+                        You marked Great
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeLikedHighlightId(bookmark.id);
+                            setFeedbackTick((t) => t + 1);
+                          }}
+                          className="ml-1 underline hover:no-underline"
+                        >
+                          undo
+                        </button>
+                      </span>
+                    );
+                  }
+                  if (fb === "not_relevant") {
+                    return (
+                      <span className="text-amber-400/90">
+                        Not relevant to you
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeDislikedHighlightId(bookmark.id);
+                            setFeedbackTick((t) => t + 1);
+                          }}
+                          className="ml-1 underline hover:no-underline"
+                        >
+                          undo
+                        </button>
+                      </span>
+                    );
+                  }
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addLikedHighlightId(bookmark.id);
+                          setFeedbackTick((t) => t + 1);
+                          toast.success("Boosted for future Highlights & Digests");
+                        }}
+                        className="text-emerald-300 hover:text-emerald-200 hover:underline focus-visible:outline-none"
+                      >
+                        Good
+                      </button>
+                      <span className="text-muted-foreground/40">·</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addDislikedHighlightId(bookmark.id);
+                          setFeedbackTick((t) => t + 1);
+                          toast.success("Deprioritized in future Highlights");
+                        }}
+                        className="text-amber-300 hover:text-amber-200 hover:underline focus-visible:outline-none"
+                      >
+                        Not relevant
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           );
         })}
       </div>

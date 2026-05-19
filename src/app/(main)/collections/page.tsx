@@ -37,6 +37,11 @@ import { UserCollectionCard, XFolderCard } from "./collection-card";
 import type { CollectionWithCount, BookmarkWithRelations } from "@/types";
 import { PerformanceHighlights } from "@/components/performance-highlights";
 import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
+import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
+import { trackFlywheelEvent } from "@/lib/flywheel";
+import { HighlightsDigest } from "@/components/highlights-digest";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -116,8 +121,26 @@ export default function CollectionsPage() {
   const { data: tags = [] } = useTagsQuery();
 
   // Broad performance highlights across the entire library (not limited to raw/unsorted).
-  // This is the "overall engagement" view we discussed for the collections area.
-  const { data: libraryHighlightData } = usePerformanceHighlightsHook(false);
+  // This is the "overall engagement" view for the collections area.
+  // Phase 2 item 7: use frequency-weighted "strong personal signals" (top tags by usage count
+  // among the user's organized bookmarks) instead of every tag. Combined with server authors
+  // via usePersonalBoost for the richer overlap boost (1.4x on matches).
+  const strongPersonalTags = useMemo(
+    () =>
+      [...tags]
+        .sort((a, b) => (b._count?.bookmarks ?? 0) - (a._count?.bookmarks ?? 0))
+        .slice(0, 8)
+        .map((t) => t.name),
+    [tags]
+  );
+  const dislikedIds = getDislikedHighlightIds();
+  const likedIds = getLikedHighlightIds();
+  const { data: libraryHighlightData } = usePerformanceHighlightsHook(false, {
+    boostTags: strongPersonalTags,
+    dislikedIds,
+    likedIds,
+    usePersonalBoost: true,
+  });
 
   const libraryHighlights = libraryHighlightData?.bookmarks ?? [];
   const libraryTotal = libraryHighlightData?.total ?? 0;
@@ -287,7 +310,14 @@ export default function CollectionsPage() {
 
           <div className="p-4 sm:p-5">
             {isLoading ? (
-              <CollectionsLoadingSkeleton />
+              <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-8">
+                <div className="h-10 w-64 rounded skeleton-shimmer" />
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-32 rounded-sm border border-hairline-soft bg-surface-1 p-4 skeleton-shimmer" />
+                  ))}
+                </div>
+              </div>
             ) : isError ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
                 <div className="rounded-sm border border-hairline-soft bg-surface-1/70 p-5">
@@ -308,7 +338,17 @@ export default function CollectionsPage() {
                 </div>
               </div>
             ) : collections.length === 0 ? (
-              <CollectionsEmptyState onCreateCollection={() => setCreateOpen(true)} />
+              <EmptyState
+                icon={Layers}
+                title="No collections yet"
+                description="Create a collection to start curating your bookmarks."
+                action={
+                  <Button onClick={() => setCreateOpen(true)} className="mt-5 gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create collection
+                  </Button>
+                }
+              />
             ) : (
               <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
                 <CollectionsOverview
@@ -336,7 +376,16 @@ export default function CollectionsPage() {
                   onSelect={(id) =>
                     router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
                   }
+                  onOrbitReview={(id) => {
+                    // Phase 3 Item 12 Slice 1: instrument "Review in Orbit" from Library Highlights
+                    trackFlywheelEvent("cta.review_in_orbit", { source: "library_highlights", bookmarkId: id });
+                    router.push(`/orbit?highlightId=${id}`);
+                  }}
+                  isRawMode={false}
                 />
+
+                {/* Habit-forming Digest (Phase 2, enhanced by personalization in 7) */}
+                <HighlightsDigest />
 
                 <CollectionsControlBar
                   searchQuery={searchQuery}
@@ -715,83 +764,6 @@ function CollectionsSection({
   );
 }
 
-function CollectionsLoadingSkeleton() {
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
-        <div className="rounded-sm border border-hairline-soft bg-surface-1 px-4 py-5 sm:px-5">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-sm skeleton-shimmer" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-7 w-56 max-w-full rounded skeleton-shimmer" />
-              <div className="h-3 w-44 rounded skeleton-shimmer" />
-            </div>
-            <div className="hidden h-9 w-32 rounded-sm skeleton-shimmer sm:block" />
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-sm border border-hairline-soft px-3 py-2.5"
-              >
-                <div className="h-7 w-7 rounded-sm skeleton-shimmer" />
-                <div className="mt-2 h-3 w-16 rounded skeleton-shimmer" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-sm border border-hairline-soft bg-surface-1 px-4 py-5 sm:px-5">
-          <div className="h-8 w-36 rounded skeleton-shimmer" />
-          <div className="mt-4 h-20 rounded-sm skeleton-shimmer" />
-        </div>
-      </div>
-      <div className="h-16 rounded-sm border-y border-hairline-soft skeleton-shimmer" />
-      <div className="grid gap-2 xl:grid-cols-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-sm border border-hairline-soft bg-surface-1 px-3.5 py-3"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-sm skeleton-shimmer" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-3 w-40 rounded skeleton-shimmer" />
-                <div className="h-3 w-28 rounded skeleton-shimmer" />
-              </div>
-              <div className="h-8 w-16 rounded-sm skeleton-shimmer" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CollectionsEmptyState({
-  onCreateCollection,
-}: {
-  onCreateCollection: () => void;
-}) {
-  return (
-    <div className="mx-auto flex min-h-[24rem] w-full max-w-4xl items-center justify-center text-center">
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/80 px-6 py-8 shadow-sm sm:px-10">
-        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
-          <Layers className="h-6 w-6" aria-hidden="true" />
-        </span>
-        <h2 className="heading-font text-2xl font-bold tracking-tight">
-          No collections yet
-        </h2>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-          Create a collection to start curating your bookmarks.
-        </p>
-        <Button onClick={onCreateCollection} className="mt-5 gap-2">
-          <Plus className="h-4 w-4" />
-          Create collection
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function NoCollectionMatches({ onClear }: { onClear: () => void }) {
   return (

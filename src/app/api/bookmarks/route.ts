@@ -71,6 +71,54 @@ function buildMediaFilterCondition(
   }
 }
 
+/**
+ * Central helper for the two most complex/advanced filters.
+ * Both fast path (Prisma) and slow path (raw SQL) call this.
+ *
+ * This is the main weapon against duplication when we later add more sophisticated
+ * filters (e.g. personalization for Highlights).
+ */
+function applyAdvancedFilters(opts: {
+  relationFilters?: Prisma.BookmarkWhereInput[];
+  sqlConditions?: Prisma.Sql[];
+  unaffiliated: boolean;
+  raw: boolean;
+}) {
+  const { relationFilters = [], sqlConditions = [], unaffiliated, raw } = opts;
+
+  if (unaffiliated) {
+    relationFilters.push({ tags: { none: {} } });
+    sqlConditions.push(Prisma.sql`
+      NOT EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")
+    `);
+
+    relationFilters.push({
+      collectionItems: {
+        none: { collection: { type: "user_collection" } },
+      },
+    });
+    sqlConditions.push(Prisma.sql`
+      NOT EXISTS (
+        SELECT 1 FROM "CollectionItem" ci
+        INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+        WHERE ci."bookmarkId" = b."id" AND c."type" = 'user_collection'
+      )
+    `);
+  }
+
+  if (raw) {
+    relationFilters.push({ tags: { none: {} } });
+    sqlConditions.push(Prisma.sql`
+      NOT EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")
+    `);
+
+    relationFilters.push({ collectionItems: { none: {} } });
+    sqlConditions.push(Prisma.sql`
+      NOT EXISTS (SELECT 1 FROM "CollectionItem" ci WHERE ci."bookmarkId" = b."id")
+    `);
+  }
+}
+
 function buildSlowPathWhereSql({
   userId,
   searchTerms,
@@ -151,43 +199,7 @@ function buildSlowPathWhereSql({
     `);
   }
 
-  if (unaffiliated) {
-    conditions.push(Prisma.sql`
-      NOT EXISTS (
-        SELECT 1
-        FROM "BookmarkTag" bt
-        WHERE bt."bookmarkId" = b."id"
-      )
-    `);
-    conditions.push(Prisma.sql`
-      NOT EXISTS (
-        SELECT 1
-        FROM "CollectionItem" ci
-        INNER JOIN "Collection" c ON c."id" = ci."collectionId"
-        WHERE ci."bookmarkId" = b."id"
-          AND c."type" = 'user_collection'::"CollectionType"
-      )
-    `);
-  }
-
-  if (raw) {
-    // Strict "completely untouched" filter (for dashboard Library Highlights).
-    // Excludes bookmarks that have any tags or any CollectionItem (x_folder or user_collection).
-    conditions.push(Prisma.sql`
-      NOT EXISTS (
-        SELECT 1
-        FROM "BookmarkTag" bt
-        WHERE bt."bookmarkId" = b."id"
-      )
-    `);
-    conditions.push(Prisma.sql`
-      NOT EXISTS (
-        SELECT 1
-        FROM "CollectionItem" ci
-        WHERE ci."bookmarkId" = b."id"
-      )
-    `);
-  }
+  applyAdvancedFilters({ sqlConditions: conditions, unaffiliated, raw });
 
   const mediaCondition = buildMediaFilterCondition(mediaFilter);
   if (mediaCondition) {
@@ -257,12 +269,44 @@ export async function GET(req: NextRequest) {
     collectionId,
     unaffiliated,
     raw,
+    personalBoost,
   } = parsed.data;
 
   const tagIds = tagFilter
     ? tagFilter.split(",").map((id) => id.trim()).filter(Boolean)
     : [];
   const searchTerms = tokenizeBookmarkSearch(search);
+
+  // Phase 2 item 7: lightweight personal signals (simple overlap query over organized bookmarks)
+  // Only runs for Highlights performance calls when ?personalBoost=1 (cheap, LIMIT 8, no heavy ranking).
+  // Provides frequency-weighted authors from items the user has already curated (tagged or saved to a personal collection).
+  let personalBoostAuthors: string[] = [];
+  const personalBoostTags: string[] = [];
+  // Only compute for the intended cheap Highlights path (performance sort + small limit).
+  // This makes the "lightweight only on Highlights" contract explicit and defensive.
+  if (personalBoost && limit <= 4 && sortField === "performance") {
+    const orgAuthorRows = await prisma.$queryRaw<
+      { author: string; c: bigint }[]
+    >`
+      SELECT b."authorUsername" AS author, COUNT(*)::bigint AS c
+      FROM "Bookmark" b
+      WHERE b."userId" = ${user.id}
+        AND (
+          EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")
+          OR EXISTS (
+            SELECT 1 FROM "CollectionItem" ci
+            INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+            WHERE ci."bookmarkId" = b."id" AND c."type" = 'user_collection'
+          )
+        )
+      GROUP BY b."authorUsername"
+      ORDER BY c DESC
+      LIMIT 8
+    `;
+    personalBoostAuthors = orgAuthorRows.map((r) => r.author);
+    // personalBoostTags left as [] for API response symmetry with the hook's merge logic.
+    // Future: server-side tag frequency aggregation could populate it (client currently derives strong tags).
+  }
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
   const relationFilters: Prisma.BookmarkWhereInput[] = [];
@@ -300,21 +344,7 @@ export async function GET(req: NextRequest) {
     relationFilters.push({ collectionItems: { some: { collectionId } } });
   }
 
-  if (unaffiliated) {
-    relationFilters.push({ tags: { none: {} } });
-    relationFilters.push({
-      collectionItems: {
-        none: { collection: { type: "user_collection" } },
-      },
-    });
-  }
-
-  if (raw) {
-    // Strict "completely untouched" filter for performance highlights / triage.
-    // No tags at all, and no CollectionItems of any kind (x_folders or user collections).
-    relationFilters.push({ tags: { none: {} } });
-    relationFilters.push({ collectionItems: { none: {} } });
-  }
+  applyAdvancedFilters({ relationFilters, unaffiliated, raw });
 
   if (relationFilters.length > 0) {
     where.AND = relationFilters;
@@ -333,6 +363,10 @@ export async function GET(req: NextRequest) {
     sortField === "replies" ||
     sortField === "performance" ||
     mediaFilter !== "all";
+
+  // Advanced filters (unaffiliated, raw, future personalization, etc.) are now centralized
+  // in `applyAdvancedFilters`. Both fast and slow paths call it.
+  // This significantly reduces the previous duplication/brittleness.
 
   if (!needsSlowPath) {
     let orderBy: Prisma.BookmarkOrderByWithRelationInput;
@@ -363,6 +397,9 @@ export async function GET(req: NextRequest) {
       total,
       page,
       totalPages: Math.ceil(total / limit) || 1,
+      ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
+        ? { personalBoostAuthors, personalBoostTags }
+        : {}),
     });
   }
 
@@ -417,6 +454,9 @@ export async function GET(req: NextRequest) {
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,
+    ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
+      ? { personalBoostAuthors, personalBoostTags }
+      : {}),
   });
 }
 
