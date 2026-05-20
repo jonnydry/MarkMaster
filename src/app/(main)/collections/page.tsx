@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
@@ -27,7 +27,7 @@ import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { sendJson } from "@/lib/fetch-json";
 import {
   invalidateCollectionsQuery,
   invalidateLibraryQueries,
