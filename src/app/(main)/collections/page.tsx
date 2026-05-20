@@ -41,7 +41,6 @@ import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-f
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { HighlightsDigest } from "@/components/highlights-digest";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -105,7 +104,26 @@ export default function CollectionsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
-  const { createCollection } = useCreateCollection();
+  const { createCollection, createCollectionQuick } = useCreateCollection();
+
+  const handleSaveGemsAsCollection = async (
+    gems: BookmarkWithRelations[],
+    suggestedName: string
+  ) => {
+    try {
+      const newCollectionId = await createCollectionQuick(suggestedName);
+      for (const b of gems) {
+        await sendJson(`/api/collections/${newCollectionId}/items`, {
+          method: "POST",
+          body: { bookmarkIds: [b.id] },
+        });
+      }
+      await invalidateCollectionsQuery(queryClient);
+      toast.success(`Created "${suggestedName}" with ${gems.length} gems`);
+    } catch {
+      toast.error("Could not save the gems as a collection");
+    }
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<CollectionFilter>("all");
@@ -385,7 +403,7 @@ export default function CollectionsPage() {
                 />
 
                 {/* Habit-forming Digest (Phase 2, enhanced by personalization in 7) */}
-                <HighlightsDigest />
+                <HighlightsDigest onSaveAsCollection={handleSaveGemsAsCollection} />
 
                 <CollectionsControlBar
                   searchQuery={searchQuery}

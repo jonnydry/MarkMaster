@@ -1,5 +1,5 @@
 import { BookmarkCard } from "@/components/bookmark-card";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
 
@@ -69,8 +69,10 @@ export function BookmarkList({
     );
   }
 
+  const listContainerClass = getBookmarkListContainerClassName(!!activeBookmarkId, viewMode);
+
   return (
-    <div className={bookmarkFeedColumnClassName}>
+    <div className={listContainerClass}>
       {bookmarks.map((bookmark, i) => (
         <BookmarkCard
           key={bookmark.id}

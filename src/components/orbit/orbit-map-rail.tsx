@@ -27,6 +27,9 @@ import type {
   OrbitGraphPayload,
 } from "@/types";
 
+import { useOrbitalTheme } from "@/components/providers";
+import { orbital } from "@/components/orbital";
+
 interface OrbitMapRailProps {
   data: OrbitGraphPayload;
   selection: OrbitMapSelection | null;
@@ -122,12 +125,18 @@ export function OrbitMapRail({
     [activeNode, data]
   );
   const isOverlay = variant === "overlay";
+  const { isOrbital } = useOrbitalTheme();
 
   return (
     <aside
       className={cn(
         isOverlay
-          ? "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-[26px] border border-white/[0.055] bg-white/[0.035] p-4 shadow-none backdrop-blur-2xl [scrollbar-width:thin]"
+          ? cn(
+              "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-[26px] p-4 shadow-none backdrop-blur-2xl [scrollbar-width:thin]",
+              isOrbital
+                ? cn(orbital.glass, "border-primary/25")
+                : "border border-white/[0.055] bg-white/[0.035]"
+            )
           : "flex w-full flex-col gap-3 lg:w-[300px] lg:shrink-0 xl:w-[320px]",
         className
       )}
@@ -155,6 +164,7 @@ export function OrbitMapRail({
           onClearSelection={onClearSelection}
           copyingCollectionId={copyingCollectionId}
           isOverlay={isOverlay}
+          isOrbital={isOrbital}
         />
       </section>
 
@@ -167,7 +177,10 @@ export function OrbitMapRail({
               : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
           )}
         >
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
+          <p className={cn(
+            "text-[11px] font-medium uppercase tracking-[0.18em]",
+            isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
+          )}>
             Legend
           </p>
           <ul
@@ -195,7 +208,10 @@ export function OrbitMapRail({
               <span>Relationship</span>
             </li>
           </ul>
-          <p className="mt-3 text-xs text-white/50">
+          <p className={cn(
+            "mt-3 text-xs",
+            isOrbital ? cn(orbital.label, "text-primary/60 text-[10px]") : "text-white/50"
+          )}>
             Scroll to zoom · drag to pan · click to focus · Esc to clear
           </p>
         </section>
@@ -220,6 +236,7 @@ interface SelectedClusterBodyProps {
   onClearSelection: () => void;
   copyingCollectionId?: string | null;
   isOverlay: boolean;
+  isOrbital: boolean;
 }
 
 function SelectedClusterBody({
@@ -238,12 +255,19 @@ function SelectedClusterBody({
   onClearSelection,
   copyingCollectionId,
   isOverlay,
+  isOrbital,
 }: SelectedClusterBodyProps) {
   if (!node) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-medium text-white">Select a node</p>
-        <p className="text-sm text-white/65">
+        <p className={cn(
+          "text-sm font-medium",
+          isOrbital ? cn(orbital.label, "text-primary/90") : "text-white"
+        )}>Select a node</p>
+        <p className={cn(
+          "text-sm",
+          isOrbital ? "text-primary/70" : "text-white/65"
+        )}>
           Click a tag, collection, or bookmark on the graph to see details and
           move it into a home.
         </p>
@@ -259,8 +283,14 @@ function SelectedClusterBody({
             <OrbitLogoMark className="size-4" />
           </span>
           <div>
-            <p className="text-sm font-medium text-white">Orbit index</p>
-            <p className="text-xs text-white/60">Central anchor for loose bookmarks</p>
+            <p className={cn(
+              "text-sm font-medium",
+              isOrbital ? cn(orbital.label, "text-primary/90") : "text-white"
+            )}>Orbit index</p>
+            <p className={cn(
+              "text-xs",
+              isOrbital ? "text-primary/70" : "text-white/60"
+            )}>Central anchor for loose bookmarks</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -268,11 +298,13 @@ function SelectedClusterBody({
             label="Total"
             value={stats.totalBookmarks.toLocaleString()}
             isOverlay={isOverlay}
+            isOrbital={isOrbital}
           />
           <RailMetric
             label="Loose"
             value={stats.looseBookmarks.toLocaleString()}
             isOverlay={isOverlay}
+            isOrbital={isOrbital}
           />
         </div>
         {connected.length > 0 && (
@@ -281,6 +313,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
+            isOrbital={isOrbital}
           />
         )}
       </div>
@@ -301,7 +334,10 @@ function SelectedClusterBody({
             <TagIcon className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
+            <p className={cn(
+              "text-[11px] uppercase tracking-[0.18em]",
+              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
+            )}>
               Tag
             </p>
             <p className="truncate text-sm font-semibold text-white">
@@ -309,7 +345,10 @@ function SelectedClusterBody({
             </p>
           </div>
         </div>
-        <p className="text-sm text-white/65">
+        <p className={cn(
+          "text-sm",
+          isOrbital ? "text-primary/70" : "text-white/65"
+        )}>
           {pluralize(node.count, "bookmark")}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -347,6 +386,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
+            isOrbital={isOrbital}
           />
         )}
       </div>
@@ -367,7 +407,10 @@ function SelectedClusterBody({
             <Icon className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
+            <p className={cn(
+              "text-[11px] uppercase tracking-[0.18em]",
+              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
+            )}>
               {node.variant === "x_folder" ? "X folder" : "Collection"}
             </p>
             <p className="truncate text-sm font-semibold text-white">
@@ -375,7 +418,10 @@ function SelectedClusterBody({
             </p>
           </div>
         </div>
-        <p className="text-sm text-white/65">
+        <p className={cn(
+          "text-sm",
+          isOrbital ? "text-primary/70" : "text-white/65"
+        )}>
           {pluralize(node.count, "bookmark")}
         </p>
         {actionState.readOnlyReason && (
@@ -439,6 +485,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
+            isOrbital={isOrbital}
           />
         )}
       </div>
@@ -459,7 +506,10 @@ function SelectedClusterBody({
             <GrokMark className="size-4" title="Grok" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/55">
+            <p className={cn(
+              "text-[11px] uppercase tracking-[0.18em]",
+              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
+            )}>
               Bookmark
             </p>
             <p className="truncate text-sm font-semibold text-white">
@@ -467,7 +517,10 @@ function SelectedClusterBody({
             </p>
           </div>
         </div>
-        <p className="text-sm text-white/70">
+        <p className={cn(
+          "text-sm",
+          isOrbital ? "text-primary/80" : "text-white/70"
+        )}>
           {focusedBookmarkLoading && !focusedBookmark
             ? "Loading…"
             : focusedBookmark?.tweetText ?? node.title}
@@ -505,11 +558,17 @@ function SelectedClusterBody({
           </Button>
         </div>
         {isLoose && (
-          <p className="text-xs text-sky-300/80">Not yet tagged or collected</p>
+          <p className={cn(
+            "text-xs",
+            isOrbital ? "text-primary/70" : "text-sky-300/80"
+          )}>Not yet tagged or collected</p>
         )}
         {tagConnections.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+            <p className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.18em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
+            )}>
               Tags
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -532,7 +591,10 @@ function SelectedClusterBody({
         )}
         {collectionConnections.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+            <p className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.18em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
+            )}>
               Collections
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -553,7 +615,10 @@ function SelectedClusterBody({
         {hasExplicitSelection && (
           <button
             type="button"
-            className="text-xs text-white/55 underline-offset-2 hover:text-white hover:underline"
+            className={cn(
+              "text-xs underline-offset-2 hover:underline",
+              isOrbital ? "text-primary/70 hover:text-primary" : "text-white/55 hover:text-white"
+            )}
             onClick={onClearSelection}
           >
             Clear selection
@@ -575,18 +640,23 @@ function ConnectedList({
   nodes,
   onOpenBookmark,
   isOverlay,
+  isOrbital,
 }: {
   title: string;
   nodes: OrbitGraphNode[];
   onOpenBookmark: (bookmarkId: string) => void;
   isOverlay: boolean;
+  isOrbital: boolean;
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
   if (bookmarks.length === 0) return null;
 
   return (
     <div className="space-y-2 pt-1">
-      <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/50">
+      <p className={cn(
+        "text-[10px] font-medium uppercase tracking-[0.18em]",
+        isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
+      )}>
         {title} · {bookmarks.length}
       </p>
       <ScrollArea
@@ -629,10 +699,12 @@ function RailMetric({
   label,
   value,
   isOverlay,
+  isOrbital,
 }: {
   label: string;
   value: string;
   isOverlay: boolean;
+  isOrbital: boolean;
 }) {
   return (
     <div
@@ -641,10 +713,16 @@ function RailMetric({
         isOverlay ? "bg-white/[0.025]" : "bg-white/[0.04]"
       )}
     >
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/55">
+      <p className={cn(
+        "text-[10px] font-medium uppercase tracking-[0.2em]",
+        isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
+      )}>
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold tracking-tight text-white">
+      <p className={cn(
+        "mt-1 text-lg font-semibold tracking-tight",
+        isOrbital ? orbital.data : "text-white"
+      )}>
         {value}
       </p>
     </div>

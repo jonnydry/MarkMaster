@@ -44,9 +44,21 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { OrbitTriageCard } from "@/components/orbit/orbit-triage-card";
 import { OrbitReviewDialog } from "@/components/orbit/orbit-review-dialog";
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
+
+// New clean-list + slide-in + overlays components (new Orbit model)
+import { OrbitList } from "@/components/orbit/orbit-list";
+import { OrbitContextualMenu } from "@/components/orbit/orbit-quick-actions";
+import { OrbitSlideInPanel } from "@/components/orbit/orbit-slide-in-panel";
+
+// Orbital primitives (used for header, labels, etc. in the new model)
+import {
+  orbital,
+  OrbitalCard,
+  MissionControlHeader,
+  TelemetryStat,
+} from "@/components/orbital";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
@@ -121,7 +133,7 @@ const VIEW_MODE_OPTIONS: Array<{
 ];
 
 const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+  fontFamily: "var(--font-jetbrains-mono)",
 };
 
 function OrbitHeaderLogoAccent() {
@@ -272,7 +284,35 @@ export default function OrbitPage() {
   const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
   const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
+  const [menuForId, setMenuForId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
+
+  // Simple click-outside + Esc for the floating menu (keeps things lightweight)
+  useEffect(() => {
+    if (!menuForId) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      setMenuForId(null);
+      setMenuPosition(null);
+    };
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuForId(null);
+        setMenuPosition(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuForId]);
+
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -288,33 +328,6 @@ export default function OrbitPage() {
   const hasHandledHighlightRef = useRef(false);
   const hasHandledDigestRef = useRef(false);
 
-  // Flywheel support (Phase 1+): if coming from Highlights/Digest, pre-focus the review dialog on that item
-  useEffect(() => {
-    if (highlightIdFromUrl && !reviewBookmarkId && !hasHandledHighlightRef.current) {
-      hasHandledHighlightRef.current = true;
-      setReviewBookmarkId(highlightIdFromUrl);
-      setReviewOpen(true);
-    }
-  }, [highlightIdFromUrl, reviewBookmarkId]);
-
-  // Digest mode: Support "Review all from Digest" flow (the important flywheel piece)
-  useEffect(() => {
-    if (digestIdsFromUrl && !reviewOpen && !hasHandledDigestRef.current) {
-      const ids = digestIdsFromUrl.split(",").filter(Boolean);
-      if (ids.length > 0) {
-        hasHandledDigestRef.current = true;
-        // Phase 3 Item 12 Slice 2: record session start + light originating source (captured only when from Digest CTA via ?source=; enables future attribution with zero extra cost today)
-        const sessionStartPayload: { size: number; source?: string } = { size: ids.length };
-        if (sourceFromUrl) sessionStartPayload.source = sourceFromUrl;
-        trackFlywheelEvent("digest.session_start", sessionStartPayload);
-        // Intentional one-time URL bootstrap for digest review flow (guarded by ref; matches pre-existing highlight intent pattern in this file)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setActiveDigestBookmarkIds(ids);
-        setReviewBookmarkId(ids[0]); // focus the first one
-        setReviewOpen(true);
-      }
-    }
-  }, [digestIdsFromUrl, reviewOpen, sourceFromUrl]);
   const [scanContextAtLastRun, setScanContextAtLastRun] = useState<string | null>(
     null
   );
@@ -499,9 +512,51 @@ export default function OrbitPage() {
   }, [scan.plan, scan.dismissedBookmarkIds]);
 
   const resolvedActiveBookmarkId =
-    activeBookmarkId && bookmarkById.has(activeBookmarkId)
-      ? activeBookmarkId
-      : bookmarks[0]?.id ?? null;
+    activeBookmarkId && bookmarkById.has(activeBookmarkId) ? activeBookmarkId : null;
+
+  const activeBookmark = resolvedActiveBookmarkId
+    ? bookmarkById.get(resolvedActiveBookmarkId) ?? null
+    : null;
+
+  // Basic keyboard navigation for the clean list (arrow keys + Enter/Esc)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!bookmarks.length) return;
+
+      const currentIndex = bookmarks.findIndex((b) => b.id === resolvedActiveBookmarkId);
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = currentIndex < bookmarks.length - 1 ? currentIndex + 1 : 0;
+        setActiveBookmarkId(bookmarks[next].id);
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = currentIndex > 0 ? currentIndex - 1 : bookmarks.length - 1;
+        setActiveBookmarkId(bookmarks[prev].id);
+      }
+
+      if (e.key === "Enter" && resolvedActiveBookmarkId && !activeBookmark) {
+        setActiveBookmarkId(resolvedActiveBookmarkId);
+      }
+
+      if (e.key === "Escape") {
+        if (menuForId) {
+          setMenuForId(null);
+          setMenuPosition(null);
+        } else if (activeBookmarkId) {
+          setActiveBookmarkId(null);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [bookmarks, resolvedActiveBookmarkId, activeBookmark, activeBookmarkId, menuForId]);
+
+  const activeDecision = activeBookmark ? scan.getDecision(activeBookmark.id) : null;
+  const activeConfidence = activeDecision?.confidence;
 
   const tagDialogBookmarks = useMemo(
     () =>
@@ -645,6 +700,55 @@ export default function OrbitPage() {
     await runOrbitScan(buildScanRequest(scanTargetIds, scanningSelection));
   }, [buildScanRequest, runOrbitScan, scanTargetIds, scanningSelection]);
 
+  // Digest flywheel: auto-scan gems from Highlights, then open review when Grok plan is ready
+  useEffect(() => {
+    if (!digestIdsFromUrl || hasHandledDigestRef.current || scan.scanning) return;
+
+    const ids = digestIdsFromUrl
+      .split(",")
+      .filter(Boolean)
+      .slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN);
+    if (ids.length === 0) return;
+
+    hasHandledDigestRef.current = true;
+    const sessionStartPayload: { size: number; source?: string } = { size: ids.length };
+    if (sourceFromUrl) sessionStartPayload.source = sourceFromUrl;
+    trackFlywheelEvent("digest.session_start", sessionStartPayload);
+    setActiveDigestBookmarkIds(ids);
+    setReviewBookmarkId(ids[0]);
+
+    void (async () => {
+      await runOrbitScan(buildScanRequest(ids, true));
+      setReviewOpen(true);
+    })();
+  }, [
+    digestIdsFromUrl,
+    sourceFromUrl,
+    scan.scanning,
+    buildScanRequest,
+    runOrbitScan,
+  ]);
+
+  // Single-bookmark flywheel: auto-scan then open review (same pattern as digest batch)
+  useEffect(() => {
+    if (!highlightIdFromUrl || hasHandledHighlightRef.current || scan.scanning) return;
+    if (digestIdsFromUrl) return;
+
+    hasHandledHighlightRef.current = true;
+    setReviewBookmarkId(highlightIdFromUrl);
+
+    void (async () => {
+      await runOrbitScan(buildScanRequest([highlightIdFromUrl], true));
+      setReviewOpen(true);
+    })();
+  }, [
+    highlightIdFromUrl,
+    digestIdsFromUrl,
+    scan.scanning,
+    buildScanRequest,
+    runOrbitScan,
+  ]);
+
   const handleRetryScan = useCallback(async () => {
     await runOrbitScan(
       lastScanRequest ?? buildScanRequest(scanTargetIds, scanningSelection)
@@ -775,6 +879,46 @@ export default function OrbitPage() {
     }
   }, [scan]);
 
+  const handleSlideInDecision = (id: string, kind: string) => {
+    const decision = scan.getDecision(id);
+    if (kind === "keep-tag" && decision?.primary) {
+      scan.applySuggestion(id, "primary")
+        .then((applied) => {
+          if (applied) {
+            toast.success(`Applied · ${formatAppliedToast(applied)}`);
+          }
+        })
+        .catch(() => {
+          handleOpenBookmarkReview(id);
+        });
+    } else if (kind === "discard") {
+      actions.handleDeleteBookmark(id);
+    } else if (kind === "dismiss" || kind === "archive") {
+      handleKeepInOrbit(id);
+    }
+    setActiveBookmarkId(null);
+  };
+
+  const handleMenuAction = (id: string, action: string) => {
+    if (action === "tag") {
+      handleBookmarkAddTag(id);
+    } else if (action === "collection") {
+      handleBookmarkAddToCollection(id);
+    } else if (action === "keep") {
+      handleKeepInOrbit(id);
+      toast.success("Kept in Orbit");
+    } else if (action === "discard") {
+      actions.handleDeleteBookmark(id);
+    } else if (action === "archive") {
+      handleKeepInOrbit(id);
+      toast.success("Kept in Orbit");
+    } else {
+      setActiveBookmarkId(id);
+    }
+    setMenuForId(null);
+    setMenuPosition(null);
+  };
+
   const toggleSelectionMode = useCallback(() => {
     setSelectionMode((prev) => {
       if (prev) {
@@ -836,7 +980,7 @@ export default function OrbitPage() {
   })();
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-hidden">
+    <div className="app-shell-bg app-viewport flex overflow-hidden theme-orbital" data-theme="orbital">
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -859,6 +1003,10 @@ export default function OrbitPage() {
                 <span className="flex items-center gap-2">
                   <OrbitLogoMark className="size-5" />
                   Orbit
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] text-mono-label text-primary">
+                    <span className="size-1.5 rounded-full bg-orbital-glow orbital-nucleus" aria-hidden="true" />
+                    LIVE
+                  </span>
                 </span>
               }
               description="Triage the bookmarks still circling your library."
@@ -893,15 +1041,9 @@ export default function OrbitPage() {
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                     {scanHelperText}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="inline-flex size-1.5 rounded-full bg-primary shadow-[0_0_0_4px_rgba(59,130,246,0.16)]" />
-                      {scanningSelection ? "Selection pass" : "Queue pass"}
-                    </span>
-                    <span aria-hidden className="text-white/20">
-                      /
-                    </span>
-                    <span style={MONO_STYLE}>{scanScopeLabel}</span>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-hairline-soft pt-2 text-[10px] text-muted-foreground">
+                    <span className="text-mono-data">{total} unsorted</span>
+                    <span className="text-mono-data">Grok</span>
                   </div>
                 </div>
 
@@ -998,9 +1140,9 @@ export default function OrbitPage() {
               {staleScanPlan ? (
                 <div
                   role="status"
-                  className="flex flex-col gap-3 rounded-2xl border border-sky-400/28 bg-sky-400/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <p className="text-sm text-sky-50/95">
+                  <p className="text-sm text-primary/95">
                     This Grok pass was run on a different search, page, or
                     selection. Review or dismiss it before trusting the
                     suggestions.
@@ -1009,7 +1151,7 @@ export default function OrbitPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-9 shrink-0 border-sky-200/35 bg-sky-950/20 text-sky-100 hover:bg-sky-950/35"
+                    className="h-9 shrink-0 border-primary/35 bg-primary/10 text-primary hover:bg-primary/20"
                     onClick={handleClearScanPlan}
                   >
                     Dismiss plan
@@ -1031,15 +1173,15 @@ export default function OrbitPage() {
               />
 
               {selectionMode && selectedBookmarkIds.size > 0 && (
-                <div className="sticky top-[calc(var(--header-height)+8px)] z-[8] flex flex-wrap items-center gap-2 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))] px-4 py-2.5 shadow-xl backdrop-blur-md sm:px-5">
-                  <span className="text-xs font-medium text-white/80">
+                <div className="sticky top-[calc(var(--header-height)+8px)] z-[8] flex flex-wrap items-center gap-2 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))] px-4 py-2.5 shadow-xl backdrop-blur-md sm:px-5 glass-orbital">
+                  <span className="text-xs font-medium text-white/80 text-mono-label">
                     {selectedBookmarkIds.size} selected
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 gap-1.5 border-sky-400/20 bg-sky-400/10 text-sky-100 hover:bg-sky-400/15"
+                      className="h-8 gap-1.5 border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
                       onClick={handleScan}
                       disabled={scan.scanning || scanTargetIds.length === 0}
                     >
@@ -1094,7 +1236,7 @@ export default function OrbitPage() {
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-white/55">
-                    <span style={MONO_STYLE}>{visibleStatusLabel}</span>
+                    <span className="text-mono-data">{visibleStatusLabel}</span>
                     {(isFetching || isSearchPending) && !isLoading && (
                       <span className="flex items-center gap-1">
                         <Loader2 className="size-3 animate-spin" /> Updating…
@@ -1107,14 +1249,18 @@ export default function OrbitPage() {
               {isLoading ? (
                 <QueueSkeleton />
               ) : isError ? (
-                <QueueError
-                  message={
-                    error instanceof Error
-                      ? error.message
-                      : "Please try again."
-                  }
-                  onRetry={() => refetch()}
-                />
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className={cn(orbital.label, "mb-2 text-primary/70")}>Something went wrong</div>
+                  <p className="mb-4 text-sm text-primary/60">
+                    {error instanceof Error ? error.message : "Please try again."}
+                  </p>
+                  <button
+                    onClick={() => refetch()}
+                    className="rounded-sm border border-primary/30 px-3 py-1 text-xs text-primary hover:bg-primary/5"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : bookmarks.length === 0 ? (
                 <QueueEmptyState
                   searching={Boolean(search.trim())}
@@ -1122,59 +1268,101 @@ export default function OrbitPage() {
                   onOpenBookmarks={() => router.push("/dashboard")}
                 />
               ) : (
-                <div className="flex flex-col gap-2">
-                  {bookmarks.map((bookmark, index) => (
-                    <OrbitTriageCard
-                      key={bookmark.id}
-                      bookmark={bookmark}
-                      viewMode={viewMode}
-                      decision={scan.getDecision(bookmark.id)}
-                      selected={
-                        selectionMode
-                          ? selectedBookmarkIds.has(bookmark.id)
-                          : resolvedActiveBookmarkId === bookmark.id
-                      }
-                      selectionMode={selectionMode}
-                      onSelectionChange={handleSelectionChange}
-                      applying={scan.applyingBookmarkId === bookmark.id || scan.applyingBatch}
-                      searchQuery={search || undefined}
-                      priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
-                      onSelect={setActiveBookmarkId}
-                      onTagClick={goToTagOnDashboard}
-                      onAddTag={handleBookmarkAddTag}
-                      onAddToCollection={handleBookmarkAddToCollection}
-                      onDelete={actions.handleDeleteBookmark}
-                      onReviewSuggestion={handleOpenBookmarkReview}
-                      onApplyAlternative={handleApplyAlternative}
-                      onKeepInOrbit={handleKeepInOrbit}
-                      onFeedback={(id, type) => {
-                        setFeedbackById(prev => ({ ...prev, [id]: type }));
-                        if (type === 'not_relevant') {
-                          addDislikedHighlightId(id);
-                        } else if (type === 'good') {
-                          addLikedHighlightId(id);
-                        }
-                        toast.success(
-                          type === 'good'
-                            ? 'Thanks! This helps improve future suggestions.'
-                            : 'Got it — we\'ll deprioritize similar items in future Highlights.'
-                        );
-                      }}
-                      className={getStaggerClass(index, "animate-fade-in-up")}
-                    />
-                  ))}
-                </div>
-              )}
+                <>
+                  <div className="flex flex-col gap-3">
+                  {/* Note: list stays full-width; slide-in panel is a fixed overlay from the right (new model) */}
+                  {/* Left column — the triage queue */}
+                  <div className="min-w-0 flex-1">
+                    {/* Elegant queue header — restrained, matches the artboard spirit */}
+                    <div className="mb-2 flex items-center justify-between border-b border-hairline-soft pb-2 px-1">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(orbital.label, "text-primary/65")}>FRESH QUEUE</span>
+                        <span className="text-[11px] text-primary/35">·</span>
+                        <span className={cn(orbital.data, "text-[10.5px] text-primary/55")}>{total} bookmarks</span>
+                        <span className="ml-1 rounded-full border border-primary/20 bg-primary/5 px-1.5 py-px text-[9px] text-primary/60">90d</span>
+                      </div>
+                      <div className={cn(orbital.label, "text-primary/45 text-[9.5px]")}>
+                        {queueOrderLabel.toUpperCase()}
+                      </div>
+                    </div>
 
-              {orbitView === "all" &&
-                totalPages > 1 &&
-                bookmarks.length > 0 && (
-                  <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    onChange={handlePageChange}
-                  />
+                    <OrbitList
+                      bookmarks={bookmarks}
+                      selectedId={resolvedActiveBookmarkId}
+                      isLoading={isLoading}
+                      onSelect={(id) => {
+                        setActiveBookmarkId(id);
+                        if (menuForId) {
+                          setMenuForId(null);
+                          setMenuPosition(null);
+                        }
+                      }}
+                      onQuickAction={(id, action, event) => {
+                        if (action === "keep") {
+                          handleKeepInOrbit(id);
+                          setActiveBookmarkId(null);
+                          toast.success("Kept in Orbit");
+                        } else if (action === "tag") {
+                          handleBookmarkAddTag(id);
+                        } else if (action === "review") {
+                          handleOpenBookmarkReview(id);
+                        } else if (action === "menu" && event) {
+                          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                          setMenuForId(id);
+                          setMenuPosition({
+                            x: rect.right + 8,
+                            y: rect.top,
+                          });
+                        } else {
+                          setActiveBookmarkId(id);
+                        }
+                      }}
+                    />
+
+                    {orbitView === "all" &&
+                      totalPages > 1 &&
+                      bookmarks.length > 0 && (
+                        <Pagination
+                          page={page}
+                          totalPages={totalPages}
+                          onChange={handlePageChange}
+                        />
+                      )}
+                  </div>
+                </div>
+
+                {/* Simple floating contextual menu (positioned from the row's ⋯ button) */}
+                {menuForId && menuPosition && (
+                  <div
+                    className="fixed z-50"
+                    style={{
+                      left: `${menuPosition.x}px`,
+                      top: `${menuPosition.y}px`,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <OrbitContextualMenu
+                      bookmarkId={menuForId}
+                      onAction={handleMenuAction}
+                      onClose={() => {
+                        setMenuForId(null);
+                        setMenuPosition(null);
+                      }}
+                    />
+                  </div>
                 )}
+
+                {/* Elegant slide-in review panel — simple, fast, premium feel */}
+                <OrbitSlideInPanel
+                  bookmark={activeBookmark}
+                  isOpen={!!activeBookmarkId && !!activeBookmark}
+                  onClose={() => setActiveBookmarkId(null)}
+                  decision={activeDecision}
+                  onFullReview={(id) => handleOpenBookmarkReview(id)}
+                  onDecision={handleSlideInDecision}
+                />
+                </>
+              )}
             </section>
           </div>
         </div>
@@ -1343,10 +1531,10 @@ function OrbitScanFailureNotice({
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
+                orbital.label,
                 "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.2em]",
                 presentation.badgeClassName
               )}
-              style={MONO_STYLE}
             >
               {presentation.label}
             </span>
@@ -1440,10 +1628,7 @@ function QueueHeader({
       <div className="flex flex-col gap-4 border-b border-hairline-soft pb-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p
-              className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/55"
-              style={MONO_STYLE}
-            >
+            <p className="text-mono-label text-white/55">
               Orbit queue
             </p>
             <p className="mt-1 text-sm font-semibold text-white">

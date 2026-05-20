@@ -26,8 +26,12 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson } from "@/lib/fetch-json";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { cn } from "@/lib/utils";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
+
+import { useOrbitalTheme } from "@/components/providers";
+import { orbital, OrbitalCard, TelemetryStat } from "@/components/orbital";
 
 export type { TimeRange };
 
@@ -70,6 +74,7 @@ export default function AnalyticsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
+  const { isOrbital } = useOrbitalTheme();
 
   const rangeControl = useMemo(
     () => <RangeControl value={range} onChange={setRange} />,
@@ -288,14 +293,20 @@ function LibraryHealthCard({
   oldestAt: string | null;
   orbitHref: string;
 }) {
+  const { isOrbital } = useOrbitalTheme();
   const untaggedPct = 100 - triagedPct;
   const oldestLabel = oldestAt
     ? relativeOldest(new Date(oldestAt))
     : null;
   const allTriaged = untaggedCount === 0;
 
+  const RootCard = isOrbital ? OrbitalCard : Card;
+  const rootCardClass = isOrbital
+    ? "relative overflow-hidden p-5 animate-fade-in-up border-primary/10"
+    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-5 shadow-sm animate-fade-in-up";
+
   return (
-    <Card className="relative overflow-hidden border-hairline-soft bg-surface-1 p-5 shadow-sm animate-fade-in-up">
+    <RootCard className={rootCardClass}>
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -306,20 +317,40 @@ function LibraryHealthCard({
             >
               <Inbox className="h-4 w-4" />
             </span>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <h2 className={cn(
+              "text-sm font-semibold uppercase tracking-[0.14em]",
+              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+            )}>
               Library Health
             </h2>
           </div>
-          <p className="mt-4 heading-font text-4xl font-bold tracking-tight tabular-nums">
-            {allTriaged ? "All tagged" : untaggedCount.toLocaleString()}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {allTriaged
-              ? `Every one of your ${totalBookmarks.toLocaleString()} bookmarks is organized.`
-              : `untriaged · ${untaggedPct.toFixed(0)}% of ${totalBookmarks.toLocaleString()}`}
-          </p>
+          {isOrbital ? (
+            <TelemetryStat
+              value={allTriaged ? "All tagged" : untaggedCount.toLocaleString()}
+              label={allTriaged
+                ? `Every one of your ${totalBookmarks.toLocaleString()} bookmarks is organized.`
+                : `untriaged · ${untaggedPct.toFixed(0)}% of ${totalBookmarks.toLocaleString()}`}
+              className="mt-4"
+            />
+          ) : (
+            <>
+              <p className="mt-4 heading-font text-4xl font-bold tracking-tight tabular-nums">
+                {allTriaged ? "All tagged" : untaggedCount.toLocaleString()}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {allTriaged
+                  ? `Every one of your ${totalBookmarks.toLocaleString()} bookmarks is organized.`
+                  : `untriaged · ${untaggedPct.toFixed(0)}% of ${totalBookmarks.toLocaleString()}`}
+              </p>
+            </>
+          )}
           {oldestLabel && !allTriaged ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+              )}
+            >
               Oldest waiting since {oldestLabel}
             </p>
           ) : null}
@@ -337,7 +368,12 @@ function LibraryHealthCard({
       </div>
 
       <div className="relative mt-5">
-        <div className="flex justify-between text-[11px] font-medium tabular-nums text-muted-foreground">
+        <div
+          className={cn(
+            "flex justify-between text-[11px] font-medium tabular-nums",
+            isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+          )}
+        >
           <span>Tagged {triagedPct.toFixed(0)}%</span>
           <span>Untagged {untaggedPct.toFixed(0)}%</span>
         </div>
@@ -348,7 +384,7 @@ function LibraryHealthCard({
           />
         </div>
       </div>
-    </Card>
+    </RootCard>
   );
 }
 
@@ -359,6 +395,7 @@ function VelocityCard({
   last30d: number;
   delta: { pct: number | null; abs: number } | null;
 }) {
+  const { isOrbital } = useOrbitalTheme();
   const trend =
     !delta ? "flat" : delta.pct == null ? "up" : delta.pct > 0 ? "up" : delta.pct < 0 ? "down" : "flat";
   const Icon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
@@ -371,14 +408,29 @@ function VelocityCard({
         ? "first 30 days"
         : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(0)}% vs prior 30d`;
 
+  const RootCard = isOrbital ? OrbitalCard : Card;
+  const rootClass = isOrbital
+    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up stagger-1"
+    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-1";
+
   return (
-    <Card className="relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-1">
+    <RootCard className={rootClass}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-[0.14em]",
+              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+            )}
+          >
             Last 30 days
           </p>
-          <p className="mt-2 heading-font text-2xl font-bold tabular-nums">
+          <p
+            className={cn(
+              "mt-2 text-2xl font-bold tabular-nums",
+              isOrbital ? orbital.data : "heading-font"
+            )}
+          >
             {last30d.toLocaleString()}
           </p>
           <p className={`mt-1 flex items-center gap-1 text-xs ${deltaTone}`}>
@@ -387,7 +439,7 @@ function VelocityCard({
           </p>
         </div>
       </div>
-    </Card>
+    </RootCard>
   );
 }
 
@@ -400,17 +452,38 @@ function AnnotationCard({
   totalBookmarks: number;
   pct: number;
 }) {
+  const { isOrbital } = useOrbitalTheme();
+  const RootCard = isOrbital ? OrbitalCard : Card;
+  const rootClass = isOrbital
+    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up stagger-2"
+    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-2";
+
   return (
-    <Card className="relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-2">
+    <RootCard className={rootClass}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <p
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-[0.14em]",
+              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+            )}
+          >
             Annotated
           </p>
-          <p className="mt-2 heading-font text-2xl font-bold tabular-nums">
+          <p
+            className={cn(
+              "mt-2 text-2xl font-bold tabular-nums",
+              isOrbital ? orbital.data : "heading-font"
+            )}
+          >
             {pct.toFixed(0)}%
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p
+            className={cn(
+              "mt-1 text-xs",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+            )}
+          >
             {notedCount.toLocaleString()} of {totalBookmarks.toLocaleString()} with notes
           </p>
         </div>
@@ -418,7 +491,7 @@ function AnnotationCard({
           <StickyNote className="h-4 w-4" />
         </span>
       </div>
-    </Card>
+    </RootCard>
   );
 }
 
@@ -431,6 +504,7 @@ function AnnotationCard({
  * no charts, no visual weight, no extra labels). Zero-state and empty still perfectly calm. Elegance preserved at every layer.
  */
 function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
+  const { isOrbital } = useOrbitalTheme();
   const cta = analytics.flywheelCtaReviewInOrbit ?? 0;
   const digestCta = analytics.flywheelDigestReviewTogether ?? 0;
   const good = analytics.flywheelFeedbackGood ?? 0;
@@ -464,45 +538,158 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
   const totalSignals = cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps;
   if (totalSignals === 0) return null;
 
+  const RootCard = isOrbital ? OrbitalCard : Card;
+  const rootClass = isOrbital
+    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up"
+    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up";
+
   return (
-    <Card className="relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up">
+    <RootCard className={rootClass}>
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <h2
+          className={cn(
+            "text-sm font-semibold uppercase tracking-[0.14em]",
+            isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+          )}
+        >
           Flywheel Signals
         </h2>
-        <span className="text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground/60">
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-[0.08em]",
+            isOrbital ? cn(orbital.label, "text-primary/50") : "font-mono text-muted-foreground/60"
+          )}
+        >
           (early)
         </span>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Highlights → Orbit</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{cta}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Highlights → Orbit
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+            )}
+          >
+            {cta}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Digest “Review together”</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{digestCta}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Digest “Review together”
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+            )}
+          >
+            {digestCta}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Good feedback</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-emerald-400/90">{good}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Good feedback
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-emerald-400/90") : "font-mono text-emerald-400/90"
+            )}
+          >
+            {good}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Not relevant feedback</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-amber-400/90">{notRel}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Not relevant feedback
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-amber-400/90") : "font-mono text-amber-400/90"
+            )}
+          >
+            {notRel}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Quick Pass toggles</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{quick}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Quick Pass toggles
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+            )}
+          >
+            {quick}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Deep Review toggles</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{deep}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Deep Review toggles
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+            )}
+          >
+            {deep}
+          </div>
         </div>
         <div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">Digest sessions started</div>
-          <div className="font-mono text-xl font-semibold tabular-nums text-foreground">{sessions}</div>
+          <div
+            className={cn(
+              "text-[10px] font-medium uppercase tracking-[0.12em]",
+              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+            )}
+          >
+            Digest sessions started
+          </div>
+          <div
+            className={cn(
+              "text-xl font-semibold tabular-nums",
+              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+            )}
+          >
+            {sessions}
+          </div>
         </div>
       </div>
 
@@ -511,23 +698,34 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           "Top sources" only for Orbit entry drivers (best/worst visible via relative %). Keep rate is the high-value Quick Pass outcome.
           Total visual delta from Slice 2: a few extra spans in the existing flex. Feels lighter and more useful, never heavier. */}
       {(digestCta > 0 || quick + deep > 0 || topEntrySources.length > 0 || quickKeeps > 0) && (
-        <div className="mt-2.5 border-t border-hairline-soft/60 pt-2 text-[10px] text-muted-foreground/70 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+        <div
+          className={cn(
+            "mt-2.5 border-t pt-2 text-[10px] flex flex-wrap items-baseline gap-x-4 gap-y-0.5",
+            isOrbital
+              ? "border-primary/20 text-primary/60"
+              : "border-hairline-soft/60 text-muted-foreground/70"
+          )}
+        >
           {digestCta > 0 && (
             <span>
               Digest CTA → session rate{" "}
-              <span className="font-mono tabular-nums text-foreground/80">{Math.round(digestRate * 100)}%</span>
+              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+                {Math.round(digestRate * 100)}%
+              </span>
             </span>
           )}
           {quick + deep > 0 && (
             <span>
               Quick Pass share of modes{" "}
-              <span className="font-mono tabular-nums text-foreground/80">{Math.round(quickShare * 100)}%</span>
+              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+                {Math.round(quickShare * 100)}%
+              </span>
             </span>
           )}
           {topEntrySources.length > 0 && (
             <span>
               Top sources{" "}
-              <span className="font-mono tabular-nums text-foreground/80">
+              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
                 {topEntrySources
                   .map((s) => `${sourceLabel(s.source)} ${Math.round(s.pct * 100)}%`)
                   .join(" · ")}
@@ -537,16 +735,23 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           {quickKeeps > 0 && (
             <span>
               Quick Pass keep rate{" "}
-              <span className="font-mono tabular-nums text-foreground/80">{Math.round(quickKeepRate * 100)}%</span>
+              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+                {Math.round(quickKeepRate * 100)}%
+              </span>
             </span>
           )}
         </div>
       )}
 
-      <p className="mt-3 text-[11px] text-muted-foreground/60">
+      <p
+        className={cn(
+          "mt-3 text-[11px]",
+          isOrbital ? cn(orbital.label, "text-primary/50") : "text-muted-foreground/60"
+        )}
+      >
         Reliable early signal: do the rituals feed Orbit? Quick Pass adoption? Feedback loops active?
       </p>
-    </Card>
+    </RootCard>
   );
 }
 
@@ -557,11 +762,17 @@ const RangeControl = React.memo(function RangeControl({
   value: TimeRange;
   onChange: (v: TimeRange) => void;
 }) {
+  const { isOrbital } = useOrbitalTheme();
   return (
     <div
       role="tablist"
       aria-label="Time range"
-      className="inline-flex items-center rounded-full border border-hairline-soft bg-surface-2 p-0.5 text-[11px] font-medium"
+      className={cn(
+        "inline-flex items-center rounded-full p-0.5 text-[11px] font-medium",
+        isOrbital
+          ? cn(orbital.glass, "border border-primary/20")
+          : "border border-hairline-soft bg-surface-2"
+      )}
     >
       {RANGE_OPTIONS.map((opt) => {
         const active = opt.value === value;
@@ -572,11 +783,14 @@ const RangeControl = React.memo(function RangeControl({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`rounded-full px-2.5 py-0.5 tabular-nums transition-colors ${
+            className={cn(
+              "rounded-full px-2.5 py-0.5 tabular-nums transition-colors",
               active
                 ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+                : isOrbital
+                  ? cn(orbital.label, "text-primary/60 hover:text-primary")
+                  : "text-muted-foreground hover:text-foreground"
+            )}
           >
             {opt.label}
           </button>
@@ -587,21 +801,30 @@ const RangeControl = React.memo(function RangeControl({
 });
 
 function LoadingSkeleton() {
+  const { isOrbital } = useOrbitalTheme();
+  const skeletonClass = (h: string) =>
+    cn(
+      h,
+      "rounded-lg border skeleton-shimmer",
+      isOrbital
+        ? "border-primary/10 bg-surface-1/60"
+        : "border-hairline-soft bg-surface-1"
+    );
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="h-[180px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
+        <div className={skeletonClass("h-[180px]")} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-          <div className="h-[86px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
-          <div className="h-[86px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
+          <div className={skeletonClass("h-[86px]")} />
+          <div className={skeletonClass("h-[86px]")} />
         </div>
       </div>
-      <div className="h-[420px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
+      <div className={skeletonClass("h-[420px]")} />
       <div className="grid gap-5 xl:grid-cols-2">
-        <div className="h-[260px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
-        <div className="h-[260px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
+        <div className={skeletonClass("h-[260px]")} />
+        <div className={skeletonClass("h-[260px]")} />
       </div>
-      <div className="h-[300px] rounded-lg border border-hairline-soft bg-surface-1 skeleton-shimmer" />
+      <div className={skeletonClass("h-[300px]")} />
     </div>
   );
 }
@@ -613,11 +836,24 @@ function ErrorState({
   message?: string;
   onRetry: () => void;
 }) {
+  const { isOrbital } = useOrbitalTheme();
   return (
     <div className="flex h-72 items-center justify-center text-center">
-      <div className="rounded-2xl border border-hairline-soft bg-surface-1 px-6 py-8 shadow-sm sm:px-8">
+      <div
+        className={cn(
+          "rounded-2xl px-6 py-8 shadow-sm sm:px-8",
+          isOrbital
+            ? cn(orbital.glass, "border border-primary/20")
+            : "border border-hairline-soft bg-surface-1"
+        )}
+      >
         <p className="text-lg font-medium">Analytics could not be loaded</p>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p
+          className={cn(
+            "mt-2 text-sm",
+            isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+          )}
+        >
           {message ?? "Please try again."}
         </p>
         <Button size="sm" className="mt-4" onClick={onRetry}>

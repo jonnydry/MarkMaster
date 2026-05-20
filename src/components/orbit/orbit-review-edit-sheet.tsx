@@ -35,7 +35,7 @@ import type {
 } from "@/lib/orbit-similar-collections";
 
 const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+  fontFamily: "var(--font-jetbrains-mono)",
 };
 
 // Truncation constants for the "Other high-performers..." panel preview text.

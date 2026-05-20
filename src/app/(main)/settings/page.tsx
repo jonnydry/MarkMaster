@@ -30,7 +30,8 @@ import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { useTheme } from "@/components/providers";
+import { useTheme, useFontMode, useOrbitalTheme } from "@/components/providers";
+import { OrbitalBadge } from "@/components/orbital";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
@@ -59,6 +60,8 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
+  const { fontMode, toggleFontMode } = useFontMode();
+  const { isOrbital, toggleOrbital } = useOrbitalTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const orbitIssue = parseOrbitIssue(searchParams.get("orbitIssue"));
@@ -326,6 +329,40 @@ export default function SettingsPage() {
                       )}
                       {theme === "dark" ? "Light" : "Dark"}
                     </Button>
+                  </div>
+                  <div className="mt-3 border-t border-hairline-soft pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <Label>Typography</Label>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Toggle global monospace (JetBrains Mono) for terminal-style UI. Preserves hierarchy and works seamlessly with Orbital theme.
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={toggleFontMode} className="gap-2 border-hairline-soft bg-surface-1 shadow-sm">
+                        {fontMode === "mono" ? "Default" : "Monospace"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-hairline-soft pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Label>Orbital Theme</Label>
+                          {isOrbital && <OrbitalBadge tone="cyan">Active</OrbitalBadge>}
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Enable the full futuristic minimalism design language: deep void surfaces, cyan-teal orbital glow, warm bronze accents, inner-glow glassmorphism, independent ring motion, and JetBrains Mono as the primary telemetry voice. Transforms the interface into a calm personal orbital intelligence system with two-column mission control.
+                        </p>
+                      </div>
+                      <Button
+                        variant={isOrbital ? "default" : "outline"}
+                        onClick={toggleOrbital}
+                        className="gap-2 border-hairline-soft bg-surface-1 shadow-sm"
+                      >
+                        {isOrbital ? "Disable Orbital" : "Enable Orbital"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>

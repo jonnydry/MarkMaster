@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Search, Image, Video, Link, FileText } from "lucide-react";
+import { Search, Image, Video, Link, FileText, Sparkles, Type } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useOrbitalTheme, useFontMode } from "@/components/providers";
+import { orbital, OrbitalBadge } from "@/components/orbital";
 import type { TagWithCount, MediaFilter } from "@/types";
 
 interface CommandPaletteProps {
@@ -27,7 +29,8 @@ const MEDIA_FILTERS: { value: MediaFilter; label: string; icon: React.ElementTyp
 
 type CommandItem =
   | { kind: "media"; value: MediaFilter; label: string; icon: React.ElementType; shortcut: string }
-  | { kind: "tag"; id: string; name: string; color: string; count: number };
+  | { kind: "tag"; id: string; name: string; color: string; count: number }
+  | { kind: "action"; id: string; label: string; description?: string; action: () => void; icon?: React.ElementType };
 
 export function CommandPalette({
   open,
@@ -38,6 +41,9 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const normalizedQuery = query.trim().toLowerCase();
+
+  const { isOrbital, toggleOrbital } = useOrbitalTheme();
+  const { fontMode, toggleFontMode } = useFontMode();
 
   const filteredTags = useMemo(
     () =>
@@ -71,20 +77,61 @@ export function CommandPalette({
     return [];
   }, [normalizedQuery, tags, filteredTags]);
 
+  // Appearance actions (Orbital + Monospace) — shown when query matches or is empty for discoverability
+  const appearanceActions = useMemo(() => {
+    const q = normalizedQuery;
+    if (!q || q.includes("orbital") || q.includes("theme") || q.includes("mono") || q.includes("font") || q.includes("design")) {
+      return [
+        {
+          kind: "action" as const,
+          id: "toggle-orbital",
+          label: isOrbital ? "Disable Orbital Theme" : "Enable Orbital Theme",
+          description: "Futuristic minimalism • glassmorphism • mission control",
+          action: toggleOrbital,
+          icon: Sparkles,
+        },
+        {
+          kind: "action" as const,
+          id: "toggle-mono",
+          label: fontMode === "mono" ? "Switch to Default Typography" : "Enable Monospace UI",
+          description: "JetBrains Mono for telemetry and terminal feel",
+          action: toggleFontMode,
+          icon: Type,
+        },
+      ];
+    }
+    return [];
+  }, [normalizedQuery, isOrbital, fontMode, toggleOrbital, toggleFontMode]);
+
+  const allItems = useMemo(() => {
+    // Show appearance actions at the top when relevant for discoverability
+    if (appearanceActions.length > 0) {
+      return [...appearanceActions, ...items];
+    }
+    return items;
+  }, [appearanceActions, items]);
+
+  // Improved heading logic (kind-transition based, robust to appearanceActions prepending at top)
+  const getPrevKind = (idx: number) => (idx > 0 ? allItems[idx - 1]?.kind : null);
+
+  // Improved focus/clamp model: always land on a valid index (prefer first item for discoverability/keyboard)
+  // Clamps on length changes, initializes from -1 when items appear (mixed virtual+button model now more predictable)
+  useEffect(() => {
+    if (allItems.length === 0) {
+      if (focusedIndex !== -1) setFocusedIndex(-1);
+      return;
+    }
+    if (focusedIndex < 0 || focusedIndex >= allItems.length) {
+      setFocusedIndex(0);
+    }
+  }, [allItems.length]);
+
   useEffect(() => {
     if (focusedIndex >= 0) {
       const el = document.getElementById(`cmd-item-${focusedIndex}`);
       el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [focusedIndex]);
-
-  const handleFilterSelect = useCallback(
-    (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
-      onFilterChange(filter);
-      onOpenChange(false);
-    },
-    [onFilterChange, onOpenChange]
-  );
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -97,6 +144,19 @@ export function CommandPalette({
     [onOpenChange]
   );
 
+  const handleFilterSelect = useCallback(
+    (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
+      onFilterChange(filter);
+      handleOpenChange(false);
+    },
+    [onFilterChange, handleOpenChange]
+  );
+
+  const executeActionAndClose = useCallback((actionFn: () => void) => {
+    actionFn();
+    handleOpenChange(false);
+  }, [handleOpenChange]);
+
   const handleQueryChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setQuery(e.target.value);
@@ -106,17 +166,17 @@ export function CommandPalette({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (items.length === 0) return;
+    if (allItems.length === 0) return;
 
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setFocusedIndex((prev) => (prev + 1) % items.length);
+        setFocusedIndex((prev) => (prev + 1) % allItems.length);
         break;
       case "ArrowUp":
         e.preventDefault();
         setFocusedIndex((prev) =>
-          prev < 0 ? items.length - 1 : (prev - 1 + items.length) % items.length
+          prev < 0 ? allItems.length - 1 : (prev - 1 + allItems.length) % allItems.length
         );
         break;
       case "Home":
@@ -125,16 +185,18 @@ export function CommandPalette({
         break;
       case "End":
         e.preventDefault();
-        setFocusedIndex(items.length - 1);
+        setFocusedIndex(allItems.length - 1);
         break;
       case "Enter": {
         e.preventDefault();
-        const item = items[focusedIndex];
+        const item = allItems[focusedIndex];
         if (!item) return;
         if (item.kind === "media") {
           handleFilterSelect({ mediaFilter: item.value });
-        } else {
+        } else if (item.kind === "tag") {
           handleFilterSelect({ selectedTag: item.id });
+        } else if (item.kind === "action") {
+          executeActionAndClose(item.action);
         }
         break;
       }
@@ -144,8 +206,13 @@ export function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="p-0 gap-0 max-w-[560px] overflow-hidden"
+        className={cn(
+          "p-0 gap-0 max-w-[560px] overflow-hidden",
+          // Full orbital surface treatment on the palette container (glass + subtle ring) only when theme active
+          isOrbital && orbital.glass
+        )}
         onKeyDown={handleKeyDown}
+        showCloseButton={false}
       >
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -165,23 +232,52 @@ export function CommandPalette({
           </kbd>
         </div>
 
-        <div id="cmd-list" role="listbox" className="p-2 max-h-[400px] overflow-y-auto">
-          {items.map((item, i) => {
+        <div
+          id="cmd-list"
+          role="listbox"
+          className={cn(
+            "p-2 max-h-[400px] overflow-y-auto",
+            // Additional orbital container treatment for the results list area
+            isOrbital && "border-t border-primary/10 bg-surface-1/50"
+          )}
+        >
+          {allItems.map((item, i) => {
             const isFocused = i === focusedIndex;
-            const showQuickFiltersHeading = normalizedQuery === "" && i === 0 && item.kind === "media";
+            const prevKind = getPrevKind(i);
+            const showAppearanceHeading =
+              (appearanceActions.length > 0) && i === 0;
+            // Robust to prepend: show Quick Filters on first media, or first media after actions group
+            const showQuickFiltersHeading =
+              normalizedQuery === "" &&
+              item.kind === "media" &&
+              (prevKind === "action" || (prevKind === null && appearanceActions.length === 0));
             const showTagsHeading =
-              normalizedQuery === "" && item.kind === "tag" && items[i - 1]?.kind === "media";
-            const showSearchTagsHeading = normalizedQuery !== "" && i === 0;
+              normalizedQuery === "" && item.kind === "tag" && prevKind === "media";
+            const showSearchTagsHeading = normalizedQuery !== "" && i === 0 && item.kind === "tag";
 
             return (
               <div key={item.kind === "media" ? item.value : item.id}>
+                {showAppearanceHeading && (
+                  <p className={cn(
+                    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                    isOrbital ? orbital.label : "text-muted-foreground"
+                  )}>
+                    Appearance
+                  </p>
+                )}
                 {showQuickFiltersHeading && (
-                  <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <p className={cn(
+                    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                    isOrbital ? orbital.label : "text-muted-foreground"
+                  )}>
                     Quick Filters
                   </p>
                 )}
                 {(showTagsHeading || showSearchTagsHeading) && (
-                  <p className="px-2 py-1.5 mt-2 border-t border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <p className={cn(
+                    "px-2 py-1.5 mt-2 border-t border-border text-xs font-semibold uppercase tracking-wider",
+                    isOrbital ? orbital.label : "text-muted-foreground"
+                  )}>
                     Tags
                   </p>
                 )}
@@ -192,13 +288,16 @@ export function CommandPalette({
                   onClick={() => {
                     if (item.kind === "media") {
                       handleFilterSelect({ mediaFilter: item.value });
-                    } else {
+                    } else if (item.kind === "tag") {
                       handleFilterSelect({ selectedTag: item.id });
+                    } else if (item.kind === "action") {
+                      executeActionAndClose(item.action);
                     }
                   }}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-muted",
-                    isFocused && "menu-selection-active pr-5"
+                    isFocused && "menu-selection-active pr-5",
+                    item.kind === "action" && isOrbital && orbital.glass
                   )}
                 >
                   {item.kind === "media" ? (
@@ -207,7 +306,7 @@ export function CommandPalette({
                       <span className="flex-1 text-left">{item.label}</span>
                       <span className="text-xs text-muted-foreground">{item.shortcut}</span>
                     </>
-                  ) : (
+                  ) : item.kind === "tag" ? (
                     <>
                       <span
                         className="w-3 h-3 rounded-full"
@@ -216,13 +315,37 @@ export function CommandPalette({
                       <span className="flex-1 text-left">{item.name}</span>
                       <span className="text-xs text-muted-foreground">{item.count}</span>
                     </>
+                  ) : (
+                    // Action items (Orbital / Monospace toggles) — full native orbital styling
+                    <>
+                      {item.icon ? (
+                        <item.icon className={cn("w-4 h-4 shrink-0", isOrbital ? orbital.icon : "text-muted-foreground")} />
+                      ) : (
+                        <div className={cn("w-4 h-4 rounded-sm shrink-0", isOrbital ? orbital.icon : "bg-muted text-muted-foreground")} />
+                      )}
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span>{item.label}</span>
+                          {/* Live state badge using canonical thin component */}
+                          {((item.id === "toggle-orbital" && isOrbital) || (item.id === "toggle-mono" && fontMode === "mono")) && (
+                            <OrbitalBadge tone="cyan" className="text-[9px] py-0">Active</OrbitalBadge>
+                          )}
+                        </div>
+                        {item.description && (
+                          <div className={cn(
+                            "text-[10px] text-muted-foreground/70 mt-0.5",
+                            isOrbital && orbital.label
+                          )}>{item.description}</div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </button>
               </div>
             );
           })}
 
-          {items.length === 0 && normalizedQuery !== "" && (
+          {allItems.length === 0 && normalizedQuery !== "" && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               No tags match <span className="font-medium text-foreground">{query}</span>.
             </div>

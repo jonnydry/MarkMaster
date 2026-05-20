@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, FolderOpen, Search, Tag } from "lucide-react";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
+import { OrbitalRings } from "@/components/orbital";
 
 type FeatureRow = {
   step: string;
@@ -39,48 +40,6 @@ const FEATURE_ROWS: readonly FeatureRow[] = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 const SPLASH_BACKGROUND_IMAGE_URL = "/rocket-launch-background.png";
-
-function OrbitRings({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 320 240"
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <ellipse
-        cx="160"
-        cy="120"
-        rx="148"
-        ry="48"
-        transform="rotate(-22 160 120)"
-        stroke="currentColor"
-        strokeOpacity="0.22"
-      />
-      <ellipse
-        cx="160"
-        cy="120"
-        rx="108"
-        ry="32"
-        transform="rotate(16 160 120)"
-        stroke="currentColor"
-        strokeOpacity="0.16"
-      />
-      <ellipse
-        cx="160"
-        cy="120"
-        rx="64"
-        ry="20"
-        transform="rotate(-44 160 120)"
-        stroke="currentColor"
-        strokeOpacity="0.12"
-      />
-      <circle cx="160" cy="120" r="14" fill="currentColor" fillOpacity="0.07" />
-      <circle cx="160" cy="120" r="3" fill="currentColor" />
-    </svg>
-  );
-}
 
 function FeatureIcon({
   icon,
@@ -220,7 +179,7 @@ export function OrbitalAuthExperience({
                 "linear-gradient(180deg, rgba(12,18,30,0.82) 0%, rgba(4,12,24,0.70) 100%)",
             }}
           >
-            <OrbitRings
+            <OrbitalRings
               className="pointer-events-none absolute -right-24 top-14 h-[260px] w-[360px] text-primary/35"
             />
 

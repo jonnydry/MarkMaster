@@ -60,6 +60,12 @@
   --animate-fade-in-up: fade-in-up 0.45s ease-out both;
   --animate-slide-in: slide-in 0.3s ease-out both;
   --animate-scale-in: scale-in 0.2s ease-out both;
+  /* Orbital theme color extensions (vars populated only under data-theme="orbital" / .theme-orbital) */
+  --color-orbital-glow: var(--orbital-glow);
+  --color-orbital-glow-strong: var(--orbital-glow-strong);
+  --color-bronze: var(--bronze);
+  --color-bronze-muted: var(--bronze-muted);
+  --color-ring-bronze: var(--ring-bronze);
 }
 
 :root {
@@ -167,6 +173,107 @@
   --success: #4ade80;
 }
 
+/* === ORBITAL THEME (opt-in layered theme, does not affect default :root or .dark colors) ===
+   Activate via data-theme="orbital" or class="theme-orbital" on html or ancestor container.
+   All new deep-void + cyan-teal orbital + bronze visuals live exclusively here.
+   Per Master-Unification-Plan: default production palette (blue #2563eb etc) remains 100% untouched.
+*/
+:root[data-theme="orbital"],
+html.theme-orbital,
+.theme-orbital {
+  /* Deep cosmic void grounds — only active when the theme is on */
+  --background: #0A0A0A;
+  --foreground: #EDE8E0;
+  --card: #111111;
+  --card-foreground: #EDE8E0;
+  --popover: #0F0F0F;
+
+  /* Primary living orbital glow (cyan-teal) */
+  --primary: #5CE1C7;
+  --primary-foreground: #0A0A0A;
+  --orbital-glow: #5CE1C7;
+  --orbital-glow-strong: #7CF4D9;
+
+  /* Refined warm bronze accent */
+  --accent: #C9AA6C;
+  --accent-foreground: #0A0A0A;
+  --bronze: #C9AA6C;
+  --bronze-muted: #A88A4E;
+
+  /* Semantic glows and rings for the new language */
+  --accent-glow: rgba(92, 225, 199, 0.18);
+  --accent-glow-strong: rgba(92, 225, 199, 0.28);
+  --ring: #5CE1C7;
+  --ring-bronze: #C9AA6C;
+
+  /* Deeper layered surfaces for glassmorphism */
+  --surface-1: #0F0F0F;
+  --surface-2: #131313;
+  --surface-3: #171717;
+  --surface-elevated: #1C1C1C;
+
+  /* Thin precise hairlines */
+  --hairline-soft: rgba(255, 255, 255, 0.055);
+  --hairline-strong: rgba(255, 255, 255, 0.095);
+  --border: #1F1F1F;
+  --input: #151515;
+
+  /* Muted and sidebar inherit the void language */
+  --secondary: #151515;
+  --secondary-foreground: #C8C0B4;
+  --muted: #151515;
+  --muted-foreground: #7A7570;
+
+  --sidebar: #0C0C0C;
+  --sidebar-foreground: #C8C0B4;
+  --sidebar-primary: #5CE1C7;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: rgba(92, 225, 199, 0.10);
+  --sidebar-accent-foreground: #7CF4D9;
+  --sidebar-border: #1F1F1F;
+  --sidebar-ring: #5CE1C7;
+
+  /* Selection and soft accents tinted to the orbital glow */
+  --accent-soft: rgba(92, 225, 199, 0.09);
+  --menu-selection-bg: rgba(92, 225, 199, 0.07);
+  --menu-selection-ring: rgba(92, 225, 199, 0.22);
+  --menu-selection-glow: rgba(92, 225, 199, 0.15);
+
+  /* Page shell ambient wash uses cyan-teal instead of blue */
+  --page-shell-depth-top: #0C0C0C;
+  --page-shell-depth-bottom: #0A0A0A;
+  --page-shell-ambient: rgba(92, 225, 199, 0.06);
+  --page-shell-highlight: rgba(255, 255, 255, 0.028);
+
+  /* Status harmonized to cosmic palette */
+  --success: #34D3A3;
+  --warning: #C9AA6C;
+  --emerald: #34D3A3;
+  --note: #A5B4C8;
+
+  /* Charts follow the new accents */
+  --chart-1: #5CE1C7;
+  --chart-2: #7CF4D9;
+  --chart-3: #C9AA6C;
+  --chart-4: #A88A4E;
+  --chart-5: #7CF4D9;
+
+  /* Missing semantic parity for popovers, destructive, etc. (completes parallel system) */
+  --popover-foreground: #EDE8E0;
+  --destructive: #ef4444;
+}
+
+/* Global Monospace Mode (seamless toggle, works with default + orbital themes) */
+[data-font-mode="mono"] {
+  --font-sans: var(--font-jetbrains-mono);
+  --font-heading: var(--font-jetbrains-mono);
+  /* thoughtful adjustments: tighter tracking for body readability while preserving hierarchy and tabular-nums */
+  letter-spacing: -0.008em;
+}
+[data-font-mode="mono"] .heading-font {
+  font-family: var(--font-jetbrains-mono);
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -218,6 +325,36 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Orbital theme motion language (only styled/animated under .theme-orbital) */
+@keyframes ring-rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ring-rotate-medium {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ring-rotate-fast {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes nucleus-breath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+/* Slide-in from right (for Orbit review panel) */
+@keyframes orbit-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
@@ -557,8 +694,139 @@
   .animate-slide-down-fade {
     animation: slide-down-fade 0.25s ease-out both;
   }
+
+  /* Orbit slide-in panel (right edge) */
+  .animate-orbit-slide-in-right {
+    animation: orbit-slide-in-right 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .animate-slide-down-fade {
+    .animate-slide-down-fade,
+    .animate-orbit-slide-in-right {
+      animation: none;
+    }
+  }
+
+  /* 3-tier Monospace-Native Typography System (first-class when data-font-mode="mono" or under orbital theme) */
+  /* Tier 1 — Display / Expressive (large numbers, hero stats, major titles) */
+  .text-mono-display {
+    font-family: var(--font-jetbrains-mono);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tier 2 — UI / Labels / Reasoning / Navigation (primary workhorse) */
+  .text-mono-ui,
+  .text-mono-label {
+    font-family: var(--font-ibm-plex-mono);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tier 3 — Data / Metrics / Tabular / Technical (best figures) */
+  .text-mono-data {
+    font-family: var(--font-jetbrains-mono);
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Legacy / fallback for older mono-label usage (still works) */
+  .text-mono-label {
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+  }
+
+  .text-heading-display {
+    font-family: var(--font-dm-sans);
+  }
+
+  /* Orbital theme glassmorphism + grain (scoped, only effective under .theme-orbital) */
+  .theme-orbital .glass-orbital {
+    background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+    border: 1px solid var(--hairline-soft);
+    backdrop-filter: blur(20px);
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 8px 32px -8px rgba(0, 0, 0, 0.55),
+      0 0 0 1px var(--accent-glow);
+  }
+  .theme-orbital .glass-orbital[data-glow="cyan"] {
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 8px 32px -8px rgba(0, 0, 0, 0.55),
+      0 0 0 1px var(--accent-glow),
+      0 0 28px -8px var(--accent-glow-strong);
+  }
+  .theme-orbital .grain {
+    position: relative;
+    overflow: hidden;
+  }
+  .theme-orbital .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(rgba(255, 255, 255, 0.04) 0.6px, transparent 0.6px),
+      radial-gradient(rgba(255, 255, 255, 0.018) 0.6px, transparent 0.6px);
+    background-size: 3px 3px, 4.5px 4.5px;
+    background-position: 0 0, 1.5px 1.5px;
+    opacity: 0.7;
+    mix-blend-mode: screen;
+    z-index: 1;
+  }
+
+  /* === Orbit redesign surface primitives (menu, action pill, slide-in) === */
+  .theme-orbital .orbital-menu {
+    /* Subtle inner cyan glow + extra fine grain for the floating contextual menu */
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 10px 30px -10px rgba(0, 0, 0, 0.6),
+      0 0 0 1px var(--accent-glow);
+  }
+
+  .theme-orbital .orbital-action-pill {
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .theme-orbital .orbital-action-pill:hover {
+    transform: translateY(-0.5px);
+    box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent-glow);
+  }
+
+  /* Slide-in panel specific depth */
+  .theme-orbital .orbital-slide-in {
+    /* The cyan left border + main glass treatment comes from the primitive classes */
+  }
+
+  /* Orbital ring + nucleus animations (GPU, reduced-motion safe; only animate under theme) */
+  .theme-orbital .orbital-ring-slow {
+    animation: ring-rotate-slow 68s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .theme-orbital .orbital-ring-medium {
+    animation: ring-rotate-medium 47s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .theme-orbital .orbital-ring-fast {
+    animation: ring-rotate-fast 31s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .theme-orbital .orbital-nucleus {
+    animation: nucleus-breath 5.8s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .theme-orbital .orbital-ring-slow,
+    .theme-orbital .orbital-ring-medium,
+    .theme-orbital .orbital-ring-fast,
+    .theme-orbital .orbital-nucleus {
       animation: none;
     }
   }

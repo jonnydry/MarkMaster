@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useOrbitalTheme } from "@/components/providers";
+import { orbital, OrbitalBadge, TelemetryStat } from "@/components/orbital";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -65,6 +67,7 @@ export function PerformanceHighlights({
   isRawMode = false,
   itemLabels = {},
 }: PerformanceHighlightsProps) {
+  const { isOrbital } = useOrbitalTheme();
   const [, setFeedbackTick] = useState(0);
   const highlightBookmarks = bookmarks.slice(0, 4);
   if (highlightBookmarks.length === 0) return null;
@@ -82,22 +85,34 @@ export function PerformanceHighlights({
         className
       )}
     >
+      {(title || displaySubtitle) && (
       <div className="mb-2 flex items-center gap-2">
-        <h2 className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+        {title ? (
+        <h2 className={cn(
+          "text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground",
+          isOrbital && orbital.label
+        )}>
           {title}
         </h2>
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+        ) : null}
+        <span
+          className={
+            isOrbital
+              ? cn(orbital.label, "text-muted-foreground/70")
+              : "font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70"
+          }
+        >
           {displaySubtitle}
         </span>
       </div>
+      )}
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {highlightBookmarks.map((bookmark, index) => {
           const active = activeBookmarkId === bookmark.id;
           const label = getHighlightLabel(bookmark);
           return (
-            <div
+            <article
               key={bookmark.id}
-              role="button"
               tabIndex={0}
               onClick={() => {
                 onSelect?.(bookmark.id);
@@ -120,12 +135,20 @@ export function PerformanceHighlights({
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
+                  <span className={cn(
+                    "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+                    isOrbital && orbital.label
+                  )}>
                     {label}
                   </span>
                   {itemLabels[bookmark.id] && (
                     <span
-                      className="font-mono text-[9px] px-1.5 py-px rounded bg-amber-400/10 text-amber-200 border border-amber-400/20"
+                      className={cn(
+                        "text-[9px] px-1.5 py-px rounded",
+                        isOrbital
+                          ? orbital.badge("bronze")
+                          : "font-mono bg-amber-400/10 text-amber-200 border border-amber-400/20"
+                      )}
                       title={itemLabels[bookmark.id].includes("Resurfaced") ? "Forgotten high-performer from >30d ago — resurfaced for review" : undefined}
                     >
                       {itemLabels[bookmark.id]}
@@ -259,7 +282,7 @@ export function PerformanceHighlights({
                   );
                 })()}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

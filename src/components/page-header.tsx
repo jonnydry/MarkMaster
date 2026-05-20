@@ -1,7 +1,11 @@
+"use client";
+
 import type { ComponentProps, ReactNode } from "react";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
+import { orbital } from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
 
 type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   title?: ReactNode;
@@ -30,6 +34,7 @@ export function PageHeader({
   chromeless = false,
   ...props
 }: PageHeaderProps) {
+  const { isOrbital } = useOrbitalTheme();
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
     "shrink-0",
@@ -62,6 +67,7 @@ export function PageHeader({
                   <p
                     className={cn(
                       "mt-1 text-xs text-muted-foreground sm:text-sm",
+                      isOrbital ? orbital.label : undefined,
                       bookmarkFeedMaxWidthClassName,
                       descriptionClassName
                     )}

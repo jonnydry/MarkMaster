@@ -99,9 +99,7 @@ describe("/api/bookmarks", () => {
 
     expect(response.status).toBe(200);
     expect(sql).toContain('INNER JOIN "Collection" c ON c."id" = ci."collectionId"');
-    expect(sql).toContain(
-      'c."type" = \'user_collection\'::"CollectionType"'
-    );
+    expect(sql).toContain("c.\"type\" = 'user_collection'");
   });
 
   it.each(["images", "video", "links", "text-only"] as const)(

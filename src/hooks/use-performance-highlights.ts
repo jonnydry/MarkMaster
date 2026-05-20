@@ -66,7 +66,7 @@ export function usePerformanceHighlights(
     ? "/api/bookmarks?raw=true&sortField=performance&sortDirection=desc&limit=4&page=1"
     : "/api/bookmarks?sortField=performance&sortDirection=desc&limit=4&page=1";
   if (usePersonalBoost) {
-    highlightUrl += "&personalBoost=1";
+    highlightUrl += "&personalBoost=true";
   }
 
   const cacheKey = [

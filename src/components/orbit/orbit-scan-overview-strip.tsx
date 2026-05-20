@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OrbitScanResponsePayload } from "@/types";
 
-const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
-};
+import { orbital } from "@/components/orbital";
 
 const STRATEGY_PREVIEW = 140;
 
@@ -43,13 +41,13 @@ function StrategyLines({
     <div className="space-y-2">
       <div className="space-y-2 text-xs leading-relaxed text-white/60">
         <p>
-          <span className="text-white/45" style={MONO_STYLE}>
+          <span className={cn(orbital.label, "text-white/45")}>
             Tagging
           </span>{" "}
           {tagDisplay}
         </p>
         <p>
-          <span className="text-white/45" style={MONO_STYLE}>
+          <span className={cn(orbital.label, "text-white/45")}>
             Collections
           </span>{" "}
           {colDisplay}
@@ -60,7 +58,7 @@ function StrategyLines({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-[11px] text-sky-200 hover:bg-white/5 hover:text-sky-100"
+          className="h-7 px-2 text-[11px] text-primary/80 hover:bg-primary/5 hover:text-primary"
           onClick={() => setExpanded((v) => !v)}
         >
           {expanded ? "Show less" : "Show more"}
@@ -89,26 +87,23 @@ export function OrbitScanOverviewStrip({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.55),rgba(15,23,42,0.72))] shadow-sm",
+        orbital.glass,
         className
       )}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left sm:px-5"
+        className="flex w-full items-center gap-2 rounded-sm px-4 py-3 text-left sm:px-5"
         aria-expanded={open}
       >
         {open ? (
-          <ChevronDown className="size-4 shrink-0 text-sky-200/90" />
+          <ChevronDown className="size-4 shrink-0 text-primary/70" />
         ) : (
-          <ChevronRight className="size-4 shrink-0 text-sky-200/90" />
+          <ChevronRight className="size-4 shrink-0 text-primary/70" />
         )}
         <div className="min-w-0 flex-1">
-          <p
-            className="text-[10px] font-medium uppercase tracking-[0.22em] text-sky-200/80"
-            style={MONO_STYLE}
-          >
+          <p className={cn(orbital.label, "text-primary/80")}>
             Grok pass overview
           </p>
           <p className="mt-0.5 truncate text-sm font-medium text-white/90">
@@ -118,8 +113,8 @@ export function OrbitScanOverviewStrip({
       </button>
 
       {open ? (
-        <div className="space-y-3 border-t border-white/10 px-4 pb-4 pt-1 sm:px-5">
-          <p className="text-xs text-white/55" style={MONO_STYLE}>
+        <div className="space-y-3 border-t border-primary/10 px-4 pb-4 pt-1 sm:px-5">
+          <p className={cn(orbital.label, "text-xs text-primary/70")}>
             {summary.bookmarkCount} bookmark
             {summary.bookmarkCount === 1 ? "" : "s"} suggested ·{" "}
             {summary.bookmarksWithTags} with tags ·{" "}
@@ -135,10 +130,7 @@ export function OrbitScanOverviewStrip({
 
           {tagRollups.length > 0 ? (
             <div>
-              <p
-                className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45"
-                style={MONO_STYLE}
-              >
+              <p className={cn(orbital.label, "mb-2 text-white/45")}>
                 Tags this pass
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -161,7 +153,7 @@ export function OrbitScanOverviewStrip({
                         lib
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider text-sky-200/80">
+                      <span className="text-[9px] uppercase tracking-wider text-primary/70">
                         new
                       </span>
                     )}
@@ -173,10 +165,7 @@ export function OrbitScanOverviewStrip({
 
           {collectionRollups.length > 0 ? (
             <div>
-              <p
-                className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45"
-                style={MONO_STYLE}
-              >
+              <p className={cn(orbital.label, "mb-2 text-white/45")}>
                 Collections this pass
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -194,7 +183,7 @@ export function OrbitScanOverviewStrip({
                         lib
                       </span>
                     ) : (
-                      <span className="text-[9px] uppercase tracking-wider text-sky-200/80">
+                      <span className="text-[9px] uppercase tracking-wider text-primary/70">
                         new
                       </span>
                     )}

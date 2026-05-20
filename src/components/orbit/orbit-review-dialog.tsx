@@ -52,6 +52,8 @@ import {
 import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import { cn } from "@/lib/utils";
 import { fetchJson } from "@/lib/fetch-json";
+
+import { orbital, OrbitalCard } from "@/components/orbital";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { toast } from "sonner";
@@ -88,13 +90,13 @@ interface OrbitReviewDialogProps {
   feedbackById?: Record<string, 'good' | 'not_relevant'>;
 }
 
-const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
-};
-
-function getPreviewText(bookmark: BookmarkWithRelations | null): string {
-  if (!bookmark) return "Bookmark is outside the current page.";
-  return bookmark.tweetText.replace(/\s+/g, " ").trim();
+function getPreviewText(
+  bookmark: BookmarkWithRelations | null,
+  fallbackReasoning?: string
+): string {
+  if (bookmark) return bookmark.tweetText.replace(/\s+/g, " ").trim();
+  if (fallbackReasoning) return fallbackReasoning.replace(/\s+/g, " ").trim();
+  return "Bookmark preview unavailable.";
 }
 
 export function OrbitReviewDialog({
@@ -307,7 +309,7 @@ export function OrbitReviewDialog({
   const impact = useMemo(() => {
     let addedTagCount = 0;
     let addedCollectionCount = 0;
-    drafts.forEach((draft) => {
+    effectiveDrafts.forEach((draft) => {
       const original = originalSuggestionById.get(draft.bookmarkId);
       if (!original) return;
       const origTagNames = original.tags.map((t) => t.name);
@@ -320,7 +322,7 @@ export function OrbitReviewDialog({
       if (hasCol && !hadCol) addedCollectionCount += 1;
     });
     return { addedTagCount, addedCollectionCount };
-  }, [drafts, originalSuggestionById]);
+  }, [effectiveDrafts, originalSuggestionById]);
 
   // Real historical author decision context (Phase 3 Item 9 Slice 2, Approach A).
   // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
@@ -333,26 +335,30 @@ export function OrbitReviewDialog({
     return bookmarkById.get(sheetBookmarkId)?.authorUsername ?? null;
   }, [sheetBookmarkId, bookmarkById]);
 
-  const { data, isLoading, isFetching } = useQuery<AuthorDecisionHistoryData>({
-    queryKey: ["orbit", "author-history", sheetAuthor],
+  const normalizedSheetAuthor = sheetAuthor?.trim().toLowerCase() ?? null;
+
+  const { data, isLoading, isFetching, isError: authorHistoryError } = useQuery<AuthorDecisionHistoryData>({
+    queryKey: ["orbit", "author-history", normalizedSheetAuthor],
     queryFn: async () => {
       if (!sheetAuthor) return null;
+      const normalized = sheetAuthor.trim().toLowerCase();
       return fetchJson<AuthorDecisionHistoryData>(
-        `/api/orbit/author-history?authorUsername=${encodeURIComponent(sheetAuthor)}`
+        `/api/orbit/author-history?authorUsername=${encodeURIComponent(normalized)}`
       );
     },
-    enabled: isEditSheetOpen && !!sheetAuthor,
+    enabled: isEditSheetOpen && !!normalizedSheetAuthor,
     staleTime: 5 * 60 * 1000, // 5 min — light natural reuse across quick re-opens
     gcTime: 10 * 60 * 1000,
   });
 
   const authorHistoryForSheet = useMemo<AuthorDecisionHistory>(() => {
     if (!sheetAuthor) return null;
+    if (authorHistoryError) return null;
     if (isLoading || isFetching) {
       return { authorUsername: sheetAuthor, loading: true };
     }
     return data ?? null;
-  }, [sheetAuthor, data, isLoading, isFetching]);
+  }, [sheetAuthor, authorHistoryError, data, isLoading, isFetching]);
 
   // Similar high-performers context (Phase 3 Item 9 Slice 3, Approach A).
   // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
@@ -361,8 +367,12 @@ export function OrbitReviewDialog({
   // established performance score + overlap strength. Small limit for quality.
   // Loading state handled for graceful UX. Reuses exact same on-demand + staleTime
   // pattern as author history (no pre-compute, no scan changes).
-  const { data: similarData, isLoading: similarLoading, isFetching: similarFetching } =
-    useQuery<SimilarCollectionsData>({
+  const {
+    data: similarData,
+    isLoading: similarLoading,
+    isFetching: similarFetching,
+    isError: similarCollectionsError,
+  } = useQuery<SimilarCollectionsData>({
       queryKey: ["orbit", "similar-collections", sheetBookmarkId],
       queryFn: async () => {
         if (!sheetBookmarkId) return null;
@@ -377,11 +387,12 @@ export function OrbitReviewDialog({
 
   const similarCollectionsForSheet = useMemo<SimilarCollections>(() => {
     if (!sheetBookmarkId) return null;
+    if (similarCollectionsError) return null;
     if (similarLoading || similarFetching) {
       return { loading: true };
     }
     return similarData ?? null;
-  }, [sheetBookmarkId, similarData, similarLoading, similarFetching]);
+  }, [sheetBookmarkId, similarCollectionsError, similarData, similarLoading, similarFetching]);
 
   // Keyboard shortcut for Quick Pass / Deep Review toggle (Q). Scoped to when the
   // dialog is open (prevents silent mutations while viewing orbit map/list outside the review).
@@ -482,7 +493,7 @@ export function OrbitReviewDialog({
 
       // Read caches at click time (safe, never triggers fetch; undefined => treat as no signal)
       const bm = bookmarkById.get(bookmarkId);
-      const auth = bm?.authorUsername ?? null;
+      const auth = bm?.authorUsername?.trim().toLowerCase() ?? null;
 
       let h: AuthorDecisionHistory | null = null;
       if (auth) {
@@ -526,10 +537,10 @@ export function OrbitReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] gap-0 overflow-hidden border border-white/10 bg-slate-950 p-0 text-white sm:max-w-5xl">
-        <DialogHeader className="border-b border-white/10 px-5 py-4">
+      <DialogContent className={cn(orbital.glass, "max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-5xl")}>
+        <DialogHeader className="border-b border-primary/10 px-5 py-4">
           {digestBookmarkIds && digestBookmarkIds.length > 0 && (
-            <div className="mb-2 flex items-center gap-2 rounded-lg bg-sky-500/10 px-3 py-1.5 text-sm text-sky-200">
+            <div className={cn("mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm", orbital.badge("cyan"))}>
               <Sparkles className="h-4 w-4" />
               <span>
                 Reviewing your Weekly Gems from Highlights ({digestBookmarkIds.length} items)
@@ -537,7 +548,7 @@ export function OrbitReviewDialog({
             </div>
           )}
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-300/10 text-sky-100">
+            <span className={cn("mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl", orbital.icon)}>
               <GrokMark className="size-4" title="Grok" />
             </span>
             <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
@@ -618,10 +629,10 @@ export function OrbitReviewDialog({
             <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-4 text-[11px]">
-                  <div><span className="text-white/45">Apply</span> <span className="font-medium tabular-nums">{reviewStats.applyableBookmarks}</span></div>
-                  <div><span className="text-white/45">Keep</span> <span className="font-medium tabular-nums">{reviewStats.keptBookmarks}</span></div>
-                  <div><span className="text-sky-300/80">+{impact.addedTagCount} tags</span></div>
-                  <div><span className="text-sky-300/80">+{impact.addedCollectionCount} cols</span></div>
+                  <div><span className="text-white/45">Apply</span> <span className="font-medium tabular-nums text-mono-data">{reviewStats.applyableBookmarks}</span></div>
+                  <div><span className="text-white/45">Keep</span> <span className="font-medium tabular-nums text-mono-data">{reviewStats.keptBookmarks}</span></div>
+                  <div><span className="text-primary/80">+{impact.addedTagCount} tags</span></div>
+                  <div><span className="text-bronze/80">+{impact.addedCollectionCount} cols</span></div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -705,14 +716,16 @@ export function OrbitReviewDialog({
             <div className={cn("space-y-3 pb-6", isQuick && "space-y-2 pb-4")}>
               {effectiveDrafts.length === 0 && (
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
-                  No suggestions are waiting for review.
+                  {!sourcePlan
+                    ? "Grok is preparing suggestions for this review…"
+                    : "No suggestions are waiting for review."}
                 </div>
               )}
 
               {effectiveDrafts.map((draft) => {
                 const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
-                const preview = getPreviewText(bookmark);
                 const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
+                const preview = getPreviewText(bookmark, original?.reasoning);
 
                 const origDecision = original
                   ? deriveReviewDecision(original)
@@ -750,7 +763,8 @@ export function OrbitReviewDialog({
                   <div
                     key={draft.bookmarkId}
                     className={cn(
-                      "group relative rounded-2xl border border-hairline-soft bg-surface-1 shadow-sm transition-all",
+                      orbital.glass,
+                      "group relative border border-hairline-soft shadow-sm transition-all",
                       isQuick && "rounded-xl shadow-none border-white/5",
                       draft.decision === "keep" && "opacity-75",
                       sheetBookmarkId === draft.bookmarkId && "border-sky-400/50 bg-surface-2/70",
@@ -910,7 +924,7 @@ export function OrbitReviewDialog({
                         <div className="flex flex-col gap-4 pt-2 md:flex-row md:gap-4">
                           {orbitReviewDecisionUsesTags(draft.decision) && (
                             <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                              <div className={cn(orbital.label, "mb-1.5 text-white/50")}>
                                 Tags
                               </div>
                               <OrbitReviewTagField
@@ -923,7 +937,7 @@ export function OrbitReviewDialog({
                           )}
                           {orbitReviewDecisionUsesCollection(draft.decision) && (
                             <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                              <div className={cn(orbital.label, "mb-1.5 text-white/50")}>
                                 Collection
                               </div>
                               <OrbitReviewCollectionField

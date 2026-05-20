@@ -17,6 +17,8 @@ import type {
   OrbitDecision,
 } from "@/types";
 
+import { orbital } from "@/components/orbital";
+
 export type OrbitFocusScanState = "idle" | "scanning" | "ready" | "applying";
 
 export interface OrbitFocusStripProps {
@@ -41,10 +43,6 @@ export interface OrbitFocusStripProps {
   stickyTopOffset?: number;
   className?: string;
 }
-
-const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
-};
 
 function describeMove(decision: OrbitDecision): string {
   return decision.kind === "collection"
@@ -87,7 +85,8 @@ export function OrbitFocusStrip({
     <section
       style={{ top: stickyTopOffset }}
       className={cn(
-        "sticky z-[9] rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))] px-4 py-3 shadow-xl backdrop-blur-md sm:px-5",
+        orbital.glass,
+        "sticky z-[9] px-4 py-3 sm:px-5",
         className
       )}
     >
@@ -152,10 +151,7 @@ function ScanSlot({
     return (
       <div className="flex min-w-0 items-center gap-3">
         <div className="min-w-0">
-          <p
-            className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/55"
-            style={MONO_STYLE}
-          >
+          <p className={cn(orbital.label, "text-white/55")}>
             Ready to scan
           </p>
           <p className="mt-0.5 truncate text-sm text-white/80">
@@ -192,10 +188,7 @@ function ScanSlot({
   return (
     <div className="flex min-w-0 items-center gap-3">
       <div className="min-w-0">
-        <p
-          className="text-[10px] font-medium uppercase tracking-[0.22em] text-sky-200/80"
-          style={MONO_STYLE}
-        >
+        <p className={cn(orbital.label, "text-primary/80")}>
           Scanned
         </p>
         <p className="mt-0.5 truncate text-sm text-white/85">
@@ -248,7 +241,7 @@ function FocusSlot({
 }) {
   if (!focus) {
     return (
-      <div className="hidden min-w-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/55 sm:inline-flex">
+      <div className={cn(orbital.pill, "hidden sm:inline-flex px-3 py-1.5 text-primary/70")}>
         <Compass className="size-3.5" />
         <span className="truncate">Select a bookmark to see its move</span>
       </div>
@@ -260,24 +253,23 @@ function FocusSlot({
   const confidenceText = confidenceLabel(decision.confidence);
 
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-3 py-1.5 text-xs text-white">
-      <span className="inline-flex size-2 shrink-0 rounded-full bg-sky-300 shadow-[0_0_0_3px_rgba(125,211,252,0.22)] animate-pulse" />
-      <span className="truncate font-medium text-white/85">
+    <div className={cn(orbital.pill, "flex px-3 py-1.5 text-primary/90")}>
+      <span className="inline-flex size-2 shrink-0 rounded-full bg-primary animate-pulse" />
+      <span className="truncate font-medium text-primary/85">
         @{bookmark.authorUsername}
       </span>
       {primary ? (
         <>
-          <span className="text-white/45">→</span>
-          <span className="truncate font-semibold text-white">
+          <span className="text-primary/45">→</span>
+          <span className="truncate font-semibold text-primary">
             {describeMove(primary)}
           </span>
         </>
       ) : (
-        <span className="truncate text-white/55">No confident move</span>
+        <span className="truncate text-primary/55">No confident move</span>
       )}
       <span
-        className="rounded-full border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/85"
-        style={MONO_STYLE}
+        className={cn(orbital.data, "rounded-full border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] text-primary/85")}
         title={formatConfidence(decision.confidence)}
       >
         {confidenceText}
@@ -292,8 +284,7 @@ function JourneyDots({ step }: { step: JourneyStep }) {
 
   return (
     <div
-      className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-white/55 md:inline-flex"
-      style={MONO_STYLE}
+      className={cn(orbital.label, "hidden items-center gap-1 rounded-full border border-primary/10 bg-primary/5 px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-primary/70 md:inline-flex")}
       aria-label={`Step ${activeIndex + 1} of ${order.length}`}
     >
       {order.map((id, idx) => {
@@ -305,14 +296,14 @@ function JourneyDots({ step }: { step: JourneyStep }) {
               className={cn(
                 "inline-block size-1.5 rounded-full border",
                 isActive
-                  ? "border-sky-300 bg-sky-300"
+                  ? "border-primary bg-primary"
                   : isDone
                     ? "border-emerald-300/80 bg-emerald-300/80"
-                    : "border-white/25 bg-transparent"
+                    : "border-primary/20 bg-transparent"
               )}
             />
             {idx < order.length - 1 && (
-              <span className="h-px w-3 bg-white/15" aria-hidden />
+              <span className="h-px w-3 bg-primary/15" aria-hidden />
             )}
           </span>
         );

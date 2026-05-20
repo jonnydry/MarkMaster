@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +12,10 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import type { CollectionWithCount } from "@/types";
+
+import { useOrbitalTheme } from "@/components/providers";
+import { orbital } from "@/components/orbital";
+import { cn } from "@/lib/utils";
 
 const collectionDateFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -58,13 +64,14 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
   onNavigate,
   onDelete,
 }: UserCollectionCardProps) {
+  const { isOrbital } = useOrbitalTheme();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
 
   return (
     <article
-      className={compactCardClassName}
+      className={isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName}
       role="button"
       tabIndex={0}
       aria-label={`Open collection ${collection.name}`}
@@ -81,7 +88,12 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
             {collection.name}
           </h3>
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-hairline-soft bg-transparent px-1.5 py-0.5 text-[0.68rem] font-semibold text-muted-foreground"
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[0.68rem] font-semibold",
+              isOrbital 
+                ? cn(orbital.pill, "border-primary/30 bg-primary/5 text-primary/90") 
+                : "border border-hairline-soft bg-transparent text-muted-foreground"
+            )}
             title={collection.isPublic ? "Public collection" : "Private collection"}
           >
             {collection.isPublic ? (
@@ -120,7 +132,10 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
         <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
           {itemCount.toLocaleString()}
         </p>
-        <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+        <p className={cn(
+          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em]",
+          isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+        )}>
           saved
         </p>
       </div>
@@ -157,13 +172,14 @@ export const XFolderCard = React.memo(function XFolderCard({
   onNavigate,
   onCopy,
 }: XFolderCardProps) {
+  const { isOrbital } = useOrbitalTheme();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
 
   return (
     <article
-      className={compactCardClassName}
+      className={isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName}
       role="button"
       tabIndex={0}
       aria-label={`Open collection ${collection.name}`}
@@ -211,7 +227,10 @@ export const XFolderCard = React.memo(function XFolderCard({
         <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
           {itemCount.toLocaleString()}
         </p>
-        <p className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+        <p className={cn(
+          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em]",
+          isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+        )}>
           synced
         </p>
       </div>

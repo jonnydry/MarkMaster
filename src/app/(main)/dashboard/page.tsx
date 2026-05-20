@@ -33,13 +33,27 @@ import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-f
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { HighlightsDigest } from "@/components/highlights-digest";
 import { toast } from "sonner";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  bookmarkFeedLeftInspectorClassName,
+  bookmarkFeedRightInspectorWrapperClassName,
+} from "@/lib/bookmark-feed-layout";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { DashboardEmptyState } from "./dashboard-empty-state";
 import { DashboardErrorState } from "./dashboard-error-state";
 import { PaginationBar } from "./pagination-bar";
 import { SelectionToolbar } from "./selection-toolbar";
+
+// Canonical orbital components for two-column mission-control inspector (dashboard slice)
+import {
+  orbital,
+  OrbitalCard,
+  MissionControlHeader,
+  TelemetryStat,
+  OrbitalBadge,
+} from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
 
 type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -149,7 +163,7 @@ function DashboardContent() {
 
       await invalidateCollectionsQuery(queryClient);
       toast.success(`Created "${suggestedName}" with ${bookmarks.length} gems`);
-    } catch (e) {
+    } catch {
       toast.error("Could not save the gems as a collection");
     }
   };
@@ -167,6 +181,8 @@ function DashboardContent() {
   const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
   const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const { isOrbital } = useOrbitalTheme();
 
   const {
     data: bookmarkData,
@@ -188,7 +204,12 @@ function DashboardContent() {
   // Shared performance highlights (raw / untouched only for the dashboard strip)
   const dislikedIds = getDislikedHighlightIds();
   const likedIds = getLikedHighlightIds();
-  const { data: highlightData } = usePerformanceHighlightsHook(true, {
+  const {
+    data: highlightData,
+    isLoading: highlightsLoading,
+    isError: highlightsError,
+    refetch: refetchHighlights,
+  } = usePerformanceHighlightsHook(true, {
     dislikedIds,
     likedIds,
   });
@@ -303,6 +324,10 @@ function DashboardContent() {
     () => bookmarks.find((b) => b.id === activeBookmarkIdForView),
     [bookmarks, activeBookmarkIdForView]
   );
+
+  // Gate inspector + two-col layout strictly behind orbital theme (P0 fix)
+  // Ensures default light/dark experience is byte-for-byte unchanged (no flex, no inspector, no selected visuals from this feature).
+  const inspectorActive = isOrbital && !!activeBookmark && viewMode !== "grid";
 
   const clearSelection = useCallback(() => {
     setSelectedBookmarkIds([]);
@@ -638,7 +663,7 @@ function DashboardContent() {
               <div
                 className={cn(
                   "relative z-10 overflow-hidden rounded-sm border border-hairline-strong shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
-                  bookmarkFeedColumnClassName,
+                  inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName,
                   appChromeFrostedClassName
                 )}
               >
@@ -653,7 +678,25 @@ function DashboardContent() {
             </div>
           </div>
 
-          {!isLoading && !isError && bookmarks.length > 0 && (
+          {!highlightsLoading && highlightsError && (
+            <div
+              className={cn(
+                "mx-auto mb-3 flex max-w-[960px] flex-wrap items-center justify-between gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive",
+                inspectorActive ? "lg:mx-0 lg:max-w-[640px]" : "px-4 sm:px-5"
+              )}
+            >
+              <span>Could not load Highlights.</span>
+              <button
+                type="button"
+                onClick={() => refetchHighlights()}
+                className="text-xs font-medium underline underline-offset-2"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!highlightsLoading && !highlightsError && highlightBookmarks.length > 0 && (
             <PerformanceHighlights
               title="Highlights"
               subtitle={
@@ -663,21 +706,24 @@ function DashboardContent() {
               }
               bookmarks={highlightBookmarks}
               total={unsortedTotal}
-              activeBookmarkId={activeBookmarkIdForView}
+              activeBookmarkId={inspectorActive ? activeBookmarkIdForView : null}
               onSelect={setActiveBookmarkId}
               onFocusForTriage={focusPerformanceHighlight}
               onOrbitReview={(id) => {
-                // Phase 3 Item 12 Slice 1: instrument "Review in Orbit" CTA from main Highlights strip
                 trackFlywheelEvent("cta.review_in_orbit", { source: "highlights", bookmarkId: id });
                 router.push(`/orbit?highlightId=${id}`);
               }}
               isRawMode={true}
+              className={inspectorActive ? "lg:max-w-[640px] lg:mx-0" : undefined}
             />
           )}
 
-          {/* Phase 2: Habit-forming "This Week's Gems" / Orbit Digest recap */}
-          {!isLoading && !isError && bookmarks.length > 0 && (
-            <HighlightsDigest onSaveAsCollection={handleSaveGemsAsCollection} />
+          {/* Weekly Gems digest — own queries; show whenever the main library is ready */}
+          {!isLoading && !isError && (
+            <HighlightsDigest
+              onSaveAsCollection={handleSaveGemsAsCollection}
+              className={inspectorActive ? "lg:max-w-[640px] lg:mx-0 pb-4 lg:pb-6" : undefined}
+            />
           )}
 
           {isLoading ? (
@@ -702,12 +748,37 @@ function DashboardContent() {
           ) : (
             <>
               {performanceFocusedId && (
-                <div className="mx-auto w-full max-w-[960px] px-4 pb-2">
-                  <div className="flex flex-wrap items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-primary">
+                <div
+                  className={cn(
+                    "px-4 pb-2",
+                    inspectorActive
+                      ? "lg:max-w-[640px] lg:mx-0"
+                      : "mx-auto w-full max-w-[960px]"
+                  )}
+                >
+                  <div
+                    className={
+                      inspectorActive
+                        ? cn(orbital.glass, "flex flex-wrap items-center gap-2 rounded-sm border border-primary/20 px-3 py-1.5 text-sm")
+                        : "flex flex-wrap items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm"
+                    }
+                  >
+                    <span
+                      className={
+                        inspectorActive
+                          ? cn(orbital.label, "text-primary")
+                          : "font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-primary"
+                      }
+                    >
                       Performance Highlight
                     </span>
-                    <span className="text-muted-foreground text-xs">
+                    <span
+                      className={
+                        inspectorActive
+                          ? cn(orbital.label, "text-primary/70 text-xs")
+                          : "text-muted-foreground text-xs"
+                      }
+                    >
                       Focused for quick tagging &amp; categorization
                     </span>
                     <button
@@ -723,27 +794,165 @@ function DashboardContent() {
                   </div>
                 </div>
               )}
-              <BookmarkList
-              bookmarks={bookmarks}
-              viewMode={viewMode}
-              searchQuery={searchQuery}
-              aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
-              selectionMode={selectionMode}
-              selectedBookmarkIdSet={selectedBookmarkIdSet}
-              activeBookmarkId={activeBookmarkIdForView}
-              onSelect={setActiveBookmarkId}
-              onSelectionChange={toggleBookmarkSelection}
-              onTagClick={filters.toggleTag}
-              onAddTag={handleBookmarkAddTag}
-              onAddToCollection={handleBookmarkAddToCollection}
-              onAddNote={handleBookmarkAddNote}
-              onDelete={actions.handleDeleteBookmark}
-              performanceHighlightId={performanceFocusedId}
-            />
+
+              {/* Two-column mission-control layout for library feed (first slice).
+                  Left: constrained bookmark queue. Right: sticky OrbitalCard inspector (lg+ only, when active item).
+                  Strictly gated behind orbital theme via useOrbitalTheme() + inspectorActive (P0 fix).
+                  Default experience byte-for-byte untouched. */}
+              <div
+                className={cn(
+                  "flex flex-col gap-3",
+                  inspectorActive && "lg:flex-row lg:items-start lg:gap-5 lg:pt-1"
+                )}
+              >
+                {/* Left column — the main library feed (constrained on lg when inspector shown) */}
+                <div
+                  className={cn(
+                    "min-w-0 flex-1",
+                    inspectorActive && bookmarkFeedLeftInspectorClassName
+                  )}
+                >
+                  <BookmarkList
+                    bookmarks={bookmarks}
+                    viewMode={viewMode}
+                    searchQuery={searchQuery}
+                    aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+                    selectionMode={selectionMode}
+                    selectedBookmarkIdSet={selectedBookmarkIdSet}
+                    activeBookmarkId={inspectorActive ? activeBookmarkIdForView : null}
+                    onSelect={inspectorActive ? setActiveBookmarkId : () => {}}
+                    onSelectionChange={toggleBookmarkSelection}
+                    onTagClick={filters.toggleTag}
+                    onAddTag={handleBookmarkAddTag}
+                    onAddToCollection={handleBookmarkAddToCollection}
+                    onAddNote={handleBookmarkAddNote}
+                    onDelete={actions.handleDeleteBookmark}
+                    performanceHighlightId={performanceFocusedId}
+                  />
+                </div>
+
+                {/* Right column — persistent library inspector (lg+ , sticky) */}
+                {inspectorActive && (
+                  <div className={bookmarkFeedRightInspectorWrapperClassName}>
+                    <OrbitalCard className="sticky top-4 p-4 space-y-4 border-primary/20">
+                      <MissionControlHeader
+                        title="Library Inspector"
+                        right={
+                          <button
+                            onClick={() => setActiveBookmarkId(null)}
+                            className={cn(orbital.label, "text-primary/80 hover:text-primary")}
+                          >
+                            Close
+                          </button>
+                        }
+                      />
+
+                      {/* Core content: tweetText + author (fixed real BookmarkWithRelations fields; was title/text/authorName) */}
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-foreground/90 line-clamp-2">
+                          {activeBookmark.tweetText?.slice(0, 120) || "Bookmark"}
+                        </div>
+                        {activeBookmark.authorUsername && (
+                          <div className="text-xs text-primary/60">@{activeBookmark.authorUsername}</div>
+                        )}
+                      </div>
+
+                      {/* Telemetry stats row using canonical component */}
+                      {activeBookmark.publicMetrics && (
+                        <div className="flex items-center gap-4 pt-1">
+                          <TelemetryStat
+                            value={activeBookmark.publicMetrics.like_count?.toLocaleString() ?? "—"}
+                            label="Likes"
+                            tone="cyan"
+                          />
+                          <TelemetryStat
+                            value={activeBookmark.publicMetrics.reply_count?.toLocaleString() ?? "—"}
+                            label="Replies"
+                            tone="cyan"
+                          />
+                          <TelemetryStat
+                            value={activeBookmark.publicMetrics.retweet_count?.toLocaleString() ?? "—"}
+                            label="Reposts"
+                            tone="cyan"
+                          />
+                        </div>
+                      )}
+
+                      {/* Tags as OrbitalBadges (cyan under orbital) */}
+                      {activeBookmark.tags.length > 0 && (
+                        <div>
+                          <div className={cn(orbital.label, "text-primary/70 mb-1.5")}>Tags</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeBookmark.tags.slice(0, 6).map((t) => (
+                              <OrbitalBadge key={t.tag.id} tone="cyan">
+                                {t.tag.name}
+                              </OrbitalBadge>
+                            ))}
+                            {activeBookmark.tags.length > 6 && (
+                              <OrbitalBadge tone="emerald">+{activeBookmark.tags.length - 6}</OrbitalBadge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Collections as badges (bronze) */}
+                      {activeBookmark.collectionItems.length > 0 && (
+                        <div>
+                          <div className={cn(orbital.label, "text-primary/70 mb-1.5")}>Collections</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeBookmark.collectionItems.slice(0, 3).map((c, idx) => (
+                              <OrbitalBadge key={idx} tone="bronze">
+                                {c.collection.name}
+                              </OrbitalBadge>
+                            ))}
+                            {activeBookmark.collectionItems.length > 3 && (
+                              <OrbitalBadge tone="emerald">+{activeBookmark.collectionItems.length - 3}</OrbitalBadge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick actions (library-native) */}
+                      <div className="pt-2 space-y-2">
+                        <button
+                          onClick={() => handleBookmarkAddTag(activeBookmark.id)}
+                          className="w-full rounded-sm border border-primary/30 bg-primary/10 py-1.5 text-xs text-primary hover:bg-primary/15 transition-colors"
+                        >
+                          Add tag
+                        </button>
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <button
+                            onClick={() => handleBookmarkAddToCollection(activeBookmark.id)}
+                            className="rounded-sm border border-primary/30 py-1 text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
+                          >
+                            Add to collection
+                          </button>
+                          <button
+                            onClick={() => router.push(`/orbit?highlightId=${activeBookmark.id}`)}
+                            className="rounded-sm border border-primary/30 py-1 text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
+                          >
+                            Review in Orbit
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => handleBookmarkAddNote(activeBookmark.id)}
+                          className="w-full rounded-sm border border-primary/30 py-1 text-xs text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          Add note
+                        </button>
+                      </div>
+
+                      <div className={cn(orbital.label, "pt-1 text-primary/50")}>
+                        Click cards to inspect. Inspector updates live.
+                      </div>
+                    </OrbitalCard>
+                  </div>
+                )}
+              </div>
             </>
           )}
 
-          <div className={bookmarkFeedColumnClassName}>
+          <div className={inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName}>
             <PaginationBar
               page={filters.page}
               totalPages={totalPages}

@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
     untaggedRows,
     notedRows,
     velocityRows,
-    flywheelRows,
   ] = await Promise.all([
     prisma.$queryRaw<
       {
@@ -183,18 +182,26 @@ export async function GET(req: NextRequest) {
       FROM "Bookmark"
       WHERE "userId" = ${user.id}
     `,
-    // Phase 3 Item 12 Slice 3: aggregate flywheel events with source extraction from payload (for per-source effectiveness).
-    // Reuses the same time-range filter (fwTimeFilter) and GROUP for cleanliness + performance.
-    // Source from payload->>'source' (populated on cta.review_in_orbit, digest.session_start, etc.).
-    // Also captures new quick.keep outcome events for Quick Pass keep-rate derivation.
-    prisma.$queryRaw<{ eventType: string; source: string | null; count: bigint }[]>`
+  ]);
+
+  // Flywheel aggregates are optional: schema may exist before migration is applied.
+  let flywheelRows: { eventType: string; source: string | null; count: bigint }[] = [];
+  try {
+    flywheelRows = await prisma.$queryRaw<
+      { eventType: string; source: string | null; count: bigint }[]
+    >`
       SELECT "eventType", COALESCE("payload"->>'source', '') AS source, COUNT(*)::bigint as count
       FROM "FlywheelEvent"
       WHERE "userId" = ${user.id}
       ${fwTimeFilter}
       GROUP BY "eventType", source
-    `,
-  ]);
+    `;
+  } catch (err) {
+    console.warn(
+      "[analytics] FlywheelEvent query failed — run prisma migrate deploy",
+      err
+    );
+  }
 
   const mediaCounts = mediaCountsRows[0] ?? {
     totalBookmarks: BigInt(0),

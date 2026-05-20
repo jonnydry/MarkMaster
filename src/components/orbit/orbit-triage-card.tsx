@@ -15,6 +15,8 @@ import type {
   ViewMode,
 } from "@/types";
 
+import { orbital } from "@/components/orbital";
+
 interface OrbitTriageCardProps {
   bookmark: BookmarkWithRelations;
   viewMode: ViewMode;
@@ -74,9 +76,9 @@ export function OrbitTriageCard({
       case "high":
         return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
       case "medium":
-        return "border-sky-400/30 bg-sky-400/10 text-sky-100";
+        return "border-primary/40 bg-primary/10 text-primary";
       case "low":
-        return "border-blue-500/30 bg-blue-500/10 text-blue-100";
+        return "border-bronze/30 bg-bronze/10 text-bronze";
       default:
         return "";
     }
@@ -107,25 +109,22 @@ export function OrbitTriageCard({
 
       {/* Phase 1 polish: Make Grok reasoning more prominent in primary triage cards */}
       {decision?.reasoning && (
-        <div className="px-4 pb-2 text-[11px] leading-snug text-white/70 border-t border-white/5">
-          <span className="font-medium text-sky-200/80">Grok: </span>
+        <div className="px-4 pb-2 text-[11px] leading-snug text-muted-foreground border-t border-hairline-soft">
+          <span className="font-medium text-primary/80">Grok: </span>
           {decision.reasoning}
         </div>
       )}
 
       {decision && (
-        <div className="relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl sm:px-5">
+        <div className={cn("relative flex flex-col gap-3 border-t border-hairline-soft px-4 py-3", orbital.glass)}>
           <div className="flex items-center justify-between gap-3">
-            <span
-              className="text-[10px] font-medium uppercase tracking-[0.22em] text-sky-200/80"
-              style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}
-            >
+            <span className={cn(orbital.label, "font-medium text-primary/80")}>
               Primary suggestion
             </span>
             {confidenceText !== null && (
               <span
                 className={cn(
-                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px]",
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-mono-data",
                   confidenceTone
                 )}
                 title={formatConfidence(decision.confidence)}
@@ -138,7 +137,7 @@ export function OrbitTriageCard({
           {primary ? (
             <>
               <div className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-white/10 text-sky-200">
+                <span className={cn("mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-md", orbital.icon)}>
                   {primary.kind === "collection" ? (
                     <Folder className="size-3.5" />
                   ) : (
@@ -148,7 +147,7 @@ export function OrbitTriageCard({
                 <p className="text-sm font-medium leading-tight text-white">
                   {describeMove(primary)}
                   {primary.reuseExisting && (
-                    <span className="ml-2 text-[10px] font-normal uppercase tracking-[0.18em] text-white/55">
+                    <span className={cn(orbital.label, "ml-2 text-white/55")}>
                       existing
                     </span>
                   )}
@@ -159,20 +158,14 @@ export function OrbitTriageCard({
 
               {decision.suggestedTags.length > 0 ? (
                 <div>
-                  <p
-                    className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/40"
-                    style={{
-                      fontFamily:
-                        "'IBM Plex Mono', ui-monospace, monospace",
-                    }}
-                  >
+                  <p className={cn(orbital.label, "mb-1.5 text-white/40")}>
                     All suggested tags
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {decision.suggestedTags.map((tag, idx) => (
                       <span
                         key={`${tag.name}-${idx}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/75"
+                        className={orbital.pill}
                       >
                         <span
                           className="size-1.5 shrink-0 rounded-full"

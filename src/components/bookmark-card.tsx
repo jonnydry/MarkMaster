@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
+import { orbital } from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -56,9 +58,11 @@ function formatCount(n: number): string {
 function TagPill({
   name,
   onClick,
+  isOrbital = false,
 }: {
   name: string;
   onClick?: () => void;
+  isOrbital?: boolean;
 }) {
   return (
     <button
@@ -67,7 +71,14 @@ function TagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+      className={
+        isOrbital
+          ? cn(
+              orbital.pill,
+              "text-muted-foreground hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+            )
+          : "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+      }
     >
       {name}
     </button>
@@ -77,9 +88,11 @@ function TagPill({
 function BookmarkRank({
   rank,
   compact = false,
+  isOrbital = false,
 }: {
   rank?: number;
   compact?: boolean;
+  isOrbital?: boolean;
 }) {
   if (typeof rank !== "number") return null;
 
@@ -87,7 +100,8 @@ function BookmarkRank({
     <div
       aria-hidden="true"
       className={cn(
-        "flex shrink-0 flex-col items-center font-mono tabular-nums",
+        isOrbital ? orbital.data : "font-mono tabular-nums",
+        "flex shrink-0 flex-col items-center",
         compact ? "w-7 pt-0.5" : "w-8 pt-1"
       )}
     >
@@ -184,6 +198,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   priorityMedia = false,
   isPerformanceHighlight = false,
 }: BookmarkCardProps) {
+  const { isOrbital } = useOrbitalTheme();
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
@@ -234,7 +249,11 @@ export const BookmarkCard = memo(function BookmarkCard({
         className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:80px] hover:bg-accent-soft/40 ${
           isInteractive ? "cursor-pointer" : ""
         } ${
-          selected ? "border-l-2 border-l-primary bg-primary/[0.04]" : ""
+          selected
+            ? isOrbital
+              ? "border-l-2 border-l-primary/70 bg-primary/[0.04] " + orbital.glass
+              : "border-l-2 border-l-primary bg-primary/[0.04]"
+            : ""
         }${className ? ` ${className}` : ""}`}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
@@ -247,7 +266,7 @@ export const BookmarkCard = memo(function BookmarkCard({
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
-        <BookmarkRank rank={rank} compact />
+        <BookmarkRank rank={rank} compact isOrbital={isOrbital} />
         {selectionMode && (
           <SelectionToggle
             selected={selected}
@@ -280,7 +299,13 @@ export const BookmarkCard = memo(function BookmarkCard({
             />
           </div>
           {isPerformanceHighlight && (
-            <div className="-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-mono font-semibold uppercase tracking-[0.08em] text-primary">
+            <div
+              className={
+                isOrbital
+                  ? cn(orbital.badge("cyan"), "inline-flex items-center gap-1 rounded-sm px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em]")
+                  : "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-mono font-semibold uppercase tracking-[0.08em] text-primary"
+              }
+            >
               Performance highlight • Top engagement unsorted
             </div>
           )}
@@ -294,6 +319,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
+                  isOrbital={isOrbital}
                 />
               ))}
             </div>
@@ -397,6 +423,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
+                  isOrbital={isOrbital}
                 />
               ))}
             </div>
@@ -460,8 +487,12 @@ export const BookmarkCard = memo(function BookmarkCard({
       } ${
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
-            ? "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
-            : "border-l-2 border-l-primary bg-primary/[0.04]"
+            ? isOrbital
+              ? "border-l-[3px] border-l-primary bg-primary/[0.05] " + orbital.glass + " ring-1 ring-inset ring-primary/25"
+              : "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
+            : isOrbital
+              ? "border-l-2 border-l-primary/70 bg-primary/[0.04] " + orbital.glass
+              : "border-l-2 border-l-primary bg-primary/[0.04]"
           : ""
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
@@ -476,7 +507,7 @@ export const BookmarkCard = memo(function BookmarkCard({
       onKeyDown={handleCardKeyDown}
     >
       <div className="flex gap-3">
-        <BookmarkRank rank={rank} />
+        <BookmarkRank rank={rank} isOrbital={isOrbital} />
         {selectionMode && (
           <SelectionToggle
             selected={selected}
@@ -658,6 +689,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
+                  isOrbital={isOrbital}
                 />
               ))}
             </div>
@@ -668,17 +700,17 @@ export const BookmarkCard = memo(function BookmarkCard({
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Replies</dt>
                 <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd>{formatCount(metrics.reply_count)}</dd>
+                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.reply_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Reposts</dt>
                 <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd>{formatCount(metrics.retweet_count)}</dd>
+                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.retweet_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Likes</dt>
                 <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd>{formatCount(metrics.like_count)}</dd>
+                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.like_count)}</dd>
               </div>
             </dl>
           )}

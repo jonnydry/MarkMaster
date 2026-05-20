@@ -10,8 +10,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useTheme } from "@/components/providers";
+import { useTheme, useOrbitalTheme } from "@/components/providers";
 import { cn } from "@/lib/utils";
+import { orbital } from "@/components/orbital";
 import type { DbUser } from "@/lib/auth";
 
 interface UserNavProps {
@@ -20,6 +21,7 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const { theme, toggleTheme } = useTheme();
+  const { isOrbital, toggleOrbital } = useOrbitalTheme();
 
   return (
     <DropdownMenu>
@@ -61,6 +63,11 @@ export function UserNav({ user }: UserNavProps) {
             <Moon className="w-4 h-4 mr-2" />
           )}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={toggleOrbital}>
+          <span className={cn("w-4 h-4 mr-2", isOrbital && orbital.icon)} />
+          {isOrbital ? "Disable Orbital" : "Enable Orbital"}
+          {isOrbital && <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => window.open("/api/export?format=json")}

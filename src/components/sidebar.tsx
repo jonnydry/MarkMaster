@@ -14,7 +14,10 @@ import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
+import { orbital } from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
@@ -61,6 +64,7 @@ export function Sidebar({
   totalBookmarks,
   onSyncComplete,
 }: SidebarProps) {
+  const { isOrbital } = useOrbitalTheme();
   const pathname = usePathname();
   const { expanded: ctxExpanded, toggle } = useSidebar();
   const expanded = forceExpanded ? true : ctxExpanded;
@@ -189,7 +193,7 @@ export function Sidebar({
                             />
                             <span className="truncate">{tag.name}</span>
                           </span>
-                          <span className="sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                          <span className={isOrbital ? cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", orbital.data) : "sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50"}>
                             {tag._count.bookmarks}
                           </span>
                         </button>
@@ -205,7 +209,7 @@ export function Sidebar({
                           {showAllTags ? "Show less" : `Show all ${tags.length}`}
                         </span>
                         {!showAllTags && hiddenTagCount > 0 && (
-                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                          <span className="text-mono-data tabular-nums text-muted-foreground/40">
                             +{hiddenTagCount}
                           </span>
                         )}
@@ -253,7 +257,7 @@ export function Sidebar({
                             <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
-                          <span className="sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                          <span className={isOrbital ? cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", orbital.data) : "sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50"}>
                             {collection._count.items}
                           </span>
                         </Link>
@@ -271,7 +275,7 @@ export function Sidebar({
                             : `Show all ${userCollections.length}`}
                         </span>
                         {!showAllCollections && hiddenCollectionCount > 0 && (
-                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                          <span className="text-mono-data tabular-nums text-muted-foreground/40">
                             +{hiddenCollectionCount}
                           </span>
                         )}
@@ -305,7 +309,7 @@ export function Sidebar({
                             <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
-                          <span className="sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50">
+                          <span className={isOrbital ? cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", orbital.data) : "sidebar-item-count ml-2 font-mono text-xs tabular-nums text-muted-foreground/50"}>
                             {collection._count.items}
                           </span>
                         </Link>
@@ -323,7 +327,7 @@ export function Sidebar({
                             : `Show all ${xFolders.length}`}
                         </span>
                         {!showAllFolders && hiddenFolderCount > 0 && (
-                          <span className="font-mono tabular-nums text-muted-foreground/40">
+                          <span className="text-mono-data tabular-nums text-muted-foreground/40">
                             +{hiddenFolderCount}
                           </span>
                         )}

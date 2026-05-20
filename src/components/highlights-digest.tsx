@@ -9,6 +9,8 @@ import { usePerformanceHighlights } from "@/hooks/use-performance-highlights";
 import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
+import { useOrbitalTheme } from "@/components/providers";
+import { orbital } from "@/components/orbital";
 import type { BookmarkWithRelations } from "@/types";
 
 /**
@@ -27,6 +29,7 @@ interface HighlightsDigestProps {
 
 export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDigestProps) {
   const router = useRouter();
+  const { isOrbital } = useOrbitalTheme();
   const [expanded, setExpanded] = useState(false);
 
   // A: lightweight ritual persistence + celebration (lazy ls init avoids set-in-effect)
@@ -72,7 +75,7 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
     itemLabels[g.id] = "Resurfaced";
   });
 
-  const rawCount = rawGems.length;
+  const rawCount = rawData?.total ?? rawGems.length;
   const hasGems = allGems.length > 0;
 
   // Light celebratory stats for ritual feel (hoisted before handlers to eliminate forward ref)
@@ -106,25 +109,46 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
   };
 
   const handleSaveAsCollection = () => {
+    if (!onSaveAsCollection) return;
     const gemsCount = allGems.length;
     const eng = totalEngagement;
     incrementNurtured(gemsCount);
     setCelebration({ gems: gemsCount, engagement: eng });
     setTimeout(() => setCelebration(null), 3800);
     const suggestedName = "This Week’s Gems";
-    onSaveAsCollection?.(allGems, suggestedName);
+    onSaveAsCollection(allGems, suggestedName);
   };
 
   return (
     <section className={cn("mx-auto w-full max-w-[960px] px-4 pb-8 sm:px-5", className)}>
       <div className="mb-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div
+            className={
+              isOrbital
+                ? cn(orbital.icon, "flex h-9 w-9 items-center justify-center rounded-sm")
+                : "flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            }
+          >
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold tracking-tight">This Week’s Gems</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2
+              className={
+                isOrbital
+                  ? cn(orbital.label, "text-xl font-semibold tracking-tight text-primary/90")
+                  : "text-xl font-semibold tracking-tight"
+              }
+            >
+              This Week’s Gems
+            </h2>
+            <p
+              className={
+                isOrbital
+                  ? cn(orbital.label, "mt-0.5 text-[11px] text-primary/70")
+                  : "text-sm text-muted-foreground"
+              }
+            >
               A mix of untouched high-performers, resurfaced older gems, and strong library items. Perfect time to review or save them.
             </p>
           </div>
@@ -132,24 +156,54 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
 
         {hasGems && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <div className="rounded-full bg-muted px-3 py-1">
+            <div
+              className={
+                isOrbital
+                  ? cn(orbital.glass, "rounded-sm border border-primary/15 px-3 py-1 text-primary/80")
+                  : "rounded-full bg-muted px-3 py-1"
+              }
+            >
               {rawCount} untouched high-performers
             </div>
-            <div className="rounded-full bg-muted px-3 py-1">
+            <div
+              className={
+                isOrbital
+                  ? cn(orbital.glass, "rounded-sm border border-primary/15 px-3 py-1 text-primary/80")
+                  : "rounded-full bg-muted px-3 py-1"
+              }
+            >
               {allGems.length} total gems
             </div>
             {totalEngagement > 0 && (
-              <div className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+              <div
+                className={
+                  isOrbital
+                    ? cn(orbital.glass, "rounded-sm border border-primary/20 px-3 py-1 text-primary")
+                    : "rounded-full bg-primary/10 px-3 py-1 text-primary"
+                }
+              >
                 ~{totalEngagement.toLocaleString()} total engagements on X
               </div>
             )}
             {resurfacedGems.length > 0 && (
-              <div className="rounded-full bg-amber-400/10 px-3 py-1 text-amber-300">
+              <div
+                className={
+                  isOrbital
+                    ? cn(orbital.badge("bronze"), "rounded-sm px-2.5 py-1 text-[10px]")
+                    : "rounded-full bg-amber-400/10 px-3 py-1 text-amber-300"
+                }
+              >
                 {resurfacedGems.length} resurfaced
               </div>
             )}
             {nurturedCount > 0 && (
-              <div className="rounded-full bg-muted px-3 py-1">
+              <div
+                className={
+                  isOrbital
+                    ? cn(orbital.glass, "rounded-sm border border-primary/15 px-3 py-1 text-primary/80")
+                    : "rounded-full bg-muted px-3 py-1"
+                }
+              >
                 {nurturedCount} gems nurtured
               </div>
             )}
@@ -219,15 +273,17 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
                 Review these together
               </Button>
 
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSaveAsCollection}
-                className="gap-1.5"
-              >
-                <Plus className="h-4 w-4" />
-                Save as collection
-              </Button>
+              {onSaveAsCollection ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSaveAsCollection}
+                  className="gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  Save as collection
+                </Button>
+              ) : null}
             </div>
 
             {allGems.length > 6 && (
