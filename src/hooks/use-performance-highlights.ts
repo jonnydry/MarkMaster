@@ -40,6 +40,7 @@ export function usePerformanceHighlights(
     likedIds?: string[];
     /** When true, appends personalBoost=1 so the API includes frequency-based authors (and tags) from the user's organized bookmarks for richer Phase 2 personalization (item 7). */
     usePersonalBoost?: boolean;
+    enabled?: boolean;
   }
 ) {
   const {
@@ -49,6 +50,7 @@ export function usePerformanceHighlights(
     dislikedIds = [],
     likedIds = [],
     usePersonalBoost = false,
+    enabled = true,
   } = options || {};
 
   const dislikedSet = new Set(dislikedIds);
@@ -135,5 +137,6 @@ export function usePerformanceHighlights(
       };
     },
     staleTime: 1000 * 60 * 2,
+    enabled,
   });
 }

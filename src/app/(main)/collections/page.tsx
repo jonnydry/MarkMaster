@@ -147,7 +147,12 @@ export default function CollectionsPage() {
   );
   const dislikedIds = getDislikedHighlightIds();
   const likedIds = getLikedHighlightIds();
-  const { data: libraryHighlightData } = usePerformanceHighlightsHook(false, {
+  const {
+    data: libraryHighlightData,
+    isLoading: libraryHighlightsLoading,
+    isError: libraryHighlightsError,
+    refetch: refetchLibraryHighlights,
+  } = usePerformanceHighlightsHook(false, {
     boostTags: strongPersonalTags,
     dislikedIds,
     likedIds,
@@ -283,7 +288,7 @@ export default function CollectionsPage() {
               ? new Date(session.dbUser.lastSyncAt)
               : null
           }
-          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+          onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
         />
       </div>
 
@@ -301,7 +306,7 @@ export default function CollectionsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={() => setCreateOpen(true)}
-                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
                 />
               </div>
             }
@@ -376,25 +381,45 @@ export default function CollectionsPage() {
                   onOpenCollection={handleNavigate}
                 />
 
-                <PerformanceHighlights
-                  title="Library Highlights"
-                  subtitle={
-                    libraryTotal > 0
-                      ? `${libraryTotal.toLocaleString()} bookmarks by X engagement`
-                      : undefined
-                  }
-                  bookmarks={libraryHighlights}
-                  total={libraryTotal}
-                  onSelect={(id) =>
-                    router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
-                  }
-                  onOrbitReview={(id) => {
-                    // Phase 3 Item 12 Slice 1: instrument "Review in Orbit" from Library Highlights
-                    trackFlywheelEvent("cta.review_in_orbit", { source: "library_highlights", bookmarkId: id });
-                    router.push(`/orbit?highlightId=${id}`);
-                  }}
-                  isRawMode={false}
-                />
+                {libraryHighlightsLoading ? (
+                  <div className="space-y-2" aria-busy aria-label="Loading library highlights">
+                    <div className="h-4 w-40 rounded skeleton-shimmer" />
+                    <div className="h-24 rounded-sm border border-hairline-soft skeleton-shimmer" />
+                  </div>
+                ) : libraryHighlightsError ? (
+                  <div className="flex items-center justify-between gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <span>Could not load library highlights.</span>
+                    <button
+                      type="button"
+                      onClick={() => void refetchLibraryHighlights()}
+                      className="text-xs font-medium underline underline-offset-2"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : libraryHighlights.length > 0 ? (
+                  <PerformanceHighlights
+                    title="Library Highlights"
+                    subtitle={
+                      libraryTotal > 0
+                        ? `${libraryTotal.toLocaleString()} bookmarks by X engagement`
+                        : undefined
+                    }
+                    bookmarks={libraryHighlights}
+                    total={libraryTotal}
+                    onSelect={(id) =>
+                      router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
+                    }
+                    onOrbitReview={(id) => {
+                      trackFlywheelEvent("cta.review_in_orbit", {
+                        source: "library_highlights",
+                        bookmarkId: id,
+                      });
+                      router.push(`/orbit?highlightId=${id}`);
+                    }}
+                    isRawMode={false}
+                  />
+                ) : null}
 
                 {/* Habit-forming Digest (Phase 2, enhanced by personalization in 7) */}
                 <HighlightsDigest onSaveAsCollection={handleSaveGemsAsCollection} />

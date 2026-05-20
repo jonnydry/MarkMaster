@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
 import { OrbitListRow } from "./orbit-list-row";
-import { orbital } from "@/components/orbital";
 
 /**
  * OrbitList
@@ -32,9 +30,7 @@ export function OrbitList({
   onQuickAction,
   className,
   isLoading,
-}: OrbitListProps & { isLoading?: boolean }) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-
+}: OrbitListProps) {
   if (isLoading) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-primary/50">
@@ -55,19 +51,13 @@ export function OrbitList({
   return (
     <div className={cn("flex flex-col", className)}>
       {bookmarks.map((bookmark) => (
-        <div
+        <OrbitListRow
           key={bookmark.id}
-          onMouseEnter={() => setHoveredId(bookmark.id)}
-          onMouseLeave={() => setHoveredId(null)}
-        >
-          <OrbitListRow
-            bookmark={bookmark}
-            selected={selectedId === bookmark.id}
-            onSelect={onSelect}
-            onQuickAction={onQuickAction}
-            showActionPill={hoveredId === bookmark.id || selectedId === bookmark.id}
-          />
-        </div>
+          bookmark={bookmark}
+          selected={selectedId === bookmark.id}
+          onSelect={onSelect}
+          onQuickAction={onQuickAction}
+        />
       ))}
     </div>
   );

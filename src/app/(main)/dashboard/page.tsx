@@ -205,6 +205,16 @@ function DashboardContent() {
     likedIds,
   });
 
+  const feedReady = !isLoading && !isError;
+  const {
+    data: libraryHighlightData,
+    isLoading: libraryHighlightsLoading,
+  } = usePerformanceHighlightsHook(false, {
+    dislikedIds,
+    likedIds,
+    enabled: feedReady,
+  });
+
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
@@ -389,7 +399,7 @@ function DashboardContent() {
   );
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient);
+    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
   }, [queryClient]);
 
   const handleCreateCollectionOpen = useCallback(() => {
@@ -669,6 +679,19 @@ function DashboardContent() {
             </div>
           </div>
 
+          {highlightsLoading && (
+            <div
+              className={cn(
+                "mx-auto mb-3 max-w-[960px] space-y-2 px-4 sm:px-5",
+                inspectorActive && "lg:mx-0 lg:max-w-[640px]"
+              )}
+              aria-hidden
+            >
+              <div className="h-4 w-32 rounded skeleton-shimmer" />
+              <div className="h-24 rounded-sm border border-hairline-soft skeleton-shimmer" />
+            </div>
+          )}
+
           {!highlightsLoading && highlightsError && (
             <div
               className={cn(
@@ -710,8 +733,11 @@ function DashboardContent() {
           )}
 
           {/* Weekly Gems digest — own queries; show whenever the main library is ready */}
-          {!isLoading && !isError && (
+          {feedReady && (
             <HighlightsDigest
+              rawData={highlightData}
+              libraryData={libraryHighlightData}
+              isLoading={libraryHighlightsLoading}
               onSaveAsCollection={handleSaveGemsAsCollection}
               className={inspectorActive ? "lg:max-w-[640px] lg:mx-0 pb-4 lg:pb-6" : undefined}
             />
@@ -943,13 +969,15 @@ function DashboardContent() {
             </>
           )}
 
-          <div className={inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName}>
-            <PaginationBar
-              page={filters.page}
-              totalPages={totalPages}
-              onPageChange={filters.setPage}
-            />
-          </div>
+          {!isLoading && !isError && bookmarks.length > 0 && (
+            <div className={inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName}>
+              <PaginationBar
+                page={filters.page}
+                totalPages={totalPages}
+                onPageChange={filters.setPage}
+              />
+            </div>
+          )}
         </div>
       </div>
 

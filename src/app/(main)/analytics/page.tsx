@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -90,7 +90,10 @@ export default function AnalyticsPage() {
   } = useQuery<AnalyticsData>({
     queryKey: ["analytics", range],
     queryFn: () => fetchJson(`/api/analytics?range=${range}`),
+    placeholderData: keepPreviousData,
   });
+
+  const showAnalyticsSkeleton = isLoading && !analytics;
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
@@ -147,7 +150,7 @@ export default function AnalyticsPage() {
               : null
           }
           onSyncComplete={() => {
-            void invalidateLibraryQueries(queryClient);
+            void invalidateLibraryQueries(queryClient, { refetchType: "all" });
             void queryClient.invalidateQueries({ queryKey: ["analytics"] });
           }}
         />
@@ -168,7 +171,7 @@ export default function AnalyticsPage() {
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={() => setCreateOpen(true)}
                   onSyncComplete={() => {
-                    void invalidateLibraryQueries(queryClient);
+                    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
                     void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                   }}
                 />
@@ -181,7 +184,7 @@ export default function AnalyticsPage() {
 
           <div className="p-4 sm:p-5">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-              {isLoading ? (
+              {showAnalyticsSkeleton ? (
                 <LoadingSkeleton />
               ) : isError || !analytics ? (
                 <ErrorState
@@ -198,7 +201,7 @@ export default function AnalyticsPage() {
                   lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
                   pendingHighlightsCount={0}
                   onSyncComplete={() => {
-                    void invalidateLibraryQueries(queryClient);
+                    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
                     void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                   }}
                   // pendingHighlightsCount=0 for empty state (item 8 wiring to orbitQueueCount)
@@ -242,7 +245,7 @@ export default function AnalyticsPage() {
                     pendingHighlightsCount={analytics.rawHighlightsCount}
                     orbitQueueCount={analytics.orbitQueueCount}
                     onSyncComplete={() => {
-                      void invalidateLibraryQueries(queryClient);
+                      void invalidateLibraryQueries(queryClient, { refetchType: "all" });
                       void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                     }}
                   />

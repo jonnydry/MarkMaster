@@ -198,7 +198,7 @@ export default function SettingsPage() {
               ? new Date(session.dbUser.lastSyncAt)
               : null
           }
-          onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+          onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
         />
       </div>
 
@@ -216,7 +216,7 @@ export default function SettingsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={() => setCreateOpen(true)}
-                  onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                  onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
                 />
               </div>
             }
@@ -279,7 +279,7 @@ export default function SettingsPage() {
                         ? new Date(session.dbUser.lastSyncAt)
                         : null
                     }
-                    onSyncComplete={() => void invalidateLibraryQueries(queryClient)}
+                    onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
                     detail="full"
                   />
                 </div>

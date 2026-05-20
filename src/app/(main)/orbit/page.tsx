@@ -44,7 +44,11 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { OrbitReviewDialog } from "@/components/orbit/orbit-review-dialog";
+const OrbitReviewDialog = dynamic(
+  () =>
+    import("@/components/orbit/orbit-review-dialog").then((m) => m.OrbitReviewDialog),
+  { ssr: false }
+);
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 
 // New clean-list + slide-in + overlays components (new Orbit model)
@@ -645,7 +649,7 @@ export default function OrbitPage() {
   }, []);
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient);
+    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
   }, [queryClient]);
 
   const goToTagOnDashboard = useCallback(

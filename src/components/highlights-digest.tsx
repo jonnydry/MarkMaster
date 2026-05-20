@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Sparkles, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PerformanceHighlights } from "@/components/performance-highlights";
-import { usePerformanceHighlights } from "@/hooks/use-performance-highlights";
+import {
+  usePerformanceHighlights,
+  type PerformanceHighlightsResponse,
+} from "@/hooks/use-performance-highlights";
 import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
@@ -25,9 +28,19 @@ import type { BookmarkWithRelations } from "@/types";
 interface HighlightsDigestProps {
   className?: string;
   onSaveAsCollection?: (bookmarks: BookmarkWithRelations[], suggestedName: string) => void;
+  /** When provided (e.g. from Dashboard), avoids duplicate highlight API calls. */
+  rawData?: PerformanceHighlightsResponse;
+  libraryData?: PerformanceHighlightsResponse;
+  isLoading?: boolean;
 }
 
-export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDigestProps) {
+export function HighlightsDigest({
+  className,
+  onSaveAsCollection,
+  rawData: rawDataProp,
+  libraryData: libraryDataProp,
+  isLoading: isLoadingProp,
+}: HighlightsDigestProps) {
   const router = useRouter();
   const { isOrbital } = useOrbitalTheme();
   const [expanded, setExpanded] = useState(false);
@@ -42,8 +55,20 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
 
   const dislikedIds = getDislikedHighlightIds();
   const likedIds = getLikedHighlightIds();
-  const { data: rawData } = usePerformanceHighlights(true, { dislikedIds, likedIds });
-  const { data: libraryData } = usePerformanceHighlights(false, { dislikedIds, likedIds });
+  const useParentData = rawDataProp !== undefined && libraryDataProp !== undefined;
+  const { data: rawFetched, isLoading: rawLoading } = usePerformanceHighlights(true, {
+    dislikedIds,
+    likedIds,
+    enabled: !useParentData,
+  });
+  const { data: libraryFetched, isLoading: libraryLoading } = usePerformanceHighlights(false, {
+    dislikedIds,
+    likedIds,
+    enabled: !useParentData,
+  });
+  const rawData = rawDataProp ?? rawFetched;
+  const libraryData = libraryDataProp ?? libraryFetched;
+  const digestLoading = isLoadingProp ?? (!useParentData && (rawLoading || libraryLoading));
 
   const rawGems = rawData?.bookmarks ?? [];
   const libraryGems = libraryData?.bookmarks ?? [];
@@ -105,7 +130,7 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
       setCelebration(null);
       const ids = allGems.map((b) => b.id).join(",");
       router.push(`/orbit?digestIds=${ids}&source=weekly-gems`);
-    }, 1100);
+    }, 400);
   };
 
   const handleSaveAsCollection = () => {
@@ -118,6 +143,19 @@ export function HighlightsDigest({ className, onSaveAsCollection }: HighlightsDi
     const suggestedName = "This Week’s Gems";
     onSaveAsCollection(allGems, suggestedName);
   };
+
+  if (digestLoading) {
+    return (
+      <section
+        className={cn("mx-auto w-full max-w-[960px] space-y-3 px-4 pb-8 sm:px-5", className)}
+        aria-busy
+        aria-label="Loading Weekly Gems"
+      >
+        <div className="h-9 w-48 rounded skeleton-shimmer" />
+        <div className="h-32 rounded-xl border border-hairline-soft skeleton-shimmer" />
+      </section>
+    );
+  }
 
   return (
     <section className={cn("mx-auto w-full max-w-[960px] px-4 pb-8 sm:px-5", className)}>

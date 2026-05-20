@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -24,15 +25,13 @@ interface OrbitListRowProps {
   selected?: boolean;
   onSelect?: (id: string) => void;
   onQuickAction?: (id: string, action: string, event?: React.MouseEvent) => void;
-  showActionPill?: boolean; // controlled by parent (hover or selected)
 }
 
-export function OrbitListRow({
+export const OrbitListRow = memo(function OrbitListRow({
   bookmark,
   selected = false,
   onSelect,
   onQuickAction,
-  showActionPill = false,
 }: OrbitListRowProps) {
   const author = bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
   const handle = bookmark.authorUsername ? `@${bookmark.authorUsername}` : "";
@@ -104,7 +103,7 @@ export function OrbitListRow({
       {/* Light action area: pill + subtle more menu trigger (elegant, not heavy) */}
       <div className={cn(
         "flex shrink-0 items-center gap-1 transition-opacity",
-        showActionPill || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       )}>
         <OrbitActionPill
           bookmarkId={bookmark.id}
@@ -124,4 +123,4 @@ export function OrbitListRow({
       </div>
     </div>
   );
-}
+});
