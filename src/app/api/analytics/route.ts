@@ -139,6 +139,7 @@ export async function GET(req: NextRequest) {
         untaggedCount: bigint;
         oldestAt: Date | null;
         orbitQueueCount: bigint;
+        rawHighlightsCount: bigint;
       }[]
     >`
       SELECT
@@ -146,7 +147,10 @@ export async function GET(req: NextRequest) {
         MIN("bookmarkedAt") FILTER (WHERE NOT has_tags) AS "oldestAt",
         COUNT(*) FILTER (
           WHERE NOT has_tags AND NOT has_user_collection
-        )::bigint AS "orbitQueueCount"
+        )::bigint AS "orbitQueueCount",
+        COUNT(*) FILTER (
+          WHERE NOT has_tags AND NOT has_any_collection
+        )::bigint AS "rawHighlightsCount"
       FROM (
         SELECT
           b."id",
@@ -162,7 +166,12 @@ export async function GET(req: NextRequest) {
             INNER JOIN "Collection" c ON c."id" = ci."collectionId"
             WHERE ci."bookmarkId" = b."id"
               AND c."type" = 'user_collection'::"CollectionType"
-          ) AS has_user_collection
+          ) AS has_user_collection,
+          EXISTS (
+            SELECT 1
+            FROM "CollectionItem" ci
+            WHERE ci."bookmarkId" = b."id"
+          ) AS has_any_collection
         FROM "Bookmark" b
         WHERE b."userId" = ${user.id}
       ) bookmark_triage
@@ -245,6 +254,7 @@ export async function GET(req: NextRequest) {
     untaggedCount: BigInt(0),
     oldestAt: null,
     orbitQueueCount: BigInt(0),
+    rawHighlightsCount: BigInt(0),
   };
   const noted = notedRows[0] ?? { notedCount: BigInt(0) };
   const velocity = velocityRows[0] ?? { last30d: BigInt(0), previous30d: BigInt(0) };
@@ -314,6 +324,7 @@ export async function GET(req: NextRequest) {
     untaggedCount: Number(untagged.untaggedCount),
     untaggedOldestAt: untagged.oldestAt ? untagged.oldestAt.toISOString() : null,
     orbitQueueCount: Number(untagged.orbitQueueCount),
+    rawHighlightsCount: Number(untagged.rawHighlightsCount),
     notedCount: Number(noted.notedCount),
     last30dCount: Number(velocity.last30d),
     previous30dCount: Number(velocity.previous30d),

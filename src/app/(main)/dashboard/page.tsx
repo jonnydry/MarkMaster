@@ -19,8 +19,9 @@ import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
-import { invalidateLibraryQueries, invalidateCollectionsQuery } from "@/lib/query-invalidation";
+import { fetchJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import { cn } from "@/lib/utils";
 import type {
   ViewMode,
@@ -151,17 +152,7 @@ function DashboardContent() {
 
   const handleSaveGemsAsCollection = async (bookmarks: BookmarkWithRelations[], suggestedName: string) => {
     try {
-      const newCollectionId = await createCollectionQuick(suggestedName);
-
-      // Add all the gems to the newly created collection
-      for (const b of bookmarks) {
-        await sendJson(`/api/collections/${newCollectionId}/items`, {
-          method: "POST",
-          body: { bookmarkIds: [b.id] },
-        });
-      }
-
-      await invalidateCollectionsQuery(queryClient);
+      await saveGemsAsCollection(queryClient, createCollectionQuick, bookmarks, suggestedName);
       toast.success(`Created "${suggestedName}" with ${bookmarks.length} gems`);
     } catch {
       toast.error("Could not save the gems as a collection");

@@ -32,6 +32,7 @@ import {
   invalidateCollectionsQuery,
   invalidateLibraryQueries,
 } from "@/lib/query-invalidation";
+import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import { toast } from "sonner";
 import { UserCollectionCard, XFolderCard } from "./collection-card";
 import type { CollectionWithCount, BookmarkWithRelations } from "@/types";
@@ -111,14 +112,7 @@ export default function CollectionsPage() {
     suggestedName: string
   ) => {
     try {
-      const newCollectionId = await createCollectionQuick(suggestedName);
-      for (const b of gems) {
-        await sendJson(`/api/collections/${newCollectionId}/items`, {
-          method: "POST",
-          body: { bookmarkIds: [b.id] },
-        });
-      }
-      await invalidateCollectionsQuery(queryClient);
+      await saveGemsAsCollection(queryClient, createCollectionQuick, gems, suggestedName);
       toast.success(`Created "${suggestedName}" with ${gems.length} gems`);
     } catch {
       toast.error("Could not save the gems as a collection");

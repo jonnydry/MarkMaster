@@ -239,12 +239,12 @@ export default function AnalyticsPage() {
                     notedCount={analytics.notedCount}
                     lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
                     orbitHref={backlogOrbitHref}
-                    pendingHighlightsCount={analytics.orbitQueueCount}
+                    pendingHighlightsCount={analytics.rawHighlightsCount}
+                    orbitQueueCount={analytics.orbitQueueCount}
                     onSyncComplete={() => {
                       void invalidateLibraryQueries(queryClient);
                       void queryClient.invalidateQueries({ queryKey: ["analytics"] });
                     }}
-                    // pendingHighlightsCount wired to orbitQueueCount (includes high-value raw Highlights pool for item 8)
                   />
 
                   <TopVoicesCard

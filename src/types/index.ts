@@ -114,6 +114,8 @@ export interface AnalyticsData {
   untaggedCount: number;
   untaggedOldestAt: string | null;
   orbitQueueCount: number;
+  /** Untagged bookmarks with no tags and no collection membership (raw Highlights pool). */
+  rawHighlightsCount: number;
   notedCount: number;
   last30dCount: number;
   previous30dCount: number;

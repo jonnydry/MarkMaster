@@ -32,9 +32,10 @@ type LibraryControlCenterProps = {
   className?: string;
   compact?: boolean;
   orbitHref?: string;
-  /** Phase 2 item 8: count of high-value untouched items (the raw Highlights pool / orbitQueueCount).
-   *  When >0, renders a prominent pending signal + direct CTA to reinforce the Highlights→Orbit flywheel. */
+  /** Count of raw untouched bookmarks (no tags, not in any collection) — Highlights pool. */
   pendingHighlightsCount?: number;
+  /** Untagged bookmarks not in a user collection — broader Orbit queue. */
+  orbitQueueCount?: number;
 };
 
 function toDate(value: Date | string | null | undefined) {
@@ -54,6 +55,7 @@ export function LibraryControlCenter({
   compact = false,
   orbitHref,
   pendingHighlightsCount = 0,
+  orbitQueueCount,
 }: LibraryControlCenterProps) {
   const { isOrbital } = useOrbitalTheme();
   const hasBookmarks = totalBookmarks > 0;
@@ -147,16 +149,17 @@ export function LibraryControlCenter({
             />
           </div>
 
-          {/* Phase 2 item 8: prominent persistent "pending high-value Highlights" signal.
-              Uses orbitQueueCount (broader untriaged pool that includes the raw Highlights candidates).
-              The UX intent ("high-value surfaced items ready for Orbit") is preserved; see analytics wiring. */}
           {pendingHighlightsCount > 0 && (
             isOrbital ? (
               <div className={cn(orbital.glass, "mt-3 flex flex-wrap items-center gap-2 border border-primary/20 px-3 py-1.5 text-[12px] text-primary/90")}>
                 <Sparkles className="size-3.5 shrink-0 text-primary" aria-hidden />
                 <span className={cn(orbital.label, "font-medium text-primary/90")}>
-                  {pendingHighlightsCount.toLocaleString()} untriaged items (incl. high-value Highlights)
-                  {lastSyncAt ? " since last sync" : ""} — ready for review
+                  {pendingHighlightsCount.toLocaleString()} untouched high-performer
+                  {pendingHighlightsCount === 1 ? "" : "s"} in Highlights
+                  {orbitQueueCount != null && orbitQueueCount > pendingHighlightsCount
+                    ? ` · ${orbitQueueCount.toLocaleString()} in Orbit queue`
+                    : ""}
+                  {lastSyncAt ? " since last sync" : ""}
                 </span>
                 <OrbitalBadge tone="cyan" className="ml-auto shrink-0 text-[10px]">Review in Orbit</OrbitalBadge>
                 <Link
@@ -174,8 +177,12 @@ export function LibraryControlCenter({
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-sm border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[12px] text-amber-700">
                 <Sparkles className="size-3.5 shrink-0" aria-hidden />
                 <span className="font-medium">
-                  {pendingHighlightsCount.toLocaleString()} untriaged items (incl. high-value Highlights)
-                  {lastSyncAt ? " since last sync" : ""} — ready for review
+                  {pendingHighlightsCount.toLocaleString()} untouched high-performer
+                  {pendingHighlightsCount === 1 ? "" : "s"} in Highlights
+                  {orbitQueueCount != null && orbitQueueCount > pendingHighlightsCount
+                    ? ` · ${orbitQueueCount.toLocaleString()} in Orbit queue`
+                    : ""}
+                  {lastSyncAt ? " since last sync" : ""}
                 </span>
                 <Link
                   href={resolvedOrbitHref}
