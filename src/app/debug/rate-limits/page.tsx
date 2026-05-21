@@ -49,8 +49,10 @@ export default function RateLimitsDebugPage() {
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState<string | null>(null);
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (options?: { showLoading?: boolean }) => {
+    if (options?.showLoading !== false) {
+      setLoading(true);
+    }
     try {
       const [rateRes, cspRes] = await Promise.all([
         fetch("/api/debug/rate-limits"),
@@ -95,7 +97,9 @@ export default function RateLimitsDebugPage() {
   };
 
   useEffect(() => {
-    fetchAll();
+    queueMicrotask(() => {
+      void fetchAll({ showLoading: false });
+    });
   }, []);
 
   if (loading && !rateLimitData) {
@@ -115,7 +119,7 @@ export default function RateLimitsDebugPage() {
             Internal debugging tools for development and security auditing.
           </p>
         </div>
-        <Button onClick={fetchAll} variant="outline" disabled={loading}>
+        <Button onClick={() => void fetchAll()} variant="outline" disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh All
         </Button>

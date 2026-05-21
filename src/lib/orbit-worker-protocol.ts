@@ -482,13 +482,17 @@ export type MainMessage =
 /* Utility Type Guards (optional but convenient)                      */
 /* ------------------------------------------------------------------ */
 
+function hasProtocolVersion(msg: object): msg is { protocolVersion: number } {
+  return "protocolVersion" in msg && typeof msg.protocolVersion === "number";
+}
+
 export function isWorkerMessage(msg: unknown): msg is WorkerMessage {
   return (
     typeof msg === "object" &&
     msg !== null &&
     "type" in msg &&
-    typeof (msg as any).protocolVersion === "number" &&
-    (msg as any).protocolVersion === PROTOCOL_VERSION
+    hasProtocolVersion(msg) &&
+    msg.protocolVersion === PROTOCOL_VERSION
   );
 }
 
@@ -497,8 +501,8 @@ export function isMainMessage(msg: unknown): msg is MainMessage {
     typeof msg === "object" &&
     msg !== null &&
     "type" in msg &&
-    typeof (msg as any).protocolVersion === "number" &&
-    (msg as any).protocolVersion === PROTOCOL_VERSION
+    hasProtocolVersion(msg) &&
+    msg.protocolVersion === PROTOCOL_VERSION
   );
 }
 

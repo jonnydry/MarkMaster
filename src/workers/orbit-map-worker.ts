@@ -33,13 +33,23 @@ import {
   type FocusPulseMessage,
   type FocusOnMessage,
   type CursorChangedMessage,
+  type LayoutUpdatedMessage,
   collectTransferables,
 } from '@/lib/orbit-worker-protocol';
 
 import type { OrbitGraphPayload, OrbitGraphNode, OrbitGraphEdge } from '@/types';
 import type { GraphFilter, OrbitMapSelection } from '@/lib/orbit-worker-protocol';
 import { Container, Graphics, Text, BitmapFont, BitmapText } from 'pixi.js';
-import { forceSimulation, forceLink, forceManyBody, forceCollide, forceX, forceY, forceCenter } from 'd3-force';
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCollide,
+  forceX,
+  forceY,
+  forceCenter,
+  type Simulation,
+} from 'd3-force';
 
 /**
  * Internal simulation node type used by d3-force and the renderer.
@@ -159,7 +169,7 @@ let effectsContainer: Container | null = null; // For temporary effects like pul
 const labelMap = new Map<string, Text | BitmapText>(); // nodeId -> Text or BitmapText object
 
 // d3-force simulation (runs in the worker)
-let simulation: any = null;
+let simulation: Simulation<SimulationNode, SimulationLink> | null = null;
 let nodeData: SimulationNode[] = [];
 let linkData: SimulationLink[] = [];
 
@@ -223,7 +233,7 @@ const activeAnimations: Animation[] = [];
  */
 function postToMain(msg: MainMessage, transfer: Transferable[] = []) {
   // Worker postMessage typing can be finicky across bundlers; use a narrow assertion
-  (self as unknown as { postMessage: (message: any, transfer?: Transferable[]) => void })
+  (self as unknown as { postMessage: (message: MainMessage, transfer?: Transferable[]) => void })
     .postMessage(msg, transfer);
 }
 
@@ -244,7 +254,7 @@ function sendLayoutUpdate(stabilized = false) {
     positions[i * 2 + 1] = n.y ?? 0;
   }
 
-  const msg: any = {
+  const msg: LayoutUpdatedMessage = {
     type: MainMessageType.LAYOUT_UPDATED,
     protocolVersion: 1,
     nodeIds,
@@ -350,7 +360,7 @@ function handleInit(msg: InitMessage) {
           fontSize: 12,
           fill: 0xe2e8f0,
         },
-        // @ts-ignore - Pixi v8 BitmapFont charset API
+        // @ts-expect-error Pixi v8 BitmapFont charset API
         chars: BitmapFont.ASCII,
       });
 
@@ -506,9 +516,10 @@ function rebuildScene() {
     .force(
       'link',
       forceLink(linkData)
-        .id((d: any) => d.id)
-        .distance((link: any) => {
-          switch (link.kind) {
+        .id((d) => (d as SimulationNode).id)
+        .distance((link) => {
+          const typedLink = link as SimulationLink;
+          switch (typedLink.kind) {
             case 'bookmark-tag': return 58;
             case 'bookmark-collection': return 66;
             case 'loose': return 135;
@@ -516,8 +527,9 @@ function rebuildScene() {
             default: return 75;
           }
         })
-        .strength((link: any) => {
-          switch (link.kind) {
+        .strength((link) => {
+          const typedLink = link as SimulationLink;
+          switch (typedLink.kind) {
             case 'bookmark-tag': return 0.65;
             case 'bookmark-collection': return 0.58;
             case 'loose': return 0.035;
@@ -528,8 +540,9 @@ function rebuildScene() {
     )
     .force(
       'charge',
-      forceManyBody().strength((d: any) => {
-        switch (d.node.kind) {
+      forceManyBody().strength((d) => {
+        const node = d as SimulationNode;
+        switch (node.node.kind) {
           case 'core': return -130;
           case 'tag':
           case 'collection': return -190;
@@ -539,16 +552,16 @@ function rebuildScene() {
     )
     .force(
       'x',
-      forceX().strength((d: any) => (d.node.kind === 'bookmark' ? 0.028 : 0.06))
+      forceX().strength((d) => ((d as SimulationNode).node.kind === 'bookmark' ? 0.028 : 0.06))
     )
     .force(
       'y',
-      forceY().strength((d: any) => (d.node.kind === 'bookmark' ? 0.028 : 0.06))
+      forceY().strength((d) => ((d as SimulationNode).node.kind === 'bookmark' ? 0.028 : 0.06))
     )
     .force(
       'collide',
       forceCollide()
-        .radius((d: any) => d.radius + 4)
+        .radius((d) => (d as SimulationNode).radius + 4)
         .strength(0.82)
     )
     .force('center', forceCenter(0, 0).strength(0.055));
@@ -647,7 +660,7 @@ function renderSceneFromSimulation() {
 
       activeAnimations.forEach((anim) => {
         if (anim.type === 'pulse') {
-          const datum = nodeData.find((d: any) => d.id === anim.nodeId);
+          const datum = nodeData.find((d) => d.id === anim.nodeId);
           if (!datum) return;
 
           const elapsed = Date.now() - anim.startTime;
@@ -680,7 +693,7 @@ function renderSceneFromSimulation() {
           anim.fromX !== undefined && anim.fromY !== undefined &&
           anim.targetX !== undefined && anim.targetY !== undefined
         ) {
-          const datum = nodeData.find((d: any) => d.id === anim.nodeId);
+          const datum = nodeData.find((d) => d.id === anim.nodeId);
           if (!datum) return;
 
           // Elegant flight path line
@@ -768,7 +781,7 @@ function renderSceneFromSimulation() {
 
     if (!label) {
       // Create new label using BitmapText for much better performance
-      // @ts-ignore - Pixi v8 BitmapText constructor differences
+      // @ts-expect-error Pixi v8 BitmapText constructor differences
       label = new BitmapText({
         text: labelText,
         style: {
@@ -810,13 +823,14 @@ function renderSceneFromSimulation() {
 
 /** Runs the simulation inside the worker */
 function startSimulationLoop() {
-  if (!simulation || !app) return;
+  const activeSimulation = simulation;
+  if (!activeSimulation || !app) return;
 
   let layoutUpdateTickCounter = 0;
   const LAYOUT_UPDATE_INTERVAL = 35; // send layout every ~35 ticks while running
 
   const tick = () => {
-    simulation.tick();
+    activeSimulation.tick();
 
     // Update animations (assign flights, pulses, etc.)
     updateAnimations();
@@ -838,14 +852,14 @@ function startSimulationLoop() {
 
     // === LAYOUT_UPDATED sending ===
     layoutUpdateTickCounter++;
-    const isStable = simulation.alpha() < 0.05 && activeAnimations.length === 0;
+    const isStable = activeSimulation.alpha() < 0.05 && activeAnimations.length === 0;
 
     if (layoutUpdateTickCounter >= LAYOUT_UPDATE_INTERVAL || isStable) {
       sendLayoutUpdate(isStable);
       layoutUpdateTickCounter = 0;
     }
 
-    const stillAnimating = simulation.alpha() > 0.008 || activeAnimations.length > 0;
+    const stillAnimating = activeSimulation.alpha() > 0.008 || activeAnimations.length > 0;
 
     if (stillAnimating) {
       requestAnimationFrame(tick);
@@ -856,7 +870,7 @@ function startSimulationLoop() {
     }
   };
 
-  simulation.alpha(1).restart();
+  activeSimulation.alpha(1).restart();
   tick();
 }
 
@@ -1198,7 +1212,7 @@ function updateAnimations() {
   const toRemove: number[] = [];
 
   activeAnimations.forEach((anim, index) => {
-    const datum = nodeData.find((d: any) => d.id === anim.nodeId);
+    const datum = nodeData.find((d) => d.id === anim.nodeId);
     if (!datum) {
       toRemove.push(index);
       return;
@@ -1321,7 +1335,7 @@ function autoFitCamera(width: number, height: number, preservePrevious = false) 
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
 
-  nodeData.forEach((d: any) => {
+  nodeData.forEach((d) => {
     if (typeof d.x === 'number' && typeof d.y === 'number') {
       minX = Math.min(minX, d.x);
       maxX = Math.max(maxX, d.x);

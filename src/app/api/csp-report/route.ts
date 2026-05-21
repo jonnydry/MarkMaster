@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     const contentType = req.headers.get("content-type") || "";
-    let rawBody: any;
+    let rawBody: unknown;
 
     // Support both modern and legacy CSP report formats
     if (contentType.includes("application/csp-report")) {

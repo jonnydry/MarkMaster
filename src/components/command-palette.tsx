@@ -116,24 +116,19 @@ export function CommandPalette({
   // Improved heading logic (kind-transition based, robust to appearanceActions prepending at top)
   const getPrevKind = (idx: number) => (idx > 0 ? allItems[idx - 1]?.kind : null);
 
-  // Improved focus/clamp model: always land on a valid index (prefer first item for discoverability/keyboard)
-  // Clamps on length changes, initializes from -1 when items appear (mixed virtual+button model now more predictable)
-  useEffect(() => {
-    if (allItems.length === 0) {
-      if (focusedIndex !== -1) setFocusedIndex(-1);
-      return;
-    }
-    if (focusedIndex < 0 || focusedIndex >= allItems.length) {
-      setFocusedIndex(0);
-    }
-  }, [allItems.length]);
+  const resolvedFocusedIndex =
+    allItems.length === 0
+      ? -1
+      : focusedIndex < 0 || focusedIndex >= allItems.length
+        ? 0
+        : focusedIndex;
 
   useEffect(() => {
-    if (focusedIndex >= 0) {
-      const el = document.getElementById(`cmd-item-${focusedIndex}`);
+    if (resolvedFocusedIndex >= 0) {
+      const el = document.getElementById(`cmd-item-${resolvedFocusedIndex}`);
       el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  }, [focusedIndex]);
+  }, [resolvedFocusedIndex]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -173,7 +168,9 @@ export function CommandPalette({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setFocusedIndex((prev) => (prev + 1) % allItems.length);
+        setFocusedIndex((prev) =>
+          prev < 0 ? 0 : (prev + 1) % allItems.length
+        );
         break;
       case "ArrowUp":
         e.preventDefault();
@@ -191,7 +188,7 @@ export function CommandPalette({
         break;
       case "Enter": {
         e.preventDefault();
-        const item = allItems[focusedIndex];
+        const item = allItems[resolvedFocusedIndex];
         if (!item) return;
         if (item.kind === "media") {
           handleFilterSelect({ mediaFilter: item.value });
@@ -227,7 +224,9 @@ export function CommandPalette({
             role="combobox"
             aria-expanded="true"
             aria-controls="cmd-list"
-            aria-activedescendant={focusedIndex >= 0 ? `cmd-item-${focusedIndex}` : undefined}
+            aria-activedescendant={
+              resolvedFocusedIndex >= 0 ? `cmd-item-${resolvedFocusedIndex}` : undefined
+            }
           />
           <kbd className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
             ESC
@@ -244,7 +243,7 @@ export function CommandPalette({
           )}
         >
           {allItems.map((item, i) => {
-            const isFocused = i === focusedIndex;
+            const isFocused = i === resolvedFocusedIndex;
             const prevKind = getPrevKind(i);
             const showAppearanceHeading =
               (appearanceActions.length > 0) && i === 0;

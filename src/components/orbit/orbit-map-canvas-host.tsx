@@ -7,6 +7,7 @@ import { OrbitMapCanvas as LegacyOrbitMapCanvas } from './orbit-map-canvas'; // 
 // Import protocol types (including shared UI types)
 import {
   type WorkerMessage,
+  type SetGraphMessage,
   WorkerMessageType,
   MainMessageType,
   type GraphFilter,
@@ -128,7 +129,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
               if (props.graph && props.graph.nodes.length > 0) {
                 // Send graph cleanly, including any known positions for layout stability
                 const initialPositions = getRelevantPositions(props.graph);
-                const graphMessage: any = {
+                const graphMessage: SetGraphMessage = {
                   type: WorkerMessageType.SET_GRAPH,
                   protocolVersion: 1,
                   graph: props.graph,
@@ -267,7 +268,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       if (graphChanged) {
         // Send full graph, including any known positions for layout stability
         const initialPositions = getRelevantPositions(props.graph);
-        const graphMessage: any = {
+        const graphMessage: SetGraphMessage = {
           type: WorkerMessageType.SET_GRAPH,
           protocolVersion: 1,
           graph: props.graph,
@@ -477,12 +478,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           return Promise.resolve();
         }
 
-        return new Promise((resolve, reject) => {
-          let timeoutId: number | undefined;
-
+        return new Promise((resolve) => {
           const cleanup = () => {
             workerRef.current?.removeEventListener('message', handleMessage);
-            if (timeoutId) clearTimeout(timeoutId);
+            window.clearTimeout(timeoutId);
           };
 
           const handleMessage = (event: MessageEvent) => {
@@ -499,7 +498,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           workerRef.current?.addEventListener('message', handleMessage);
 
           // Safety timeout (5 seconds) in case the animation never completes
-          timeoutId = window.setTimeout(() => {
+          const timeoutId = window.setTimeout(() => {
             cleanup();
             console.warn(`[OrbitMapHost] animateAssign for ${bookmarkId} timed out`);
             resolve(); // resolve anyway to not hang the caller
@@ -521,8 +520,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     if (useFallback) {
       return (
         <LegacyOrbitMapCanvas
-          // @ts-ignore - Legacy fallback component has a completely different prop interface
-          ref={ref as any}
+          ref={ref}
           data={props.graph!}
           selection={props.selection ?? null}
           focus={props.focus}

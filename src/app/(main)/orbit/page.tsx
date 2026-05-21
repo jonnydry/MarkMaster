@@ -703,14 +703,16 @@ export default function OrbitPage() {
     hasHandledDigestRef.current = true;
     const sessionStartPayload: { size: number; source?: string } = { size: ids.length };
     if (sourceFromUrl) sessionStartPayload.source = sourceFromUrl;
-    trackFlywheelEvent("digest.session_start", sessionStartPayload);
-    setActiveDigestBookmarkIds(ids);
-    setReviewBookmarkId(ids[0]);
 
-    void (async () => {
-      await runOrbitScan(buildScanRequest(ids, true));
-      setReviewOpen(true);
-    })();
+    queueMicrotask(() => {
+      trackFlywheelEvent("digest.session_start", sessionStartPayload);
+      setActiveDigestBookmarkIds(ids);
+      setReviewBookmarkId(ids[0]);
+      void (async () => {
+        await runOrbitScan(buildScanRequest(ids, true));
+        setReviewOpen(true);
+      })();
+    });
   }, [
     digestIdsFromUrl,
     sourceFromUrl,
@@ -725,12 +727,14 @@ export default function OrbitPage() {
     if (digestIdsFromUrl) return;
 
     hasHandledHighlightRef.current = true;
-    setReviewBookmarkId(highlightIdFromUrl);
 
-    void (async () => {
-      await runOrbitScan(buildScanRequest([highlightIdFromUrl], true));
-      setReviewOpen(true);
-    })();
+    queueMicrotask(() => {
+      setReviewBookmarkId(highlightIdFromUrl);
+      void (async () => {
+        await runOrbitScan(buildScanRequest([highlightIdFromUrl], true));
+        setReviewOpen(true);
+      })();
+    });
   }, [
     highlightIdFromUrl,
     digestIdsFromUrl,

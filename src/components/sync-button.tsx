@@ -38,7 +38,7 @@ export function SyncButton({
 
   const currentRun = syncStatus?.currentRun;
   const latestRun = syncStatus?.recentRuns[0] ?? null;
-  const isRateLimited = rateLimitedUntil ? Date.now() < rateLimitedUntil : false;
+  const isRateLimited = rateLimitedUntil !== null;
   const isAnySyncRunning = syncing || Boolean(currentRun) || isRateLimited;
 
   // Live countdown for rate limit
@@ -94,8 +94,9 @@ export function SyncButton({
     } catch (error) {
       if (error instanceof FetchJsonError && error.status === 429) {
         // Try to extract retry time from body or message
+        const body = error.body as Record<string, unknown> | null;
         const retryAfter =
-          (error.body as any)?.retryAfter ??
+          (typeof body?.retryAfter === "number" ? body.retryAfter : undefined) ??
           parseInt(error.message.match(/(\d+)\s*seconds?/i)?.[1] || "60", 10);
 
         const until = Date.now() + retryAfter * 1000;
