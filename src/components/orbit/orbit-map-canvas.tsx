@@ -24,6 +24,7 @@ import {
 } from "d3-force";
 
 import { Clock, Filter, Layers, Minus, Plus, RotateCcw } from "lucide-react";
+import { useOrbitalTheme } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import type {
   OrbitGraphEdge,
@@ -89,7 +90,15 @@ type LinkDatum = SimulationLinkDatum<NodeDatum> & {
 const DPR_CAP = 2;
 const MIN_ZOOM = 0.06;
 const MAX_ZOOM = 4;
-const BG_COLOR = "#0b0f1a";
+const BG_FALLBACK = "#0b0f1a";
+
+function readCanvasBackground(): string {
+  if (typeof document === "undefined") return BG_FALLBACK;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue("--background")
+    .trim();
+  return value || BG_FALLBACK;
+}
 // Obsidian-style muted palette.
 const COLOR_ANCHOR_TAG = "#9ca3af";
 const COLOR_ANCHOR_COLLECTION = "#60a5fa";
@@ -301,6 +310,8 @@ export const OrbitMapCanvas = forwardRef<
   const adjacencyRef = useRef<Map<string, Set<string>>>(new Map());
 
   const [size, setSize] = useState({ width: 800, height: 600 });
+  const [bgColor, setBgColor] = useState(BG_FALLBACK);
+  const { isOrbital } = useOrbitalTheme();
   const [isDragging, setIsDragging] = useState(false);
   const viewRef = useRef({ x: 0, y: 0, zoom: 1 });
   const userAdjustedViewRef = useRef(false);
@@ -421,6 +432,10 @@ export const OrbitMapCanvas = forwardRef<
   useEffect(() => {
     focusRef.current = focus ?? null;
   }, [focus]);
+
+  useEffect(() => {
+    setBgColor(readCanvasBackground());
+  }, []);
 
   useEffect(() => {
     activeFilterRef.current = activeFilter;
@@ -850,7 +865,7 @@ export const OrbitMapCanvas = forwardRef<
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       // Solid background — no gradient rings.
-      ctx.fillStyle = BG_COLOR;
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, size.width, size.height);
 
       const view = viewRef.current;
@@ -1494,7 +1509,7 @@ export const OrbitMapCanvas = forwardRef<
         "relative h-full w-full select-none overflow-hidden rounded-[26px] outline-none touch-none overscroll-contain focus-visible:ring-2 focus-visible:ring-primary/60",
         className
       )}
-      style={{ cursor: "grab", backgroundColor: BG_COLOR }}
+      style={{ cursor: "grab", backgroundColor: bgColor }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -1552,7 +1567,12 @@ export const OrbitMapCanvas = forwardRef<
       {/* Hover card */}
       {hoverCard && hoverCard.node.node.kind === "bookmark" && (
         <div
-          className="pointer-events-none absolute z-20 w-64 rounded-2xl border border-white/[0.08] bg-[#07111d]/72 p-3 shadow-none backdrop-blur-xl"
+          className={cn(
+            "pointer-events-none absolute z-20 w-64 p-3 shadow-none backdrop-blur-xl",
+            isOrbital
+              ? "rounded-sm border border-hairline-soft bg-surface-1/90"
+              : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
+          )}
           style={{
             left: Math.min(
               Math.max(hoverCard.screenX + 14, 8),
@@ -1570,18 +1590,28 @@ export const OrbitMapCanvas = forwardRef<
                 "inline-block size-2 rounded-full",
                 hoverCard.node.node.affiliated
                   ? "bg-slate-200"
-                  : "bg-sky-300"
+                  : "bg-primary"
               )}
             />
-            <span className="truncate text-xs font-semibold text-white">
+            <span
+              className={cn(
+                "truncate text-xs font-semibold",
+                isOrbital ? "text-foreground" : "text-white"
+              )}
+            >
               @{hoverCard.node.node.authorUsername}
             </span>
           </div>
-          <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-white/75">
+          <p
+            className={cn(
+              "mt-1.5 line-clamp-3 text-xs leading-relaxed",
+              isOrbital ? "text-muted-foreground" : "text-white/75"
+            )}
+          >
             {hoverCard.node.node.title}
           </p>
           {hoverCard.node.node.recent && (
-            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-sky-200/80">
+            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-primary/80">
               <Clock className="size-3" />
               Recent
             </span>

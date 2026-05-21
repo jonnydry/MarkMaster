@@ -10,6 +10,12 @@ import {
   OrbitalBadge,
   OrbitalActionPill,
 } from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
+import {
+  orbitDataClass,
+  orbitLabelClass,
+  orbitSectionLabelClass,
+} from "@/lib/orbit-route-chrome";
 
 /**
  * OrbitSlideInPanel
@@ -17,8 +23,6 @@ import {
  * Right-edge slide-in review panel for the new clean-list Orbit experience.
  * Matches Paper artboard 7X-0 exactly in spirit and structure.
  *
- * This is currently a high-fidelity skeleton. Full wiring (Grok decisions,
- * tag/collection handlers, apply logic) will be added in the implementation phase.
  */
 
 interface OrbitSlideInPanelProps {
@@ -28,6 +32,10 @@ interface OrbitSlideInPanelProps {
   decision?: OrbitBookmarkDecision | null;
   onFullReview?: (bookmarkId: string) => void;
   onDecision?: (bookmarkId: string, kind: string) => void;
+  onAddTag?: (bookmarkId: string) => void;
+  onAddToCollection?: (bookmarkId: string) => void;
+  /** Show batch “Full review” entry only when a scan plan is active. */
+  showFullReview?: boolean;
 }
 
 export function OrbitSlideInPanel({
@@ -37,7 +45,11 @@ export function OrbitSlideInPanel({
   decision,
   onFullReview,
   onDecision,
+  onAddTag,
+  onAddToCollection,
+  showFullReview = false,
 }: OrbitSlideInPanelProps) {
+  const { isOrbital } = useOrbitalTheme();
   if (!isOpen || !bookmark) return null;
 
   const author = bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
@@ -46,14 +58,22 @@ export function OrbitSlideInPanel({
   return (
     <div
       className={cn(
-        "fixed inset-y-0 right-0 z-40 w-[460px] border-l border-primary/30 bg-[#0A0A0A]",
+        "fixed inset-y-0 right-0 z-40 w-full max-w-full sm:w-[460px] sm:max-w-[460px]",
         "animate-orbit-slide-in-right orbital-slide-in",
-        orbital.slideIn
+        isOrbital
+          ? cn("border-l border-primary/30 bg-background", orbital.slideIn)
+          : "border-l border-white/10 bg-[#0b0f1a] text-white"
       )}
     >
       {/* Panel Header */}
       <div className="flex items-center justify-between border-b border-primary/20 px-5 py-4">
-        <div className={cn(orbital.label, "text-primary/80 tracking-[0.18em]")}>
+        <div
+          className={cn(
+            orbitLabelClass(isOrbital),
+            "tracking-[0.18em]",
+            isOrbital ? "text-primary/80" : "text-white/80"
+          )}
+        >
           REVIEW
         </div>
         <button
@@ -68,10 +88,15 @@ export function OrbitSlideInPanel({
       <div className="flex h-[calc(100%-56px)] flex-col overflow-y-auto px-5 py-5 text-sm">
         {/* Post Context */}
         <div className="mb-5">
-          <div className="line-clamp-2 text-[15px] font-medium leading-tight text-white">
+          <div
+            className={cn(
+              orbital.label,
+              "line-clamp-2 normal-case text-[15px] font-medium leading-tight tracking-normal text-foreground"
+            )}
+          >
             {bookmark.tweetText?.slice(0, 180) || "Bookmark content"}
           </div>
-          <div className="mt-1.5 text-[11px] text-primary/60">
+          <div className={cn(orbital.data, "mt-1.5 normal-case text-[11px] text-primary/60")}>
             {author} {handle && <span className="text-primary/40">{handle}</span>}
           </div>
         </div>
@@ -81,15 +106,15 @@ export function OrbitSlideInPanel({
           <div className={cn(orbital.sectionLabel, "mb-2")}>GROK SUGGESTION</div>
 
           {decision?.primary ? (
-            <div className="text-[13px] leading-snug text-white/90">
+            <div className={cn(orbital.data, "normal-case text-[13px] leading-snug text-foreground/90")}>
               {decision.primary.kind === "collection" 
                 ? `Add to ${decision.primary.label}` 
                 : `Tag as ${decision.primary.label}`}
             </div>
           ) : decision?.reasoning ? (
-            <p className="text-[13px] leading-snug text-white/90">{decision.reasoning}</p>
+            <p className={cn(orbital.data, "normal-case text-[13px] leading-snug text-foreground/90")}>{decision.reasoning}</p>
           ) : (
-            <p className="text-[13px] leading-snug text-white/90">
+            <p className={cn(orbital.data, "normal-case text-[13px] leading-snug text-foreground/90")}>
               Strong match for your existing collections.
             </p>
           )}
@@ -132,7 +157,13 @@ export function OrbitSlideInPanel({
             ) : (
               <span className="text-[11px] text-primary/45">No tag suggestions yet</span>
             )}
-            <button className="text-[11px] text-primary/50 hover:text-primary">+ add</button>
+            <button
+              type="button"
+              onClick={() => bookmark.id && onAddTag?.(bookmark.id)}
+              className="text-[11px] text-primary/50 hover:text-primary"
+            >
+              + add
+            </button>
           </div>
         </div>
 
@@ -147,7 +178,11 @@ export function OrbitSlideInPanel({
             ) : (
               <span className="text-[11px] text-primary/45">No collection suggestion</span>
             )}
-            <button className="border border-dashed border-primary/30 px-2 py-0.5 text-[11px] text-primary/50 hover:border-primary/50">
+            <button
+              type="button"
+              onClick={() => bookmark.id && onAddToCollection?.(bookmark.id)}
+              className="border border-dashed border-primary/30 px-2 py-0.5 text-[11px] text-primary/50 hover:border-primary/50"
+            >
               + add
             </button>
           </div>
@@ -174,18 +209,23 @@ export function OrbitSlideInPanel({
 
             <button
               onClick={() => bookmark.id && onDecision?.(bookmark.id, "discard")}
-              className="rounded-sm border border-primary/20 py-2 text-sm text-primary/70 hover:bg-white/5"
+              className="rounded-sm border border-primary/20 py-2 text-sm text-primary/70 hover:bg-accent-soft"
             >
               DISCARD
             </button>
           </div>
 
-          <button
-            onClick={() => bookmark.id && onFullReview?.(bookmark.id)}
-            className="mt-4 w-full text-center text-[10px] uppercase tracking-[0.14em] text-primary/60 hover:text-primary"
-          >
-            Full review →
-          </button>
+          {showFullReview && onFullReview ? (
+            <button
+              onClick={() => onFullReview(bookmark.id)}
+              className={cn(
+                orbital.label,
+                "mt-4 w-full text-center text-primary/60 hover:text-primary"
+              )}
+            >
+              Full review →
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

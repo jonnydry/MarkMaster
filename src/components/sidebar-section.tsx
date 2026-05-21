@@ -4,8 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 import { useSidebarSection } from "@/hooks/use-sidebar-section";
-import { orbital } from "@/components/orbital";
-import { useOrbitalTheme } from "@/components/providers";
+import { useTypography } from "@/hooks/use-typography";
 
 interface SidebarSectionProps {
   id: string;
@@ -24,7 +23,7 @@ export function SidebarSection({
   defaultOpen = true,
   children,
 }: SidebarSectionProps) {
-  const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const { open, toggle } = useSidebarSection(id, defaultOpen);
   const contentId = `sidebar-section-${id}`;
 
@@ -36,14 +35,10 @@ export function SidebarSection({
           onClick={toggle}
           aria-expanded={open}
           aria-controls={contentId}
-          className={
-            isOrbital
-              ? cn(
-                  "group flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-                  orbital.label
-                )
-              : "group flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-          }
+          className={cn(
+            "group flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+            t.monoNative ? cn(t.label, t.chromeLabel) : "text-[10px] uppercase tracking-[0.18em]"
+          )}
         >
           <ChevronDown
             aria-hidden
@@ -54,11 +49,10 @@ export function SidebarSection({
           <span className="truncate">{title}</span>
           {typeof count === "number" && count > 0 && (
             <span
-              className={
-                isOrbital
-                  ? cn(orbital.data, "ml-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground/50")
-                  : "ml-0.5 font-mono text-[10px] font-normal normal-case tracking-normal tabular-nums text-muted-foreground/50"
-              }
+              className={cn(
+                t.data,
+                "ml-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground/50"
+              )}
             >
               {count}
             </span>

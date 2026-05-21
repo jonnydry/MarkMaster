@@ -46,14 +46,8 @@ import { DashboardErrorState } from "./dashboard-error-state";
 import { PaginationBar } from "./pagination-bar";
 import { SelectionToolbar } from "./selection-toolbar";
 
-// Canonical orbital components for two-column mission-control inspector (dashboard slice)
-import {
-  orbital,
-  OrbitalCard,
-  MissionControlHeader,
-  TelemetryStat,
-  OrbitalBadge,
-} from "@/components/orbital";
+import { orbital } from "@/components/orbital";
+import { LibraryBookmarkInspector } from "@/components/library-bookmark-inspector";
 import { useOrbitalTheme } from "@/components/providers";
 
 type BookmarkResponse = {
@@ -784,7 +778,7 @@ function DashboardContent() {
                       className={
                         inspectorActive
                           ? cn(orbital.label, "text-primary")
-                          : "font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-primary"
+                          : "text-[10px] font-bold uppercase tracking-[0.1em] text-primary"
                       }
                     >
                       Performance Highlight
@@ -849,120 +843,18 @@ function DashboardContent() {
                 </div>
 
                 {/* Right column — persistent library inspector (lg+ , sticky) */}
-                {inspectorActive && (
+                {inspectorActive && activeBookmark && (
                   <div className={bookmarkFeedRightInspectorWrapperClassName}>
-                    <OrbitalCard className="sticky top-4 p-4 space-y-4 border-primary/20">
-                      <MissionControlHeader
-                        title="Library Inspector"
-                        right={
-                          <button
-                            onClick={() => setActiveBookmarkId(null)}
-                            className={cn(orbital.label, "text-primary/80 hover:text-primary")}
-                          >
-                            Close
-                          </button>
-                        }
-                      />
-
-                      {/* Core content: tweetText + author (fixed real BookmarkWithRelations fields; was title/text/authorName) */}
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium text-foreground/90 line-clamp-2">
-                          {activeBookmark.tweetText?.slice(0, 120) || "Bookmark"}
-                        </div>
-                        {activeBookmark.authorUsername && (
-                          <div className="text-xs text-primary/60">@{activeBookmark.authorUsername}</div>
-                        )}
-                      </div>
-
-                      {/* Telemetry stats row using canonical component */}
-                      {activeBookmark.publicMetrics && (
-                        <div className="flex items-center gap-4 pt-1">
-                          <TelemetryStat
-                            value={activeBookmark.publicMetrics.like_count?.toLocaleString() ?? "—"}
-                            label="Likes"
-                            tone="cyan"
-                          />
-                          <TelemetryStat
-                            value={activeBookmark.publicMetrics.reply_count?.toLocaleString() ?? "—"}
-                            label="Replies"
-                            tone="cyan"
-                          />
-                          <TelemetryStat
-                            value={activeBookmark.publicMetrics.retweet_count?.toLocaleString() ?? "—"}
-                            label="Reposts"
-                            tone="cyan"
-                          />
-                        </div>
-                      )}
-
-                      {/* Tags as OrbitalBadges (cyan under orbital) */}
-                      {activeBookmark.tags.length > 0 && (
-                        <div>
-                          <div className={cn(orbital.label, "text-primary/70 mb-1.5")}>Tags</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {activeBookmark.tags.slice(0, 6).map((t) => (
-                              <OrbitalBadge key={t.tag.id} tone="cyan">
-                                {t.tag.name}
-                              </OrbitalBadge>
-                            ))}
-                            {activeBookmark.tags.length > 6 && (
-                              <OrbitalBadge tone="emerald">+{activeBookmark.tags.length - 6}</OrbitalBadge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Collections as badges (bronze) */}
-                      {activeBookmark.collectionItems.length > 0 && (
-                        <div>
-                          <div className={cn(orbital.label, "text-primary/70 mb-1.5")}>Collections</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {activeBookmark.collectionItems.slice(0, 3).map((c, idx) => (
-                              <OrbitalBadge key={idx} tone="bronze">
-                                {c.collection.name}
-                              </OrbitalBadge>
-                            ))}
-                            {activeBookmark.collectionItems.length > 3 && (
-                              <OrbitalBadge tone="emerald">+{activeBookmark.collectionItems.length - 3}</OrbitalBadge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Quick actions (library-native) */}
-                      <div className="pt-2 space-y-2">
-                        <button
-                          onClick={() => handleBookmarkAddTag(activeBookmark.id)}
-                          className="w-full rounded-sm border border-primary/30 bg-primary/10 py-1.5 text-xs text-primary hover:bg-primary/15 transition-colors"
-                        >
-                          Add tag
-                        </button>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <button
-                            onClick={() => handleBookmarkAddToCollection(activeBookmark.id)}
-                            className="rounded-sm border border-primary/30 py-1 text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
-                          >
-                            Add to collection
-                          </button>
-                          <button
-                            onClick={() => router.push(`/orbit?highlightId=${activeBookmark.id}`)}
-                            className="rounded-sm border border-primary/30 py-1 text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
-                          >
-                            Review in Orbit
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => handleBookmarkAddNote(activeBookmark.id)}
-                          className="w-full rounded-sm border border-primary/30 py-1 text-xs text-primary/80 hover:bg-primary/10 hover:text-primary transition-colors"
-                        >
-                          Add note
-                        </button>
-                      </div>
-
-                      <div className={cn(orbital.label, "pt-1 text-primary/50")}>
-                        Click cards to inspect. Inspector updates live.
-                      </div>
-                    </OrbitalCard>
+                    <LibraryBookmarkInspector
+                      bookmark={activeBookmark}
+                      onClose={() => setActiveBookmarkId(null)}
+                      onAddTag={handleBookmarkAddTag}
+                      onAddToCollection={handleBookmarkAddToCollection}
+                      onAddNote={handleBookmarkAddNote}
+                      onReviewInOrbit={(id) =>
+                        router.push(`/orbit?highlightId=${id}`)
+                      }
+                    />
                   </div>
                 )}
               </div>

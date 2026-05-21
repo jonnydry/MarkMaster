@@ -12,6 +12,9 @@ import {
   getDecisionLabel,
 } from "@/components/orbit/orbit-review-fields";
 
+import { orbital } from "@/components/orbital";
+import { useOrbitalTheme } from "@/components/providers";
+import { reviewChrome } from "@/lib/orbit-review-chrome";
 import { cn } from "@/lib/utils";
 import { confidenceLabel } from "@/lib/orbit-decision";
 import type {
@@ -34,9 +37,12 @@ import type {
   SimilarCollectionItem,
 } from "@/lib/orbit-similar-collections";
 
-const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-jetbrains-mono)",
-};
+function sectionLabelClass(isOrbital: boolean) {
+  return cn(
+    isOrbital ? orbital.label : "text-[10px] font-medium uppercase tracking-[0.18em] text-white/50",
+    "normal-case tracking-[0.18em]"
+  );
+}
 
 // Truncation constants for the "Other high-performers..." panel preview text.
 // Keeps the list dense while showing enough of the tweet to be recognizable.
@@ -75,6 +81,9 @@ export function OrbitReviewEditSheet({
   reviewMode = "deep",
   reviewSessionId = 0,
 }: OrbitReviewEditSheetProps) {
+  const { isOrbital } = useOrbitalTheme();
+  const rcx = reviewChrome(isOrbital);
+  const labelClass = sectionLabelClass(isOrbital);
   const isQuick = reviewMode === "quick";
   // Panel UI state (opens + locks) is keyed by reviewSessionId using the exact same
   // pattern as draftState/createCollectionsState in the parent dialog. This guarantees
@@ -144,11 +153,11 @@ export function OrbitReviewEditSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full max-w-[440px] border-l border-white/10 bg-slate-950 p-0 text-white shadow-2xl"
+        className={cn("w-full max-w-[440px] border-l p-0 shadow-2xl", rcx.sheetShell)}
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className={cn("flex items-center justify-between border-b px-4 py-3", rcx.headerBorder)}>
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-medium">
                 @{bookmark?.authorUsername ?? draft.bookmarkId}
@@ -157,7 +166,7 @@ export function OrbitReviewEditSheet({
                     className={cn(
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
                       original.confidence === "high" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-                      original.confidence === "medium" && "border-sky-400/30 bg-sky-400/10 text-sky-200",
+                      original.confidence === "medium" && "border-primary/30 bg-primary/10 text-primary/80",
                       original.confidence === "low" && "border-blue-500/30 bg-blue-500/10 text-blue-200"
                     )}
                   >
@@ -179,7 +188,12 @@ export function OrbitReviewEditSheet({
               >
                 <RotateCcw className="size-3.5" /> Reset
               </Button>
-              <SheetClose className="rounded p-1 hover:bg-white/10" />
+              <SheetClose
+                className={cn(
+                  "rounded p-1",
+                  isOrbital ? "hover:bg-accent-soft" : "hover:bg-white/10"
+                )}
+              />
             </div>
           </div>
 
@@ -191,15 +205,14 @@ export function OrbitReviewEditSheet({
                   // Lock + invert the *current render's effective* value (mode default if first click)
                   // so the manual choice is captured against what the user actually saw.
                   onClick={() => updatePanel("reasoning", !effectiveReasoningOpen)}
-                  className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
-                  style={MONO_STYLE}
+                  className={cn(labelClass, "flex w-full items-center gap-1.5", rcx.collapsibleBtn)}
                 >
                   Why Grok suggested this
                   {effectiveReasoningOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                 </button>
 
                 {effectiveReasoningOpen && (
-                  <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-snug text-white/75">
+                  <div className={cn("mt-2 p-4 text-sm leading-snug", rcx.panel, rcx.bodyDim)}>
                     {original?.reasoning || "No detailed reasoning provided."}
                   </div>
                 )}
@@ -207,21 +220,21 @@ export function OrbitReviewEditSheet({
 
               {/* Premium Diff Block */}
               {original && hasChanges && (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <div className={cn("p-4", rcx.card)}>
                   <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                    <div className={cn(labelClass, "flex items-center gap-2", rcx.soft)}>
                       Grok original → Your edits
                     </div>
                     <span className="rounded bg-amber-400/15 px-1.5 py-px text-[10px] text-amber-300">Edited</span>
                   </div>
 
-                  <div className="space-y-2 text-xs text-white/75">
+                  <div className={cn("space-y-2 text-xs", rcx.bodyDim)}>
                     {/* Decision */}
                     {(() => {
                       const origDec = getDecisionLabel(deriveReviewDecision(original));
                       const currDec = getDecisionLabel(draft.decision);
                       if (origDec === currDec) return null;
-                      return <div>Decision: <span className="text-white/50 line-through">{origDec}</span> → <span className="font-medium text-amber-300">{currDec}</span></div>;
+                      return <div>Decision: <span className={cn(rcx.soft, "line-through")}>{origDec}</span> → <span className="font-medium text-amber-300">{currDec}</span></div>;
                     })()}
 
                     {/* Tags */}
@@ -245,7 +258,7 @@ export function OrbitReviewEditSheet({
                       const origC = original.collection?.name || "—";
                       const currC = draft.collectionName.trim() || "—";
                       if (origC === currC) return null;
-                      return <div>Collection: <span className="text-white/50">{origC}</span> → <span className="font-medium text-amber-300">{currC}</span></div>;
+                      return <div>Collection: <span className={rcx.soft}>{origC}</span> → <span className="font-medium text-amber-300">{currC}</span></div>;
                     })()}
                   </div>
                 </div>
@@ -271,32 +284,31 @@ export function OrbitReviewEditSheet({
                     // Lock + invert the *current render's effective* value (mode default if first click)
                     // so the manual choice is captured against what the user actually saw.
                     onClick={() => updatePanel("authorHistory", !effectiveAuthorHistoryOpen)}
-                    className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
-                    style={MONO_STYLE}
+                    className={cn(labelClass, "flex w-full items-center gap-1.5", rcx.collapsibleBtn)}
                   >
                     Your past decisions on @{authorHistory.authorUsername}
                     {effectiveAuthorHistoryOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                   </button>
 
                   {effectiveAuthorHistoryOpen && (
-                    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/70">
+                    <div className={cn("mt-2 p-3 text-[11px]", rcx.panel, rcx.bodyDim)}>
                       {"loading" in authorHistory ? (
-                        <div className="text-white/50">Loading your past decisions for this author…</div>
+                        <div className={rcx.soft}>Loading your past decisions for this author…</div>
                       ) : (
                         <div className="space-y-1">
                           {authorHistory.tags.length > 0 && (
                             <div>
-                              <span className="text-white/50">Tags: </span>
+                              <span className={rcx.soft}>Tags: </span>
                               <span className="text-emerald-300">{authorHistory.tags.join(", ")}</span>
                             </div>
                           )}
                           {authorHistory.collections.length > 0 && (
                             <div>
-                              <span className="text-white/50">Collections: </span>
-                              <span className="text-sky-300">{authorHistory.collections.join(", ")}</span>
+                              <span className={rcx.soft}>Collections: </span>
+                              <span className="text-primary">{authorHistory.collections.join(", ")}</span>
                             </div>
                           )}
-                          <div className="pt-0.5 text-[10px] text-white/40">
+                          <div className={cn("pt-0.5 text-[10px]", rcx.soft)}>
                             from {authorHistory.priorCount} bookmark{authorHistory.priorCount === 1 ? "" : "s"} by this author in your library
                           </div>
                         </div>
@@ -319,22 +331,21 @@ export function OrbitReviewEditSheet({
                     // Lock + invert the *current render's effective* value (mode default if first click)
                     // so the manual choice is captured against what the user actually saw.
                     onClick={() => updatePanel("similar", !effectiveSimilarOpen)}
-                    className="flex w-full items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50 hover:text-white/70"
-                    style={MONO_STYLE}
+                    className={cn(labelClass, "flex w-full items-center gap-1.5", rcx.collapsibleBtn)}
                   >
                     Other high-performers in similar collections
                     {effectiveSimilarOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
                   </button>
 
                   {effectiveSimilarOpen && (
-                    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-white/70">
+                    <div className={cn("mt-2 p-3 text-[11px]", rcx.panel, rcx.bodyDim)}>
                       {"loading" in similarCollections ? (
-                        <div className="text-white/50">Loading other high-performers in similar collections…</div>
+                        <div className={rcx.soft}>Loading other high-performers in similar collections…</div>
                       ) : (
                         <div className="space-y-2">
                           {(similarCollections as SimilarCollectionItem[]).map((item) => (
                             <div key={item.bookmarkId}>
-                              <div className="text-white/80">
+                              <div className={rcx.body}>
                                 @{item.authorUsername}:{" "}
                                 {/* Slice 2: more aggressive truncation in Quick Pass while preserving original consts for Deep Review */}
                                 {item.tweetText.length > (isQuick ? 50 : SIMILAR_PREVIEW_MAX_CHARS)
@@ -344,7 +355,7 @@ export function OrbitReviewEditSheet({
                               <div className="text-[10px] text-white/50">
                                 {item.sharedCollections.length > 0 && (
                                   <span>
-                                    Collections: <span className="text-sky-300">{item.sharedCollections.join(", ")}</span>
+                                    Collections: <span className="text-primary">{item.sharedCollections.join(", ")}</span>
                                   </span>
                                 )}
                                 {item.sharedCollections.length > 0 && item.sharedTags.length > 0 && " • "}
@@ -365,7 +376,7 @@ export function OrbitReviewEditSheet({
 
               {/* Decision */}
               <div>
-                <div className="mb-1.5 flex items-center text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                <div className={cn(labelClass, "mb-1.5 flex items-center", rcx.soft)}>
                   Decision
                   {/* Slice 3: tiny non-intrusive "why smart" note in Quick Pass sheet.
                       Uses native title tooltip (subtle floating, zero visual noise until hover).
@@ -412,7 +423,7 @@ export function OrbitReviewEditSheet({
                   })()}
                 </div>
                 {isQuick ? (
-                  <div className="rounded-xl border border-white/20 bg-white/[0.04] p-2 shadow-sm">
+                  <div className={rcx.quickDecisionShell}>
                     <OrbitReviewDecisionControl
                       value={draft.decision}
                       onChange={(d) => update({ decision: d, included: d !== "keep" })}
@@ -429,10 +440,10 @@ export function OrbitReviewEditSheet({
               {/* Tags */}
               {orbitReviewDecisionUsesTags(draft.decision) && (
                 <div>
-                  <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                  <div className={cn(labelClass, "mb-1.5", rcx.soft)}>
                     Tags
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                  <div className={rcx.fieldShell}>
                     <OrbitReviewTagField
                       tagNames={draft.tagNames}
                       included={true}
@@ -446,10 +457,10 @@ export function OrbitReviewEditSheet({
               {/* Collection */}
               {orbitReviewDecisionUsesCollection(draft.decision) && (
                 <div>
-                  <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-white/50" style={MONO_STYLE}>
+                  <div className={cn(labelClass, "mb-1.5", rcx.soft)}>
                     Collection
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                  <div className={rcx.fieldShell}>
                     <OrbitReviewCollectionField
                       collectionName={draft.collectionName}
                       collectionDescription={draft.collectionDescription}
@@ -466,7 +477,7 @@ export function OrbitReviewEditSheet({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-white/10 p-4 text-[10px] text-white/40">
+          <div className={cn("border-t p-4 text-[10px]", rcx.footer)}>
             Esc closes • Tab to fields
           </div>
         </div>

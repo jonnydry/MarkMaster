@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital, OrbitalBadge, TelemetryStat } from "@/components/orbital";
+import { useTypography } from "@/hooks/use-typography";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -68,6 +69,7 @@ export function PerformanceHighlights({
   itemLabels = {},
 }: PerformanceHighlightsProps) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const [, setFeedbackTick] = useState(0);
   const highlightBookmarks = bookmarks.slice(0, 4);
   if (highlightBookmarks.length === 0) return null;
@@ -90,18 +92,12 @@ export function PerformanceHighlights({
         {title ? (
         <h2 className={cn(
           "text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground",
-          isOrbital && orbital.label
+          t.monoNative && t.label
         )}>
           {title}
         </h2>
         ) : null}
-        <span
-          className={
-            isOrbital
-              ? cn(orbital.label, "text-muted-foreground/70")
-              : "font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70"
-          }
-        >
+        <span className={cn(t.label, "text-muted-foreground/70")}>
           {displaySubtitle}
         </span>
       </div>
@@ -137,7 +133,7 @@ export function PerformanceHighlights({
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className={cn(
                     "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
-                    isOrbital && orbital.label
+                    t.monoNative && t.label
                   )}>
                     {label}
                   </span>
@@ -147,7 +143,7 @@ export function PerformanceHighlights({
                         "text-[9px] px-1.5 py-px rounded",
                         isOrbital
                           ? orbital.badge("bronze")
-                          : "font-mono bg-amber-400/10 text-amber-200 border border-amber-400/20"
+                          : "bg-amber-400/10 text-amber-200 border border-amber-400/20 text-[9px] uppercase tracking-wider"
                       )}
                       title={itemLabels[bookmark.id].includes("Resurfaced") ? "Forgotten high-performer from >30d ago — resurfaced for review" : undefined}
                     >
@@ -155,16 +151,16 @@ export function PerformanceHighlights({
                     </span>
                   )}
                 </div>
-                <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground/55">
+                <span className={cn(t.data, "text-[10px] font-bold text-muted-foreground/55")}>
                   #{index + 1}
                 </span>
               </div>
-              <p className="mt-2 line-clamp-3 font-mono text-sm font-bold leading-5 text-foreground">
+              <p className={cn("mt-2 line-clamp-3 text-sm font-bold leading-5 text-foreground", t.monoNative && "text-mono-data")}>
                 {bookmark.tweetText}
               </p>
 
               {/* "Why this?" rationale (Phase 1) + personalization now active via hook (7) */}
-              <div className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
+              <div className={cn("mt-1 text-[10px] text-muted-foreground/70", t.monoNative && t.label, "normal-case")}>
                 {isRawMode 
                   ? "High X engagement • untouched — strong triage candidate"
                   : "Top performer across your library by X saves & discussion"}
@@ -181,15 +177,15 @@ export function PerformanceHighlights({
                       className="h-6 w-6 shrink-0 rounded-full border border-background/70"
                     />
                   ) : (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 font-mono text-[10px] font-bold text-muted-foreground">
+                    <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 text-[10px] font-bold text-muted-foreground", t.monoNative && t.data)}>
                       {bookmark.authorDisplayName.charAt(0).toUpperCase()}
                     </span>
                   )}
-                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                  <span className={cn("truncate text-[11px] text-muted-foreground", t.monoNative && t.data, "normal-case")}>
                     @{bookmark.authorUsername}
                   </span>
                 </div>
-                <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.05em] text-muted-foreground/75">
+                <span className={cn("shrink-0 text-[10px] uppercase tracking-[0.05em] text-muted-foreground/75", t.monoNative && t.data)}>
                   {getHighlightMetric(bookmark)}
                 </span>
               </div>
@@ -202,7 +198,7 @@ export function PerformanceHighlights({
                     e.stopPropagation();
                     onOrbitReview(bookmark.id);
                   }}
-                  className="mt-1 self-start text-[10px] font-mono uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none"
+                  className={cn("mt-1 self-start text-[10px] uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none", t.monoNative && t.label)}
                 >
                   Review in Orbit →
                 </button>
@@ -210,7 +206,7 @@ export function PerformanceHighlights({
 
               {/* B: Inline feedback (Good boost / Not relevant deboost) + history indicator; uses tick for LS reactivity */}
               <div
-                className="mt-1.5 flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.05em] text-muted-foreground/70"
+                className={cn("mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70", t.monoNative && t.label)}
                 onClick={(e) => e.stopPropagation()}
               >
                 {(() => {

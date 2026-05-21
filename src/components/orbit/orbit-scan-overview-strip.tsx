@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OrbitScanResponsePayload } from "@/types";
 
+import { useOrbitalTheme } from "@/components/providers";
 import { orbital } from "@/components/orbital";
+import { orbitLabelClass, orbitMetaMuted } from "@/lib/orbit-route-chrome";
 
 const STRATEGY_PREVIEW = 140;
 
@@ -19,9 +21,11 @@ interface OrbitScanOverviewStripProps {
 function StrategyLines({
   taggingStrategy,
   collectionStrategy,
+  isOrbital,
 }: {
   taggingStrategy: string;
   collectionStrategy: string;
+  isOrbital: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const tagLong = taggingStrategy.length > STRATEGY_PREVIEW;
@@ -39,15 +43,20 @@ function StrategyLines({
 
   return (
     <div className="space-y-2">
-      <div className="space-y-2 text-xs leading-relaxed text-white/60">
+      <div
+        className={cn(
+          "space-y-2 text-xs leading-relaxed",
+          isOrbital ? "text-muted-foreground" : "text-white/60"
+        )}
+      >
         <p>
-          <span className={cn(orbital.label, "text-white/45")}>
+          <span className={orbitLabelClass(isOrbital, orbitMetaMuted(isOrbital))}>
             Tagging
           </span>{" "}
           {tagDisplay}
         </p>
         <p>
-          <span className={cn(orbital.label, "text-white/45")}>
+          <span className={orbitLabelClass(isOrbital, orbitMetaMuted(isOrbital))}>
             Collections
           </span>{" "}
           {colDisplay}
@@ -72,6 +81,7 @@ export function OrbitScanOverviewStrip({
   payload,
   className,
 }: OrbitScanOverviewStripProps) {
+  const { isOrbital } = useOrbitalTheme();
   const [open, setOpen] = useState(true);
 
   const modelLine = useMemo(() => {
@@ -126,6 +136,7 @@ export function OrbitScanOverviewStrip({
           <StrategyLines
             taggingStrategy={overview.taggingStrategy}
             collectionStrategy={overview.collectionStrategy}
+            isOrbital={isOrbital}
           />
 
           {tagRollups.length > 0 ? (

@@ -346,7 +346,7 @@ function handleInit(msg: InitMessage) {
       BitmapFont.install({
         name: 'OrbitLabel',
         style: {
-          fontFamily: 'Inter, system-ui, sans-serif',
+          fontFamily: 'var(--font-sans), system-ui, sans-serif',
           fontSize: 12,
           fill: 0xe2e8f0,
         },

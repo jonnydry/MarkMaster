@@ -36,9 +36,12 @@ const tooltipStyle = {
   borderRadius: "0.6rem",
   boxShadow: "0 12px 32px -12px rgba(0, 0, 0, 0.22)",
   color: "var(--foreground)",
+  fontFamily: "var(--font-sans)",
   fontSize: "12px",
   padding: "6px 8px",
 };
+
+const chartTickStyle = { fontSize: 11, fontFamily: "var(--font-sans)" };
 
 const chartCardClass = "border-hairline-soft bg-surface-1 p-5 shadow-sm";
 
@@ -563,14 +566,14 @@ export const TimelineCard = React.memo(function TimelineCard({
               <XAxis
                 dataKey="label"
                 stroke="var(--muted-foreground)"
-                tick={{ fontSize: 11 }}
+                tick={chartTickStyle}
                 tickLine={false}
                 axisLine={false}
                 minTickGap={timeline.tickGap}
               />
               <YAxis
                 stroke="var(--muted-foreground)"
-                tick={{ fontSize: 11 }}
+                tick={chartTickStyle}
                 tickLine={false}
                 axisLine={false}
                 width={32}

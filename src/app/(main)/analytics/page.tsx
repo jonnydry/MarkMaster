@@ -32,6 +32,7 @@ import type { TimeRange } from "./time-range";
 
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital, OrbitalCard, TelemetryStat } from "@/components/orbital";
+import { useTypography } from "@/hooks/use-typography";
 
 export type { TimeRange };
 
@@ -75,6 +76,7 @@ export default function AnalyticsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
 
   const rangeControl = useMemo(
     () => <RangeControl value={range} onChange={setRange} />,
@@ -297,6 +299,7 @@ function LibraryHealthCard({
   orbitHref: string;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const untaggedPct = 100 - triagedPct;
   const oldestLabel = oldestAt
     ? relativeOldest(new Date(oldestAt))
@@ -322,7 +325,7 @@ function LibraryHealthCard({
             </span>
             <h2 className={cn(
               "text-sm font-semibold uppercase tracking-[0.14em]",
-              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
             )}>
               Library Health
             </h2>
@@ -351,7 +354,7 @@ function LibraryHealthCard({
             <p
               className={cn(
                 "mt-1 text-xs",
-                isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+                t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
               )}
             >
               Oldest waiting since {oldestLabel}
@@ -374,7 +377,7 @@ function LibraryHealthCard({
         <div
           className={cn(
             "flex justify-between text-[11px] font-medium tabular-nums",
-            isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+            t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
           )}
         >
           <span>Tagged {triagedPct.toFixed(0)}%</span>
@@ -399,6 +402,7 @@ function VelocityCard({
   delta: { pct: number | null; abs: number } | null;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const trend =
     !delta ? "flat" : delta.pct == null ? "up" : delta.pct > 0 ? "up" : delta.pct < 0 ? "down" : "flat";
   const Icon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
@@ -423,7 +427,7 @@ function VelocityCard({
           <p
             className={cn(
               "text-[11px] font-semibold uppercase tracking-[0.14em]",
-              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
             )}
           >
             Last 30 days
@@ -431,7 +435,7 @@ function VelocityCard({
           <p
             className={cn(
               "mt-2 text-2xl font-bold tabular-nums",
-              isOrbital ? orbital.data : "heading-font"
+              t.monoNative ? t.data : "heading-font"
             )}
           >
             {last30d.toLocaleString()}
@@ -456,6 +460,7 @@ function AnnotationCard({
   pct: number;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const RootCard = isOrbital ? OrbitalCard : Card;
   const rootClass = isOrbital
     ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up stagger-2"
@@ -468,7 +473,7 @@ function AnnotationCard({
           <p
             className={cn(
               "text-[11px] font-semibold uppercase tracking-[0.14em]",
-              isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
             )}
           >
             Annotated
@@ -476,7 +481,7 @@ function AnnotationCard({
           <p
             className={cn(
               "mt-2 text-2xl font-bold tabular-nums",
-              isOrbital ? orbital.data : "heading-font"
+              t.monoNative ? t.data : "heading-font"
             )}
           >
             {pct.toFixed(0)}%
@@ -484,7 +489,7 @@ function AnnotationCard({
           <p
             className={cn(
               "mt-1 text-xs",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
             )}
           >
             {notedCount.toLocaleString()} of {totalBookmarks.toLocaleString()} with notes
@@ -508,6 +513,7 @@ function AnnotationCard({
  */
 function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const cta = analytics.flywheelCtaReviewInOrbit ?? 0;
   const digestCta = analytics.flywheelDigestReviewTogether ?? 0;
   const good = analytics.flywheelFeedbackGood ?? 0;
@@ -552,7 +558,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
         <h2
           className={cn(
             "text-sm font-semibold uppercase tracking-[0.14em]",
-            isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+            t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
           )}
         >
           Flywheel Signals
@@ -560,7 +566,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
         <span
           className={cn(
             "text-[10px] uppercase tracking-[0.08em]",
-            isOrbital ? cn(orbital.label, "text-primary/50") : "font-mono text-muted-foreground/60"
+            t.monoNative ? cn(t.label, "text-primary/50") : "text-muted-foreground/60"
           )}
         >
           (early)
@@ -572,7 +578,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Highlights → Orbit
@@ -580,7 +586,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
             )}
           >
             {cta}
@@ -590,7 +596,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Digest “Review together”
@@ -598,7 +604,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
             )}
           >
             {digestCta}
@@ -608,7 +614,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Good feedback
@@ -616,7 +622,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-emerald-400/90") : "font-mono text-emerald-400/90"
+              t.monoNative ? cn(t.data, "text-emerald-400/90") : "tabular-nums text-emerald-400/90"
             )}
           >
             {good}
@@ -626,7 +632,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Not relevant feedback
@@ -634,7 +640,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-amber-400/90") : "font-mono text-amber-400/90"
+              t.monoNative ? cn(t.data, "text-amber-400/90") : "tabular-nums text-amber-400/90"
             )}
           >
             {notRel}
@@ -644,7 +650,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Quick Pass toggles
@@ -652,7 +658,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
             )}
           >
             {quick}
@@ -662,7 +668,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Deep Review toggles
@@ -670,7 +676,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
             )}
           >
             {deep}
@@ -680,7 +686,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-[10px] font-medium uppercase tracking-[0.12em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground/70"
+              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
             )}
           >
             Digest sessions started
@@ -688,7 +694,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           <div
             className={cn(
               "text-xl font-semibold tabular-nums",
-              isOrbital ? cn(orbital.data, "text-foreground") : "font-mono text-foreground"
+              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
             )}
           >
             {sessions}
@@ -712,7 +718,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           {digestCta > 0 && (
             <span>
               Digest CTA → session rate{" "}
-              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
                 {Math.round(digestRate * 100)}%
               </span>
             </span>
@@ -720,7 +726,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           {quick + deep > 0 && (
             <span>
               Quick Pass share of modes{" "}
-              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
                 {Math.round(quickShare * 100)}%
               </span>
             </span>
@@ -728,7 +734,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           {topEntrySources.length > 0 && (
             <span>
               Top sources{" "}
-              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
                 {topEntrySources
                   .map((s) => `${sourceLabel(s.source)} ${Math.round(s.pct * 100)}%`)
                   .join(" · ")}
@@ -738,7 +744,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
           {quickKeeps > 0 && (
             <span>
               Quick Pass keep rate{" "}
-              <span className={cn("tabular-nums", isOrbital ? cn(orbital.data, "text-primary/80") : "font-mono text-foreground/80")}>
+              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
                 {Math.round(quickKeepRate * 100)}%
               </span>
             </span>
@@ -749,7 +755,7 @@ function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
       <p
         className={cn(
           "mt-3 text-[11px]",
-          isOrbital ? cn(orbital.label, "text-primary/50") : "text-muted-foreground/60"
+          t.monoNative ? cn(t.label, "text-primary/50") : "text-muted-foreground/60"
         )}
       >
         Reliable early signal: do the rituals feed Orbit? Quick Pass adoption? Feedback loops active?
@@ -766,6 +772,7 @@ const RangeControl = React.memo(function RangeControl({
   onChange: (v: TimeRange) => void;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   return (
     <div
       role="tablist"
@@ -790,8 +797,8 @@ const RangeControl = React.memo(function RangeControl({
               "rounded-full px-2.5 py-0.5 tabular-nums transition-colors",
               active
                 ? "bg-primary text-primary-foreground"
-                : isOrbital
-                  ? cn(orbital.label, "text-primary/60 hover:text-primary")
+                : t.monoNative
+                  ? cn(t.label, "text-primary/60 hover:text-primary")
                   : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -805,6 +812,7 @@ const RangeControl = React.memo(function RangeControl({
 
 function LoadingSkeleton() {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const skeletonClass = (h: string) =>
     cn(
       h,
@@ -840,6 +848,7 @@ function ErrorState({
   onRetry: () => void;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   return (
     <div className="flex h-72 items-center justify-center text-center">
       <div
@@ -854,7 +863,7 @@ function ErrorState({
         <p
           className={cn(
             "mt-2 text-sm",
-            isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+            t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
           )}
         >
           {message ?? "Please try again."}

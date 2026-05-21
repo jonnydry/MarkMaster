@@ -145,7 +145,9 @@ export function OrbitMapRail({
         className={cn(
           isOverlay
             ? "min-w-0"
-            : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
+            : isOrbital
+              ? "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
+              : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
         )}
       >
         <SelectedClusterBody
@@ -174,7 +176,9 @@ export function OrbitMapRail({
             "text-sm text-white/70",
             isOverlay
               ? "mt-4 border-t border-white/[0.055] pt-3"
-              : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
+              : isOrbital
+                ? "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
+                : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
           )}
         >
           <p className={cn(
@@ -192,7 +196,7 @@ export function OrbitMapRail({
             )}
           >
             <li className="flex items-center gap-3">
-              <span className="inline-block size-2.5 rounded-full bg-sky-300" />
+              <span className="inline-block size-2.5 rounded-full bg-primary" />
               <span>Loose bookmark</span>
             </li>
             <li className="flex items-center gap-3">
@@ -279,7 +283,7 @@ function SelectedClusterBody({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <OrbitLogoMark className="size-4" />
           </span>
           <div>
@@ -355,7 +359,7 @@ function SelectedClusterBody({
           <Button
             size="sm"
             variant="outline"
-            className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
+            className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
             onClick={onAssign}
             disabled={!selectedBookmarkId}
           >
@@ -403,7 +407,7 @@ function SelectedClusterBody({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <Icon className="size-4" />
           </span>
           <div className="min-w-0">
@@ -434,7 +438,7 @@ function SelectedClusterBody({
             <Button
               size="sm"
               variant="outline"
-              className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
+              className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
               onClick={() => onCopyAsCollection(node.id)}
               disabled={isCopying}
             >
@@ -450,7 +454,7 @@ function SelectedClusterBody({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-9 gap-1.5 border-sky-200/25 bg-sky-300/15 text-sky-50 hover:bg-sky-300/20"
+                className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
                 onClick={onAssign}
                 disabled={!actionState.canAssign}
               >
@@ -502,7 +506,7 @@ function SelectedClusterBody({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-200">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary/80">
             <GrokMark className="size-4" title="Grok" />
           </span>
           <div className="min-w-0">
@@ -560,7 +564,7 @@ function SelectedClusterBody({
         {isLoose && (
           <p className={cn(
             "text-xs",
-            isOrbital ? "text-primary/70" : "text-sky-300/80"
+            isOrbital ? "text-primary/70" : "text-primary/80"
           )}>Not yet tagged or collected</p>
         )}
         {tagConnections.length > 0 && (
@@ -604,7 +608,7 @@ function SelectedClusterBody({
                     key={c.id}
                     className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80"
                   >
-                    <Folder className="size-3 text-sky-300" />
+                    <Folder className="size-3 text-primary" />
                     {c.name}
                   </span>
                 ) : null
@@ -679,7 +683,7 @@ function ConnectedList({
                   <span
                     className={cn(
                       "inline-block size-1.5 shrink-0 rounded-full",
-                      b.affiliated ? "bg-slate-200" : "bg-sky-300"
+                      b.affiliated ? "bg-slate-200" : "bg-primary"
                     )}
                   />
                   <span className="min-w-0 truncate">

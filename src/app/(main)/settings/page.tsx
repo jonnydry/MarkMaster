@@ -226,7 +226,10 @@ export default function SettingsPage() {
           />
 
           <div className="p-4 sm:p-5">
-            <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <div
+              data-settings-page
+              className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]"
+            >
             <div className="space-y-5">
               {hasSettingsError && (
                 <Card className="border-destructive/30 bg-surface-1 p-5 shadow-sm">
@@ -335,7 +338,7 @@ export default function SettingsPage() {
                       <div>
                         <Label>Typography</Label>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Toggle global monospace (JetBrains Mono) for terminal-style UI. Preserves hierarchy and works seamlessly with Orbital theme.
+                          Toggle global monospace (JetBrains Mono) for terminal-style UI on the default theme. Orbit Theme enables the full monospace suite automatically.
                         </p>
                       </div>
                       <Button variant="outline" onClick={toggleFontMode} className="gap-2 border-hairline-soft bg-surface-1 shadow-sm">
@@ -348,11 +351,11 @@ export default function SettingsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Label>Orbital Theme</Label>
+                          <Label>Orbit Theme</Label>
                           {isOrbital && <OrbitalBadge tone="cyan">Active</OrbitalBadge>}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Enable the full futuristic minimalism design language: deep void surfaces, cyan-teal orbital glow, warm bronze accents, inner-glow glassmorphism, independent ring motion, and JetBrains Mono as the primary telemetry voice. Transforms the interface into a calm personal orbital intelligence system with two-column mission control.
+                          Enable the full Orbit design language: deep void surfaces, cyan-teal glow, warm bronze accents, glass chrome, and the monospace typography suite app-wide. The library dashboard can use a two-column inspector when this theme is on.
                         </p>
                       </div>
                       <Button
@@ -360,7 +363,7 @@ export default function SettingsPage() {
                         onClick={toggleOrbital}
                         className="gap-2 border-hairline-soft bg-surface-1 shadow-sm"
                       >
-                        {isOrbital ? "Disable Orbital" : "Enable Orbital"}
+                        {isOrbital ? "Disable Orbit" : "Enable Orbit"}
                       </Button>
                     </div>
                   </div>

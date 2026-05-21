@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderPlus, Tag, X } from "lucide-react";
+import { ClipboardList, ExternalLink, Link2, Tag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { orbital, OrbitalMenu, OrbitalActionPill } from "@/components/orbital";
@@ -38,38 +38,23 @@ export function OrbitContextualMenu({
   return (
     <OrbitalMenu className="orbital-menu py-1 text-[12.5px]">
       <div className={cn(orbital.label, "px-3 py-1 text-[10px] text-primary/50")}>
-        QUICK ACTIONS
+        MORE
       </div>
 
-      {/* Quick Tag */}
       <div
-        onClick={() => handleAction("tag")}
+        onClick={() => handleAction("open-x")}
         className={orbital.menuItem}
       >
-        <Tag className="size-3.5 text-bronze" />
-        <span className="flex-1">Quick Tag</span>
-        <span className="text-[10px] text-primary/40">T</span>
+        <ExternalLink className="size-3.5 text-primary/70" />
+        <span className="flex-1">Open on X</span>
       </div>
 
-      {/* Quick Collection */}
       <div
-        onClick={() => handleAction("collection")}
+        onClick={() => handleAction("copy-link")}
         className={orbital.menuItem}
       >
-        <FolderPlus className="size-3.5 text-bronze" />
-        <span className="flex-1">Add to Collection</span>
-        <span className="text-[10px] text-primary/40">C</span>
-      </div>
-
-      <div className="my-1 h-px bg-hairline-soft mx-2" />
-
-      {/* Keep */}
-      <div
-        onClick={() => handleAction("keep")}
-        className={orbital.menuItem}
-      >
-        <div className="size-3.5 rounded-full bg-primary/80" />
-        <span className="flex-1 text-primary">Keep</span>
+        <Link2 className="size-3.5 text-primary/70" />
+        <span className="flex-1">Copy link</span>
       </div>
 
       <div className="my-1 h-px bg-hairline-soft mx-2" />
@@ -96,7 +81,7 @@ export function OrbitActionPill({
   const actions = [
     { key: "keep", label: "Keep", icon: <div className="size-3 rounded-full bg-primary" /> },
     { key: "tag", label: "Tag", icon: <Tag className="size-3 text-bronze" /> },
-    { key: "review", label: "Review", icon: <FolderPlus className="size-3 text-primary/70" /> },
+    { key: "review", label: "Review", icon: <ClipboardList className="size-3 text-primary/70" /> },
   ];
 
   return (

@@ -23,6 +23,8 @@ import {
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Button } from "@/components/ui/button";
+import { useOrbitalTheme } from "@/components/providers";
+import { orbitShellClass } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -46,7 +48,7 @@ const OrbitMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center rounded-[28px] border border-white/10 bg-[#0b0f1a]">
+      <div className="flex h-full items-center justify-center rounded-[28px] border border-white/10 bg-background">
         <div className="flex items-center gap-2 text-sm text-white/60">
           <Loader2 className="size-4 animate-spin" />
           Charting graph…
@@ -86,6 +88,7 @@ const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> = new Set([
 ]);
 
 export default function OrbitMapPage() {
+  const { isOrbital } = useOrbitalTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -330,7 +333,7 @@ export default function OrbitMapPage() {
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-hidden theme-orbital" data-theme="orbital">
+    <div className={orbitShellClass(isOrbital)}>
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -392,16 +395,33 @@ export default function OrbitMapPage() {
         />
 
         <div className="flex min-h-0 min-w-0 flex-1 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
-          <div className="orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden rounded-[26px] border border-white/[0.055] bg-[#070b13]">
+          <div
+            className={cn(
+              "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
+              isOrbital
+                ? "rounded-sm border border-hairline-soft bg-background"
+                : "rounded-[26px] border border-white/[0.055] bg-[#070b13]"
+            )}
+          >
             {isLoading ? (
-              <div className="flex h-full w-full items-center justify-center bg-[#0b0f1a]">
+              <div
+                className={cn(
+                  "flex h-full w-full items-center justify-center",
+                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                )}
+              >
                 <div className="flex items-center gap-2 text-sm text-white/60">
                   <Loader2 className="size-4 animate-spin" />
                   Charting graph…
                 </div>
               </div>
             ) : isError ? (
-              <div className="flex h-full w-full items-center justify-center bg-[#0b0f1a] p-6 text-center">
+              <div
+                className={cn(
+                  "flex h-full w-full items-center justify-center p-6 text-center",
+                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                )}
+              >
                 <div className="max-w-md space-y-3">
                   <p className="text-lg font-medium text-white">
                     Graph could not be loaded
@@ -451,7 +471,14 @@ export default function OrbitMapPage() {
                 </div>
 
                 {searchDeferred && searchResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 overflow-auto rounded-2xl border border-white/[0.08] bg-[#07111d]/72 shadow-none backdrop-blur-xl">
+                  <div
+                    className={cn(
+                      "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 overflow-auto shadow-none backdrop-blur-xl",
+                      isOrbital
+                        ? "rounded-sm border border-hairline-soft bg-surface-1/90"
+                        : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
+                    )}
+                  >
                     <ul className="py-1">
                       {searchResults.slice(0, 20).map((node) => {
                         const identity: OrbitMapSelection =
@@ -522,7 +549,14 @@ export default function OrbitMapPage() {
                   </div>
                 )}
                 {searchDeferred && searchResults.length === 0 && (
-                  <div className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 rounded-2xl border border-white/[0.08] bg-[#07111d]/72 p-3 text-sm text-white/50 shadow-none backdrop-blur-xl">
+                  <div
+                    className={cn(
+                      "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 p-3 text-sm text-white/50 shadow-none backdrop-blur-xl",
+                      isOrbital
+                        ? "rounded-sm border border-hairline-soft bg-surface-1/90"
+                        : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
+                    )}
+                  >
                     No results for “{searchDeferred}”
                   </div>
                 )}

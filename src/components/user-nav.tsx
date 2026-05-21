@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Moon, Sun, LogOut, Download, User } from "lucide-react";
+import { Moon, Sun, LogOut, Download, User, Type } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useTheme, useOrbitalTheme } from "@/components/providers";
+import { useTheme, useOrbitalTheme, useFontMode } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import { orbital } from "@/components/orbital";
 import type { DbUser } from "@/lib/auth";
@@ -21,6 +21,7 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const { theme, toggleTheme } = useTheme();
+  const { fontMode, toggleFontMode } = useFontMode();
   const { isOrbital, toggleOrbital } = useOrbitalTheme();
 
   return (
@@ -64,9 +65,16 @@ export function UserNav({ user }: UserNavProps) {
           )}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={toggleFontMode}>
+          <Type className="w-4 h-4 mr-2" />
+          {fontMode === "mono" ? "Default Typography" : "Monospace UI"}
+          {fontMode === "mono" && (
+            <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>
+          )}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={toggleOrbital}>
           <span className={cn("w-4 h-4 mr-2", isOrbital && orbital.icon)} />
-          {isOrbital ? "Disable Orbital" : "Enable Orbital"}
+          {isOrbital ? "Disable Orbit Theme" : "Enable Orbit Theme"}
           {isOrbital && <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>}
         </DropdownMenuItem>
         <DropdownMenuItem

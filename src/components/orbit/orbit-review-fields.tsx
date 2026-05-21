@@ -276,7 +276,7 @@ export function OrbitReviewCollectionField({
                         setPickOpen(false);
                       }}
                     >
-                      <Folder className="size-3.5 text-sky-200/90" />
+                      <Folder className="size-3.5 text-primary/80/90" />
                       {collection.name}
                     </CommandItem>
                   ))}
@@ -284,7 +284,7 @@ export function OrbitReviewCollectionField({
                 <CommandGroup>
                   <CommandItem
                     value="__clear__orbit_collection__"
-                    className="text-sky-200/90 data-[selected=true]:bg-white/10"
+                    className="text-primary/80/90 data-[selected=true]:bg-white/10"
                     onSelect={() => {
                       onCollectionNameChange("");
                       onCollectionDescriptionChange("");

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme, useFontMode } from "@/components/providers";
 import { orbital, OrbitalBadge } from "@/components/orbital";
+import { useTypography } from "@/hooks/use-typography";
 import type { TagWithCount, MediaFilter } from "@/types";
 
 interface CommandPaletteProps {
@@ -44,6 +45,7 @@ export function CommandPalette({
 
   const { isOrbital, toggleOrbital } = useOrbitalTheme();
   const { fontMode, toggleFontMode } = useFontMode();
+  const t = useTypography();
 
   const filteredTags = useMemo(
     () =>
@@ -85,7 +87,7 @@ export function CommandPalette({
         {
           kind: "action" as const,
           id: "toggle-orbital",
-          label: isOrbital ? "Disable Orbital Theme" : "Enable Orbital Theme",
+          label: isOrbital ? "Disable Orbit Theme" : "Enable Orbit Theme",
           description: "Futuristic minimalism • glassmorphism • mission control",
           action: toggleOrbital,
           icon: Sparkles,
@@ -260,7 +262,7 @@ export function CommandPalette({
                 {showAppearanceHeading && (
                   <p className={cn(
                     "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
-                    isOrbital ? orbital.label : "text-muted-foreground"
+                    t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Appearance
                   </p>
@@ -268,7 +270,7 @@ export function CommandPalette({
                 {showQuickFiltersHeading && (
                   <p className={cn(
                     "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
-                    isOrbital ? orbital.label : "text-muted-foreground"
+                    t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Quick Filters
                   </p>
@@ -276,7 +278,7 @@ export function CommandPalette({
                 {(showTagsHeading || showSearchTagsHeading) && (
                   <p className={cn(
                     "px-2 py-1.5 mt-2 border-t border-border text-xs font-semibold uppercase tracking-wider",
-                    isOrbital ? orbital.label : "text-muted-foreground"
+                    t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Tags
                   </p>

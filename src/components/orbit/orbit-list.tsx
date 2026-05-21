@@ -5,15 +5,6 @@ import type { BookmarkWithRelations } from "@/types";
 
 import { OrbitListRow } from "./orbit-list-row";
 
-/**
- * OrbitList
- *
- * Clean, high-density container for the new Orbit triage queue.
- * Matches the visual language and density of Paper artboard 6U-0.
- *
- * This is the primary surface for the new slide-in + overlays model.
- */
-
 interface OrbitListProps {
   bookmarks: BookmarkWithRelations[];
   selectedId?: string | null;
@@ -21,6 +12,9 @@ interface OrbitListProps {
   onQuickAction?: (id: string, action: string, event?: React.MouseEvent) => void;
   className?: string;
   isLoading?: boolean;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
 export function OrbitList({
@@ -30,6 +24,9 @@ export function OrbitList({
   onQuickAction,
   className,
   isLoading,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
 }: OrbitListProps) {
   if (isLoading) {
     return (
@@ -55,7 +52,10 @@ export function OrbitList({
           key={bookmark.id}
           bookmark={bookmark}
           selected={selectedId === bookmark.id}
+          selectionMode={selectionMode}
+          bulkSelected={selectedIds?.has(bookmark.id) ?? false}
           onSelect={onSelect}
+          onToggleSelect={onToggleSelect}
           onQuickAction={onQuickAction}
         />
       ))}

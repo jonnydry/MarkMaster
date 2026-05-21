@@ -1,7 +1,7 @@
 # Remaining Work Plan for Final Cohesion — Orbital Theme (Futuristic Minimalism)
 
 **Date:** 2026-05-19  
-**Context:** Master Unification Plan (IMPL b6793308). Orbital primitives + thin reusable components (`@/components/orbital`) are established as the single authoring contract. Theme toggle is now first-class (Settings, user-nav, command palette). Two-column mission control exists in Orbit as the hero exemplar.
+**Context:** Master Unification Plan (IMPL b6793308). Orbital primitives + thin reusable components (`@/components/orbital`) are established as the single authoring contract. Theme toggle is now first-class (Settings, user-nav, command palette). **Orbit triage** uses the clean list + right slide-in panel pattern (see `Orbit-List-SlideIn-Overlays-Implementation-Plan.md`); the retired two-column persistent inspector on `/orbit` is no longer the live model.
 
 **Goal:** Every surface under `data-theme="orbital"` must feel like one calm, precise personal orbital intelligence system. Default production experience remains completely untouched.
 
@@ -9,7 +9,7 @@
 
 ## 1. Structural Cohesion — Extend Two-Column Mission Control to Main Feed (Highest Structural Priority)
 
-**Current State:** Two-column (left queue + right persistent `OrbitalCard` inspector using `MissionControlHeader` + `TelemetryStat`) lives **only** in `/orbit`. Main dashboard/library feed remains single-column (`bookmarkFeedColumnClassName`).
+**Current State:** `/orbit` uses list + slide-in review (not a persistent two-column inspector). Two-column mission control is planned for the **main dashboard/library feed** (`bookmarkFeedColumnClassName`), which remains single-column today.
 
 **Recommended Plan (from Structural Cohesion Planner subagent):**
 

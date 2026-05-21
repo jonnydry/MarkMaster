@@ -649,7 +649,7 @@ function CollectionMetric({
         <span className={`flex h-7 w-7 items-center justify-center rounded-sm ${toneClassName}`}>
           <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground/70">
+        <span className="text-xs tabular-nums text-muted-foreground/70">
           {value}
         </span>
       </div>
@@ -740,7 +740,7 @@ function CollectionsControlBar({
               >
                 <span>{filter.label}</span>
                 <span
-                  className={`font-mono tabular-nums ${
+                  className={`tabular-nums ${
                     active
                       ? "text-primary-foreground/75"
                       : "text-muted-foreground/60"
@@ -753,7 +753,7 @@ function CollectionsControlBar({
           })}
         </div>
 
-        <span className="font-mono text-xs tabular-nums text-muted-foreground/70">
+        <span className="text-xs tabular-nums text-muted-foreground/70">
           {filteredCount.toLocaleString()} shown
         </span>
 
@@ -792,7 +792,7 @@ function CollectionsSection({
           <Icon className="h-3.5 w-3.5" aria-hidden="true" />
           {title}
         </h2>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground/60">
+        <span className="text-xs tabular-nums text-muted-foreground/60">
           {count}
         </span>
       </div>

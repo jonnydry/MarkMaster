@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 import { orbital } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
+import { useTypography } from "@/hooks/use-typography";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -77,7 +78,7 @@ function TagPill({
               orbital.pill,
               "text-muted-foreground hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
             )
-          : "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+          : "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
       }
     >
       {name}
@@ -100,7 +101,7 @@ function BookmarkRank({
     <div
       aria-hidden="true"
       className={cn(
-        isOrbital ? orbital.data : "font-mono tabular-nums",
+        isOrbital ? orbital.data : "tabular-nums text-muted-foreground/55",
         "flex shrink-0 flex-col items-center",
         compact ? "w-7 pt-0.5" : "w-8 pt-1"
       )}
@@ -199,6 +200,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   isPerformanceHighlight = false,
 }: BookmarkCardProps) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
@@ -303,7 +305,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               className={
                 isOrbital
                   ? cn(orbital.badge("cyan"), "inline-flex items-center gap-1 rounded-sm px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em]")
-                  : "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-mono font-semibold uppercase tracking-[0.08em] text-primary"
+                  : "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-primary"
               }
             >
               Performance highlight • Top engagement unsorted
@@ -700,17 +702,17 @@ export const BookmarkCard = memo(function BookmarkCard({
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Replies</dt>
                 <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.reply_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.reply_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Reposts</dt>
                 <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.retweet_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.retweet_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Likes</dt>
                 <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={isOrbital ? orbital.data : undefined}>{formatCount(metrics.like_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.like_count)}</dd>
               </div>
             </dl>
           )}

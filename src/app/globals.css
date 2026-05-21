@@ -263,15 +263,20 @@ html.theme-orbital,
   --destructive: #ef4444;
 }
 
-/* Global Monospace Mode (seamless toggle, works with default + orbital themes) */
+/* Global Monospace Mode — full 3-tier suite (JetBrains body/data, IBM Plex labels) */
 [data-font-mode="mono"] {
   --font-sans: var(--font-jetbrains-mono);
   --font-heading: var(--font-jetbrains-mono);
-  /* thoughtful adjustments: tighter tracking for body readability while preserving hierarchy and tabular-nums */
+  --font-mono: var(--font-jetbrains-mono);
   letter-spacing: -0.008em;
 }
-[data-font-mode="mono"] .heading-font {
-  font-family: var(--font-jetbrains-mono);
+
+[data-font-mode="mono"] body,
+[data-font-mode="mono"] button,
+[data-font-mode="mono"] input,
+[data-font-mode="mono"] textarea,
+[data-font-mode="mono"] select {
+  font-family: var(--font-sans);
 }
 
 @keyframes fade-in {
@@ -628,7 +633,7 @@ html.theme-orbital,
     }
   }
   .heading-font {
-    font-family: var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-heading), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   }
   .menu-selection-active {
     position: relative;
@@ -707,18 +712,56 @@ html.theme-orbital,
     }
   }
 
-  /* 3-tier Monospace-Native Typography System (first-class when data-font-mode="mono" or under orbital theme) */
-  /* Tier 1 — Display / Expressive (large numbers, hero stats, major titles) */
-  .text-mono-display {
+  /* 3-tier Monospace-Native Typography — active under mono toggle or Orbit theme */
+  [data-font-mode="mono"] .text-mono-display,
+  .theme-orbital .text-mono-display {
     font-family: var(--font-jetbrains-mono);
     font-weight: 700;
     letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
   }
 
-  /* Tier 2 — UI / Labels / Reasoning / Navigation (primary workhorse) */
-  .text-mono-ui,
-  .text-mono-label {
+  [data-font-mode="mono"] .text-mono-ui,
+  [data-font-mode="mono"] .text-mono-label,
+  .theme-orbital .text-mono-ui,
+  .theme-orbital .text-mono-label {
+    font-family: var(--font-ibm-plex-mono);
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.625rem;
+  }
+
+  [data-font-mode="mono"] .text-mono-data,
+  .theme-orbital .text-mono-data {
+    font-family: var(--font-jetbrains-mono);
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tier 1 — display headings */
+  [data-font-mode="mono"] .text-heading-display,
+  [data-font-mode="mono"] h1.heading-font,
+  .theme-orbital .text-heading-display,
+  .theme-orbital h1.heading-font {
+    font-family: var(--font-jetbrains-mono);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tier 2 — labels / chrome / section headers */
+  [data-font-mode="mono"] label,
+  [data-font-mode="mono"] [data-slot="label"],
+  [data-font-mode="mono"] .app-chrome-label,
+  [data-font-mode="mono"] h2.heading-font,
+  [data-font-mode="mono"] [data-slot="dialog-title"],
+  .theme-orbital label,
+  .theme-orbital [data-slot="label"],
+  .theme-orbital .app-chrome-label,
+  .theme-orbital h2.heading-font,
+  .theme-orbital [data-slot="dialog-title"] {
     font-family: var(--font-ibm-plex-mono);
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -726,21 +769,31 @@ html.theme-orbital,
     font-variant-numeric: tabular-nums;
   }
 
-  /* Tier 3 — Data / Metrics / Tabular / Technical (best figures) */
-  .text-mono-data {
+  [data-font-mode="mono"] .app-chrome-label,
+  .theme-orbital .app-chrome-label {
+    letter-spacing: 0.14em;
+    font-size: 0.625rem;
+  }
+
+  [data-font-mode="mono"] h2.heading-font,
+  .theme-orbital h2.heading-font {
+    font-size: 0.6875rem;
+  }
+
+  /* Tier 3 — tabular data */
+  [data-font-mode="mono"] .tabular-nums,
+  .theme-orbital .tabular-nums {
     font-family: var(--font-jetbrains-mono);
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
   }
 
-  /* Legacy / fallback for older mono-label usage (still works) */
-  .text-mono-label {
-    font-size: 0.625rem;
-    letter-spacing: 0.14em;
+  .text-heading-display {
+    font-family: var(--font-heading), var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   }
 
-  .text-heading-display {
-    font-family: var(--font-dm-sans);
+  .theme-orbital [data-settings-page] .rounded-2xl {
+    border-radius: 0.125rem;
   }
 
   /* Orbital theme glassmorphism + grain (scoped, only effective under .theme-orbital) */

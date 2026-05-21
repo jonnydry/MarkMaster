@@ -20,6 +20,7 @@ import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital, OrbitalBadge, TelemetryStat } from "@/components/orbital";
+import { useTypography } from "@/hooks/use-typography";
 
 type LibraryControlCenterProps = {
   totalBookmarks: number;
@@ -58,6 +59,7 @@ export function LibraryControlCenter({
   orbitQueueCount,
 }: LibraryControlCenterProps) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   const hasBookmarks = totalBookmarks > 0;
   const allOrganized = hasBookmarks && untriagedCount === 0;
   const syncDate = toDate(lastSyncAt);
@@ -102,7 +104,7 @@ export function LibraryControlCenter({
             <div className="min-w-0">
               <p className={cn(
                 "text-[11px] font-semibold uppercase tracking-[0.14em]",
-                isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+                t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
               )}>
                 Library control center
               </p>
@@ -226,7 +228,7 @@ export function LibraryControlCenter({
         <div className="border-t border-hairline-soft bg-transparent p-4 lg:border-l lg:border-t-0">
           <p className={cn(
             "mb-2 text-[11px] font-semibold uppercase tracking-[0.14em]",
-            isOrbital ? cn(orbital.label, "text-primary/80") : "text-muted-foreground"
+            t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
           )}>
             Sync status
           </p>
@@ -254,6 +256,7 @@ function ControlMetric({
   active?: boolean;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  const t = useTypography();
   return (
     <div className={
       isOrbital
@@ -270,12 +273,12 @@ function ControlMetric({
         />
         <span className={cn(
           "text-[11px]",
-          isOrbital ? orbital.label : "text-muted-foreground"
+          t.monoNative ? t.label : "text-muted-foreground"
         )}>{label}</span>
       </div>
       <p className={cn(
         "mt-1 font-semibold tabular-nums",
-        isOrbital ? orbital.data : "heading-font text-lg"
+        t.monoNative ? t.data : "heading-font text-lg"
       )}>
         {value}
       </p>

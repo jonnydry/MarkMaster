@@ -4,8 +4,9 @@ import type { ComponentProps, ReactNode } from "react";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
-import { orbital } from "@/components/orbital";
+import { useTypography } from "@/hooks/use-typography";
 import { useOrbitalTheme } from "@/components/providers";
+import { OrbitalBadge } from "@/components/orbital";
 
 type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   title?: ReactNode;
@@ -34,13 +35,18 @@ export function PageHeader({
   chromeless = false,
   ...props
 }: PageHeaderProps) {
+  const t = useTypography();
   const { isOrbital } = useOrbitalTheme();
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
     "shrink-0",
     chromeless
       ? "border-b-0 bg-transparent"
-      : cn("border-b border-hairline-strong", appChromeFrostedClassName),
+      : cn(
+          "border-b border-hairline-strong",
+          appChromeFrostedClassName,
+          isOrbital && "shadow-[inset_0_-1px_0_var(--accent-glow)]"
+        ),
     sticky && "sticky top-0 z-10",
     className
   );
@@ -54,20 +60,27 @@ export function PageHeader({
               {leading ? <div className="shrink-0">{leading}</div> : null}
               <div className="min-w-0">
                 {title ? (
-                  <h1
-                    className={cn(
-                      "truncate text-lg font-bold tracking-tight heading-font sm:text-xl",
-                      titleClassName
-                    )}
-                  >
-                    {title}
-                  </h1>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h1
+                      className={cn(
+                        "truncate text-lg font-bold tracking-tight heading-font sm:text-xl",
+                        titleClassName
+                      )}
+                    >
+                      {title}
+                    </h1>
+                    {isOrbital ? (
+                      <OrbitalBadge tone="cyan" className="hidden shrink-0 sm:inline-flex">
+                        Orbit
+                      </OrbitalBadge>
+                    ) : null}
+                  </div>
                 ) : null}
                 {description ? (
                   <p
                     className={cn(
                       "mt-1 text-xs text-muted-foreground sm:text-sm",
-                      isOrbital ? orbital.label : undefined,
+                      t.monoNative ? t.label : undefined,
                       bookmarkFeedMaxWidthClassName,
                       descriptionClassName
                     )}

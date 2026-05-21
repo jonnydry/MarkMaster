@@ -53,7 +53,9 @@ import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import { cn } from "@/lib/utils";
 import { fetchJson } from "@/lib/fetch-json";
 
+import { useOrbitalTheme } from "@/components/providers";
 import { orbital, OrbitalCard } from "@/components/orbital";
+import { reviewChrome } from "@/lib/orbit-review-chrome";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { toast } from "sonner";
@@ -114,6 +116,7 @@ export function OrbitReviewDialog({
   digestBookmarkIds,
   feedbackById = {},
 }: OrbitReviewDialogProps) {
+  const { isOrbital } = useOrbitalTheme();
   const [draftState, setDraftState] = useState<{
     key: string;
     drafts: OrbitReviewSuggestionDraft[];
@@ -535,10 +538,12 @@ export function OrbitReviewDialog({
     ]
   );
 
+  const rcx = reviewChrome(isOrbital);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(orbital.glass, "max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-5xl")}>
-        <DialogHeader className="border-b border-primary/10 px-5 py-4">
+      <DialogContent className={rcx.dialogShell}>
+        <DialogHeader className={cn("border-b px-5 py-4", rcx.headerBorder)}>
           {digestBookmarkIds && digestBookmarkIds.length > 0 && (
             <div className={cn("mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm", orbital.badge("cyan"))}>
               <Sparkles className="h-4 w-4" />
@@ -554,7 +559,7 @@ export function OrbitReviewDialog({
             <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
               <div className="min-w-0">
                 <DialogTitle>{title}</DialogTitle>
-                <DialogDescription className="mt-1 text-white/60">
+                <DialogDescription className={cn("mt-1", rcx.muted)}>
                   Choose what to do with each suggestion, then adjust the tags and
                   destinations that will be applied.
                 </DialogDescription>
@@ -566,8 +571,9 @@ export function OrbitReviewDialog({
                 <div className="flex items-center gap-1.5">
                   <div
                     className={cn(
-                      "inline-flex items-center rounded-lg border border-white/10 bg-black/10 p-0.5 text-[10px]",
-                      isQuick && "border-sky-400/30"
+                      "inline-flex items-center p-0.5 text-[10px]",
+                      rcx.toggleShell,
+                      isQuick && (isOrbital ? "border-primary/30" : "border-primary/30")
                     )}
                     role="group"
                     aria-label="Review mode"
@@ -582,9 +588,7 @@ export function OrbitReviewDialog({
                       }}
                       className={cn(
                         "rounded-md px-2.5 py-0.5 font-medium transition-colors",
-                        isQuick
-                          ? "bg-white text-slate-950 shadow-sm"
-                          : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+                        isQuick ? rcx.toggleActive : rcx.toggleIdle
                       )}
                       title="Quick Pass: light path from standouts into Orbit (press Q)"
                     >
@@ -600,9 +604,7 @@ export function OrbitReviewDialog({
                       }}
                       className={cn(
                         "rounded-md px-2.5 py-0.5 font-medium transition-colors",
-                        !isQuick
-                          ? "bg-white text-slate-950 shadow-sm"
-                          : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+                        !isQuick ? rcx.toggleActive : rcx.toggleIdle
                       )}
                       title="Deep Review: full reasoning with context panels (press Q)"
                     >
@@ -610,7 +612,7 @@ export function OrbitReviewDialog({
                     </button>
                   </div>
                   <kbd
-                    className="rounded border border-white/20 bg-white/5 px-1 py-px font-mono text-[9px] text-white/50"
+                    className={cn(orbital.data, "rounded border border-hairline-soft bg-surface-2/80 px-1 py-px text-[9px] text-primary/50")}
                     aria-hidden="true"
                     title="Keyboard shortcut"
                   >
@@ -626,11 +628,11 @@ export function OrbitReviewDialog({
         <div className="min-h-0 overflow-hidden px-4 py-3">
           {/* Global Impact Bar (styled like rail metrics) */}
           {effectiveDrafts.length > 0 && (
-            <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className={cn("mb-3 p-3", rcx.panel)}>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-4 text-[11px]">
-                  <div><span className="text-white/45">Apply</span> <span className="font-medium tabular-nums text-mono-data">{reviewStats.applyableBookmarks}</span></div>
-                  <div><span className="text-white/45">Keep</span> <span className="font-medium tabular-nums text-mono-data">{reviewStats.keptBookmarks}</span></div>
+                <div className={cn("flex items-center gap-4 text-[11px]", rcx.data)}>
+                  <div><span className={rcx.soft}>Apply</span> <span className="font-medium tabular-nums">{reviewStats.applyableBookmarks}</span></div>
+                  <div><span className={rcx.soft}>Keep</span> <span className="font-medium tabular-nums">{reviewStats.keptBookmarks}</span></div>
                   <div><span className="text-primary/80">+{impact.addedTagCount} tags</span></div>
                   <div><span className="text-bronze/80">+{impact.addedCollectionCount} cols</span></div>
                 </div>
@@ -703,8 +705,8 @@ export function OrbitReviewDialog({
                     </>
                   )}
 
-                  <div className="ml-2 flex items-center gap-2 border-l border-white/10 pl-3">
-                    <span className="text-xs text-white/60">New collections</span>
+                  <div className={cn("ml-2 flex items-center gap-2 border-l pl-3", rcx.headerBorder)}>
+                    <span className={cn("text-xs", rcx.muted)}>New collections</span>
                     <Switch checked={createCollections} onCheckedChange={handleCreateCollectionsChange} />
                   </div>
                 </div>
@@ -715,7 +717,7 @@ export function OrbitReviewDialog({
           <ScrollArea className="h-[58vh]">
             <div className={cn("space-y-3 pb-6", isQuick && "space-y-2 pb-4")}>
               {effectiveDrafts.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
+                <div className={cn("p-6 text-center text-sm", rcx.panel, rcx.soft)}>
                   {!sourcePlan
                     ? "Grok is preparing suggestions for this review…"
                     : "No suggestions are waiting for review."}
@@ -767,7 +769,7 @@ export function OrbitReviewDialog({
                       "group relative border border-hairline-soft shadow-sm transition-all",
                       isQuick && "rounded-xl shadow-none border-white/5",
                       draft.decision === "keep" && "opacity-75",
-                      sheetBookmarkId === draft.bookmarkId && "border-sky-400/50 bg-surface-2/70",
+                      sheetBookmarkId === draft.bookmarkId && "border-primary/50 bg-surface-2/70",
                       "hover:border-white/20 hover:bg-surface-2/50"
                     )}
                   >
@@ -777,7 +779,7 @@ export function OrbitReviewDialog({
                       isQuick && "px-3 pt-2 pb-1"
                     )}>
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium text-white/90">
+                        <span className={cn("truncate text-sm font-medium", rcx.body)}>
                           @{bookmark?.authorUsername || draft.bookmarkId}
                         </span>
                         {original && (
@@ -785,7 +787,7 @@ export function OrbitReviewDialog({
                             className={cn(
                               "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
                               original.confidence === "high" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-                              original.confidence === "medium" && "border-sky-400/30 bg-sky-400/10 text-sky-200",
+                              original.confidence === "medium" && "border-primary/30 bg-primary/10 text-primary/80",
                               original.confidence === "low" && "border-blue-500/30 bg-blue-500/10 text-blue-200"
                             )}
                             title={formatConfidence(original.confidence)}
@@ -802,8 +804,8 @@ export function OrbitReviewDialog({
 
                     {/* Preview */}
                     <div className={cn(
-                      "px-4 pb-2 text-[13px] leading-snug text-white/80 line-clamp-2",
-                      isQuick && "px-3 pb-1 text-[12px] leading-snug line-clamp-1 text-white/75"
+                      cn("px-4 pb-2 text-[13px] leading-snug line-clamp-2", rcx.bodyDim),
+                      isQuick && cn("px-3 pb-1 text-[12px] leading-snug line-clamp-1", rcx.muted)
                     )}>
                       {preview}
                     </div>
@@ -824,7 +826,7 @@ export function OrbitReviewDialog({
 
                     {/* Grok reasoning — native meta label (de-emphasized/hidden in Quick Pass for density) */}
                     {original?.reasoning && !isQuick && (
-                      <div className="px-4 pb-2 text-xs leading-snug text-white/65">
+                      <div className={cn("px-4 pb-2 text-xs leading-snug", rcx.muted)}>
                         {original.reasoning}
                       </div>
                     )}
@@ -895,7 +897,7 @@ export function OrbitReviewDialog({
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 gap-1 text-[10px] text-white/70 hover:text-white"
+                              className={cn("h-7 gap-1 text-[10px]", rcx.muted, "hover:text-foreground")}
                               onClick={() => handleResetOne(draft.bookmarkId)}
                               disabled={applying}
                             >
@@ -906,8 +908,8 @@ export function OrbitReviewDialog({
                             size="sm"
                             variant="outline"
                             className={cn(
-                              "h-7 gap-1 border-white/20 bg-white/5 text-[10px] text-white/80 hover:bg-white/10",
-                              sheetBookmarkId === draft.bookmarkId && "border-sky-400/60 bg-sky-400/10 text-sky-200"
+                              cn("h-7 gap-1 text-[10px]", rcx.ghostBtn),
+                              sheetBookmarkId === draft.bookmarkId && "border-primary/60 bg-primary/10 text-primary/80"
                             )}
                             onClick={() => {
                               setSheetBookmarkId(draft.bookmarkId);
@@ -924,7 +926,7 @@ export function OrbitReviewDialog({
                         <div className="flex flex-col gap-4 pt-2 md:flex-row md:gap-4">
                           {orbitReviewDecisionUsesTags(draft.decision) && (
                             <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className={cn(orbital.label, "mb-1.5 text-white/50")}>
+                              <div className={cn(rcx.label, "mb-1.5")}>
                                 Tags
                               </div>
                               <OrbitReviewTagField
@@ -937,7 +939,7 @@ export function OrbitReviewDialog({
                           )}
                           {orbitReviewDecisionUsesCollection(draft.decision) && (
                             <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className={cn(orbital.label, "mb-1.5 text-white/50")}>
+                              <div className={cn(rcx.label, "mb-1.5")}>
                                 Collection
                               </div>
                               <OrbitReviewCollectionField
@@ -981,17 +983,22 @@ export function OrbitReviewDialog({
           reviewSessionId={reviewSessionId}
         />
 
-        <DialogFooter className="border-white/10 bg-slate-950/95 px-5 py-4">
+        <DialogFooter className={cn("px-5 py-4", rcx.footerBar)}>
           <Button
             variant="outline"
-            className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+            className={rcx.ghostBtn}
             onClick={() => onOpenChange(false)}
             disabled={applying}
           >
             Cancel
           </Button>
           <Button
-            className="gap-1.5 bg-white text-slate-950 hover:bg-white/90"
+            className={cn(
+              "gap-1.5",
+              isOrbital
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-white text-slate-950 hover:bg-white/90"
+            )}
             onClick={handleApply}
             disabled={!canApply || applying}
           >
