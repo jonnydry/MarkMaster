@@ -1041,7 +1041,7 @@ export const OrbitMapCanvas = forwardRef<
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [size.height, size.width, activeFilter, fitViewToNodes, overflowCounts]);
+  }, [size.height, size.width, activeFilter, fitViewToNodes, overflowCounts, bgColor]);
 
   // --- hit testing ---
   const findNodeAt = useCallback(

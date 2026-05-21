@@ -278,7 +278,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
   breakdown: AnalyticsData["mediaBreakdown"];
 }) {
   const { isOrbital } = useOrbitalTheme();
-  const safeBreakdown = breakdown ?? [];
+  const safeBreakdown = useMemo(() => breakdown ?? [], [breakdown]);
   const total = useMemo(() => safeBreakdown.reduce((s, m) => s + m.count, 0), [safeBreakdown]);
   const byKey = useMemo(() => new Map(safeBreakdown.map((b) => [b.type, b.count])), [safeBreakdown]);
   const segments = useMemo(

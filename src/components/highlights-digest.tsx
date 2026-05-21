@@ -70,8 +70,8 @@ export function HighlightsDigest({
   const libraryData = libraryDataProp ?? libraryFetched;
   const digestLoading = isLoadingProp ?? (!useParentData && (rawLoading || libraryLoading));
 
-  const rawGems = rawData?.bookmarks ?? [];
-  const libraryGems = libraryData?.bookmarks ?? [];
+  const rawGems = useMemo(() => rawData?.bookmarks ?? [], [rawData?.bookmarks]);
+  const libraryGems = useMemo(() => libraryData?.bookmarks ?? [], [libraryData?.bookmarks]);
 
   const curation = useMemo(() => {
     /* eslint-disable-next-line react-hooks/purity */

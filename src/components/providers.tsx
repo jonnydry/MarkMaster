@@ -15,7 +15,6 @@ import {
 
 type Theme = "dark" | "light";
 type FontMode = "default" | "mono";
-type OrbitalTheme = boolean;
 
 const THEME_STORAGE_KEY = "markmaster-theme";
 const THEME_CHANGE_EVENT = "markmaster-theme-change";

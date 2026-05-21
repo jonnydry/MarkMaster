@@ -52,11 +52,11 @@ export function OrbitalCard({
 export function TelemetryStat({
   value,
   label,
-  tone = "cyan",
   className,
 }: {
   value: React.ReactNode;
   label: string;
+  /** Reserved for future tone-specific stat styling */
   tone?: OrbitalTone;
   className?: string;
 }) {

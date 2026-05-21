@@ -75,8 +75,6 @@ export default function AnalyticsPage() {
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
 
   const rangeControl = useMemo(
     () => <RangeControl value={range} onChange={setRange} />,
@@ -812,7 +810,6 @@ const RangeControl = React.memo(function RangeControl({
 
 function LoadingSkeleton() {
   const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
   const skeletonClass = (h: string) =>
     cn(
       h,

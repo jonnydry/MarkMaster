@@ -51,7 +51,7 @@ export async function getUserIdFromRequest(
     });
 
     return (payload.sub as string) || (payload.id as string) || null;
-  } catch (err) {
+  } catch {
     // Silently fail — caller should treat as unauthenticated for rate limiting
     return null;
   }

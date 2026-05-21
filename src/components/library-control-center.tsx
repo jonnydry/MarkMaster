@@ -19,7 +19,7 @@ import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
-import { orbital, OrbitalBadge, TelemetryStat } from "@/components/orbital";
+import { orbital, OrbitalBadge } from "@/components/orbital";
 import { useTypography } from "@/hooks/use-typography";
 
 type LibraryControlCenterProps = {

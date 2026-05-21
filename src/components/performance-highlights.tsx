@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
-import { orbital, OrbitalBadge, TelemetryStat } from "@/components/orbital";
+import { orbital } from "@/components/orbital";
 import { useTypography } from "@/hooks/use-typography";
 import Image from "next/image";
 import { toast } from "sonner";

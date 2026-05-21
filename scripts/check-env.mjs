@@ -52,7 +52,7 @@ if (ok) {
         );
       }
     }
-  } catch (e) {
+  } catch {
     // Non-fatal
   }
 }

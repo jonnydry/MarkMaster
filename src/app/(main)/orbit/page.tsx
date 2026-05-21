@@ -17,13 +17,11 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
-  BadgeCheck,
   ChevronLeft,
   ChevronRight,
   Folder,
   Gauge,
   KeyRound,
-  ListChecks,
   Loader2,
   Map as MapIcon,
   RefreshCw,
@@ -68,7 +66,7 @@ import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
-import { addDislikedHighlightId, addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
+import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { fetchJson } from "@/lib/fetch-json";
@@ -81,7 +79,6 @@ import {
 } from "@/lib/orbit-navigation";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
-import { getStaggerClass } from "@/lib/stagger";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 import type {
@@ -282,7 +279,7 @@ export default function OrbitPage() {
   useEffect(() => {
     if (!menuForId) return;
 
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       setMenuForId(null);
       setMenuPosition(null);
     };
@@ -368,14 +365,6 @@ export default function OrbitPage() {
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
   );
-  const aboveFoldMediaBookmarkId = useMemo(() => {
-    const first = bookmarks.find((bookmark) => {
-      const media = bookmark.media?.[0];
-      return Boolean(media?.url || media?.preview_image_url);
-    });
-    return first?.id ?? null;
-  }, [bookmarks]);
-
   const visibleBookmarkIds = useMemo(
     () => bookmarks.map((b) => b.id),
     [bookmarks]
@@ -434,18 +423,6 @@ export default function OrbitPage() {
           : scanningSelection
             ? "Auto-categorize selection"
             : "Auto-categorize queue";
-  const scanScopeLabel =
-    queueIsLoading
-      ? "Loading queue"
-      : scanTargetCount === 0
-      ? hasSearchQuery
-        ? "No matches in current filter"
-        : "No pending bookmarks"
-      : `${scanTargetCount} ${
-          scanningSelection ? "selected" : queueOrderLabel
-        } bookmark${
-          scanTargetCount === 1 ? "" : "s"
-        }`;
   const showQueueTools =
     isLoading || isError || total > 0 || hasSearchQuery;
 
@@ -546,7 +523,6 @@ export default function OrbitPage() {
   }, [bookmarks, resolvedActiveBookmarkId, activeBookmark, activeBookmarkId, menuForId]);
 
   const activeDecision = activeBookmark ? scan.getDecision(activeBookmark.id) : null;
-  const activeConfidence = activeDecision?.confidence;
 
   const tagDialogBookmarks = useMemo(
     () =>
@@ -842,20 +818,6 @@ export default function OrbitPage() {
     (bookmarkId: string) => {
       scan.dismiss(bookmarkId);
       toast("Keeping this bookmark in Orbit for now.");
-    },
-    [scan]
-  );
-
-  const handleApplyAlternative = useCallback(
-    async (bookmarkId: string) => {
-      try {
-        const applied = await scan.applySuggestion(bookmarkId, "alt");
-        if (applied) {
-          toast.success(`Applied alternative · ${formatAppliedToast(applied)}`);
-        }
-      } catch {
-        // Inline failure state is rendered near the Orbit scan controls.
-      }
     },
     [scan]
   );
@@ -1230,18 +1192,10 @@ export default function OrbitPage() {
               {isLoading ? (
                 <QueueSkeleton />
               ) : isError ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className={cn(orbital.label, "mb-2 text-primary/70")}>Something went wrong</div>
-                  <p className="mb-4 text-sm text-primary/60">
-                    {error instanceof Error ? error.message : "Please try again."}
-                  </p>
-                  <button
-                    onClick={() => refetch()}
-                    className="rounded-sm border border-primary/30 px-3 py-1 text-xs text-primary hover:bg-primary/5"
-                  >
-                    Retry
-                  </button>
-                </div>
+                <QueueError
+                  message={error instanceof Error ? error.message : "Please try again."}
+                  onRetry={() => void refetch()}
+                />
               ) : bookmarks.length === 0 ? (
                 <QueueEmptyState
                   searching={Boolean(search.trim())}

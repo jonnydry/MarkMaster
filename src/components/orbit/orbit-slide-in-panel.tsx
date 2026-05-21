@@ -4,18 +4,9 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
-import {
-  orbital,
-  OrbitalCard,
-  OrbitalBadge,
-  OrbitalActionPill,
-} from "@/components/orbital";
+import { orbital, OrbitalCard } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
-import {
-  orbitDataClass,
-  orbitLabelClass,
-  orbitSectionLabelClass,
-} from "@/lib/orbit-route-chrome";
+import { orbitLabelClass } from "@/lib/orbit-route-chrome";
 
 /**
  * OrbitSlideInPanel

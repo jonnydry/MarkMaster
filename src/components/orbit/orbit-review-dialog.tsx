@@ -54,7 +54,7 @@ import { cn } from "@/lib/utils";
 import { fetchJson } from "@/lib/fetch-json";
 
 import { useOrbitalTheme } from "@/components/providers";
-import { orbital, OrbitalCard } from "@/components/orbital";
+import { orbital } from "@/components/orbital";
 import { reviewChrome } from "@/lib/orbit-review-chrome";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
@@ -478,7 +478,7 @@ export function OrbitReviewDialog({
         collectionDescription: fresh.collectionDescription,
       });
     },
-    [createOrbitReviewDraftFromSuggestion, originalSuggestionById, updateDraft]
+    [originalSuggestionById, updateDraft]
   );
 
   // Slice 3: explicit one-click handler for the prominent Quick Pass "Accept Orbit suggestion" button.

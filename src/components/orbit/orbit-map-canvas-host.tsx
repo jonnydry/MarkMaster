@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { OrbitGraphPayload } from '@/types';
 import { OrbitMapCanvas as LegacyOrbitMapCanvas } from './orbit-map-canvas'; // Fallback
 
@@ -53,6 +53,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       ...rawProps,
       graph: rawProps.graph ?? rawProps.data,
     };
+    const graph = props.graph;
+    const filter = props.filter;
+    const propsRef = useRef(props);
+    propsRef.current = props;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const [useFallback, setUseFallback] = React.useState(false);
@@ -126,23 +130,23 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           switch (msg.type) {
             case MainMessageType.READY:
               console.log('[OrbitMapHost] Worker ready');
-              if (props.graph && props.graph.nodes.length > 0) {
+              if (propsRef.current.graph && propsRef.current.graph.nodes.length > 0) {
                 // Send graph cleanly, including any known positions for layout stability
-                const initialPositions = getRelevantPositions(props.graph);
+                const initialPositions = getRelevantPositions(propsRef.current.graph);
                 const graphMessage: SetGraphMessage = {
                   type: WorkerMessageType.SET_GRAPH,
                   protocolVersion: 1,
-                  graph: props.graph,
+                  graph: propsRef.current.graph,
                   ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
                 };
                 workerRef.current?.postMessage(graphMessage);
-                lastGraphKey.current = `${props.graph.nodes.length}-${props.graph.edges.length}`;
+                lastGraphKey.current = `${propsRef.current.graph.nodes.length}-${propsRef.current.graph.edges.length}`;
 
                 // Then send the current filter
                 const filterMessage = {
                   type: WorkerMessageType.SET_FILTER,
                   protocolVersion: 1,
-                  filter: props.filter,
+                  filter: propsRef.current.filter,
                 };
                 workerRef.current?.postMessage(filterMessage);
               }
@@ -156,11 +160,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
               break;
 
             case MainMessageType.SELECTION_CHANGED:
-              props.onSelectionChange?.(msg.selection ?? null);
+              propsRef.current.onSelectionChange?.(msg.selection ?? null);
               break;
 
             case MainMessageType.HOVER_CHANGED:
-              props.onHoverChange?.(
+              propsRef.current.onHoverChange?.(
                 msg.selection ?? null,
                 msg.canvasX !== undefined && msg.canvasY !== undefined
                   ? { x: msg.canvasX, y: msg.canvasY }
@@ -174,7 +178,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
             case MainMessageType.OPEN_BOOKMARK:
               if (msg.bookmarkId) {
-                props.onOpenBookmark?.(msg.bookmarkId);
+                propsRef.current.onOpenBookmark?.(msg.bookmarkId);
               }
               break;
 
@@ -203,14 +207,14 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                   };
 
                   // Notify parent for persistence (e.g. localStorage)
-                  props.onLayoutUpdated?.({ ...stablePositionsRef.current });
+                  propsRef.current.onLayoutUpdated?.({ ...stablePositionsRef.current });
                 }
               }
               break;
 
             case MainMessageType.CURSOR_CHANGED: {
               // Apply cursor to the container for better UX (visible even near canvas edges)
-              const container = canvasRef.current?.parentElement;
+              const container = canvas.parentElement;
               if (container) {
                 container.style.cursor = msg.cursor;
               }
@@ -219,7 +223,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
             case MainMessageType.ERROR: {
               console.error('[OrbitMapHost] Worker error:', msg);
-              const container = canvasRef.current?.parentElement;
+              const container = canvas.parentElement;
               if (container) container.style.cursor = 'default';
               setUseFallback(true);
               worker.terminate();
@@ -234,7 +238,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
         worker.onerror = (err) => {
           console.error('[OrbitMapHost] Worker crashed:', err);
-          if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+          canvas.style.cursor = 'default';
           setUseFallback(true);
           worker.terminate();
         };
@@ -245,7 +249,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
       // Cleanup
       return () => {
-        const container = canvasRef.current?.parentElement;
+        const container = canvas?.parentElement;
         if (container) container.style.cursor = 'default';
         if (workerRef.current) {
           workerRef.current.postMessage({ type: WorkerMessageType.DESTROY, protocolVersion: 1 });
@@ -259,19 +263,19 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const lastGraphKey = useRef<string>("");
 
     useEffect(() => {
-      if (!workerRef.current || useFallback || !props.graph) return;
+      if (!workerRef.current || useFallback || !graph) return;
 
-      const graphKey = `${props.graph.nodes.length}-${props.graph.edges.length}`;
+      const graphKey = `${graph.nodes.length}-${graph.edges.length}`;
 
       const graphChanged = lastGraphKey.current !== graphKey;
 
       if (graphChanged) {
         // Send full graph, including any known positions for layout stability
-        const initialPositions = getRelevantPositions(props.graph);
+        const initialPositions = getRelevantPositions(graph);
         const graphMessage: SetGraphMessage = {
           type: WorkerMessageType.SET_GRAPH,
           protocolVersion: 1,
-          graph: props.graph,
+          graph,
           ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
         };
 
@@ -283,11 +287,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       const filterMessage = {
         type: WorkerMessageType.SET_FILTER,
         protocolVersion: 1,
-        filter: props.filter,
+        filter,
       };
 
       workerRef.current.postMessage(filterMessage);
-    }, [props.graph, props.filter, useFallback]);
+    }, [graph, filter, useFallback]);
 
     // Forward resize to worker
     useEffect(() => {

@@ -283,7 +283,7 @@ class SyncTestHarness {
     mocks.prisma.$transaction.mockImplementation(async (fn: (p: any) => any) => {
       try {
         return await fn(mocks.prisma);
-      } catch (err) {
+      } catch {
         // During development of resume PBT, we tolerate collection errors
         return {};
       }

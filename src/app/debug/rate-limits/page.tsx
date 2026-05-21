@@ -89,7 +89,7 @@ export default function RateLimitsDebugPage() {
 
       toast.success(`Rate limit for "${action}" has been reset`);
       await fetchAll();
-    } catch (error) {
+    } catch {
       toast.error(`Failed to reset "${action}"`);
     } finally {
       setResetting(null);

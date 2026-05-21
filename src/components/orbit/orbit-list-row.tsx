@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
 import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 import { orbitDataClass, orbitHairlineBorder, orbitLabelClass } from "@/lib/orbit-route-chrome";
 import { OrbitActionPill } from "./orbit-quick-actions";
 
