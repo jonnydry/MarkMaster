@@ -363,10 +363,13 @@ export interface OrbitGraphStats {
   xFolderCount: number;
 }
 
+export type OrbitGraphScope = "library" | "orbit";
+
 export interface OrbitGraphPayload {
   nodes: OrbitGraphNode[];
   edges: OrbitGraphEdge[];
   stats: OrbitGraphStats;
   generatedAt: string;
   nodeCap: number;
+  scope?: OrbitGraphScope;
 }

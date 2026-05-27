@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import type { OrbitGraphPayload } from '@/types';
-import { OrbitMapCanvas as LegacyOrbitMapCanvas } from './orbit-map-canvas'; // Fallback
+import { OrbitMapCanvas as LegacyOrbitMapCanvas } from './orbit-map-canvas';
+import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
+import { loadOrbitMapPositions } from '@/lib/orbit-map-layout-storage';
 
 // Import protocol types (including shared UI types)
 import {
@@ -29,6 +31,8 @@ interface OrbitMapCanvasHostProps {
   className?: string;
   filterControlsClassName?: string;
   zoomControlsClassName?: string;
+  /** Persists layout positions per graph scope (library vs orbit). */
+  layoutScope?: string;
 }
 
 export interface OrbitMapCanvasHandle {
@@ -59,7 +63,24 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     propsRef.current = props;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
-    const [useFallback, setUseFallback] = React.useState(false);
+    const [useFallback, setUseFallback] = useState(false);
+    const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
+    const activeFilter = filter ?? internalFilter;
+    const layoutScope = props.layoutScope ?? 'library';
+
+    useEffect(() => {
+      const loaded = loadOrbitMapPositions(layoutScope);
+      stablePositionsRef.current = loaded;
+      latestPositionsRef.current = { ...loaded };
+    }, [layoutScope]);
+
+    useEffect(() => {
+      if (filter) setInternalFilter(filter);
+    }, [filter]);
+
+    const postToWorker = useCallback((msg: WorkerMessage) => {
+      workerRef.current?.postMessage(msg);
+    }, []);
 
     // Stores the most recent node positions received from the worker (live, may be mid-simulation).
     const latestPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
@@ -129,7 +150,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
           switch (msg.type) {
             case MainMessageType.READY:
-              console.log('[OrbitMapHost] Worker ready');
               if (propsRef.current.graph && propsRef.current.graph.nodes.length > 0) {
                 // Send graph cleanly, including any known positions for layout stability
                 const initialPositions = getRelevantPositions(propsRef.current.graph);
@@ -146,9 +166,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                 const filterMessage = {
                   type: WorkerMessageType.SET_FILTER,
                   protocolVersion: 1,
-                  filter: propsRef.current.filter,
+                  filter: propsRef.current.filter ?? 'all',
                 };
                 workerRef.current?.postMessage(filterMessage);
+              }
+              if (propsRef.current.selection) {
+                workerRef.current?.postMessage({
+                  type: WorkerMessageType.SET_SELECTION,
+                  protocolVersion: 1,
+                  selection: propsRef.current.selection,
+                });
               }
               break;
 
@@ -290,8 +317,34 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         filter,
       };
 
-      workerRef.current.postMessage(filterMessage);
-    }, [graph, filter, useFallback]);
+      workerRef.current.postMessage({
+        ...filterMessage,
+        filter: activeFilter,
+      });
+    }, [graph, activeFilter, filter, useFallback]);
+
+    useEffect(() => {
+      if (!workerRef.current || useFallback) return;
+      workerRef.current.postMessage({
+        type: WorkerMessageType.SET_SELECTION,
+        protocolVersion: 1,
+        selection: props.selection ?? null,
+      });
+    }, [props.selection, useFallback]);
+
+    useEffect(() => {
+      if (!workerRef.current || useFallback || !props.focus) return;
+      workerRef.current.postMessage({
+        type: WorkerMessageType.FOCUS_ON,
+        protocolVersion: 1,
+        selection: { kind: 'bookmark', id: props.focus.bookmarkId },
+      });
+      workerRef.current.postMessage({
+        type: WorkerMessageType.FOCUS_PULSE,
+        protocolVersion: 1,
+        nodeId: props.focus.predictedAnchorId,
+      });
+    }, [props.focus, useFallback]);
 
     // Forward resize to worker
     useEffect(() => {
@@ -315,69 +368,96 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       return () => observer.disconnect();
     }, [useFallback]);
 
-    // === Event Forwarding for Pan & Zoom (to the worker) ===
+    const canvasPoint = (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+
+    // Pointer, wheel, and touch → worker (hit-test + pan + zoom)
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas || useFallback || !workerRef.current) return;
 
-      let isDragging = false;
-      let lastX = 0;
-      let lastY = 0;
-
-      const sendMessage = (msg: WorkerMessage) => {
+      const send = (msg: WorkerMessage) => {
         workerRef.current?.postMessage(msg);
       };
 
-      // Mouse / Pointer events for pan
       const handlePointerDown = (e: PointerEvent) => {
-        isDragging = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
         canvas.setPointerCapture(e.pointerId);
+        send({
+          type: WorkerMessageType.POINTER_DOWN,
+          protocolVersion: 1,
+          x,
+          y,
+          button: e.button,
+        });
       };
 
       const handlePointerMove = (e: PointerEvent) => {
-        if (!isDragging) return;
-
-        const dx = e.clientX - lastX;
-        const dy = e.clientY - lastY;
-        lastX = e.clientX;
-        lastY = e.clientY;
-
-        sendMessage({
-          type: WorkerMessageType.PAN,
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        send({
+          type: WorkerMessageType.POINTER_MOVE,
           protocolVersion: 1,
-          dx,
-          dy,
+          x,
+          y,
+          buttons: e.buttons,
         });
       };
 
       const handlePointerUp = (e: PointerEvent) => {
-        isDragging = false;
-        canvas.releasePointerCapture(e.pointerId);
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        send({
+          type: WorkerMessageType.POINTER_UP,
+          protocolVersion: 1,
+          x,
+          y,
+          button: e.button,
+        });
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          /* capture may already be released */
+        }
       };
 
-      // Wheel for zoom (with cursor position)
+      const handlePointerLeave = () => {
+        send({
+          type: WorkerMessageType.POINTER_LEAVE,
+          protocolVersion: 1,
+        });
+      };
+
       const handleWheel = (e: WheelEvent) => {
         e.preventDefault();
-
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const delta = e.deltaY < 0 ? 1.1 : 0.9;
-
-        sendMessage({
-          type: WorkerMessageType.ZOOM,
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        send({
+          type: WorkerMessageType.WHEEL,
           protocolVersion: 1,
-          factor: delta,
-          focalX: x,
-          focalY: y,
-        });  // Now matches ZoomMessage interface
+          deltaY: e.deltaY,
+          x,
+          y,
+          ctrlKey: e.ctrlKey,
+        });
       };
 
-      // Touch support (basic pinch + pan)
+      const handleDoubleClick = (e: MouseEvent) => {
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        send({
+          type: WorkerMessageType.DOUBLE_CLICK,
+          protocolVersion: 1,
+          x,
+          y,
+        });
+      };
+
       let lastTouchDist = 0;
+      let lastTouchX = 0;
+      let lastTouchY = 0;
 
       const handleTouchStart = (e: TouchEvent) => {
         if (e.touches.length === 2) {
@@ -385,42 +465,37 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           const dy = e.touches[0].clientY - e.touches[1].clientY;
           lastTouchDist = Math.hypot(dx, dy);
         } else if (e.touches.length === 1) {
-          lastX = e.touches[0].clientX;
-          lastY = e.touches[0].clientY;
+          lastTouchX = e.touches[0].clientX;
+          lastTouchY = e.touches[0].clientY;
         }
       };
 
       const handleTouchMove = (e: TouchEvent) => {
         e.preventDefault();
-
         if (e.touches.length === 2) {
-          // Pinch zoom
           const dx = e.touches[0].clientX - e.touches[1].clientX;
           const dy = e.touches[0].clientY - e.touches[1].clientY;
           const dist = Math.hypot(dx, dy);
-
           const rect = canvas.getBoundingClientRect();
-          const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-          const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-
-          const delta = dist > lastTouchDist ? 1.06 : 0.94;
+          const cx =
+            (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+          const cy =
+            (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+          const factor = dist > lastTouchDist ? 1.06 : 0.94;
           lastTouchDist = dist;
-
-          sendMessage({
+          send({
             type: WorkerMessageType.ZOOM,
             protocolVersion: 1,
-            factor: delta,
+            factor,
             focalX: cx,
             focalY: cy,
-          });  // Now matches ZoomMessage interface
+          });
         } else if (e.touches.length === 1) {
-          // Single finger pan
-          const dx = e.touches[0].clientX - lastX;
-          const dy = e.touches[0].clientY - lastY;
-          lastX = e.touches[0].clientX;
-          lastY = e.touches[0].clientY;
-
-          sendMessage({
+          const dx = e.touches[0].clientX - lastTouchX;
+          const dy = e.touches[0].clientY - lastTouchY;
+          lastTouchX = e.touches[0].clientX;
+          lastTouchY = e.touches[0].clientY;
+          send({
             type: WorkerMessageType.PAN,
             protocolVersion: 1,
             dx,
@@ -429,11 +504,12 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         }
       };
 
-      // Attach listeners
       canvas.addEventListener('pointerdown', handlePointerDown);
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp);
+      canvas.addEventListener('pointerleave', handlePointerLeave);
       canvas.addEventListener('wheel', handleWheel, { passive: false });
+      canvas.addEventListener('dblclick', handleDoubleClick);
       canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
       canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 
@@ -441,11 +517,55 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         canvas.removeEventListener('pointerdown', handlePointerDown);
         window.removeEventListener('pointermove', handlePointerMove);
         window.removeEventListener('pointerup', handlePointerUp);
+        canvas.removeEventListener('pointerleave', handlePointerLeave);
         canvas.removeEventListener('wheel', handleWheel);
+        canvas.removeEventListener('dblclick', handleDoubleClick);
         canvas.removeEventListener('touchstart', handleTouchStart);
         canvas.removeEventListener('touchmove', handleTouchMove);
       };
     }, [useFallback]);
+
+    const handleFilterChange = (next: GraphFilter) => {
+      setInternalFilter(next);
+      postToWorker({
+        type: WorkerMessageType.SET_FILTER,
+        protocolVersion: 1,
+        filter: next,
+      });
+    };
+
+    const handleZoomIn = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      postToWorker({
+        type: WorkerMessageType.ZOOM,
+        protocolVersion: 1,
+        factor: 1.2,
+        focalX: rect.width / 2,
+        focalY: rect.height / 2,
+      });
+    };
+
+    const handleZoomOut = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      postToWorker({
+        type: WorkerMessageType.ZOOM,
+        protocolVersion: 1,
+        factor: 0.85,
+        focalX: rect.width / 2,
+        focalY: rect.height / 2,
+      });
+    };
+
+    const handleResetView = () => {
+      postToWorker({
+        type: WorkerMessageType.RESET_VIEW,
+        protocolVersion: 1,
+      });
+    };
 
     // Helper to normalize various focusOn input formats into a proper OrbitMapSelection
     const normalizeToSelection = (input: string | { kind: string; id: string } | OrbitMapSelection): OrbitMapSelection => {
@@ -537,17 +657,30 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }
 
     return (
-      <div className={props.className} style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div
+        className={props.className}
+        role="application"
+        aria-label="Orbit graph map"
+        style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
+      >
         <canvas
           ref={canvasRef}
           style={{
             width: '100%',
             height: '100%',
             display: 'block',
-            touchAction: 'none', // Important for smooth touch gestures
+            touchAction: 'none',
           }}
         />
-        {/* DOM overlays (hover cards, etc.) will be rendered here by the parent */}
+        <OrbitMapCanvasControls
+          activeFilter={activeFilter}
+          onFilterChange={handleFilterChange}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetView={handleResetView}
+          filterControlsClassName={props.filterControlsClassName}
+          zoomControlsClassName={props.zoomControlsClassName}
+        />
       </div>
     );
   }

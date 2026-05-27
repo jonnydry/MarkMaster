@@ -139,6 +139,50 @@ describe("/api/orbit/graph", () => {
     );
   });
 
+  it("limits bookmark nodes to the Orbit queue when scope=orbit", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count)
+      .mockResolvedValueOnce(12)
+      .mockResolvedValueOnce(4);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+      {
+        id: "bookmark-loose",
+        tweetText: "Still in orbit",
+        authorUsername: "orbituser",
+        authorDisplayName: "Orbit User",
+        bookmarkedAt: new Date(),
+        tags: [],
+        collectionItems: [],
+      },
+    ]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph?scope=orbit")
+    );
+    const payload = (await response.json()) as OrbitGraphPayload;
+
+    expect(response.status).toBe(200);
+    expect(payload.scope).toBe("orbit");
+    expect(prisma.bookmark.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: "user-1",
+          tags: { none: {} },
+          collectionItems: {
+            none: { collection: { type: "user_collection" } },
+          },
+        },
+      })
+    );
+    expect(payload.nodes).toContainEqual(
+      expect.objectContaining({ kind: "bookmark", id: "bookmark-loose" })
+    );
+  });
+
   it("preserves expanded-spectrum tag colors in graph nodes", async () => {
     const { prisma } = await import("@/lib/prisma");
     const { GET } = await import("./route");

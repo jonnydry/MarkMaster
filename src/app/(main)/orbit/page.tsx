@@ -17,8 +17,6 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
   Folder,
   Gauge,
   KeyRound,
@@ -32,6 +30,10 @@ import {
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { RetryButton } from "@/components/ui/retry-button";
+import { PaginationControls } from "@/components/pagination-controls";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { SearchBar } from "@/components/search-bar";
@@ -45,7 +47,9 @@ const OrbitReviewDialog = dynamic(
   { ssr: false }
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
+import { OrbitQueueToolbar } from "@/components/orbit/orbit-queue-toolbar";
 import { OrbitScanHero } from "@/components/orbit/orbit-scan-hero";
+import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 
 // New clean-list + slide-in + overlays components (new Orbit model)
 import { OrbitList } from "@/components/orbit/orbit-list";
@@ -55,13 +59,18 @@ import { OrbitSlideInPanel } from "@/components/orbit/orbit-slide-in-panel";
 import { orbital } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
 import {
+  clampMenuPosition,
+  orbitBannerClass,
+  orbitControlRadius,
   orbitDataClass,
+  orbitGhostButtonClass,
   orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
-  orbitMetaSoft,
+  orbitSelectionBarClass,
   orbitShellClass,
 } from "@/lib/orbit-route-chrome";
+import { appContentGutterClassName } from "@/lib/app-chrome";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
@@ -126,12 +135,15 @@ function sameBookmarkIds(a: string[], b: string[]) {
 function OrbitHeaderLogoAccent() {
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 right-16 hidden w-[240px] overflow-hidden sm:block"
+      className="pointer-events-none absolute right-16 top-3 z-0 hidden w-[240px] sm:block"
       aria-hidden
     >
-      <div className="absolute right-3 top-1/2 size-28 -translate-y-1/2 rounded-full bg-primary/15 blur-2xl" />
-      <OrbitLogoMark className="absolute right-0 top-1/2 size-28 -translate-y-1/2 opacity-[0.12]" />
-      <OrbitLogoMark className="absolute right-12 top-1/2 size-16 -translate-y-1/2 opacity-80 drop-shadow-[0_0_22px_rgba(37,99,235,0.42)]" />
+      {/* Fixed-height anchor so dismissible content below (triage hint) does not shift vertical center. */}
+      <div className="relative h-[4.75rem] w-full overflow-hidden">
+        <div className="absolute right-3 top-1/2 size-28 -translate-y-1/2 rounded-full bg-primary/15 blur-2xl" />
+        <OrbitLogoMark className="absolute right-0 top-1/2 size-28 -translate-y-1/2 opacity-[0.12]" />
+        <OrbitLogoMark className="absolute right-12 top-1/2 size-16 -translate-y-1/2 opacity-80 drop-shadow-[0_0_22px_rgba(37,99,235,0.42)]" />
+      </div>
     </div>
   );
 }
@@ -273,6 +285,9 @@ export default function OrbitPage() {
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [menuForId, setMenuForId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [appliedBookmarkIds, setAppliedBookmarkIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [selectionMode, setSelectionMode] = useState(false);
 
   // Simple click-outside + Esc for the floating menu (keeps things lightweight)
@@ -485,9 +500,21 @@ export default function OrbitPage() {
     ? bookmarkById.get(resolvedActiveBookmarkId) ?? null
     : null;
 
-  // Basic keyboard navigation for the clean list (arrow keys + Enter/Esc)
+  const isEditableTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return (
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      target.isContentEditable ||
+      target.closest("[contenteditable='true']") !== null
+    );
+  };
+
+  // Keyboard navigation for the clean list (arrow keys + Enter/Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
       if (!bookmarks.length) return;
 
       const currentIndex = bookmarks.findIndex((b) => b.id === resolvedActiveBookmarkId);
@@ -504,7 +531,8 @@ export default function OrbitPage() {
         setActiveBookmarkId(bookmarks[prev].id);
       }
 
-      if (e.key === "Enter" && resolvedActiveBookmarkId && !activeBookmark) {
+      if (e.key === "Enter" && resolvedActiveBookmarkId) {
+        e.preventDefault();
         setActiveBookmarkId(resolvedActiveBookmarkId);
       }
 
@@ -520,9 +548,35 @@ export default function OrbitPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [bookmarks, resolvedActiveBookmarkId, activeBookmark, activeBookmarkId, menuForId]);
+  }, [bookmarks, resolvedActiveBookmarkId, activeBookmarkId, menuForId]);
+
+  useEffect(() => {
+    if (!resolvedActiveBookmarkId) return;
+    const row = document.querySelector(
+      `[data-orbit-row-id="${resolvedActiveBookmarkId}"]`
+    );
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [resolvedActiveBookmarkId]);
 
   const activeDecision = activeBookmark ? scan.getDecision(activeBookmark.id) : null;
+
+  const orbitMapHref = useMemo(() => {
+    if (!resolvedActiveBookmarkId) return "/orbit/map?scope=orbit";
+    const params = new URLSearchParams({
+      focus: resolvedActiveBookmarkId,
+      scope: "orbit",
+    });
+    const decision = scan.getDecision(resolvedActiveBookmarkId);
+    const primary = decision?.primary;
+    if (primary?.kind === "tag") {
+      const tag = tags.find((t) => t.name === primary.label);
+      if (tag) params.set("anchor", tag.id);
+    } else if (primary?.kind === "collection") {
+      const collection = collections.find((c) => c.name === primary.label);
+      if (collection) params.set("anchor", collection.id);
+    }
+    return `/orbit/map?${params.toString()}`;
+  }, [collections, resolvedActiveBookmarkId, scan, tags]);
 
   const tagDialogBookmarks = useMemo(
     () =>
@@ -757,12 +811,19 @@ export default function OrbitPage() {
     setLastScanRequest(null);
   }, [scan]);
 
-  const handleOpenBookmarkReview = useCallback((bookmarkId: string) => {
-    setActiveBookmarkId(bookmarkId);
-    setReviewBookmarkId(bookmarkId);
-    setReviewSessionId((current) => current + 1);
-    setReviewOpen(true);
-  }, []);
+  const handleOpenBookmarkReview = useCallback(
+    (bookmarkId: string) => {
+      if (!scan.plan) {
+        toast.message("Run a scan first to open Review pass.");
+        return;
+      }
+      setActiveBookmarkId(bookmarkId);
+      setReviewBookmarkId(bookmarkId);
+      setReviewSessionId((current) => current + 1);
+      setReviewOpen(true);
+    },
+    [scan.plan]
+  );
 
   const handleApplyReviewedPlan = useCallback(
     async (
@@ -816,8 +877,14 @@ export default function OrbitPage() {
 
   const handleKeepInOrbit = useCallback(
     (bookmarkId: string) => {
-      scan.dismiss(bookmarkId);
-      toast("Keeping this bookmark in Orbit for now.");
+      const wasDismissed = scan.dismissedBookmarkIds.has(bookmarkId);
+      scan.toggleDismiss(bookmarkId);
+      if (wasDismissed) {
+        toast.success("Grok suggestion restored for this bookmark.");
+        return true;
+      }
+      toast("Skipped Grok suggestion for this pass.");
+      return false;
     },
     [scan]
   );
@@ -841,6 +908,11 @@ export default function OrbitPage() {
       scan.applySuggestion(id, "primary")
         .then((applied) => {
           if (applied) {
+            setAppliedBookmarkIds((current) => {
+              const next = new Set(current);
+              next.add(id);
+              return next;
+            });
             toast.success(`Applied · ${formatAppliedToast(applied)}`);
           }
         })
@@ -850,7 +922,9 @@ export default function OrbitPage() {
     } else if (kind === "discard") {
       actions.handleDeleteBookmark(id);
     } else if (kind === "dismiss" || kind === "archive") {
-      handleKeepInOrbit(id);
+      const restored = handleKeepInOrbit(id);
+      if (!restored) setActiveBookmarkId(null);
+      return;
     }
     setActiveBookmarkId(null);
   };
@@ -874,12 +948,10 @@ export default function OrbitPage() {
       handleBookmarkAddToCollection(id);
     } else if (action === "keep") {
       handleKeepInOrbit(id);
-      toast.success("Kept in Orbit");
     } else if (action === "discard") {
       actions.handleDeleteBookmark(id);
     } else if (action === "archive") {
       handleKeepInOrbit(id);
-      toast.success("Kept in Orbit");
     } else {
       setActiveBookmarkId(id);
     }
@@ -967,47 +1039,57 @@ export default function OrbitPage() {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="app-main-scroll scrollbar-thin">
-          <div className="sticky top-0 z-10">
-            <PageHeader
-              className="isolate overflow-hidden"
-              bodyClassName="relative overflow-hidden"
-              title={
-                <span className="flex items-center gap-2">
-                  <OrbitLogoMark className="size-5" />
-                  Orbit
-                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] text-mono-label text-primary">
-                    <span className="size-1.5 rounded-full bg-orbital-glow orbital-nucleus" aria-hidden="true" />
-                    LIVE
-                  </span>
+          <PageHeader
+            sticky
+            className="isolate overflow-hidden"
+            bodyClassName="relative overflow-hidden"
+            title={
+              <span className="flex items-center gap-2">
+                <OrbitLogoMark className="size-5" />
+                Orbit
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] text-mono-label text-primary"
+                  aria-live="polite"
+                >
+                  {total > 0 ? `${total.toLocaleString()} waiting` : "Queue clear"}
                 </span>
-              }
-              description="Triage the bookmarks still circling your library."
-              leading={
-                <div className="md:hidden">
-                  <MobileSidebar
-                    tags={tags}
-                    collections={collections}
-                    selectedTags={[]}
-                    onTagToggle={goToTagOnDashboard}
-                    onCreateCollection={handleCreateCollectionOpen}
-                    lastSyncAt={
-                      dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
-                    }
-                    onSyncComplete={handleSyncComplete}
-                  />
-                </div>
-              }
-              actions={dbUser ? <UserNavDynamic user={dbUser} /> : null}
+              </span>
+            }
+            description={scanHelperText}
+            leading={
+              <div className="md:hidden">
+                <MobileSidebar
+                  tags={tags}
+                  collections={collections}
+                  selectedTags={[]}
+                  onTagToggle={goToTagOnDashboard}
+                  onCreateCollection={handleCreateCollectionOpen}
+                  lastSyncAt={
+                    dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
+                  }
+                  onSyncComplete={handleSyncComplete}
+                />
+              </div>
+            }
+            actions={dbUser ? <UserNavDynamic user={dbUser} /> : null}
+          >
+            <OrbitHeaderLogoAccent />
+            <div
+              className={cn(
+                "mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2 text-[10px]",
+                orbitHairlineBorder(isOrbital),
+                orbitMetaMuted(isOrbital)
+              )}
             >
-              <OrbitHeaderLogoAccent />
-            </PageHeader>
-          </div>
+              <span className={orbitDataClass(isOrbital)}>{total} unsorted</span>
+              <span className={orbitDataClass(isOrbital)}>Grok</span>
+            </div>
+            <OrbitTriageHint className="mt-2" />
+          </PageHeader>
 
-          <div className="space-y-4 px-4 pb-6 pt-3 sm:px-5">
+          <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-4")}>
             <section className={cn(bookmarkFeedColumnClassName, "pt-1")}>
               <OrbitScanHero
-                helperText={scanHelperText}
-                total={total}
                 scanButtonLabel={scanButtonLabel}
                 queueIsLoading={queueIsLoading}
                 scanning={scan.scanning}
@@ -1015,14 +1097,23 @@ export default function OrbitPage() {
                 hasScanPlan={!!scan.plan}
                 applyingBatch={scan.applyingBatch}
                 canApplyStrongMatches={canApplyStrongMatches}
-                mapHref={
-                  resolvedActiveBookmarkId
-                    ? `/orbit/map?focus=${resolvedActiveBookmarkId}`
-                    : "/orbit/map"
-                }
+                mapHref={orbitMapHref}
                 onScan={handleScan}
                 onApplyStrongMatches={handleApplyStrongMatches}
                 onReviewPass={handleOpenReviewAll}
+                queueToolbar={
+                  <OrbitQueueToolbar
+                    orbitView={orbitView}
+                    total={total}
+                    sortDirection={queueSortDirection}
+                    queueOrderLabel={queueOrderLabel}
+                    onChangeView={handleOrbitViewChange}
+                    onChangeSortDirection={handleQueueSortDirectionChange}
+                    selectionMode={selectionMode}
+                    canSelect={total > 0}
+                    onToggleSelectionMode={toggleSelectionMode}
+                  />
+                }
                 scanError={
                   scan.error ? (
                   <OrbitScanFailureNotice
@@ -1049,7 +1140,10 @@ export default function OrbitPage() {
               {staleScanPlan ? (
                 <div
                   role="status"
-                  className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className={cn(
+                    "flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+                    orbitBannerClass(isOrbital)
+                  )}
                 >
                   <p className="text-sm text-primary/95">
                     This Grok pass was run on a different search, page, or
@@ -1068,35 +1162,34 @@ export default function OrbitPage() {
                 </div>
               ) : null}
 
-              <QueueHeader
-                orbitView={orbitView}
-                total={total}
-                sortDirection={queueSortDirection}
-                queueOrderLabel={queueOrderLabel}
-                onChangeView={handleOrbitViewChange}
-                onChangeSortDirection={handleQueueSortDirectionChange}
-                selectionMode={selectionMode}
-                canSelect={total > 0}
-                onToggleSelectionMode={toggleSelectionMode}
-              />
-
               {selectionMode && selectedBookmarkIds.size > 0 && (
                 <div
                   className={cn(
-                    "sticky top-[calc(var(--header-height)+8px)] z-[8] flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-5",
-                    isOrbital
-                      ? "rounded-sm border border-hairline-soft glass-orbital"
-                      : "rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))] shadow-xl backdrop-blur-md"
+                    "sticky top-[calc(var(--header-height)+8px)] z-[var(--z-sticky-subbar)] flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-5",
+                    orbitSelectionBarClass(isOrbital)
                   )}
                 >
-                  <span
-                    className={cn(
-                      orbitLabelClass(isOrbital),
-                      isOrbital ? "text-primary/80" : "text-white/80"
-                    )}
-                  >
-                    {selectedBookmarkIds.size} selected
-                  </span>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span
+                      className={cn(
+                        orbitLabelClass(isOrbital),
+                        isOrbital ? "text-primary/80" : "text-white/80"
+                      )}
+                    >
+                      {selectedBookmarkIds.size} selected
+                    </span>
+                    {hasSelectionOverflow ? (
+                      <span
+                        className={cn(
+                          "text-[10px]",
+                          isOrbital ? "text-amber-300/90" : "text-amber-200/90"
+                        )}
+                      >
+                        Grok will process the first{" "}
+                        {ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} selected.
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="ml-auto flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
@@ -1129,7 +1222,7 @@ export default function OrbitPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 gap-1.5 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      className={cn("h-8 gap-1.5", orbitGhostButtonClass(isOrbital))}
                       onClick={handleBulkAddTag}
                     >
                       <TagIcon className="size-3.5" />
@@ -1189,18 +1282,77 @@ export default function OrbitPage() {
                 </>
               )}
 
-              {isLoading ? (
-                <QueueSkeleton />
-              ) : isError ? (
-                <QueueError
-                  message={error instanceof Error ? error.message : "Please try again."}
-                  onRetry={() => void refetch()}
+              {isError ? (
+                <ErrorState
+                  layout="panel"
+                  title="Orbit could not be loaded"
+                  description={
+                    error instanceof Error ? error.message : "Please try again."
+                  }
+                  action={<RetryButton onClick={() => void refetch()} />}
+                />
+              ) : isLoading ? (
+                <OrbitList
+                  bookmarks={[]}
+                  isLoading
+                  selectionMode={selectionMode}
+                  selectedIds={selectedBookmarkIds}
+                  getDecision={scan.getDecision}
+                  dismissedBookmarkIds={scan.dismissedBookmarkIds}
+                  appliedBookmarkIds={appliedBookmarkIds}
                 />
               ) : bookmarks.length === 0 ? (
-                <QueueEmptyState
-                  searching={Boolean(search.trim())}
-                  onClearSearch={() => handleSearchChange("")}
-                  onOpenBookmarks={() => router.push("/dashboard")}
+                <EmptyState
+                  layout="inline"
+                  leading={<OrbitLogoMark className="mx-auto mb-4 size-8" />}
+                  title={search.trim() ? "No matches in Orbit" : "Orbit is clear"}
+                  description={
+                    search.trim()
+                      ? "Try a different term or clear the query."
+                      : "Library organized. Highlights will surface the next standouts for Orbit review."
+                  }
+                  action={
+                    search.trim() ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={orbitControlRadius(isOrbital)}
+                        onClick={() => handleSearchChange("")}
+                      >
+                        Clear search
+                      </Button>
+                    ) : (
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <Link
+                          href="/orbit/map"
+                          className={cn(
+                            buttonVariants({ size: "sm" }),
+                            orbitControlRadius(isOrbital)
+                          )}
+                        >
+                          <MapIcon className="size-3.5" aria-hidden />
+                          Inspect graph
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={orbitControlRadius(isOrbital)}
+                          onClick={() => router.push("/dashboard")}
+                        >
+                          Search bookmarks
+                        </Button>
+                        <Link
+                          href="/collections"
+                          className={cn(
+                            buttonVariants({ size: "sm", variant: "outline" }),
+                            orbitControlRadius(isOrbital)
+                          )}
+                        >
+                          Open collections
+                        </Link>
+                      </div>
+                    )
+                  }
                 />
               ) : (
                 <>
@@ -1214,6 +1366,9 @@ export default function OrbitPage() {
                       isLoading={isLoading}
                       selectionMode={selectionMode}
                       selectedIds={selectedBookmarkIds}
+                      getDecision={scan.getDecision}
+                      dismissedBookmarkIds={scan.dismissedBookmarkIds}
+                      appliedBookmarkIds={appliedBookmarkIds}
                       onToggleSelect={(id) =>
                         handleSelectionChange(id, !selectedBookmarkIds.has(id))
                       }
@@ -1226,20 +1381,18 @@ export default function OrbitPage() {
                       }}
                       onQuickAction={(id, action, event) => {
                         if (action === "keep") {
+                          const wasDismissed = scan.dismissedBookmarkIds.has(id);
                           handleKeepInOrbit(id);
-                          setActiveBookmarkId(null);
-                          toast.success("Kept in Orbit");
+                          if (!wasDismissed) setActiveBookmarkId(null);
                         } else if (action === "tag") {
                           handleBookmarkAddTag(id);
-                        } else if (action === "review") {
-                          handleOpenBookmarkReview(id);
                         } else if (action === "menu" && event) {
-                          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                          const rect = (
+                            event.currentTarget as HTMLElement
+                          ).getBoundingClientRect();
+                          const raw = { x: rect.right + 8, y: rect.top };
                           setMenuForId(id);
-                          setMenuPosition({
-                            x: rect.right + 8,
-                            y: rect.top,
-                          });
+                          setMenuPosition(clampMenuPosition(raw.x, raw.y));
                         } else {
                           setActiveBookmarkId(id);
                         }
@@ -1249,10 +1402,11 @@ export default function OrbitPage() {
                     {orbitView === "all" &&
                       totalPages > 1 &&
                       bookmarks.length > 0 && (
-                        <Pagination
+                        <PaginationControls
+                          variant="orbit"
                           page={page}
                           totalPages={totalPages}
-                          onChange={handlePageChange}
+                          onPageChange={handlePageChange}
                         />
                       )}
                   </div>
@@ -1285,6 +1439,11 @@ export default function OrbitPage() {
                   isOpen={!!activeBookmarkId && !!activeBookmark && !selectionMode}
                   onClose={() => setActiveBookmarkId(null)}
                   decision={activeDecision}
+                  suggestionDismissed={
+                    activeBookmark
+                      ? scan.dismissedBookmarkIds.has(activeBookmark.id)
+                      : false
+                  }
                   onFullReview={(id) => handleOpenBookmarkReview(id)}
                   onDecision={handleSlideInDecision}
                   onAddTag={handleBookmarkAddTag}
@@ -1561,322 +1720,6 @@ function OrbitScanFailureNotice({
           </Button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-interface QueueHeaderProps {
-  orbitView: OrbitView;
-  total: number;
-  sortDirection: OrbitSortDirection;
-  queueOrderLabel: string;
-  onChangeView: (view: OrbitView) => void;
-  onChangeSortDirection: (direction: OrbitSortDirection) => void;
-  selectionMode: boolean;
-  canSelect: boolean;
-  onToggleSelectionMode: () => void;
-}
-
-function QueueHeader({
-  orbitView,
-  total,
-  sortDirection,
-  queueOrderLabel,
-  onChangeView,
-  onChangeSortDirection,
-  selectionMode,
-  canSelect,
-  onToggleSelectionMode,
-}: QueueHeaderProps) {
-  const { isOrbital } = useOrbitalTheme();
-  const controlShell = isOrbital
-    ? "inline-flex items-center gap-1 rounded-xl border border-hairline-soft bg-surface-2/70 p-1 shadow-sm"
-    : "inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 shadow-sm";
-
-  return (
-    <section className="pt-1">
-      <div
-        className={cn(
-          "flex flex-col gap-4 border-b pb-4",
-          orbitHairlineBorder(isOrbital)
-        )}
-      >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className={orbitLabelClass(isOrbital, orbitMetaMuted(isOrbital))}>
-              Orbit queue
-            </p>
-            <p
-              className={cn(
-                "mt-1 text-sm font-semibold",
-                isOrbital ? "text-foreground" : "text-white"
-              )}
-            >
-              {orbitView === "recent"
-                ? sortDirection === "asc"
-                  ? "Oldest bookmarks still in orbit"
-                  : "Freshest bookmarks still in orbit"
-                : sortDirection === "asc"
-                  ? "All unsorted bookmarks, oldest first"
-                  : "All unsorted bookmarks, newest first"}
-            </p>
-            <p
-              className={cn(
-                orbitDataClass(isOrbital),
-                "mt-1 normal-case text-[11px]",
-                orbitMetaSoft(isOrbital)
-              )}
-            >
-              {total.toLocaleString()} bookmarks · {queueOrderLabel}
-            </p>
-          </div>
-
-          {canSelect ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className={controlShell}>
-                <button
-                  type="button"
-                  aria-pressed={orbitView === "recent"}
-                  onClick={() => onChangeView("recent")}
-                  className={cn(
-                    "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
-                    orbitView === "recent"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Recent
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px]",
-                      orbitView === "recent"
-                        ? "bg-primary-foreground/15 text-primary-foreground/80"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {Math.min(total, ORBIT_RECENT_PAGE_SIZE).toLocaleString()}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={orbitView === "all"}
-                  onClick={() => onChangeView("all")}
-                  className={cn(
-                    "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors",
-                    orbitView === "all"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  All
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px]",
-                      orbitView === "all"
-                        ? "bg-primary-foreground/15 text-primary-foreground/80"
-                        : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {total.toLocaleString()}
-                  </span>
-                </button>
-              </div>
-
-              <div className={controlShell}>
-                <button
-                  type="button"
-                  aria-pressed={sortDirection === "desc"}
-                  onClick={() => onChangeSortDirection("desc")}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors",
-                    sortDirection === "desc"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Newest
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={sortDirection === "asc"}
-                  onClick={() => onChangeSortDirection("asc")}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors",
-                    sortDirection === "asc"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  Oldest
-                </button>
-              </div>
-
-              <button
-                type="button"
-                aria-pressed={selectionMode}
-                onClick={onToggleSelectionMode}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors",
-                  selectionMode
-                    ? isOrbital
-                      ? "bg-primary/15 text-primary hover:bg-primary/25"
-                      : "bg-sky-500/15 text-sky-200 hover:bg-sky-500/25"
-                    : isOrbital
-                      ? "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                )}
-              >
-                {selectionMode ? "Done" : "Select"}
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-      </div>
-    </section>
-  );
-}
-
-function QueueSkeleton() {
-  return (
-    <div className="space-y-2" role="status" aria-label="Loading Orbit">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div
-          key={index}
-          className="rounded-2xl border border-hairline-soft bg-surface-1 px-4 py-4"
-        >
-          <div className="flex gap-3">
-            <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
-            <div className="flex-1 space-y-2">
-              <div className="h-3 w-24 rounded skeleton-shimmer" />
-              <div className="h-3 w-full rounded skeleton-shimmer" />
-              <div className="h-3 w-4/5 rounded skeleton-shimmer" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function QueueError({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-hairline-soft bg-surface-1 p-6 text-center">
-      <p className="text-sm font-medium text-foreground">
-        Orbit could not be loaded
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{message}</p>
-      <Button size="sm" variant="outline" className="mt-3" onClick={onRetry}>
-        Retry
-      </Button>
-    </div>
-  );
-}
-
-function QueueEmptyState({
-  searching,
-  onClearSearch,
-  onOpenBookmarks,
-}: {
-  searching: boolean;
-  onClearSearch: () => void;
-  onOpenBookmarks: () => void;
-}) {
-  return (
-    <div className="border-y border-hairline-soft py-10 text-center">
-      <OrbitLogoMark className="mx-auto mb-4 size-8" />
-      <p className="text-base font-semibold text-foreground">
-        {searching ? "No matches in Orbit" : "Orbit is clear"}
-      </p>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-        {searching
-          ? "Try a different term or clear the query."
-          : "Library organized. Highlights will surface the next standouts for Orbit review."}
-      </p>
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {searching ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-lg"
-            onClick={onClearSearch}
-          >
-            Clear search
-          </Button>
-        ) : (
-          <>
-            <Link
-              href="/orbit/map"
-              className={cn(buttonVariants({ size: "sm" }), "rounded-lg")}
-            >
-              <MapIcon className="size-3.5" aria-hidden />
-              Inspect graph
-            </Link>
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-lg"
-              onClick={onOpenBookmarks}
-            >
-              Search bookmarks
-            </Button>
-            <Link
-              href="/collections"
-              className={cn(
-                buttonVariants({ size: "sm", variant: "outline" }),
-                "rounded-lg"
-              )}
-            >
-              Open collections
-            </Link>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Pagination({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-center gap-2 pt-2">
-      <button
-        type="button"
-        onClick={() => onChange(page - 1)}
-        disabled={page <= 1}
-        aria-label="Previous page"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30"
-      >
-        <ChevronLeft className="size-4" aria-hidden />
-      </button>
-      <span
-        className="tabular-nums text-xs text-muted-foreground"
-        aria-live="polite"
-      >
-        {page} of {totalPages}
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(page + 1)}
-        disabled={page >= totalPages}
-        aria-label="Next page"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline-soft bg-surface-1 text-foreground shadow-sm transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-30"
-      >
-        <ChevronRight className="size-4" aria-hidden />
-      </button>
     </div>
   );
 }

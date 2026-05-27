@@ -5,15 +5,12 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CheckSquare, SlidersHorizontal } from "lucide-react";
-import { SearchBar } from "@/components/search-bar";
+import { DashboardToolbar } from "@/components/dashboard-toolbar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { SortControls } from "@/components/sort-controls";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
-import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
@@ -28,11 +25,9 @@ import type {
   BookmarkWithRelations,
   MediaFilter,
 } from "@/types";
-import { PerformanceHighlights } from "@/components/performance-highlights";
+import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
 import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
-import { trackFlywheelEvent } from "@/lib/flywheel";
-import { HighlightsDigest } from "@/components/highlights-digest";
 import { toast } from "sonner";
 import {
   bookmarkFeedColumnClassName,
@@ -41,9 +36,13 @@ import {
 } from "@/lib/bookmark-feed-layout";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
-import { DashboardEmptyState } from "./dashboard-empty-state";
-import { DashboardErrorState } from "./dashboard-error-state";
-import { PaginationBar } from "./pagination-bar";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RetryButton } from "@/components/ui/retry-button";
+import { PaginationControls } from "@/components/pagination-controls";
+import { Button } from "@/components/ui/button";
+import { SyncButton } from "@/components/sync-button";
+import { Bookmark } from "lucide-react";
 import { SelectionToolbar } from "./selection-toolbar";
 
 import { orbital } from "@/components/orbital";
@@ -203,11 +202,18 @@ function DashboardContent() {
   const {
     data: libraryHighlightData,
     isLoading: libraryHighlightsLoading,
+    isError: libraryHighlightsError,
+    refetch: refetchLibraryHighlights,
   } = usePerformanceHighlightsHook(false, {
     dislikedIds,
     likedIds,
     enabled: feedReady,
   });
+
+  const refetchDiscovery = useCallback(() => {
+    void refetchHighlights();
+    void refetchLibraryHighlights();
+  }, [refetchHighlights, refetchLibraryHighlights]);
 
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
@@ -454,6 +460,13 @@ function DashboardContent() {
     ? highlightBookmarks.filter((b) => new Date(b.bookmarkedAt) > lastSyncAtForHighlights).length
     : 0;
 
+  const quickPicksSubtitle =
+    typeof unsortedTotal === "number"
+      ? `${unsortedTotal.toLocaleString()} untouched high-performers${
+          newSinceLastSync > 0 ? ` • ${newSinceLastSync} new since last sync` : ""
+        }`
+      : undefined;
+
   const handleCommandPaletteFilter = useCallback(
     (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
       if (filter.mediaFilter) {
@@ -474,6 +487,15 @@ function DashboardContent() {
   const primaryFilterCompactLabel =
     filters.mediaFilter === "all" ? "All" : primaryFilterLabel;
 
+  const selectedTagEntries = useMemo(
+    () =>
+      filters.selectedTags.flatMap((tagId) => {
+        const tag = tags.find((entry) => entry.id === tagId);
+        return tag ? [tag] : [];
+      }),
+    [filters.selectedTags, tags]
+  );
+
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
@@ -491,130 +513,59 @@ function DashboardContent() {
 
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="app-main-scroll h-full overflow-x-hidden scrollbar-thin">
-          <div className="sticky top-0 z-20 isolate">
-            <div
-              className={cn(
-                "border-b border-hairline-strong",
-                appChromeFrostedClassName
-              )}
-            >
-              <PageHeader chromeless bodyClassName="px-0 py-0">
-                <div className="dashboard-toolbar px-4 py-2.5 sm:px-5">
-                  <div className="dashboard-toolbar-row flex flex-wrap items-center gap-2">
-                    <div className="dashboard-mobile-menu md:hidden">
-                      <MobileSidebar
-                        tags={tags}
-                        collections={collections}
-                        selectedTags={filters.selectedTags}
-                        onTagToggle={filters.toggleTag}
-                        onCreateCollection={handleCreateCollectionOpen}
-                        lastSyncAt={
-                          dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
-                        }
-                        totalBookmarks={total}
-                        onSyncComplete={handleSyncComplete}
-                      />
-                    </div>
-
-                    <div className="dashboard-filter-strip order-3 flex min-w-0 w-full flex-wrap items-center gap-2 sm:order-none sm:flex-1 sm:w-auto">
-                      <button
-                        onClick={() => {
-                          filters.setSelectedTags([]);
-                          filters.setMediaFilter("all");
-                        }}
-                        aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-                        className="dashboard-filter-summary inline-flex h-9 max-w-full items-center gap-2 whitespace-nowrap rounded-sm border border-hairline-strong border-l-primary bg-background/35 px-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                      >
-                        <span className="dashboard-filter-summary-full truncate">
-                          {primaryFilterLabel}
-                        </span>
-                        <span className="dashboard-filter-summary-compact truncate">
-                          {primaryFilterCompactLabel}
-                        </span>
-                        <span className="text-xs opacity-70" aria-hidden>
-                          {total.toLocaleString()}
-                        </span>
-                      </button>
-                      {filters.selectedTags.map((tagId) => {
-                        const tag = tags.find((t) => t.id === tagId);
-                        return tag ? (
-                          <button
-                            key={tagId}
-                            onClick={() => filters.toggleTag(tagId)}
-                            className="inline-flex items-center gap-1 border-b-2 border-primary px-0.5 py-1 text-xs font-semibold text-foreground transition-colors hover:text-primary"
-                          >
-                            #{tag.name}
-                            <span
-                              className="ml-0.5 text-primary/60 hover:text-primary"
-                              aria-hidden
-                            >
-                              ×
-                            </span>
-                          </button>
-                        ) : null;
-                      })}
-                      <button
-                        type="button"
-                        onClick={() => setShowFilters((v) => !v)}
-                        aria-expanded={showFilters}
-                        aria-controls="dashboard-filter-panel"
-                        aria-label={showFilters ? "Hide filters" : "Show filters"}
-                        className={`dashboard-action-button inline-flex h-9 items-center gap-1.5 rounded-sm border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
-                          showFilters
-                            ? "border-primary/35 bg-primary/10 text-foreground"
-                            : "border-hairline-strong bg-background/35 text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
-                        }`}
-                      >
-                        <SlidersHorizontal className="size-4" aria-hidden />
-                        <span className="dashboard-action-label">Filters</span>
-                        {filters.hasActiveFilters && (
-                          <span
-                            className="w-2 h-2 rounded-full bg-primary"
-                            aria-hidden
-                          />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectionMode) {
-                            clearSelection();
-                          } else {
-                            setSelectionMode(true);
-                          }
-                        }}
-                        aria-pressed={selectionMode}
-                        aria-label={
-                          selectionMode ? "Exit selection mode" : "Enter selection mode"
-                        }
-                        className={`dashboard-action-button inline-flex h-9 items-center gap-1.5 rounded-sm border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
-                          selectionMode
-                            ? "border-primary/35 bg-primary/10 text-foreground"
-                            : "border-hairline-strong bg-background/35 text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
-                        }`}
-                      >
-                        <CheckSquare className="size-4" aria-hidden />
-                        <span className="dashboard-action-label">
-                          {selectionMode ? "Done" : "Select"}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="dashboard-toolbar-controls order-2 ml-auto flex w-full shrink-0 items-center gap-2 sm:order-none sm:ml-0 sm:w-auto">
-                      <SortControls
-                        sortField={filters.sortField}
-                        viewMode={viewMode}
-                        onSortFieldChange={filters.setSortField}
-                        onViewModeChange={setViewMode}
-                      />
-                      {dbUser && (
-                        <div className="dashboard-user-nav shrink-0">
-                          <UserNavDynamic user={dbUser} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+          <PageHeader
+            sticky
+            chromeless
+            className={cn(
+              "isolate border-b border-hairline-strong",
+              appChromeFrostedClassName
+            )}
+            bodyClassName="px-0 py-0"
+          >
+                <DashboardToolbar
+                  mobileSidebar={
+                    <MobileSidebar
+                      tags={tags}
+                      collections={collections}
+                      selectedTags={filters.selectedTags}
+                      onTagToggle={filters.toggleTag}
+                      onCreateCollection={handleCreateCollectionOpen}
+                      lastSyncAt={
+                        dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
+                      }
+                      totalBookmarks={total}
+                      onSyncComplete={handleSyncComplete}
+                    />
+                  }
+                  search={filters.search}
+                  onSearchChange={filters.setSearch}
+                  searchInputRef={searchInputRef}
+                  primaryFilterLabel={primaryFilterLabel}
+                  primaryFilterCompactLabel={primaryFilterCompactLabel}
+                  total={total}
+                  onResetPrimaryFilter={() => {
+                    filters.setSelectedTags([]);
+                    filters.setMediaFilter("all");
+                  }}
+                  selectedTagEntries={selectedTagEntries}
+                  onTagToggle={filters.toggleTag}
+                  showFilters={showFilters}
+                  onToggleFilters={() => setShowFilters((value) => !value)}
+                  hasActiveFilters={filters.hasActiveFilters}
+                  selectionMode={selectionMode}
+                  onToggleSelectionMode={() => {
+                    if (selectionMode) {
+                      clearSelection();
+                    } else {
+                      setSelectionMode(true);
+                    }
+                  }}
+                  sortField={filters.sortField}
+                  viewMode={viewMode}
+                  onSortFieldChange={filters.setSortField}
+                  onViewModeChange={setViewMode}
+                  user={dbUser ?? undefined}
+                />
 
                 {(isFetching || filters.isSearchPending) && !isLoading && (
                   <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">
@@ -631,129 +582,83 @@ function DashboardContent() {
                     onHide={handleBulkHide}
                   />
                 )}
+                {showFilters && (
+                  <div id="dashboard-filter-panel" className="animate-slide-down-fade">
+                    <FilterPanel
+                      mediaFilter={filters.mediaFilter}
+                      onMediaFilterChange={filters.setMediaFilter}
+                      authorFilter={filters.authorFilter}
+                      onAuthorFilterChange={filters.setAuthorFilter}
+                      dateFrom={filters.dateFrom}
+                      dateTo={filters.dateTo}
+                      onDateFromChange={filters.setDateFrom}
+                      onDateToChange={filters.setDateTo}
+                      selectedTags={filters.selectedTags}
+                      onTagToggle={filters.toggleTag}
+                      tags={tags}
+                      onClearAll={filters.clearFilters}
+                      hasActiveFilters={filters.hasActiveFilters}
+                    />
+                  </div>
+                )}
               </PageHeader>
 
-            {showFilters && (
-              <div id="dashboard-filter-panel" className="animate-slide-down-fade">
-                <FilterPanel
-                  mediaFilter={filters.mediaFilter}
-                  onMediaFilterChange={filters.setMediaFilter}
-                  authorFilter={filters.authorFilter}
-                  onAuthorFilterChange={filters.setAuthorFilter}
-                  dateFrom={filters.dateFrom}
-                  dateTo={filters.dateTo}
-                  onDateFromChange={filters.setDateFrom}
-                  onDateToChange={filters.setDateTo}
-                  selectedTags={filters.selectedTags}
-                  onTagToggle={filters.toggleTag}
-                  tags={tags}
-                  onClearAll={filters.clearFilters}
-                  hasActiveFilters={filters.hasActiveFilters}
-                />
-              </div>
-            )}
-            </div>
-
-            <div className="relative mt-3 px-4 pb-3 pt-0 sm:mt-3.5 sm:px-5">
-              <div
-                className={cn(
-                  "relative z-10 overflow-hidden rounded-sm border border-hairline-strong shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
-                  inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName,
-                  appChromeFrostedClassName
-                )}
-              >
-                <SearchBar
-                  ref={searchInputRef}
-                  glass
-                  value={filters.search}
-                  onChange={filters.setSearch}
-                  placeholder="Search bookmarks, authors, notes..."
-                />
-              </div>
-            </div>
-          </div>
-
-          {highlightsLoading && (
-            <div
-              className={cn(
-                "mx-auto mb-3 max-w-[960px] space-y-2 px-4 sm:px-5",
-                inspectorActive && "lg:mx-0 lg:max-w-[640px]"
-              )}
-              aria-hidden
-            >
-              <div className="h-4 w-32 rounded skeleton-shimmer" />
-              <div className="h-24 rounded-sm border border-hairline-soft skeleton-shimmer" />
-            </div>
-          )}
-
-          {!highlightsLoading && highlightsError && (
-            <div
-              className={cn(
-                "mx-auto mb-3 flex max-w-[960px] flex-wrap items-center justify-between gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive",
-                inspectorActive ? "lg:mx-0 lg:max-w-[640px]" : "px-4 sm:px-5"
-              )}
-            >
-              <span>Could not load Highlights.</span>
-              <button
-                type="button"
-                onClick={() => refetchHighlights()}
-                className="text-xs font-medium underline underline-offset-2"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {!highlightsLoading && !highlightsError && highlightBookmarks.length > 0 && (
-            <PerformanceHighlights
-              title="Highlights"
-              subtitle={
-                typeof unsortedTotal === "number"
-                  ? `${unsortedTotal.toLocaleString()} untouched high-performers${newSinceLastSync > 0 ? ` • ${newSinceLastSync} new since last sync` : ''}`
-                  : undefined
-              }
-              bookmarks={highlightBookmarks}
-              total={unsortedTotal}
-              activeBookmarkId={inspectorActive ? activeBookmarkIdForView : null}
-              onSelect={setActiveBookmarkId}
-              onFocusForTriage={focusPerformanceHighlight}
-              onOrbitReview={(id) => {
-                trackFlywheelEvent("cta.review_in_orbit", { source: "highlights", bookmarkId: id });
-                router.push(`/orbit?highlightId=${id}`);
-              }}
-              isRawMode={true}
-              className={inspectorActive ? "lg:max-w-[640px] lg:mx-0" : undefined}
-            />
-          )}
-
-          {/* Weekly Gems digest — own queries; show whenever the main library is ready */}
-          {feedReady && (
-            <HighlightsDigest
-              rawData={highlightData}
-              libraryData={libraryHighlightData}
-              isLoading={libraryHighlightsLoading}
-              onSaveAsCollection={handleSaveGemsAsCollection}
-              className={inspectorActive ? "lg:max-w-[640px] lg:mx-0 pb-4 lg:pb-6" : undefined}
-            />
-          )}
+          <DashboardDiscovery
+            feedReady={feedReady}
+            parentData={{
+              rawData: highlightData,
+              libraryData: libraryHighlightData,
+              rawLoading: highlightsLoading,
+              libraryLoading: libraryHighlightsLoading,
+              rawError: highlightsError || libraryHighlightsError,
+              refetchRaw: refetchDiscovery,
+            }}
+            activeBookmarkId={inspectorActive ? activeBookmarkIdForView : null}
+            onSelectBookmark={setActiveBookmarkId}
+            onFocusForTriage={focusPerformanceHighlight}
+            onSaveAsCollection={handleSaveGemsAsCollection}
+            quickPicksSubtitle={quickPicksSubtitle}
+            className={inspectorActive ? "lg:max-w-[640px] lg:mx-0" : undefined}
+          />
 
           {isLoading ? (
             <DashboardSkeleton viewMode={viewMode} />
           ) : isError ? (
-            <div className={bookmarkFeedColumnClassName}>
-              <DashboardErrorState
-                message={error instanceof Error ? error.message : undefined}
-                onRetry={() => refetch()}
+            <div className={cn(bookmarkFeedColumnClassName, "flex h-64 items-center justify-center px-6")}>
+              <ErrorState
+                title="Bookmarks could not be loaded"
+                description={error instanceof Error ? error.message : "Please try again."}
+                action={<RetryButton onClick={() => refetch()} className="mt-0" />}
               />
             </div>
           ) : bookmarks.length === 0 ? (
-            <div className={bookmarkFeedColumnClassName}>
-              <DashboardEmptyState
-                search={filters.search}
-                hasActiveFilters={filters.hasActiveFilters}
-                onClearFilters={filters.clearFilters}
-                lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-                onSyncComplete={handleSyncComplete}
+            <div className={cn(bookmarkFeedColumnClassName, "flex h-72 items-center justify-center px-4 sm:px-6")}>
+              <EmptyState
+                layout="panel"
+                icon={Bookmark}
+                title={
+                  filters.search || filters.hasActiveFilters ? "No matches" : "Nothing in Orbit"
+                }
+                description={
+                  filters.search || filters.hasActiveFilters
+                    ? "Try a different search or adjust the filters."
+                    : "Library ready. Highlights will surface the next standouts for Orbit review."
+                }
+                action={
+                  filters.search || filters.hasActiveFilters ? (
+                    <Button variant="outline" size="sm" onClick={filters.clearFilters}>
+                      Clear filters
+                    </Button>
+                  ) : (
+                    <div className="mx-auto max-w-sm">
+                      <SyncButton
+                        lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                        onSyncComplete={handleSyncComplete}
+                        detail="full"
+                      />
+                    </div>
+                  )
+                }
               />
             </div>
           ) : (
@@ -863,10 +768,10 @@ function DashboardContent() {
 
           {!isLoading && !isError && bookmarks.length > 0 && (
             <div className={inspectorActive ? "w-full lg:max-w-[640px]" : bookmarkFeedColumnClassName}>
-              <PaginationBar
+              <PaginationControls
                 page={filters.page}
                 totalPages={totalPages}
-                onPageChange={filters.setPage}
+                onPageChange={(next) => filters.setPage(next)}
               />
             </div>
           )}

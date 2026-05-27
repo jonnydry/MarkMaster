@@ -160,10 +160,10 @@ describe("buildSingleSuggestionPlan", () => {
     suggestions: [baseSuggestion],
   };
 
-  it("builds a collection-only plan for primary when a collection exists", () => {
+  it("builds a collection plan with tags for primary when a collection exists", () => {
     const result = buildSingleSuggestionPlan(plan, "b1", "primary");
     expect(result?.suggestions).toHaveLength(1);
-    expect(result?.suggestions[0].tags).toHaveLength(0);
+    expect(result?.suggestions[0].tags).toHaveLength(2);
     expect(result?.suggestions[0].collection?.name).toBe("Deep Work");
   });
 

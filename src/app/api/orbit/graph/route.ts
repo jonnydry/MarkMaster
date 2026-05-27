@@ -41,6 +41,19 @@ export async function GET(req: NextRequest) {
   const nodeCap = parsed.success
     ? (parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP)
     : DEFAULT_ORBIT_GRAPH_NODE_CAP;
+  const scope = parsed.success ? (parsed.data.scope ?? "library") : "library";
+
+  const orbitQueueWhere = {
+    tags: { none: {} },
+    collectionItems: {
+      none: { collection: { type: "user_collection" as const } },
+    },
+  };
+
+  const bookmarkWhere = {
+    userId: user.id,
+    ...(scope === "orbit" ? orbitQueueWhere : {}),
+  };
 
   const [tagsRaw, collectionsRaw, totalBookmarks, bookmarksRaw] =
     await Promise.all([
@@ -66,7 +79,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.bookmark.count({ where: { userId: user.id } }),
       prisma.bookmark.findMany({
-        where: { userId: user.id },
+        where: bookmarkWhere,
         select: {
           id: true,
           tweetText: true,
@@ -217,10 +230,7 @@ export async function GET(req: NextRequest) {
   const totalLooseBookmarks = await prisma.bookmark.count({
     where: {
       userId: user.id,
-      tags: { none: {} },
-      collectionItems: {
-        none: { collection: { type: "user_collection" } },
-      },
+      ...orbitQueueWhere,
     },
   });
 
@@ -286,6 +296,7 @@ export async function GET(req: NextRequest) {
     stats,
     generatedAt: new Date().toISOString(),
     nodeCap,
+    scope,
   };
 
   return NextResponse.json(payload, {

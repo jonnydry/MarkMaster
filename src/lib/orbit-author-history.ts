@@ -70,3 +70,50 @@ export async function getAuthorDecisionHistory(
     collections: colRows.map((r) => r.name),
   };
 }
+
+const MIN_PRIOR_HINT_COUNT = 2;
+
+/**
+ * Batch-fetch author prior-decision hints for an Orbit scan.
+ * Only returns authors with enough history and at least one tag or collection signal.
+ */
+export async function getAuthorPriorHintsForScan(
+  userId: string,
+  authorUsernames: string[]
+): Promise<
+  Array<{
+    authorUsername: string;
+    priorCount: number;
+    tags: string[];
+    collections: string[];
+  }>
+> {
+  const unique = [
+    ...new Set(
+      authorUsernames.map((username) => username.trim()).filter(Boolean)
+    ),
+  ];
+  if (unique.length === 0) return [];
+
+  const hints: Array<{
+    authorUsername: string;
+    priorCount: number;
+    tags: string[];
+    collections: string[];
+  }> = [];
+  await Promise.all(
+    unique.map(async (authorUsername) => {
+      const history = await getAuthorDecisionHistory(userId, authorUsername);
+      if (
+        !history ||
+        history.priorCount < MIN_PRIOR_HINT_COUNT ||
+        (history.tags.length === 0 && history.collections.length === 0)
+      ) {
+        return;
+      }
+      hints.push(history);
+    })
+  );
+
+  return hints.sort((a, b) => b.priorCount - a.priorCount);
+}

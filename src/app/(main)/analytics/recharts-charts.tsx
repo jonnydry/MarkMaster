@@ -19,9 +19,12 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
+import { analyticsChartSurfaceClass } from "./analytics-primitives";
 import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital, OrbitalCard } from "@/components/orbital";
+
+type ChartVariant = "card" | "flat";
 
 const MIX_SERIES: Array<{ key: string; color: string; label: string }> = [
   { key: "Media", color: "var(--chart-1)", label: "Media" },
@@ -45,18 +48,51 @@ const chartTickStyle = { fontSize: 11, fontFamily: "var(--font-sans)" };
 
 const chartCardClass = "border-hairline-soft bg-surface-1 p-5 shadow-sm";
 
+function ChartShell({
+  variant,
+  className,
+  children,
+}: {
+  variant: ChartVariant;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { isOrbital } = useOrbitalTheme();
+  if (variant === "flat") {
+    return <section className={cn("py-6 first:pt-4", className)}>{children}</section>;
+  }
+  const RootCard = isOrbital ? OrbitalCard : Card;
+  const rootClass = isOrbital
+    ? cn("animate-fade-in-up border-primary/10 p-5", className)
+    : cn(chartCardClass, "animate-fade-in-up", className);
+  return <RootCard className={rootClass}>{children}</RootCard>;
+}
+
 function SectionHeading({
   title,
   icon,
   meta,
   aside,
+  variant = "card",
 }: {
   title: string;
   icon: React.ReactNode;
   meta?: string;
   aside?: React.ReactNode;
+  variant?: ChartVariant;
 }) {
   const { isOrbital } = useOrbitalTheme();
+  if (variant === "flat") {
+    return (
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold heading-font">{title}</h2>
+          {meta ? <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p> : null}
+        </div>
+        {aside ? <div className="shrink-0">{aside}</div> : null}
+      </header>
+    );
+  }
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-2">
@@ -99,9 +135,11 @@ function SectionHeading({
 export const TopVoicesCard = React.memo(function TopVoicesCard({
   authors,
   totalBookmarks,
+  variant = "card",
 }: {
   authors: AnalyticsData["topAuthors"];
   totalBookmarks: number;
+  variant?: ChartVariant;
 }) {
   const { isOrbital } = useOrbitalTheme();
   const max = useMemo(() => authors.reduce((m, a) => Math.max(m, a.count), 0) || 1, [authors]);
@@ -121,17 +159,23 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
   );
   const overexposed = useMemo(() => topShareSingle >= 15, [topShareSingle]);
 
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "animate-fade-in-up border-primary/10 p-5"
-    : `${chartCardClass} animate-fade-in-up`;
+  const listClass =
+    variant === "flat"
+      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
+      : cn(
+          "flex flex-col overflow-hidden rounded-xl border",
+          isOrbital
+            ? cn(orbital.glass, "divide-primary/10 border-primary/20")
+            : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
+        );
 
   return (
-    <RootCard className={rootClass}>
+    <ChartShell variant={variant}>
       <SectionHeading
         title="Top voices"
         icon={<Users className="h-4 w-4" />}
         meta={authors.length > 0 ? `${authors.length} authors` : undefined}
+        variant={variant}
       />
       {authors.length === 0 ? (
         <EmptyBox />
@@ -162,14 +206,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
             </div>
           ) : null}
 
-          <ul
-            className={cn(
-              "flex flex-col overflow-hidden rounded-xl border",
-              isOrbital
-                ? cn(orbital.glass, "divide-primary/10 border-primary/20")
-                : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
-            )}
-          >
+          <ul className={listClass}>
             {authors.map((a, idx) => {
               const share = (a.count / max) * 100;
               const libraryShare =
@@ -268,14 +305,16 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
           ) : null}
         </div>
       )}
-    </RootCard>
+    </ChartShell>
   );
 });
 
 export const ContentMixCard = React.memo(function ContentMixCard({
   breakdown,
+  variant = "card",
 }: {
   breakdown: AnalyticsData["mediaBreakdown"];
+  variant?: ChartVariant;
 }) {
   const { isOrbital } = useOrbitalTheme();
   const safeBreakdown = useMemo(() => breakdown ?? [], [breakdown]);
@@ -310,32 +349,29 @@ export const ContentMixCard = React.memo(function ContentMixCard({
     return `Bar chart showing content mix: ${summary}`;
   }, [segments]);
 
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "animate-fade-in-up stagger-1 border-primary/10 p-5"
-    : `${chartCardClass} animate-fade-in-up stagger-1`;
+  const chartSurfaceClass =
+    variant === "flat"
+      ? analyticsChartSurfaceClass
+      : cn(
+          "rounded-xl border p-3",
+          isOrbital
+            ? cn(orbital.glass, "border-primary/20")
+            : "border-hairline-soft bg-surface-2"
+        );
 
   return (
-    <RootCard className={rootClass}>
+    <ChartShell variant={variant}>
       <SectionHeading
         title="Content mix"
         icon={<Layers className="h-4 w-4" />}
         meta={total > 0 ? `${total.toLocaleString()} bookmarks` : undefined}
+        variant={variant}
       />
       {total === 0 ? (
         <EmptyBox />
       ) : (
         <div className="flex flex-col gap-4">
-          <div
-            className={cn(
-              "rounded-xl border p-3",
-              isOrbital
-                ? cn(orbital.glass, "border-primary/20")
-                : "border-hairline-soft bg-surface-2"
-            )}
-            role="img"
-            aria-label={contentMixLabel}
-          >
+          <div className={chartSurfaceClass} role="img" aria-label={contentMixLabel}>
             <ResponsiveContainer width="100%" height={44}>
               <BarChart
                 data={chartData}
@@ -371,17 +407,9 @@ export const ContentMixCard = React.memo(function ContentMixCard({
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <ul className="grid grid-cols-2 gap-2 text-sm">
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             {segments.map((s) => (
-              <li
-                key={s.key}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg border px-3 py-2",
-                  isOrbital
-                    ? cn(orbital.glass, "border-primary/20")
-                    : "border-hairline-soft bg-surface-1"
-                )}
-              >
+              <li key={s.key} className="flex items-center gap-2 py-1">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: s.color }}
@@ -407,39 +435,41 @@ export const ContentMixCard = React.memo(function ContentMixCard({
           </ul>
         </div>
       )}
-    </RootCard>
+    </ChartShell>
   );
 });
 
 export const TagRankCard = React.memo(function TagRankCard({
   tags,
+  variant = "card",
 }: {
   tags: AnalyticsData["tagDistribution"];
+  variant?: ChartVariant;
 }) {
   const { isOrbital } = useOrbitalTheme();
   const max = useMemo(() => tags.reduce((m, t) => Math.max(m, t.count), 0) || 1, [tags]);
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "animate-fade-in-up stagger-2 border-primary/10 p-5"
-    : `${chartCardClass} animate-fade-in-up stagger-2`;
+  const listClass =
+    variant === "flat"
+      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
+      : cn(
+          "flex flex-col overflow-hidden rounded-xl border",
+          isOrbital
+            ? cn(orbital.glass, "divide-primary/10 border-primary/20")
+            : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
+        );
+
   return (
-    <RootCard className={rootClass}>
+    <ChartShell variant={variant}>
       <SectionHeading
         title="Most used tags"
         icon={<Hash className="h-4 w-4" />}
         meta={tags.length > 0 ? `${tags.length} tags` : undefined}
+        variant={variant}
       />
       {tags.length === 0 ? (
         <EmptyBox />
       ) : (
-        <ul
-          className={cn(
-            "flex flex-col overflow-hidden rounded-xl border",
-            isOrbital
-              ? cn(orbital.glass, "divide-primary/10 border-primary/20")
-              : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
-          )}
-        >
+        <ul className={listClass}>
           {tags.slice(0, 10).map((t) => {
             const share = (t.count / max) * 100;
             return (
@@ -492,18 +522,18 @@ export const TagRankCard = React.memo(function TagRankCard({
           })}
         </ul>
       )}
-    </RootCard>
+    </ChartShell>
   );
 });
 
 export const TimelineCard = React.memo(function TimelineCard({
   analytics,
   range,
-  rangeControl,
+  variant = "card",
 }: {
   analytics: AnalyticsData;
   range: TimeRange;
-  rangeControl: React.ReactNode;
+  variant?: ChartVariant;
 }) {
   const { isOrbital } = useOrbitalTheme();
   const timelineFillId = `timeline-fill-${useId().replace(/:/g, "")}`;
@@ -519,34 +549,30 @@ export const TimelineCard = React.memo(function TimelineCard({
     return `Area chart showing ${rangeTotal.toLocaleString()} bookmarks over ${rangeLabel(range)}`;
   }, [timeline.data.length, rangeTotal, range]);
 
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "animate-fade-in-up stagger-3 border-primary/10 p-5"
-    : `${chartCardClass} animate-fade-in-up stagger-3`;
+  const chartSurfaceClass =
+    variant === "flat"
+      ? cn(analyticsChartSurfaceClass, "px-3 py-4")
+      : cn(
+          "rounded-xl border px-3 py-4",
+          isOrbital
+            ? cn(orbital.glass, "border-primary/20")
+            : "border-hairline-soft bg-surface-2"
+        );
 
   return (
-    <RootCard className={rootClass}>
+    <ChartShell variant={variant}>
       <SectionHeading
         title="Bookmarks over time"
         icon={<Activity className="h-4 w-4" />}
         meta={
           rangeTotal > 0 ? `${rangeTotal.toLocaleString()} in ${rangeLabel(range)}` : undefined
         }
-        aside={rangeControl}
+        variant={variant}
       />
       {timeline.data.length === 0 ? (
         <EmptyBox height={220} />
       ) : (
-        <div
-          className={cn(
-            "rounded-xl border px-3 py-4",
-            isOrbital
-              ? cn(orbital.glass, "border-primary/20")
-              : "border-hairline-soft bg-surface-2"
-          )}
-          role="img"
-          aria-label={timelineLabel}
-        >
+        <div className={chartSurfaceClass} role="img" aria-label={timelineLabel}>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
               data={timeline.data}
@@ -629,7 +655,7 @@ export const TimelineCard = React.memo(function TimelineCard({
           ) : null}
         </div>
       )}
-    </RootCard>
+    </ChartShell>
   );
 });
 

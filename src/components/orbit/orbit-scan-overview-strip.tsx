@@ -77,12 +77,17 @@ function StrategyLines({
   );
 }
 
+function defaultOverviewOpen(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(min-width: 640px)").matches;
+}
+
 export function OrbitScanOverviewStrip({
   payload,
   className,
 }: OrbitScanOverviewStripProps) {
   const { isOrbital } = useOrbitalTheme();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOverviewOpen);
 
   const modelLine = useMemo(() => {
     const z = payload.privacy.zeroDataRetention;
@@ -117,7 +122,9 @@ export function OrbitScanOverviewStrip({
             Grok pass overview
           </p>
           <p className="mt-0.5 truncate text-sm font-medium text-white/90">
-            {overview.summary}
+            {open
+              ? overview.summary
+              : `Grok plan · ${tagRollups.length} tags · ${collectionRollups.length} collections · ${modelLine}`}
           </p>
         </div>
       </button>

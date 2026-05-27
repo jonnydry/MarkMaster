@@ -32,6 +32,9 @@ import {
   type AnimateAssignMessage,
   type FocusPulseMessage,
   type FocusOnMessage,
+  type SetSelectionMessage,
+  type WheelMessage,
+  type DoubleClickMessage,
   type CursorChangedMessage,
   type LayoutUpdatedMessage,
   collectTransferables,
@@ -147,6 +150,8 @@ let currentFilter: GraphFilter = 'all';
 
 // Cursor state for CURSOR_CHANGED messages
 let isPointerDown = false;
+let isPanning = false;
+let panDragLast: { x: number; y: number } | null = null;
 let currentCursor: CursorChangedMessage['cursor'] = 'default';
 
 function postCursorChange(cursor: CursorChangedMessage['cursor']) {
@@ -319,6 +324,22 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
 
     case WorkerMessageType.FOCUS_ON:
       handleFocusOn(msg as FocusOnMessage);
+      break;
+
+    case WorkerMessageType.SET_SELECTION:
+      handleSetSelection(msg as SetSelectionMessage);
+      break;
+
+    case WorkerMessageType.RESET_VIEW:
+      handleResetView();
+      break;
+
+    case WorkerMessageType.WHEEL:
+      handleWheel(msg as WheelMessage);
+      break;
+
+    case WorkerMessageType.DOUBLE_CLICK:
+      handleDoubleClick(msg as DoubleClickMessage);
       break;
 
     case WorkerMessageType.REQUEST_LAYOUT:
@@ -944,12 +965,115 @@ function handleCameraMessage(msg: CameraControlMessage) {
    HIT-TESTING + SELECTION / HOVER (runs in worker for best performance)
    ============================================================ */
 
+function handleSetSelection(msg: SetSelectionMessage) {
+  currentSelection = msg.selection;
+  renderSceneFromSimulation();
+}
+
+function handleResetView() {
+  if (!app || nodeData.length === 0) return;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const datum of nodeData) {
+    if (typeof datum.x !== "number" || typeof datum.y !== "number") continue;
+    const pad = datum.radius + 8;
+    minX = Math.min(minX, datum.x - pad);
+    maxX = Math.max(maxX, datum.x + pad);
+    minY = Math.min(minY, datum.y - pad);
+    maxY = Math.max(maxY, datum.y + pad);
+  }
+
+  if (!Number.isFinite(minX)) return;
+
+  const padding = 72;
+  const worldWidth = maxX - minX + padding * 2;
+  const worldHeight = maxY - minY + padding * 2;
+  const zoomX = app.renderer.width / worldWidth;
+  const zoomY = app.renderer.height / worldHeight;
+  const nextZoom = Math.max(0.12, Math.min(2.4, Math.min(zoomX, zoomY) * 0.92));
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  camera.zoom = nextZoom;
+  camera.x = app.renderer.width / 2 - cx * nextZoom;
+  camera.y = app.renderer.height / 2 - cy * nextZoom;
+
+  applyCameraTransform();
+  app.renderer.render(app.stage);
+
+  postToMain({
+    type: MainMessageType.CAMERA_CHANGED,
+    protocolVersion: 1,
+    camera: { ...camera },
+  });
+}
+
+function handleWheel(msg: WheelMessage) {
+  if (!app) return;
+
+  const factor = msg.deltaY < 0 ? 1.12 : 0.9;
+  const screenX = msg.x;
+  const screenY = msg.y;
+
+  const worldX = (screenX - camera.x) / camera.zoom;
+  const worldY = (screenY - camera.y) / camera.zoom;
+  const newZoom = Math.max(0.1, Math.min(8, camera.zoom * factor));
+
+  camera.x = screenX - worldX * newZoom;
+  camera.y = screenY - worldY * newZoom;
+  camera.zoom = newZoom;
+
+  applyCameraTransform();
+  app.renderer.render(app.stage);
+
+  postToMain({
+    type: MainMessageType.CAMERA_CHANGED,
+    protocolVersion: 1,
+    camera: { ...camera },
+  });
+}
+
+function handleDoubleClick(msg: DoubleClickMessage) {
+  if (!app || !currentGraph || nodeData.length === 0) return;
+
+  const worldX = (msg.x - camera.x) / camera.zoom;
+  const worldY = (msg.y - camera.y) / camera.zoom;
+
+  let closest: SimulationNode | null = null;
+  let minDist = Infinity;
+
+  for (const datum of nodeData) {
+    const dx = (datum.x ?? 0) - worldX;
+    const dy = (datum.y ?? 0) - worldY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < minDist && dist <= datum.radius + 10) {
+      minDist = dist;
+      closest = datum;
+    }
+  }
+
+  if (closest?.node.kind === "bookmark") {
+    postToMain({
+      type: MainMessageType.OPEN_BOOKMARK,
+      protocolVersion: 1,
+      bookmarkId: closest.id,
+    });
+  }
+}
+
 function handlePointerEvent(msg: PointerEventMessage) {
   if (!app || !currentGraph || nodeData.length === 0) return;
 
   // PointerLeaveMessage doesn't carry coordinates, so we handle it separately
   if (msg.type === WorkerMessageType.POINTER_LEAVE) {
     isPointerDown = false;
+    isPanning = false;
+    panDragLast = null;
     if (currentHover) {
       currentHover = null;
       renderSceneFromSimulation();
@@ -987,6 +1111,18 @@ function handlePointerEvent(msg: PointerEventMessage) {
   const newHover = closest ? { id: closest.id, kind: closest.node.kind } : null;
 
   if (type === WorkerMessageType.POINTER_MOVE) {
+    if (isPanning && isPointerDown && panDragLast) {
+      const dx = x - panDragLast.x;
+      const dy = y - panDragLast.y;
+      panDragLast = { x, y };
+      camera.x += dx;
+      camera.y += dy;
+      applyCameraTransform();
+      app.renderer.render(app.stage);
+      postCursorChange("grabbing");
+      return;
+    }
+
     if (JSON.stringify(newHover) !== JSON.stringify(currentHover)) {
       currentHover = newHover;
       renderSceneFromSimulation();
@@ -1000,13 +1136,12 @@ function handlePointerEvent(msg: PointerEventMessage) {
       });
     }
 
-    // Cursor logic during move
     if (isPointerDown) {
-      postCursorChange('grabbing');
+      postCursorChange("grabbing");
     } else if (newHover) {
-      postCursorChange('pointer');
+      postCursorChange("pointer");
     } else {
-      postCursorChange('grab'); // hovering background → ready to pan
+      postCursorChange("grab");
     }
   }
 
@@ -1014,6 +1149,8 @@ function handlePointerEvent(msg: PointerEventMessage) {
     isPointerDown = true;
 
     if (newHover) {
+      isPanning = false;
+      panDragLast = null;
       currentSelection = newHover;
       renderSceneFromSimulation();
 
@@ -1022,20 +1159,23 @@ function handlePointerEvent(msg: PointerEventMessage) {
         protocolVersion: 1,
         selection: newHover,
       });
-      postCursorChange('pointer');
+      postCursorChange("pointer");
     } else {
-      // Starting to pan the map
-      postCursorChange('grabbing');
+      isPanning = true;
+      panDragLast = { x, y };
+      postCursorChange("grabbing");
     }
   }
 
   if (type === WorkerMessageType.POINTER_UP) {
     isPointerDown = false;
+    isPanning = false;
+    panDragLast = null;
 
     if (newHover) {
-      postCursorChange('pointer');
+      postCursorChange("pointer");
     } else {
-      postCursorChange('grab'); // still over background → ready to pan
+      postCursorChange("grab");
     }
   }
 }

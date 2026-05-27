@@ -134,7 +134,7 @@ export function buildSingleSuggestionPlan(
           bookmarkId: suggestion.bookmarkId,
           confidence: suggestion.confidence,
           reasoning: suggestion.reasoning,
-          tags: [],
+          tags: suggestion.tags,
           collection,
         },
       ],

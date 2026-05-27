@@ -25,9 +25,11 @@ const ORBITAL_CHANGE_EVENT = "markmaster-orbital-change";
 
 const ThemeContext = createContext<{
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }>({
   theme: "dark",
+  setTheme: () => {},
   toggleTheme: () => {},
 });
 
@@ -75,9 +77,11 @@ function writeTheme(theme: Theme) {
 /* Font Mode (Monospace UI toggle) — follows exact same persisted + sync pattern as Theme for seamlessness */
 const FontModeContext = createContext<{
   fontMode: FontMode;
+  setFontMode: (mode: FontMode) => void;
   toggleFontMode: () => void;
 }>({
   fontMode: "default",
+  setFontMode: () => {},
   toggleFontMode: () => {},
 });
 
@@ -124,11 +128,18 @@ function FontModeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute("data-font-mode", fontMode);
   }, [fontMode]);
 
+  const setFontMode = useCallback((mode: FontMode) => {
+    writeFontMode(mode);
+  }, []);
+
   const toggleFontMode = useCallback(() => {
     writeFontMode(fontMode === "default" ? "mono" : "default");
   }, [fontMode]);
 
-  const value = useMemo(() => ({ fontMode, toggleFontMode }), [fontMode, toggleFontMode]);
+  const value = useMemo(
+    () => ({ fontMode, setFontMode, toggleFontMode }),
+    [fontMode, setFontMode, toggleFontMode]
+  );
 
   return (
     <FontModeContext.Provider value={value}>
@@ -223,11 +234,18 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  const setTheme = useCallback((next: Theme) => {
+    writeTheme(next);
+  }, []);
+
   const toggleTheme = useCallback(() => {
     writeTheme(theme === "dark" ? "light" : "dark");
   }, [theme]);
 
-  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+  const value = useMemo(
+    () => ({ theme, setTheme, toggleTheme }),
+    [theme, setTheme, toggleTheme]
+  );
 
   return (
     <ThemeContext.Provider value={value}>

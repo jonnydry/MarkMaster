@@ -7,6 +7,7 @@ import {
   orbitScanRequestSchema,
   scanOrbitBookmarksWithXai,
 } from "@/lib/orbit-grok";
+import { getAuthorPriorHintsForScan } from "@/lib/orbit-author-history";
 import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
@@ -67,16 +68,26 @@ export async function POST(req: NextRequest) {
         }),
         prisma.tag.findMany({
           where: { userId: user.id },
-          select: { id: true, name: true, color: true },
-          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            _count: { select: { bookmarks: true } },
+          },
+          orderBy: { bookmarks: { _count: "desc" } },
         }),
         prisma.collection.findMany({
           where: {
             userId: user.id,
             type: "user_collection",
           },
-          select: { id: true, name: true, description: true },
-          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            _count: { select: { items: true } },
+          },
+          orderBy: { items: { _count: "desc" } },
         }),
       ]);
 
@@ -109,8 +120,22 @@ export async function POST(req: NextRequest) {
 
       const scan = await scanOrbitBookmarksWithXai({
         bookmarks: bookmarksWithFolderHints,
-        existingTags: tags,
-        existingCollections: collections,
+        existingTags: tags.map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          color: tag.color,
+          bookmarkCount: tag._count.bookmarks,
+        })),
+        existingCollections: collections.map((collection) => ({
+          id: collection.id,
+          name: collection.name,
+          description: collection.description,
+          bookmarkCount: collection._count.items,
+        })),
+        authorPriorHints: await getAuthorPriorHintsForScan(
+          user.id,
+          bookmarksWithFolderHints.map((bookmark) => bookmark.authorUsername)
+        ),
       });
 
       return NextResponse.json(scan);

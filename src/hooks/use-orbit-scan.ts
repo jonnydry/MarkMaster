@@ -66,7 +66,10 @@ export interface OrbitScanHandle extends OrbitScanState {
   applyPlanSubset: (opts: {
     minConfidence: OrbitScanConfidence;
   }) => Promise<OrbitApplyResult | null>;
+  /** Skip this bookmark for the current Grok pass (idempotent). */
   dismiss: (bookmarkId: string) => void;
+  /** Skip or restore Grok suggestion for the current pass. */
+  toggleDismiss: (bookmarkId: string) => void;
   getDecision: (bookmarkId: string) => OrbitBookmarkDecision | null;
   hasSuggestion: (bookmarkId: string) => boolean;
   clearPlan: () => void;
@@ -468,6 +471,18 @@ export function useOrbitScan(): OrbitScanHandle {
     });
   }, []);
 
+  const toggleDismiss = useCallback((bookmarkId: string) => {
+    setDismissed((current) => {
+      const next = new Set(current);
+      if (next.has(bookmarkId)) {
+        next.delete(bookmarkId);
+      } else {
+        next.add(bookmarkId);
+      }
+      return next;
+    });
+  }, []);
+
   const getDecision = useCallback(
     (bookmarkId: string): OrbitBookmarkDecision | null => {
       if (dismissed.has(bookmarkId)) return null;
@@ -504,6 +519,7 @@ export function useOrbitScan(): OrbitScanHandle {
     applyEntirePlan,
     applyPlanSubset,
     dismiss,
+    toggleDismiss,
     getDecision,
     hasSuggestion,
     clearPlan,

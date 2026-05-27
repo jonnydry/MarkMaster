@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,11 +22,18 @@ import {
 } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RetryButton } from "@/components/ui/retry-button";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbitShellClass } from "@/lib/orbit-route-chrome";
+import { appContentInsetClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
+import { fetchJson } from "@/lib/fetch-json";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import type { BookmarkWithRelations } from "@/types";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -35,7 +42,12 @@ import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
+import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
+import { saveOrbitMapPositions } from "@/lib/orbit-map-layout-storage";
+import type { OrbitGraphNode, OrbitGraphScope } from "@/types";
+
+type BookmarkGraphNode = Extract<OrbitGraphNode, { kind: "bookmark" }>;
 import type {
   OrbitMapCanvasHandle,
   OrbitMapFocus,
@@ -95,6 +107,7 @@ export default function OrbitMapPage() {
   const focusBookmarkIdParam = searchParams?.get("focus") ?? null;
   const focusAnchorIdParam = searchParams?.get("anchor") ?? null;
   const assignmentBookmarkIdParam = searchParams?.get("bookmark") ?? null;
+  const scopeParam = searchParams?.get("scope");
   const { data: session } = useSession();
   const actions = useBookmarkActions();
   const { createCollection, createCollectionQuick } = useCreateCollection();
@@ -118,8 +131,17 @@ export default function OrbitMapPage() {
     }
     return null;
   }, [focusBookmarkIdParam, selectIdParam, selectKindParam]);
+  const graphScope: OrbitGraphScope =
+    scopeParam === "orbit" ? "orbit" : "library";
   const [hoverSelection, setHoverSelection] =
     useState<OrbitMapSelection | null>(null);
+  const [hoverCard, setHoverCard] = useState<{
+    node: BookmarkGraphNode;
+    x: number;
+    y: number;
+  } | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageSize, setStageSize] = useState({ width: 960, height: 640 });
 
   const handleSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
@@ -162,7 +184,42 @@ export default function OrbitMapPage() {
     error,
     refetch,
     isFetching,
-  } = useOrbitGraphQuery();
+  } = useOrbitGraphQuery(graphScope);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setStageSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleHoverChange = useCallback(
+    (
+      next: OrbitMapSelection | null,
+      position?: { x: number; y: number }
+    ) => {
+      setHoverSelection(next);
+      if (next?.kind === "bookmark" && position && graph) {
+        const node = graph.nodes.find(
+          (n) => n.kind === "bookmark" && n.id === next.id
+        );
+        if (node?.kind === "bookmark") {
+          setHoverCard({ node, x: position.x, y: position.y });
+          return;
+        }
+      }
+      setHoverCard(null);
+    },
+    [graph]
+  );
 
   const dbUser = session?.dbUser;
 
@@ -176,6 +233,39 @@ export default function OrbitMapPage() {
     if (selection?.kind === "bookmark") return selection.id;
     return assignmentBookmarkIdParam ?? focusBookmarkIdParam;
   }, [assignmentBookmarkIdParam, focusBookmarkIdParam, selection]);
+
+  const { data: focusedBookmarkData, isLoading: focusedBookmarkLoading } = useQuery({
+    queryKey: ["bookmarks", "orbit-map-focus", selectedBookmarkId],
+    queryFn: () =>
+      fetchJson<{ bookmarks: BookmarkWithRelations[] }>(
+        `/api/bookmarks?bookmarkId=${encodeURIComponent(selectedBookmarkId!)}&limit=1`
+      ),
+    enabled: Boolean(selectedBookmarkId),
+    placeholderData: keepPreviousData,
+  });
+  const focusedBookmark = focusedBookmarkData?.bookmarks?.[0] ?? null;
+
+  const dialogBookmarkTags = useMemo(() => {
+    if (
+      pendingBookmarkIds.length !== 1 ||
+      !focusedBookmark ||
+      focusedBookmark.id !== pendingBookmarkIds[0]
+    ) {
+      return [];
+    }
+    return focusedBookmark.tags.map((entry) => entry.tag.id);
+  }, [focusedBookmark, pendingBookmarkIds]);
+
+  const dialogBookmarkCollections = useMemo(() => {
+    if (
+      pendingBookmarkIds.length !== 1 ||
+      !focusedBookmark ||
+      focusedBookmark.id !== pendingBookmarkIds[0]
+    ) {
+      return [];
+    }
+    return focusedBookmark.collectionItems.map((entry) => entry.collection.id);
+  }, [focusedBookmark, pendingBookmarkIds]);
 
   const focus: OrbitMapFocus | null = useMemo(() => {
     if (!focusBookmarkIdParam || !focusAnchorIdParam) return null;
@@ -331,6 +421,65 @@ export default function OrbitMapPage() {
 
   const stats = graph?.stats;
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
+  const graphIsEmpty =
+    Boolean(graph) &&
+    (graphScope === "orbit"
+      ? stats?.looseBookmarks === 0
+      : stats?.totalBookmarks === 0 ||
+        graph!.nodes.filter((node) => node.kind === "bookmark").length === 0);
+
+  const handleSyncComplete = useCallback(() => {
+    void invalidateLibraryQueries(queryClient);
+    void refetch();
+  }, [queryClient, refetch]);
+
+  const handleLayoutUpdated = useCallback(
+    (positions: Record<string, { x: number; y: number }>) => {
+      saveOrbitMapPositions(positions, graphScope);
+    },
+    [graphScope]
+  );
+
+  const handleScopeChange = useCallback(
+    (next: OrbitGraphScope) => {
+      setHoverCard(null);
+      setHoverSelection(null);
+
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (next === "orbit") {
+        params.set("scope", "orbit");
+      } else {
+        params.delete("scope");
+      }
+      params.delete("select");
+      params.delete("kind");
+      params.delete("bookmark");
+      params.delete("focus");
+      params.delete("anchor");
+
+      const query = params.toString();
+      router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
+        scroll: false,
+      });
+    },
+    [router, searchParams]
+  );
+
+  const headerDescription = useMemo(() => {
+    if (!stats) return "Visualise how tags, collections, and bookmarks connect.";
+    const scopeLabel =
+      graphScope === "orbit" ? "Orbit queue map" : "Full library map";
+    const bookmarkCount =
+      graphScope === "orbit"
+        ? stats.looseBookmarks.toLocaleString()
+        : stats.totalBookmarks.toLocaleString();
+    const bookmarkLabel = graphScope === "orbit" ? "in queue" : "bookmarks";
+    return `${scopeLabel} · ${bookmarkCount} ${bookmarkLabel} · ${stats.tagCount} tags · ${
+      stats.userCollectionCount + stats.xFolderCount
+    } collections${
+      truncatedCount > 0 ? ` · ${truncatedCount.toLocaleString()} hidden` : ""
+    }`;
+  }, [graphScope, stats, truncatedCount]);
 
   return (
     <div className={orbitShellClass(isOrbital)}>
@@ -342,7 +491,7 @@ export default function OrbitMapPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-          onSyncComplete={() => refetch()}
+          onSyncComplete={handleSyncComplete}
         />
       </div>
 
@@ -354,17 +503,7 @@ export default function OrbitMapPage() {
               Graph
             </span>
           }
-          description={
-            stats
-              ? `${stats.totalBookmarks.toLocaleString()} bookmarks · ${stats.tagCount} tags · ${
-                  stats.userCollectionCount + stats.xFolderCount
-                } collections${
-                  truncatedCount > 0
-                    ? ` · ${truncatedCount.toLocaleString()} hidden`
-                    : ""
-                }`
-              : "Visualise how your library connects."
-          }
+          description={headerDescription}
           leading={
             <div className="md:hidden">
               <MobileSidebar
@@ -376,7 +515,7 @@ export default function OrbitMapPage() {
                 lastSyncAt={
                   dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
                 }
-                onSyncComplete={() => refetch()}
+                onSyncComplete={handleSyncComplete}
               />
             </div>
           }
@@ -394,8 +533,9 @@ export default function OrbitMapPage() {
           }
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 px-3 pb-3 pt-3 sm:px-5 sm:pb-5">
+        <div className={cn("flex min-h-0 min-w-0 flex-1", appContentInsetClassName)}>
           <div
+            ref={stageRef}
             className={cn(
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
               isOrbital
@@ -418,21 +558,47 @@ export default function OrbitMapPage() {
             ) : isError ? (
               <div
                 className={cn(
-                  "flex h-full w-full items-center justify-center p-6 text-center",
+                  "flex h-full w-full items-center justify-center p-6",
                   isOrbital ? "bg-background" : "bg-[#0b0f1a]"
                 )}
               >
-                <div className="max-w-md space-y-3">
-                  <p className="text-lg font-medium text-white">
-                    Graph could not be loaded
-                  </p>
-                  <p className="text-sm text-white/65">
-                    {error instanceof Error ? error.message : "Please try again."}
-                  </p>
-                  <Button onClick={() => refetch()} size="sm">
-                    Retry
-                  </Button>
-                </div>
+                <ErrorState
+                  layout="stage"
+                  title="Graph could not be loaded"
+                  description={
+                    error instanceof Error ? error.message : "Please try again."
+                  }
+                  action={
+                    <RetryButton context="stage" onClick={() => refetch()} className="mt-0" />
+                  }
+                />
+              </div>
+            ) : graphIsEmpty ? (
+              <div
+                className={cn(
+                  "flex h-full w-full flex-col items-center justify-center p-8",
+                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                )}
+              >
+                <EmptyState
+                  layout="stage"
+                  title="Nothing to chart yet"
+                  description={
+                    graphScope === "orbit"
+                      ? "Your Orbit queue is clear. Sync new bookmarks or switch to the full library map."
+                      : "Sync bookmarks from X, then return here to explore how tags and collections connect."
+                  }
+                  action={
+                    <Link
+                      href="/orbit"
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" })
+                      )}
+                    >
+                      Open Orbit queue
+                    </Link>
+                  }
+                />
               </div>
             ) : graph ? (
               <OrbitMapCanvas
@@ -440,17 +606,58 @@ export default function OrbitMapPage() {
                 data={graph}
                 selection={selection}
                 onSelectionChange={handleSelectionChange}
-                onHoverChange={setHoverSelection}
+                onHoverChange={handleHoverChange}
                 onOpenBookmark={handleOpenBookmark}
+                onLayoutUpdated={handleLayoutUpdated}
+                layoutScope={graphScope}
                 focus={focus}
                 className="h-full w-full"
-                filterControlsClassName="top-[4.65rem] lg:top-[4.65rem]"
+                filterControlsClassName="top-[7.25rem] lg:top-[7.25rem]"
                 zoomControlsClassName="bottom-[12.5rem] right-3 sm:bottom-[11rem] lg:bottom-4 lg:right-4"
               />
             ) : null}
 
+            {hoverCard ? (
+              <OrbitMapHoverCard
+                node={hoverCard.node}
+                x={hoverCard.x}
+                y={hoverCard.y}
+                containerWidth={stageSize.width}
+                containerHeight={stageSize.height}
+              />
+            ) : null}
+
             <div className="pointer-events-none absolute inset-x-3 top-3 z-30 lg:inset-x-auto lg:left-4 lg:w-[min(520px,calc(100%-404px))] xl:w-[min(560px,calc(100%-420px))]">
-              <div className="pointer-events-auto relative rounded-full border border-white/[0.055] bg-white/[0.035] px-3 py-2 shadow-none backdrop-blur-xl">
+              <div className="pointer-events-auto space-y-2 rounded-2xl border border-white/[0.055] bg-white/[0.035] p-2 shadow-none backdrop-blur-xl">
+                <div
+                  className="flex gap-1 rounded-full bg-white/[0.04] p-0.5"
+                  role="group"
+                  aria-label="Graph data scope"
+                >
+                  {(
+                    [
+                      { key: "library" as const, label: "Full library" },
+                      { key: "orbit" as const, label: "Orbit queue" },
+                    ] as const
+                  ).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={graphScope === key}
+                      onClick={() => handleScopeChange(key)}
+                      disabled={isLoading}
+                      className={cn(
+                        "flex-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50",
+                        graphScope === key
+                          ? "bg-white/[0.14] text-white"
+                          : "text-white/50 hover:text-white/80"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative rounded-full px-1">
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
                     <Search className="size-4 text-white/40" />
@@ -560,6 +767,7 @@ export default function OrbitMapPage() {
                     No results for “{searchDeferred}”
                   </div>
                 )}
+                </div>
               </div>
             </div>
 
@@ -590,8 +798,8 @@ export default function OrbitMapPage() {
                     selection={selection}
                     hoverSelection={hoverSelection}
                     selectedBookmarkId={selectedBookmarkId}
-                    focusedBookmark={null}
-                    focusedBookmarkLoading={false}
+                    focusedBookmark={focusedBookmark}
+                    focusedBookmarkLoading={focusedBookmarkLoading}
                     onAssign={handleAssign}
                     onAddTag={openTagDialog}
                     onAddToCollection={openCollectionDialog}
@@ -609,8 +817,8 @@ export default function OrbitMapPage() {
                     selection={selection}
                     hoverSelection={hoverSelection}
                     selectedBookmarkId={selectedBookmarkId}
-                    focusedBookmark={null}
-                    focusedBookmarkLoading={false}
+                    focusedBookmark={focusedBookmark}
+                    focusedBookmarkLoading={focusedBookmarkLoading}
                     onAssign={handleAssign}
                     onAddTag={openTagDialog}
                     onAddToCollection={openCollectionDialog}
@@ -642,7 +850,7 @@ export default function OrbitMapPage() {
         existingTags={tags}
         onAddTag={actions.handleAddTag}
         onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={[]}
+        bookmarkTags={dialogBookmarkTags}
       />
 
       <AddToCollectionDialog
@@ -656,7 +864,7 @@ export default function OrbitMapPage() {
         }}
         bookmarkIds={pendingBookmarkIds}
         collections={collections}
-        bookmarkCollections={[]}
+        bookmarkCollections={dialogBookmarkCollections}
         onAddToCollection={actions.handleAddToCollection}
         onCreateCollection={createCollectionQuick}
       />

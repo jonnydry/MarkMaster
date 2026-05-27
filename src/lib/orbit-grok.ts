@@ -24,6 +24,8 @@ const MAX_URLS_PER_BOOKMARK = 3;
 const MAX_X_FOLDER_HINTS_PER_BOOKMARK = 5;
 const MAX_X_FOLDER_HINT_LENGTH = 80;
 const MAX_PROMPT_TAG_COLORS = 160;
+const MAX_PROMPT_EXISTING_TAGS = 80;
+const MAX_PROMPT_EXISTING_COLLECTIONS = 40;
 const FALLBACK_TAG_COLOR = PRESET_COLORS[0];
 const GENERIC_COLLECTION_NAMES = new Set([
   "bookmark",
@@ -62,6 +64,21 @@ const TAG_CANONICAL_ALIASES = new Map([
   ["machine learning", "ml"],
   ["typescript", "ts"],
   ["javascript", "js"],
+  ["reactjs", "react"],
+  ["react.js", "react"],
+  ["vuejs", "vue.js"],
+  ["nodejs", "node.js"],
+  ["node", "node.js"],
+  ["startups", "startup"],
+  ["dev ops", "devops"],
+  ["k8s", "kubernetes"],
+  ["py", "python"],
+  ["golang", "go"],
+  ["go lang", "go"],
+  ["postgres", "postgresql"],
+  ["postgre sql", "postgresql"],
+  ["infra", "infrastructure"],
+  ["design systems", "design system"],
 ]);
 const ACRONYMS = new Set([
   "ai",
@@ -180,12 +197,21 @@ export interface OrbitTagContext {
   id?: string;
   name: string;
   color: string;
+  bookmarkCount?: number;
 }
 
 export interface OrbitCollectionContext {
   id?: string;
   name: string;
   description: string | null;
+  bookmarkCount?: number;
+}
+
+export interface OrbitAuthorPriorHint {
+  authorUsername: string;
+  priorCount: number;
+  tags: string[];
+  collections: string[];
 }
 
 export const orbitConfidenceSchema = z.enum(["high", "medium", "low"]);
@@ -439,6 +465,42 @@ function normalizeTagKey(value: string) {
   return TAG_CANONICAL_ALIASES.get(key) ?? key;
 }
 
+/** Lookup keys including simple plural/singular variants for tag reuse. */
+function tagLookupKeys(value: string): string[] {
+  const key = normalizeTagKey(value);
+  const keys = [key];
+
+  if (key.length > 2 && key.endsWith("s") && !key.endsWith("ss")) {
+    keys.push(key.slice(0, -1));
+  } else if (key.length > 1 && !key.endsWith("s")) {
+    keys.push(`${key}s`);
+  }
+
+  return keys;
+}
+
+export function trimTagsForOrbitPrompt(tags: OrbitTagContext[]): OrbitTagContext[] {
+  return [...tags]
+    .sort(
+      (a, b) =>
+        (b.bookmarkCount ?? 0) - (a.bookmarkCount ?? 0) ||
+        a.name.localeCompare(b.name)
+    )
+    .slice(0, MAX_PROMPT_EXISTING_TAGS);
+}
+
+export function trimCollectionsForOrbitPrompt(
+  collections: OrbitCollectionContext[]
+): OrbitCollectionContext[] {
+  return [...collections]
+    .sort(
+      (a, b) =>
+        (b.bookmarkCount ?? 0) - (a.bookmarkCount ?? 0) ||
+        a.name.localeCompare(b.name)
+    )
+    .slice(0, MAX_PROMPT_EXISTING_COLLECTIONS);
+}
+
 function truncateText(value: string | null | undefined, maxLength: number) {
   if (!value) return "";
   const normalized = value.trim();
@@ -570,7 +632,10 @@ function asXFolderHints(input: OrbitBookmarkForScan["xFolderHints"]) {
   return Array.from(deduped.values()).slice(0, MAX_X_FOLDER_HINTS_PER_BOOKMARK);
 }
 
-function buildBookmarkPayload(bookmark: OrbitBookmarkForScan) {
+function buildBookmarkPayload(
+  bookmark: OrbitBookmarkForScan,
+  authorPriorHint?: OrbitAuthorPriorHint
+) {
   return {
     id: bookmark.id,
     author: {
@@ -587,6 +652,15 @@ function buildBookmarkPayload(bookmark: OrbitBookmarkForScan) {
     quotedTweet: asQuotedTweet(bookmark.quotedTweet),
     sourceFolders: asXFolderHints(bookmark.xFolderHints),
     metrics: asPublicMetrics(bookmark.publicMetrics),
+    ...(authorPriorHint
+      ? {
+          priorDecisions: {
+            priorBookmarkCount: authorPriorHint.priorCount,
+            frequentTags: authorPriorHint.tags,
+            frequentCollections: authorPriorHint.collections,
+          },
+        }
+      : {}),
   };
 }
 
@@ -594,6 +668,7 @@ export function buildOrbitPromptPayload(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
+  authorPriorHints?: OrbitAuthorPriorHint[];
 }) {
   const palette = getTagColorSpectrum(
     Math.min(
@@ -605,12 +680,23 @@ export function buildOrbitPromptPayload(args: {
     )
   );
 
+  const authorHintByUsername = new Map(
+    (args.authorPriorHints ?? []).map((hint) => [
+      normalizeKey(hint.authorUsername),
+      hint,
+    ])
+  );
+
+  const promptTags = trimTagsForOrbitPrompt(args.existingTags);
+  const promptCollections = trimCollectionsForOrbitPrompt(args.existingCollections);
+
   return {
     goal:
       "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
 
     signalPriority: [
       "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
+      "When a bookmark includes priorDecisions, treat frequentTags/frequentCollections as strong hints for that author — but never override explicit tweet/quote/note topic.",
       "Use sourceFolders as weak-but-useful context because they are synced X folder names for that bookmark.",
       "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
       "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
@@ -618,23 +704,30 @@ export function buildOrbitPromptPayload(args: {
       "When title and excerpt disagree, prefer the explicit tweet/quoted text and choose the narrower topic, or return low confidence if no topic is clear.",
     ],
 
+    batchConsistencyRules: [
+      "Before finalizing, scan all bookmarks in this batch and reuse the same tag spellings for the same topic.",
+      "Prefer tags you already assigned to earlier bookmarks in this batch when the topic matches.",
+      "Align new collection names across bookmarks that share a theme.",
+    ],
+
     taggingRules: [
-      "Reuse an existingTag exactly (case-insensitive name match) whenever it clearly fits. Set reuseExisting=true and keep that tag's exact color.",
+      "Strongly prefer existingTags with high bookmarkCount when they fit — use the exact name and color.",
+      "For existing tags/collections, use the exact name; the server determines whether it is reused.",
       "Otherwise create a new tag: a short, reusable topic or content-type label, 1-3 words, Title Case (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
-      "Unless the bookmark has no topical signal, return at least one useful tag. Tags are the default fallback when no collection fits.",
+      "Prefer abstention over weak tags: only tag when tweet/quote/note/url context supports a specific topic.",
       "If you propose any collection, also include at least one tag that captures the same topic or content type.",
       "For new tags pick a color from the palette. Use the SAME color for semantically related new tags when reasonable.",
       "Max 3 tags per bookmark. No near-duplicates or parent/child duplicates (e.g. don't pair 'LLM' and 'LLMs', 'AI' and 'Artificial Intelligence', or 'TypeScript' and 'Programming' unless both add clear recall value).",
       "Prefer topic or content-type tags over stylistic or sentiment tags.",
       "Never use generic or source labels: General, Misc, Other, Interesting, Saved, Bookmark, Post, Tweet, X, Link, Article, Resource, Thread (unless Thread is a content type used on purpose), domain names, or URL fragments.",
-      "For sparse bookmarks, return one precise tag at most; if the topic is only guessed from an excerpt or title, use confidence medium or low.",
+      "For sparse bookmarks, return at most one precise tag; if the topic is only guessed from an excerpt or title, use confidence medium or low.",
     ],
 
     collectionRules: [
       "A collection is a durable, themed home for multiple related bookmarks — not a tag alias.",
-      "sourceFolders are read-only X folders, not editable existingCollections. Use them as hints only; do not mark them reuseExisting unless they match an existingCollection.",
-      "Reuse an existingCollection (reuseExisting=true) for any bookmark that clearly belongs there, even if it's the only one in this batch.",
-      "Only propose a NEW collection (reuseExisting=false) when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
+      "sourceFolders are read-only X folders, not editable existingCollections. Use them as hints only.",
+      "Reuse an existingCollection for any bookmark that clearly belongs there, even if it is the only one in this batch.",
+      "Only propose a NEW collection when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
       "Do not create a collection from overlapping but different topics. If bookmarks only share a broad parent theme, use tags and leave collection null.",
       "Collection name: 2-4 words, Title Case, specific (not 'Interesting Posts', 'Saved Stuff').",
       "Collection description: one short sentence describing what belongs here.",
@@ -644,75 +737,114 @@ export function buildOrbitPromptPayload(args: {
     confidenceRubric: {
       high: "Content explicitly signals a specific topic; an obvious reusable tag applies.",
       medium: "Topic is inferable but not explicit; tags are reasonable defaults.",
-      low: "Content is weakly inferable. Use one broad-but-useful tag if there is a real topic; return empty tags only when no clean topic is present.",
+      low: "Content is weakly inferable or ambiguous. Return empty tags and null collection unless one specific topic is clearly supported.",
     },
 
     outputContract: [
       "For every bookmark id in `bookmarks`, return exactly one suggestion with the same id.",
       "Never invent bookmark ids that were not provided.",
-      "Only return { confidence: 'low', reasoning: '<short>', tags: [], collection: null } when tweetText, quotedTweet, note, and url context do not support any clean topic.",
+      "Return { confidence: 'low', tags: [], collection: null } when tweetText, quotedTweet, note, and url context do not support any clean topic — do not guess.",
       "Keep `reason` and `reasoning` strings short and practical (under 180 characters).",
     ],
 
     palette,
 
-    existingTags: args.existingTags.map((tag) => ({
+    existingTags: promptTags.map((tag) => ({
       name: tag.name,
       color: tag.color,
+      ...(typeof tag.bookmarkCount === "number"
+        ? { bookmarkCount: tag.bookmarkCount }
+        : {}),
     })),
-    existingCollections: args.existingCollections.map((collection) => ({
+    existingCollections: promptCollections.map((collection) => ({
       name: collection.name,
       description: collection.description,
+      ...(typeof collection.bookmarkCount === "number"
+        ? { bookmarkCount: collection.bookmarkCount }
+        : {}),
     })),
 
-    example: {
-      bookmark: {
-        id: "example-1",
-        author: {
-          username: "ai_researcher",
-          displayName: "AI Researcher",
-          verified: true,
-        },
-        tweetText:
-          "New paper: scaling laws for evaluation benchmarks on reasoning tasks. arxiv link below.",
-        urls: [
+    examples: [
+      {
+        note: "Two bookmarks in one batch share a new collection — required for reuseExisting=false collections.",
+        bookmarks: [
           {
-            displayUrl: "arxiv.org/abs/2410.00001",
-            expandedUrl: "https://arxiv.org/abs/2410.00001",
-            title: "Scaling laws for evaluation benchmarks",
-            description: null,
+            id: "example-1",
+            tweetText:
+              "New paper: scaling laws for evaluation benchmarks on reasoning tasks. arxiv link below.",
+            urls: [
+              {
+                displayUrl: "arxiv.org/abs/2410.00001",
+                title: "Scaling laws for evaluation benchmarks",
+              },
+            ],
+          },
+          {
+            id: "example-2",
+            tweetText:
+              "Follow-up preprint on mixture-of-experts routing for long-context LLM inference.",
+            urls: [
+              {
+                displayUrl: "arxiv.org/abs/2410.11111",
+                title: "Mixture-of-experts routing for long-context LLMs",
+              },
+            ],
           },
         ],
-        mediaTypes: [],
-      },
-      expectedSuggestion: {
-        bookmarkId: "example-1",
-        confidence: "high",
-        reasoning: "Explicit AI research paper with arxiv link.",
-        tags: [
+        expectedSuggestions: [
           {
-            name: "AI",
-            color: "#1d9bf0",
-            reason: "AI research topic",
-            reuseExisting: false,
+            bookmarkId: "example-1",
+            confidence: "high",
+            reasoning: "Explicit AI research paper with arxiv link.",
+            tags: [
+              { name: "AI", color: "#1d9bf0", reason: "AI research topic" },
+              { name: "Paper", color: "#a855f7", reason: "Academic paper format" },
+            ],
+            collection: {
+              name: "AI Papers",
+              description: "Academic papers and preprints on AI and ML.",
+              reason: "Shared research theme with example-2.",
+            },
           },
           {
-            name: "Paper",
-            color: "#a855f7",
-            reason: "Academic paper format",
-            reuseExisting: false,
+            bookmarkId: "example-2",
+            confidence: "high",
+            reasoning: "Another explicit AI/LLM research preprint.",
+            tags: [
+              { name: "AI", color: "#1d9bf0", reason: "Same topic label as example-1" },
+              { name: "LLM", color: "#22c55e", reason: "Long-context LLM focus" },
+            ],
+            collection: {
+              name: "AI Papers",
+              description: "Academic papers and preprints on AI and ML.",
+              reason: "Same batch theme as example-1.",
+            },
           },
         ],
-        collection: {
-          name: "AI Papers",
-          description: "Academic papers and preprints on AI and ML.",
-          reason: "Durable home for research papers.",
-          reuseExisting: false,
+      },
+      {
+        note: "Sparse bookmark — abstain instead of guessing.",
+        bookmark: {
+          id: "example-sparse",
+          tweetText: "👀",
+          urls: [],
+        },
+        expectedSuggestion: {
+          bookmarkId: "example-sparse",
+          confidence: "low",
+          reasoning: "No topical signal in text or links.",
+          tags: [],
+          collection: null,
         },
       },
-    },
+    ],
 
-    bookmarks: args.bookmarks.map(buildBookmarkPayload),
+    bookmarks: args.bookmarks.map((bookmark) =>
+      buildBookmarkPayload(
+        bookmark,
+        authorHintByUsername.get(normalizeKey(bookmark.authorUsername))
+      )
+    ),
   };
 }
 
@@ -721,9 +853,10 @@ function buildOrbitSystemPrompt() {
     "You are MarkMaster's Orbit librarian.",
     "Orbit is an inbox of bookmarked X posts that have no tags and are not in any user collection.",
     "Your job: for each bookmark, propose up to 3 concise tags and, only when it clearly fits, a single collection home — so the user can retrieve these posts later by topic.",
-    "Optimize for reuse and recall, not novelty: always prefer an existing tag or collection when it fits.",
+    "Optimize for reuse and recall, not novelty: always prefer high-usage existing tags and collections when they fit.",
+    "Keep tag vocabulary consistent across the entire batch.",
     "Never invent bookmark ids. Return exactly one suggestion per provided id.",
-    "When content is ambiguous, return confidence 'low' with empty tags and null collection instead of guessing.",
+    "When content is ambiguous, prefer confidence 'low' with empty tags and null collection over guessing.",
     "Use only hex colors from the provided palette for new tags. Return strict JSON matching the provided schema.",
   ].join(" ");
 }
@@ -842,10 +975,15 @@ export function normalizeOrbitScanPlan(
       context.existingTags.length + rawPlan.suggestions.length * 3
     )
   );
-  const resolveExistingTag = (normalizedName: string, key: string) =>
-    existingTagMap.get(normalizeKey(normalizedName)) ??
-    existingTagAliasMap.get(key) ??
-    existingTagMap.get(key);
+  const resolveExistingTag = (normalizedName: string) => {
+    for (const lookupKey of tagLookupKeys(normalizedName)) {
+      const fromMap = existingTagMap.get(lookupKey);
+      if (fromMap) return fromMap;
+      const fromAlias = existingTagAliasMap.get(lookupKey);
+      if (fromAlias) return fromAlias;
+    }
+    return existingTagMap.get(normalizeKey(normalizedName));
+  };
   const collectionSuggestionBookmarkIds = new Map<string, Set<string>>();
   for (const suggestion of rawPlan.suggestions) {
     if (!bookmarkIdSet.has(suggestion.bookmarkId) || !suggestion.collection) continue;
@@ -878,7 +1016,7 @@ export function normalizeOrbitScanPlan(
         if (seenTagKeys.has(key)) return null;
         seenTagKeys.add(key);
 
-        const existingTag = resolveExistingTag(normalizedName, key);
+        const existingTag = resolveExistingTag(normalizedName);
         return {
           name: existingTag?.name ?? normalizedName.slice(0, 50),
           color:
@@ -933,7 +1071,7 @@ export function normalizeOrbitScanPlan(
         const tagKey = normalizeTagKey(normalizedName);
         if (!GENERIC_TAG_NAMES.has(tagKey) && !seenTagKeys.has(tagKey)) {
           seenTagKeys.add(tagKey);
-          const existingTag = resolveExistingTag(normalizedName, tagKey);
+          const existingTag = resolveExistingTag(normalizedName);
           normalizedTags.push({
             name: existingTag?.name ?? normalizedName,
             color:
@@ -948,12 +1086,25 @@ export function normalizeOrbitScanPlan(
       }
     }
 
+    const hasApplyable =
+      normalizedTags.length > 0 || normalizedCollection !== null;
+    let reasoning: string;
+    if (!hasApplyable) {
+      reasoning =
+        suggestion.confidence !== "low"
+          ? "No applyable suggestion remained after cleanup."
+          : truncateText(suggestion.reasoning, 240) ||
+            "No confident auto-sort suggestion yet.";
+    } else {
+      reasoning =
+        truncateText(suggestion.reasoning, 240) ||
+        "Suggested from bookmark content.";
+    }
+
     suggestionMap.set(suggestion.bookmarkId, {
       bookmarkId: suggestion.bookmarkId,
-      confidence: suggestion.confidence,
-      reasoning:
-        truncateText(suggestion.reasoning, 240) ||
-        "Suggested from bookmark content.",
+      confidence: hasApplyable ? suggestion.confidence : "low",
+      reasoning,
       tags: normalizedTags,
       collection: normalizedCollection,
     });
@@ -1106,6 +1257,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
+  authorPriorHints?: OrbitAuthorPriorHint[];
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitGrokError(
@@ -1147,6 +1299,7 @@ export async function scanOrbitBookmarksWithXai(args: {
       },
       body: JSON.stringify({
         model,
+        temperature: 0.3,
         input: [
           {
             role: "system",

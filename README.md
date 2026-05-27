@@ -14,7 +14,7 @@ Search, tag, annotate, and curate your X bookmarks. Built for power users who ac
 - **Export** to JSON or CSV with all metadata
 - **Keyboard shortcuts** — `j/k` navigate, `/` focus search, `cmd/ctrl+k` command palette, `cmd/ctrl+1..5` media filters, `t` tag, `c` collect, `n` note
 - **X folder sync** — import premium bookmark folders and mirror them into managed collections
-- **Dark/light theme** with amber accent branding
+- **Dark/light theme** with blue accent; optional Orbit cyan theme
 - **Synced archive** — once bookmarks are synced into MarkMaster, they remain searchable locally
 
 ## Tech Stack

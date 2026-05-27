@@ -8,6 +8,10 @@ vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1" })),
 }));
 
+vi.mock("@/lib/orbit-author-history", () => ({
+  getAuthorPriorHintsForScan: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     bookmark: {
@@ -151,6 +155,7 @@ describe("/api/orbit/scan", () => {
         id: "collection-1",
         name: "Research",
         description: "Editable research collection",
+        _count: { items: 3 },
       },
     ]);
 
@@ -195,8 +200,10 @@ describe("/api/orbit/scan", () => {
             id: "collection-1",
             name: "Research",
             description: "Editable research collection",
+            bookmarkCount: 3,
           },
         ],
+        authorPriorHints: [],
       })
     );
   });

@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRESET_COLORS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import type { TagWithCount } from "@/types";
 
 interface ColorSwatchProps {
@@ -20,11 +21,12 @@ const ColorSwatch = React.memo(function ColorSwatch({
       type="button"
       aria-label={`Select color ${color}`}
       aria-pressed={selected}
-      className={`h-6 w-6 rounded-full border transition-transform ${
+      className={cn(
+        "size-6 rounded-full border transition-transform",
         selected
           ? "scale-105 border-foreground ring-2 ring-foreground/30 ring-offset-2 ring-offset-surface-2"
-          : "border-black/10"
-      }`}
+          : "border-black/10 hover:scale-105"
+      )}
       style={{ backgroundColor: color }}
       onClick={onClick}
     />
@@ -82,9 +84,10 @@ export const TagEditRow = React.memo(function TagEditRow({
       ref={rowRef}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      className={`flex flex-wrap items-center gap-3 px-4 py-3 ${
-        index > 0 ? "border-t border-hairline-soft" : ""
-      }`}
+      className={cn(
+        "flex flex-col gap-3 bg-accent-soft/40 px-4 py-4 sm:flex-row sm:items-center",
+        index > 0 && "border-t border-hairline-soft"
+      )}
     >
       <div className="flex flex-wrap gap-1.5">
         {colorOptions.map((c) => (
@@ -100,19 +103,17 @@ export const TagEditRow = React.memo(function TagEditRow({
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="h-8 min-w-[12rem] flex-1 border-hairline-soft bg-surface-1"
+        className="h-9 min-w-0 flex-1 border-hairline-soft bg-surface-1 sm:min-w-[12rem]"
         onKeyDown={(e) => e.key === "Enter" && onSave(tag.id, name.trim(), color)}
       />
-      <Button
-        size="sm"
-        className="shadow-sm"
-        onClick={() => onSave(tag.id, name.trim(), color)}
-      >
-        Save
-      </Button>
-      <Button size="sm" variant="ghost" onClick={onCancel}>
-        Cancel
-      </Button>
+      <div className="flex shrink-0 gap-2">
+        <Button size="sm" onClick={() => onSave(tag.id, name.trim(), color)}>
+          Save
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 });

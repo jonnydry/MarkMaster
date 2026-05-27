@@ -239,6 +239,8 @@ export const exportQuerySchema = z.object({
 export const MAX_ORBIT_GRAPH_NODE_CAP = 4000;
 export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1500;
 
+export const orbitGraphScopeSchema = z.enum(["library", "orbit"]).default("library");
+
 export const orbitGraphQuerySchema = z.object({
   nodeCap: z.coerce
     .number()
@@ -247,4 +249,5 @@ export const orbitGraphQuerySchema = z.object({
     .max(MAX_ORBIT_GRAPH_NODE_CAP, `nodeCap cannot exceed ${MAX_ORBIT_GRAPH_NODE_CAP}`)
     .default(DEFAULT_ORBIT_GRAPH_NODE_CAP)
     .optional(),
+  scope: orbitGraphScopeSchema.optional(),
 });

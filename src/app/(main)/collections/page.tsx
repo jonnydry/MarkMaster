@@ -36,12 +36,12 @@ import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import { toast } from "sonner";
 import { UserCollectionCard, XFolderCard } from "./collection-card";
 import type { CollectionWithCount, BookmarkWithRelations } from "@/types";
-import { PerformanceHighlights } from "@/components/performance-highlights";
+import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
 import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
-import { trackFlywheelEvent } from "@/lib/flywheel";
-import { HighlightsDigest } from "@/components/highlights-digest";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -148,6 +148,15 @@ export default function CollectionsPage() {
   const dislikedIds = getDislikedHighlightIds();
   const likedIds = getLikedHighlightIds();
   const {
+    data: rawHighlightData,
+    isLoading: rawHighlightsLoading,
+    isError: rawHighlightsError,
+    refetch: refetchRawHighlights,
+  } = usePerformanceHighlightsHook(true, {
+    dislikedIds,
+    likedIds,
+  });
+  const {
     data: libraryHighlightData,
     isLoading: libraryHighlightsLoading,
     isError: libraryHighlightsError,
@@ -159,8 +168,10 @@ export default function CollectionsPage() {
     usePersonalBoost: true,
   });
 
-  const libraryHighlights = libraryHighlightData?.bookmarks ?? [];
-  const libraryTotal = libraryHighlightData?.total ?? 0;
+  const refetchDiscovery = useCallback(() => {
+    void refetchRawHighlights();
+    void refetchLibraryHighlights();
+  }, [refetchRawHighlights, refetchLibraryHighlights]);
 
   const { userCollections, xFolders } = useMemo(
     () => splitCollections(collections),
@@ -337,22 +348,14 @@ export default function CollectionsPage() {
               </div>
             ) : isError ? (
               <div className="flex h-64 flex-col items-center justify-center text-center">
-                <div className="rounded-sm border border-hairline-soft bg-surface-1/70 p-5">
-                  <p className="text-sm font-medium text-foreground">
-                    Collections could not be loaded
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {error instanceof Error ? error.message : "Please try again."}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-3"
-                    onClick={() => refetch()}
-                  >
-                    Retry
-                  </Button>
-                </div>
+                <ErrorState
+                  layout="panel"
+                  title="Collections could not be loaded"
+                  description={
+                    error instanceof Error ? error.message : "Please try again."
+                  }
+                  action={<RetryButton onClick={() => refetch()} />}
+                />
               </div>
             ) : collections.length === 0 ? (
               <EmptyState
@@ -381,48 +384,23 @@ export default function CollectionsPage() {
                   onOpenCollection={handleNavigate}
                 />
 
-                {libraryHighlightsLoading ? (
-                  <div className="space-y-2" aria-busy aria-label="Loading library highlights">
-                    <div className="h-4 w-40 rounded skeleton-shimmer" />
-                    <div className="h-24 rounded-sm border border-hairline-soft skeleton-shimmer" />
-                  </div>
-                ) : libraryHighlightsError ? (
-                  <div className="flex items-center justify-between gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    <span>Could not load library highlights.</span>
-                    <button
-                      type="button"
-                      onClick={() => void refetchLibraryHighlights()}
-                      className="text-xs font-medium underline underline-offset-2"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : libraryHighlights.length > 0 ? (
-                  <PerformanceHighlights
-                    title="Library Highlights"
-                    subtitle={
-                      libraryTotal > 0
-                        ? `${libraryTotal.toLocaleString()} bookmarks by X engagement`
-                        : undefined
-                    }
-                    bookmarks={libraryHighlights}
-                    total={libraryTotal}
-                    onSelect={(id) =>
-                      router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
-                    }
-                    onOrbitReview={(id) => {
-                      trackFlywheelEvent("cta.review_in_orbit", {
-                        source: "library_highlights",
-                        bookmarkId: id,
-                      });
-                      router.push(`/orbit?highlightId=${id}`);
-                    }}
-                    isRawMode={false}
-                  />
-                ) : null}
-
-                {/* Habit-forming Digest (Phase 2, enhanced by personalization in 7) */}
-                <HighlightsDigest onSaveAsCollection={handleSaveGemsAsCollection} />
+                <DashboardDiscovery
+                  feedReady
+                  variant="flush"
+                  parentData={{
+                    rawData: rawHighlightData,
+                    libraryData: libraryHighlightData,
+                    rawLoading: rawHighlightsLoading || libraryHighlightsLoading,
+                    libraryLoading: libraryHighlightsLoading,
+                    rawError: rawHighlightsError || libraryHighlightsError,
+                    refetchRaw: refetchDiscovery,
+                  }}
+                  onSelectBookmark={(id) =>
+                    router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
+                  }
+                  onSaveAsCollection={handleSaveGemsAsCollection}
+                  explainer="High-performing posts from your library — quick picks to triage in Orbit, plus a weekly mix for batch review."
+                />
 
                 <CollectionsControlBar
                   searchQuery={searchQuery}

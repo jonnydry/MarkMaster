@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TagWithCount } from "@/types";
 
 interface TagRowProps {
@@ -16,37 +17,46 @@ export const TagRow = React.memo(function TagRow({
   onStartEdit,
   onDelete,
 }: TagRowProps) {
+  const count = tag._count?.bookmarks ?? 0;
+
   return (
     <div
-      className={`flex flex-wrap items-center gap-3 px-4 py-3 ${
-        index > 0 ? "border-t border-hairline-soft" : ""
-      }`}
+      className={cn(
+        "group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-1/80",
+        index > 0 && "border-t border-hairline-soft"
+      )}
     >
-      <div
-        className="h-4 w-4 shrink-0 rounded-full"
+      <span
+        className="size-3.5 shrink-0 rounded-full ring-2 ring-black/5 ring-offset-1 ring-offset-surface-2"
         style={{ backgroundColor: tag.color }}
+        aria-hidden
       />
-      <span className="flex-1 text-sm font-medium">{tag.name}</span>
-      <span className="rounded-full border border-hairline-soft bg-surface-1 px-2 py-0.5 text-xs text-muted-foreground shadow-sm">
-        {tag._count?.bookmarks ?? 0}
-      </span>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground hover:bg-surface-1 hover:text-foreground"
-        onClick={() => onStartEdit(tag)}
-      >
-        Edit
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-        aria-label={`Delete tag ${tag.name}`}
-        onClick={() => onDelete(tag.id)}
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </Button>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{tag.name}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {count.toLocaleString()} {count === 1 ? "bookmark" : "bookmarks"}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+          aria-label={`Edit tag ${tag.name}`}
+          onClick={() => onStartEdit(tag)}
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-destructive hover:bg-destructive/10"
+          aria-label={`Delete tag ${tag.name}`}
+          onClick={() => onDelete(tag.id)}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
     </div>
   );
 });

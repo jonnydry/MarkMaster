@@ -526,6 +526,82 @@ describe("normalizeOrbitScanPlan", () => {
       collection: null,
     });
   });
+
+  it("downgrades confidence when cleanup removes all applyable suggestions", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Noisy pass",
+        taggingStrategy: "Clean up model labels",
+        collectionStrategy: "Avoid one-off buckets",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "Looked useful at first glance.",
+          tags: [
+            {
+              name: "Article",
+              color: "#93c5fd",
+              reason: "Generic metadata",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0]).toMatchObject({
+      confidence: "low",
+      tags: [],
+      collection: null,
+      reasoning: "No applyable suggestion remained after cleanup.",
+    });
+  });
+
+  it("matches plural tag suggestions to existing singular tags", () => {
+    const parsed = orbitScanPlanSchema.parse({
+      overview: {
+        summary: "Plural pass",
+        taggingStrategy: "Reuse tags",
+        collectionStrategy: "No collections",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "Startup content",
+          tags: [
+            {
+              name: "Startups",
+              color: "#ef4444",
+              reason: "Startup topic",
+              reuseExisting: false,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    });
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [{ name: "Startup", color: "#1d9bf0" }],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0].tags[0]).toMatchObject({
+      name: "Startup",
+      reuseExisting: true,
+    });
+  });
 });
 
 describe("buildOrbitPromptPayload", () => {
@@ -557,14 +633,97 @@ describe("buildOrbitPromptPayload", () => {
     });
 
     expect(payload.signalPriority).toEqual(
-      expect.arrayContaining([expect.stringContaining("sourceFolders")])
+      expect.arrayContaining([expect.stringContaining("priorDecisions")])
+    );
+    expect(payload.batchConsistencyRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("same tag spellings")])
     );
     expect(payload.collectionRules).toEqual(
       expect.arrayContaining([expect.stringContaining("read-only X folders")])
     );
+    expect(payload.examples).toHaveLength(2);
     expect(payload.bookmarks[0]).toMatchObject({
       id: "b1",
       sourceFolders: [{ name: "AI Papers" }],
+    });
+  });
+
+  it("includes author prior hints on matching bookmarks", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "A saved post.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: [],
+      existingCollections: [],
+      authorPriorHints: [
+        {
+          authorUsername: "researcher",
+          priorCount: 5,
+          tags: ["AI", "Paper"],
+          collections: ["AI Papers"],
+        },
+      ],
+    });
+
+    expect(payload.bookmarks[0]).toMatchObject({
+      priorDecisions: {
+        priorBookmarkCount: 5,
+        frequentTags: ["AI", "Paper"],
+        frequentCollections: ["AI Papers"],
+      },
+    });
+  });
+
+  it("trims existing tags and collections to prompt limits by usage", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "A saved post.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: Array.from({ length: 90 }, (_, index) => ({
+        name: `Tag ${index}`,
+        color: PRESET_COLORS[index % PRESET_COLORS.length],
+        bookmarkCount: index,
+      })),
+      existingCollections: Array.from({ length: 50 }, (_, index) => ({
+        name: `Collection ${index}`,
+        description: null,
+        bookmarkCount: index,
+      })),
+    });
+
+    expect(payload.existingTags).toHaveLength(80);
+    expect(payload.existingCollections).toHaveLength(40);
+    expect(payload.existingTags[0]).toMatchObject({
+      name: "Tag 89",
+      bookmarkCount: 89,
     });
   });
 

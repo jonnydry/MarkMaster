@@ -1,26 +1,19 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  ArrowRight,
-  Inbox,
-  StickyNote,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { BarChart3 } from "lucide-react";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
+import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { LibraryControlCenter } from "@/components/library-control-center";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { RetryButton } from "@/components/ui/retry-button";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { fetchJson } from "@/lib/fetch-json";
@@ -29,10 +22,14 @@ import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { cn } from "@/lib/utils";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
-
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital, OrbitalCard, TelemetryStat } from "@/components/orbital";
-import { useTypography } from "@/hooks/use-typography";
+import {
+  AnalyticsHero,
+  AnalyticsRangeSegment,
+  AnalyticsTabs,
+  FlywheelSignalsPanel,
+  parseAnalyticsTab,
+  type AnalyticsTab,
+} from "./analytics-primitives";
 
 export type { TimeRange };
 
@@ -61,25 +58,15 @@ const TimelineCard = dynamic(
   { ssr: false }
 );
 
-const RANGE_OPTIONS: Array<{ value: TimeRange; label: string }> = [
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
-  { value: "12m", label: "12m" },
-  { value: "all", label: "All" },
-];
-
 export default function AnalyticsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
-
-  const rangeControl = useMemo(
-    () => <RangeControl value={range} onChange={setRange} />,
-    [range]
-  );
+  const activeTab = parseAnalyticsTab(searchParams.get("tab"));
 
   const {
     data: analytics,
@@ -97,6 +84,7 @@ export default function AnalyticsPage() {
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
+
   const oldestOrbitHref = analytics
     ? buildOrbitIntentHref({
         intent: "oldest",
@@ -104,16 +92,29 @@ export default function AnalyticsPage() {
         untaggedOldestAt: analytics.untaggedOldestAt,
       })
     : "/orbit";
-  const backlogOrbitHref = analytics
-    ? buildOrbitIntentHref({
-        intent: "backlog",
-        orbitQueueCount: analytics.orbitQueueCount,
-      })
-    : "/orbit";
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
   };
+
+  const handleSyncComplete = useCallback(() => {
+    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
+    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+  }, [queryClient]);
+
+  const handleTabChange = useCallback(
+    (tab: AnalyticsTab) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (tab === "overview") {
+        params.delete("tab");
+      } else {
+        params.set("tab", tab);
+      }
+      const query = params.toString();
+      router.replace(query ? `/analytics?${query}` : "/analytics", { scroll: false });
+    },
+    [router, searchParams]
+  );
 
   const triagedPct = useMemo(() => {
     if (!analytics || analytics.totalBookmarks === 0) return 0;
@@ -137,7 +138,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
-      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
+      <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -145,14 +146,9 @@ export default function AnalyticsPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
           lastSyncAt={
-            session?.dbUser?.lastSyncAt
-              ? new Date(session.dbUser.lastSyncAt)
-              : null
+            session?.dbUser?.lastSyncAt ? new Date(session.dbUser.lastSyncAt) : null
           }
-          onSyncComplete={() => {
-            void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-            void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-          }}
+          onSyncComplete={handleSyncComplete}
         />
       </div>
 
@@ -161,7 +157,7 @@ export default function AnalyticsPage() {
           <PageHeader
             sticky
             title="Analytics"
-            description="How your library is growing — and what still needs attention"
+            description="Library health, composition, and activity"
             leading={
               <div className="md:hidden">
                 <MobileSidebar
@@ -170,101 +166,103 @@ export default function AnalyticsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={() => setCreateOpen(true)}
-                  onSyncComplete={() => {
-                    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-                    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-                  }}
+                  onSyncComplete={handleSyncComplete}
                 />
               </div>
             }
             actions={
-              session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : undefined
+              <div className="flex items-center gap-2">
+                {!showAnalyticsSkeleton && analytics && analytics.totalBookmarks > 0 ? (
+                  <AnalyticsRangeSegment value={range} onChange={setRange} />
+                ) : null}
+                {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
+              </div>
             }
           />
 
           <div className="p-4 sm:p-5">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+            <div className="mx-auto w-full max-w-4xl">
               {showAnalyticsSkeleton ? (
                 <LoadingSkeleton />
               ) : isError || !analytics ? (
                 <ErrorState
-                  message={error instanceof Error ? error.message : undefined}
-                  onRetry={() => refetch()}
+                  title="Analytics could not be loaded"
+                  description={
+                    error instanceof Error ? error.message : "Please try again."
+                  }
+                  action={<RetryButton onClick={() => refetch()} />}
                 />
               ) : analytics.totalBookmarks === 0 ? (
-                <LibraryControlCenter
-                  totalBookmarks={0}
-                  untriagedCount={0}
-                  totalTags={analytics.totalTags}
-                  totalCollections={analytics.totalCollections}
-                  notedCount={analytics.notedCount}
-                  lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
-                  pendingHighlightsCount={0}
-                  onSyncComplete={() => {
-                    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-                    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-                  }}
-                  // pendingHighlightsCount=0 for empty state (item 8 wiring to orbitQueueCount)
+                <EmptyState
+                  layout="panel"
+                  icon={BarChart3}
+                  title="No bookmarks yet"
+                  description="Sync from X to see library health, top voices, and activity trends."
+                  action={
+                    <div className="mx-auto max-w-sm">
+                      <SyncButton
+                        lastSyncAt={
+                          session?.dbUser?.lastSyncAt
+                            ? new Date(session.dbUser.lastSyncAt)
+                            : null
+                        }
+                        onSyncComplete={handleSyncComplete}
+                        detail="full"
+                      />
+                    </div>
+                  }
                 />
               ) : (
                 <>
-                  <section className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <LibraryHealthCard
-                      untaggedCount={analytics.untaggedCount}
-                      orbitQueueCount={analytics.orbitQueueCount}
-                      totalBookmarks={analytics.totalBookmarks}
-                      triagedPct={triagedPct}
-                      oldestAt={analytics.untaggedOldestAt}
-                      orbitHref={oldestOrbitHref}
-                    />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                      <VelocityCard
-                        last30d={analytics.last30dCount}
-                        delta={velocityDelta}
-                      />
-                      <AnnotationCard
-                        notedCount={analytics.notedCount}
-                        totalBookmarks={analytics.totalBookmarks}
-                        pct={annotationPct}
-                      />
-                    </div>
-                  </section>
-
-                  {/* Phase 3 Item 12 Slice 2: time-aware signals (via range filter) + two high-value ratios (restrained presentation).
-                      Attribution captured at source. Still zero-weight when no signals. Elegant and calm by design. */}
-                  <FlywheelSignalsCard analytics={analytics} />
-
-                  <LibraryControlCenter
+                  <AnalyticsHero
                     totalBookmarks={analytics.totalBookmarks}
-                    untriagedCount={analytics.orbitQueueCount}
-                    totalTags={analytics.totalTags}
-                    totalCollections={analytics.totalCollections}
-                    notedCount={analytics.notedCount}
-                    lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
-                    orbitHref={backlogOrbitHref}
-                    pendingHighlightsCount={analytics.rawHighlightsCount}
                     orbitQueueCount={analytics.orbitQueueCount}
-                    onSyncComplete={() => {
-                      void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-                      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-                    }}
+                    untaggedCount={analytics.untaggedCount}
+                    triagedPct={triagedPct}
+                    last30d={analytics.last30dCount}
+                    velocityDelta={velocityDelta}
+                    notedCount={analytics.notedCount}
+                    annotationPct={annotationPct}
+                    oldestAt={analytics.untaggedOldestAt}
+                    orbitHref={oldestOrbitHref}
+                    lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
                   />
 
-                  <TopVoicesCard
-                    authors={analytics.topAuthors}
-                    totalBookmarks={analytics.totalBookmarks}
+                  <AnalyticsTabs
+                    activeTab={activeTab}
+                    onTabChange={handleTabChange}
+                    className="mt-6"
                   />
 
-                  <div className="grid gap-5 xl:grid-cols-2">
-                    <ContentMixCard breakdown={analytics.mediaBreakdown} />
-                    <TagRankCard tags={analytics.tagDistribution} />
+                  <div role="tabpanel" aria-label={activeTab} className="min-h-[12rem]">
+                    {activeTab === "overview" ? (
+                      <TopVoicesCard
+                        authors={analytics.topAuthors}
+                        totalBookmarks={analytics.totalBookmarks}
+                        variant="flat"
+                      />
+                    ) : null}
+
+                    {activeTab === "composition" ? (
+                      <div className="grid gap-0 xl:grid-cols-2 xl:gap-8">
+                        <ContentMixCard breakdown={analytics.mediaBreakdown} variant="flat" />
+                        <TagRankCard tags={analytics.tagDistribution} variant="flat" />
+                      </div>
+                    ) : null}
+
+                    {activeTab === "activity" ? (
+                      <TimelineCard analytics={analytics} range={range} variant="flat" />
+                    ) : null}
+
+                    {activeTab === "signals" ? (
+                      <FlywheelSignalsPanel analytics={analytics} />
+                    ) : null}
                   </div>
 
-                  <TimelineCard
-                    analytics={analytics}
-                    range={range}
-                    rangeControl={rangeControl}
-                  />
+                  <p className="mt-4 border-t border-hairline-soft pt-3 text-xs text-muted-foreground">
+                    Time range applies to activity charts and flywheel signals. Author, tag, and
+                    health stats reflect your full library.
+                  </p>
                 </>
               )}
             </div>
@@ -281,611 +279,26 @@ export default function AnalyticsPage() {
   );
 }
 
-function LibraryHealthCard({
-  untaggedCount,
-  orbitQueueCount,
-  totalBookmarks,
-  triagedPct,
-  oldestAt,
-  orbitHref,
-}: {
-  untaggedCount: number;
-  orbitQueueCount: number;
-  totalBookmarks: number;
-  triagedPct: number;
-  oldestAt: string | null;
-  orbitHref: string;
-}) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  const untaggedPct = 100 - triagedPct;
-  const oldestLabel = oldestAt
-    ? relativeOldest(new Date(oldestAt))
-    : null;
-  const allTriaged = untaggedCount === 0;
-
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootCardClass = isOrbital
-    ? "relative overflow-hidden p-5 animate-fade-in-up border-primary/10"
-    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-5 shadow-sm animate-fade-in-up";
-
-  return (
-    <RootCard className={rootCardClass}>
-      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                allTriaged ? "bg-emerald/10 text-emerald" : "bg-note/12 text-note"
-              }`}
-            >
-              <Inbox className="h-4 w-4" />
-            </span>
-            <h2 className={cn(
-              "text-sm font-semibold uppercase tracking-[0.14em]",
-              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
-            )}>
-              Library Health
-            </h2>
-          </div>
-          {isOrbital ? (
-            <TelemetryStat
-              value={allTriaged ? "All tagged" : untaggedCount.toLocaleString()}
-              label={allTriaged
-                ? `Every one of your ${totalBookmarks.toLocaleString()} bookmarks is organized.`
-                : `untriaged · ${untaggedPct.toFixed(0)}% of ${totalBookmarks.toLocaleString()}`}
-              className="mt-4"
-            />
-          ) : (
-            <>
-              <p className="mt-4 heading-font text-4xl font-bold tracking-tight tabular-nums">
-                {allTriaged ? "All tagged" : untaggedCount.toLocaleString()}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {allTriaged
-                  ? `Every one of your ${totalBookmarks.toLocaleString()} bookmarks is organized.`
-                  : `untriaged · ${untaggedPct.toFixed(0)}% of ${totalBookmarks.toLocaleString()}`}
-              </p>
-            </>
-          )}
-          {oldestLabel && !allTriaged ? (
-            <p
-              className={cn(
-                "mt-1 text-xs",
-                t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
-              )}
-            >
-              Oldest waiting since {oldestLabel}
-            </p>
-          ) : null}
-        </div>
-
-        {!allTriaged && orbitQueueCount > 0 ? (
-          <Link
-            href={orbitHref}
-            className={`${buttonVariants({ size: "sm" })} shrink-0`}
-          >
-            Triage now
-            <ArrowRight className="ml-1 h-3.5 w-3.5" />
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="relative mt-5">
-        <div
-          className={cn(
-            "flex justify-between text-[11px] font-medium tabular-nums",
-            t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
-          )}
-        >
-          <span>Tagged {triagedPct.toFixed(0)}%</span>
-          <span>Untagged {untaggedPct.toFixed(0)}%</span>
-        </div>
-        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-3">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
-            style={{ width: `${triagedPct}%` }}
-          />
-        </div>
-      </div>
-    </RootCard>
-  );
-}
-
-function VelocityCard({
-  last30d,
-  delta,
-}: {
-  last30d: number;
-  delta: { pct: number | null; abs: number } | null;
-}) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  const trend =
-    !delta ? "flat" : delta.pct == null ? "up" : delta.pct > 0 ? "up" : delta.pct < 0 ? "down" : "flat";
-  const Icon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
-  const deltaTone =
-    trend === "up" ? "text-emerald" : trend === "down" ? "text-destructive" : "text-muted-foreground";
-  const deltaLabel =
-    !delta
-      ? "—"
-      : delta.pct == null
-        ? "first 30 days"
-        : `${delta.pct > 0 ? "+" : ""}${delta.pct.toFixed(0)}% vs prior 30d`;
-
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up stagger-1"
-    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-1";
-
-  return (
-    <RootCard className={rootClass}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "text-[11px] font-semibold uppercase tracking-[0.14em]",
-              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
-            )}
-          >
-            Last 30 days
-          </p>
-          <p
-            className={cn(
-              "mt-2 text-2xl font-bold tabular-nums",
-              t.monoNative ? t.data : "heading-font"
-            )}
-          >
-            {last30d.toLocaleString()}
-          </p>
-          <p className={`mt-1 flex items-center gap-1 text-xs ${deltaTone}`}>
-            <Icon className="h-3 w-3" />
-            {deltaLabel}
-          </p>
-        </div>
-      </div>
-    </RootCard>
-  );
-}
-
-function AnnotationCard({
-  notedCount,
-  totalBookmarks,
-  pct,
-}: {
-  notedCount: number;
-  totalBookmarks: number;
-  pct: number;
-}) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up stagger-2"
-    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up stagger-2";
-
-  return (
-    <RootCard className={rootClass}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "text-[11px] font-semibold uppercase tracking-[0.14em]",
-              t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
-            )}
-          >
-            Annotated
-          </p>
-          <p
-            className={cn(
-              "mt-2 text-2xl font-bold tabular-nums",
-              t.monoNative ? t.data : "heading-font"
-            )}
-          >
-            {pct.toFixed(0)}%
-          </p>
-          <p
-            className={cn(
-              "mt-1 text-xs",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
-            )}
-          >
-            {notedCount.toLocaleString()} of {totalBookmarks.toLocaleString()} with notes
-          </p>
-        </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald/10 text-emerald">
-          <StickyNote className="h-4 w-4" />
-        </span>
-      </div>
-    </RootCard>
-  );
-}
-
-/**
- * Phase 3 Item 12 Slice 3 — Per-Source Effectiveness + Quick Pass Outcome (builds on Slice 2)
- * All data time-filtered server-side via range. Per-source: lightweight top-3 entry sources (review CTAs + digest sessions)
- * grouped from payload->>'source' — shows which origins drive Orbit traffic (secondary, inline % only).
- * Quick Pass outcome: keep rate after quick (from minimal quick.keep instrumentation on decision sets; % of quick activity).
- * Everything remains ultra-restrained: appended to the *existing* ratios footer using identical tokens (no new card sections,
- * no charts, no visual weight, no extra labels). Zero-state and empty still perfectly calm. Elegance preserved at every layer.
- */
-function FlywheelSignalsCard({ analytics }: { analytics: AnalyticsData }) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  const cta = analytics.flywheelCtaReviewInOrbit ?? 0;
-  const digestCta = analytics.flywheelDigestReviewTogether ?? 0;
-  const good = analytics.flywheelFeedbackGood ?? 0;
-  const notRel = analytics.flywheelFeedbackNotRelevant ?? 0;
-  const quick = analytics.flywheelQuickModeToggles ?? 0;
-  const deep = analytics.flywheelDeepModeToggles ?? 0;
-  const sessions = analytics.flywheelDigestSessions ?? 0;
-
-  // Slice 2 ratios (0–1, pre-clamped and time-filtered on server)
-  const digestRate = analytics.flywheelDigestCtaToSessionRate ?? 0;
-  const quickShare = analytics.flywheelQuickPassShare ?? 0;
-
-  // Slice 3 additions (server-computed, may be empty arrays/0 when no data yet)
-  const topEntrySources = analytics.flywheelTopEntrySources ?? [];
-  const quickKeeps = analytics.flywheelQuickKeepCount ?? 0;
-  const quickKeepRate = analytics.flywheelQuickPassKeepRate ?? 0;
-
-  // Ultra-light, view-only label map for per-source display (Slice 3).
-  // Keeps raw keys for grouping/aggregation on server; only humanizes here for calm, premium readability.
-  // No new state, no weight — just friendlier nouns in the existing inline footer.
-  const SOURCE_LABELS: Record<string, string> = {
-    highlights: "Highlights",
-    library_highlights: "Library",
-    library_control: "Control",
-    digest: "Digest",
-    "weekly-gems": "Gems",
-    direct: "Direct",
-  };
-  const sourceLabel = (src: string): string => SOURCE_LABELS[src] || src;
-
-  const totalSignals = cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps;
-  if (totalSignals === 0) return null;
-
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? "relative overflow-hidden border-primary/10 p-4 animate-fade-in-up"
-    : "relative overflow-hidden border-hairline-soft bg-surface-1 p-4 shadow-sm animate-fade-in-up";
-
-  return (
-    <RootCard className={rootClass}>
-      <div className="flex items-center gap-2">
-        <h2
-          className={cn(
-            "text-sm font-semibold uppercase tracking-[0.14em]",
-            t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
-          )}
-        >
-          Flywheel Signals
-        </h2>
-        <span
-          className={cn(
-            "text-[10px] uppercase tracking-[0.08em]",
-            t.monoNative ? cn(t.label, "text-primary/50") : "text-muted-foreground/60"
-          )}
-        >
-          (early)
-        </span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Highlights → Orbit
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
-            )}
-          >
-            {cta}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Digest “Review together”
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
-            )}
-          >
-            {digestCta}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Good feedback
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-emerald-400/90") : "tabular-nums text-emerald-400/90"
-            )}
-          >
-            {good}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Not relevant feedback
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-amber-400/90") : "tabular-nums text-amber-400/90"
-            )}
-          >
-            {notRel}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Quick Pass toggles
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
-            )}
-          >
-            {quick}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Deep Review toggles
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
-            )}
-          >
-            {deep}
-          </div>
-        </div>
-        <div>
-          <div
-            className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.12em]",
-              t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground/70"
-            )}
-          >
-            Digest sessions started
-          </div>
-          <div
-            className={cn(
-              "text-xl font-semibold tabular-nums",
-              t.monoNative ? cn(t.data, "text-foreground") : "tabular-nums text-foreground"
-            )}
-          >
-            {sessions}
-          </div>
-        </div>
-      </div>
-
-      {/* Slice 2 ratios + Slice 3 per-source + Quick Pass keep outcome — all in ONE ultra-light footer row.
-          Uses identical classes, hairline, opacity, mono nums, wrap. Never dominates; purely additive clarity when data exists.
-          "Top sources" only for Orbit entry drivers (best/worst visible via relative %). Keep rate is the high-value Quick Pass outcome.
-          Total visual delta from Slice 2: a few extra spans in the existing flex. Feels lighter and more useful, never heavier. */}
-      {(digestCta > 0 || quick + deep > 0 || topEntrySources.length > 0 || quickKeeps > 0) && (
-        <div
-          className={cn(
-            "mt-2.5 border-t pt-2 text-[10px] flex flex-wrap items-baseline gap-x-4 gap-y-0.5",
-            isOrbital
-              ? "border-primary/20 text-primary/60"
-              : "border-hairline-soft/60 text-muted-foreground/70"
-          )}
-        >
-          {digestCta > 0 && (
-            <span>
-              Digest CTA → session rate{" "}
-              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
-                {Math.round(digestRate * 100)}%
-              </span>
-            </span>
-          )}
-          {quick + deep > 0 && (
-            <span>
-              Quick Pass share of modes{" "}
-              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
-                {Math.round(quickShare * 100)}%
-              </span>
-            </span>
-          )}
-          {topEntrySources.length > 0 && (
-            <span>
-              Top sources{" "}
-              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
-                {topEntrySources
-                  .map((s) => `${sourceLabel(s.source)} ${Math.round(s.pct * 100)}%`)
-                  .join(" · ")}
-              </span>
-            </span>
-          )}
-          {quickKeeps > 0 && (
-            <span>
-              Quick Pass keep rate{" "}
-              <span className={cn("tabular-nums", t.monoNative ? cn(t.data, "text-primary/80") : "tabular-nums text-foreground/80")}>
-                {Math.round(quickKeepRate * 100)}%
-              </span>
-            </span>
-          )}
-        </div>
-      )}
-
-      <p
-        className={cn(
-          "mt-3 text-[11px]",
-          t.monoNative ? cn(t.label, "text-primary/50") : "text-muted-foreground/60"
-        )}
-      >
-        Reliable early signal: do the rituals feed Orbit? Quick Pass adoption? Feedback loops active?
-      </p>
-    </RootCard>
-  );
-}
-
-const RangeControl = React.memo(function RangeControl({
-  value,
-  onChange,
-}: {
-  value: TimeRange;
-  onChange: (v: TimeRange) => void;
-}) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  return (
-    <div
-      role="tablist"
-      aria-label="Time range"
-      className={cn(
-        "inline-flex items-center rounded-full p-0.5 text-[11px] font-medium",
-        isOrbital
-          ? cn(orbital.glass, "border border-primary/20")
-          : "border border-hairline-soft bg-surface-2"
-      )}
-    >
-      {RANGE_OPTIONS.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              "rounded-full px-2.5 py-0.5 tabular-nums transition-colors",
-              active
-                ? "bg-primary text-primary-foreground"
-                : t.monoNative
-                  ? cn(t.label, "text-primary/60 hover:text-primary")
-                  : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-});
-
 function LoadingSkeleton() {
-  const { isOrbital } = useOrbitalTheme();
-  const skeletonClass = (h: string) =>
-    cn(
-      h,
-      "rounded-lg border skeleton-shimmer",
-      isOrbital
-        ? "border-primary/10 bg-surface-1/60"
-        : "border-hairline-soft bg-surface-1"
-    );
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className={skeletonClass("h-[180px]")} />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-          <div className={skeletonClass("h-[86px]")} />
-          <div className={skeletonClass("h-[86px]")} />
+    <div className="space-y-6">
+      <div className="space-y-3 border-b border-hairline-soft pb-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3 w-16 rounded skeleton-shimmer" />
+              <div className="h-6 w-12 rounded skeleton-shimmer" />
+            </div>
+          ))}
         </div>
+        <div className="h-1.5 w-full rounded-full skeleton-shimmer" />
       </div>
-      <div className={skeletonClass("h-[420px]")} />
-      <div className="grid gap-5 xl:grid-cols-2">
-        <div className={skeletonClass("h-[260px]")} />
-        <div className={skeletonClass("h-[260px]")} />
+      <div className="flex gap-4 border-b border-hairline-soft pb-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-4 w-16 rounded skeleton-shimmer" />
+        ))}
       </div>
-      <div className={skeletonClass("h-[300px]")} />
+      <div className={cn("h-64 rounded-sm border border-hairline-soft skeleton-shimmer")} />
     </div>
   );
-}
-
-function ErrorState({
-  message,
-  onRetry,
-}: {
-  message?: string;
-  onRetry: () => void;
-}) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
-  return (
-    <div className="flex h-72 items-center justify-center text-center">
-      <div
-        className={cn(
-          "rounded-2xl px-6 py-8 shadow-sm sm:px-8",
-          isOrbital
-            ? cn(orbital.glass, "border border-primary/20")
-            : "border border-hairline-soft bg-surface-1"
-        )}
-      >
-        <p className="text-lg font-medium">Analytics could not be loaded</p>
-        <p
-          className={cn(
-            "mt-2 text-sm",
-            t.monoNative ? cn(t.label, "text-primary/60") : "text-muted-foreground"
-          )}
-        >
-          {message ?? "Please try again."}
-        </p>
-        <Button size="sm" className="mt-4" onClick={onRetry}>
-          Retry
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function relativeOldest(date: Date) {
-  const now = new Date();
-  const days = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
-  if (days < 30) {
-    const w = Math.floor(days / 7);
-    return `${w} week${w === 1 ? "" : "s"} ago`;
-  }
-  if (days < 365) {
-    const m = Math.floor(days / 30);
-    return `${m} month${m === 1 ? "" : "s"} ago`;
-  }
-  const y = Math.floor(days / 365);
-  return `${y} year${y === 1 ? "" : "s"} ago`;
 }

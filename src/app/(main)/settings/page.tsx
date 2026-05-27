@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   AlertTriangle,
+  Braces,
   Download,
   Sun,
   Moon,
@@ -17,14 +18,15 @@ import {
   KeyRound,
   Loader2,
   Palette,
-  ServerCog,
+  Search,
   ShieldCheck,
-  Sparkles,
+  Table2,
   type LucideIcon,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { ErrorState } from "@/components/ui/error-state";
+import { RetryButton } from "@/components/ui/retry-button";
+import { Input } from "@/components/ui/input";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -44,6 +46,16 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TagRow } from "./tag-row";
 import { TagEditRow } from "./tag-edit-row";
+import {
+  OrbitReadyBadge,
+  SETTINGS_SECTIONS,
+  SettingsHero,
+  SettingsNav,
+  SettingsRow,
+  SettingsSection,
+  SettingsSegment,
+  settingsSurfaceClass,
+} from "./settings-primitives";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const CreateCollectionDialog = dynamic(
@@ -59,11 +71,12 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
-  const { theme, toggleTheme } = useTheme();
-  const { fontMode, toggleFontMode } = useFontMode();
+  const { theme, setTheme } = useTheme();
+  const { fontMode, setFontMode } = useFontMode();
   const { isOrbital, toggleOrbital } = useOrbitalTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
   const orbitIssue = parseOrbitIssue(searchParams.get("orbitIssue"));
 
   const {
@@ -97,6 +110,12 @@ export default function SettingsPage() {
       fetchJson<OrbitXaiStatusPayload>(buildOrbitStatusUrl(orbitIssue)),
     staleTime: 30_000,
   });
+
+  const filteredTags = useMemo(() => {
+    const query = tagSearch.trim().toLowerCase();
+    if (!query) return tags;
+    return tags.filter((tag) => tag.name.toLowerCase().includes(query));
+  }, [tagSearch, tags]);
 
   const handleDeleteTag = useCallback(async (tagId: string) => {
     if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
@@ -186,7 +205,7 @@ export default function SettingsPage() {
 
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
-      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
+      <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -207,7 +226,7 @@ export default function SettingsPage() {
           <PageHeader
             sticky
             title="Settings"
-            description="Appearance, tags, exports, and account controls"
+            description="Account, sync, appearance, and tags"
             leading={
               <div className="md:hidden">
                 <MobileSidebar
@@ -226,281 +245,271 @@ export default function SettingsPage() {
           />
 
           <div className="p-4 sm:p-5">
-            <div
-              data-settings-page
-              className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]"
-            >
-            <div className="space-y-5">
+            <div data-settings-page className="mx-auto max-w-4xl">
+              <SettingsHero
+                user={session?.dbUser}
+                tagCount={tags.length}
+                collectionCount={collections.length}
+              />
+
               {hasSettingsError && (
-                <Card className="border-destructive/30 bg-surface-1 p-5 shadow-sm">
-                  <h2 className="mb-2 font-semibold">Settings data could not be loaded</h2>
-                  <p className="mb-4 text-sm text-muted-foreground">{settingsErrorMessage}</p>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      void refetchTags();
-                      void refetchCollections();
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </Card>
-              )}
-
-              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold heading-font">Connection & Trust</h2>
-                </div>
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-hairline-soft bg-surface-2 p-4">
-                    <p className="text-sm font-medium">
-                      {session?.dbUser?.username
-                        ? `Connected to @${session.dbUser.username}`
-                        : "X account connection"}
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      MarkMaster requests read-only bookmark access. Sync imports
-                      bookmarks and X folders into your searchable archive.
-                    </p>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <TrustItem
-                      icon={KeyRound}
-                      label="Encrypted tokens"
-                      copy="Access and refresh tokens are encrypted before storage."
+                <ErrorState
+                  layout="panel"
+                  className="mt-5 max-w-none rounded-sm border-destructive/30 bg-destructive/5"
+                  title="Settings data could not be loaded"
+                  description={settingsErrorMessage}
+                  action={
+                    <RetryButton
+                      onClick={() => {
+                        void refetchTags();
+                        void refetchCollections();
+                      }}
                     />
-                    <TrustItem
-                      icon={BrainCircuit}
-                      label="Review-first AI"
-                      copy="Orbit asks Grok only when you scan, then waits for approval."
-                    />
-                  </div>
-                  <SyncButton
-                    lastSyncAt={
-                      session?.dbUser?.lastSyncAt
-                        ? new Date(session.dbUser.lastSyncAt)
-                        : null
-                    }
-                    onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
-                    detail="full"
-                  />
-                </div>
-              </Card>
-
-              <Card
-                id="orbit-grok"
-                className="scroll-mt-24 border-hairline-soft bg-surface-1 p-5 shadow-sm"
-              >
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <BrainCircuit className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold heading-font">Orbit Grok</h2>
-                  </div>
-                  <OrbitStatusBadge status={orbitStatusQuery.data} />
-                </div>
-                <OrbitGrokStatusPanel
-                  status={orbitStatusQuery.data}
-                  loading={orbitStatusQuery.isLoading}
-                  error={orbitStatusQuery.error}
-                  onRetry={() => void orbitStatusQuery.refetch()}
+                  }
                 />
-              </Card>
-
-              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  {theme === "dark" ? (
-                    <Moon className="w-4 h-4 text-primary" />
-                  ) : (
-                    <Sun className="w-4 h-4 text-primary" />
-                  )}
-                  <h2 className="font-semibold heading-font">Appearance</h2>
-                </div>
-                <div className="rounded-2xl border border-hairline-soft bg-surface-2 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <Label>Theme</Label>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Switch between dark and light mode.
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={toggleTheme} className="gap-2 border-hairline-soft bg-surface-1 shadow-sm">
-                      {theme === "dark" ? (
-                        <Sun className="w-4 h-4" />
-                      ) : (
-                        <Moon className="w-4 h-4" />
-                      )}
-                      {theme === "dark" ? "Light" : "Dark"}
-                    </Button>
-                  </div>
-                  <div className="mt-3 border-t border-hairline-soft pt-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <Label>Typography</Label>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Toggle global monospace (JetBrains Mono) for terminal-style UI on the default theme. Orbit Theme enables the full monospace suite automatically.
-                        </p>
-                      </div>
-                      <Button variant="outline" onClick={toggleFontMode} className="gap-2 border-hairline-soft bg-surface-1 shadow-sm">
-                        {fontMode === "mono" ? "Default" : "Monospace"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 border-t border-hairline-soft pt-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Label>Orbit Theme</Label>
-                          {isOrbital && <OrbitalBadge tone="cyan">Active</OrbitalBadge>}
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Enable the full Orbit design language: deep void surfaces, cyan-teal glow, warm bronze accents, glass chrome, and the monospace typography suite app-wide. The library dashboard can use a two-column inspector when this theme is on.
-                        </p>
-                      </div>
-                      <Button
-                        variant={isOrbital ? "default" : "outline"}
-                        onClick={toggleOrbital}
-                        className="gap-2 border-hairline-soft bg-surface-1 shadow-sm"
-                      >
-                        {isOrbital ? "Disable Orbit" : "Enable Orbit"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <Download className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold heading-font">Export</h2>
-                </div>
-                <div className="rounded-2xl border border-hairline-soft bg-surface-2 p-4">
-                  <p className="mb-4 text-sm text-muted-foreground">
-                    Download all your bookmarks with tags and notes.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-hairline-soft bg-surface-1 shadow-sm"
-                      onClick={() => {
-                        window.location.href = "/api/export?format=json";
-                      }}
-                    >
-                      Export as JSON
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-hairline-soft bg-surface-1 shadow-sm"
-                      onClick={() => {
-                        window.location.href = "/api/export?format=csv";
-                      }}
-                    >
-                      Export as CSV
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="border-destructive/30 bg-surface-1 p-5 shadow-sm">
-                <h2 className="mb-4 font-semibold heading-font text-destructive">Danger Zone</h2>
-                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">Sign out</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Disconnect your X account.
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => signOut({ callbackUrl: "/" })}
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-              <Card className="border-hairline-soft bg-surface-1 p-5 shadow-sm">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold heading-font">Manage Tags</h2>
-                  </div>
-                  {tags.length > 1 ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 border-hairline-soft bg-surface-2 shadow-sm"
-                      onClick={handleBalanceTagColors}
-                      disabled={
-                        balancingTagColors ||
-                        balancedTagColorUpdates.length === 0
-                      }
-                    >
-                      {balancingTagColors ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Palette className="size-3.5" />
-                      )}
-                      Balance colors
-                    </Button>
-                  ) : null}
-                </div>
-                {tagsLoading ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 rounded-xl border border-hairline-soft bg-surface-1 px-4 py-3"
-                      >
-                        <div className="h-5 w-5 rounded-full skeleton-shimmer" />
-                        <div className="h-3 w-24 rounded skeleton-shimmer" />
-                        <div className="ml-auto h-3 w-16 rounded skeleton-shimmer" />
-                      </div>
-                    ))}
-                  </div>
-                ) : tags.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-hairline-soft bg-surface-2 px-4 py-10 text-center">
-                  <Tag className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-                  <p className="text-sm font-medium text-foreground">No tags yet</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Tags will appear here as you organize bookmarks.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-hidden rounded-2xl border border-hairline-soft bg-surface-2">
-                  {tags.map((tag, index) =>
-                    editingTag === tag.id ? (
-                      <TagEditRow
-                        key={tag.id}
-                        tag={tag}
-                        index={index}
-                        initialName={editTagName}
-                        initialColor={editTagColor}
-                        onSave={handleUpdateTag}
-                        onCancel={handleCancelEdit}
-                      />
-                    ) : (
-                      <TagRow
-                        key={tag.id}
-                        tag={tag}
-                        index={index}
-                        onStartEdit={handleStartEdit}
-                        onDelete={handleDeleteTag}
-                      />
-                    )
-                  )}
-                </div>
               )}
-            </Card>
+
+              <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:gap-10">
+                <aside className="hidden shrink-0 lg:block lg:w-36">
+                  <SettingsNav className="sticky top-[calc(var(--header-height)+1.25rem)]" />
+                </aside>
+
+                <div className="min-w-0 flex-1 space-y-0">
+                  <nav
+                    aria-label="Settings sections"
+                    className="mb-6 flex gap-1 overflow-x-auto pb-0.5 scrollbar-none lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {SETTINGS_SECTIONS.map(({ id, label }) => (
+                      <a
+                        key={id}
+                        href={`#${id}`}
+                        className="shrink-0 rounded-full border border-hairline-soft px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
+                      >
+                        {label}
+                      </a>
+                    ))}
+                  </nav>
+
+                  <SettingsSection
+                    id="connection"
+                    icon={ShieldCheck}
+                    title="Connection"
+                    description="Read-only X access. Sync imports bookmarks and folders — nothing is posted for you."
+                  >
+                    <div className="space-y-3">
+                      <ul className="space-y-1.5 text-xs text-muted-foreground">
+                        <li className="flex items-start gap-2">
+                          <KeyRound className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                          Tokens are encrypted before storage.
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <BrainCircuit className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                          Orbit only calls Grok when you scan, then waits for approval.
+                        </li>
+                      </ul>
+                      <SyncButton
+                        lastSyncAt={
+                          session?.dbUser?.lastSyncAt
+                            ? new Date(session.dbUser.lastSyncAt)
+                            : null
+                        }
+                        onSyncComplete={() =>
+                          void invalidateLibraryQueries(queryClient, { refetchType: "all" })
+                        }
+                      />
+                    </div>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="orbit-grok"
+                    icon={BrainCircuit}
+                    title="Orbit Grok"
+                    description="Server-side xAI configuration for scan and review."
+                    badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
+                  >
+                    <OrbitGrokStatusPanel
+                      status={orbitStatusQuery.data}
+                      loading={orbitStatusQuery.isLoading}
+                      error={orbitStatusQuery.error}
+                      onRetry={() => void orbitStatusQuery.refetch()}
+                    />
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="appearance"
+                    icon={theme === "dark" ? Moon : Sun}
+                    title="Appearance"
+                  >
+                    <div className="rounded-sm border border-hairline-soft bg-surface-2/40 px-4">
+                      <SettingsRow label="Color mode" divider={false}>
+                        <SettingsSegment
+                          ariaLabel="Color mode"
+                          value={theme}
+                          options={[
+                            { value: "dark" as const, label: "Dark" },
+                            { value: "light" as const, label: "Light" },
+                          ]}
+                          onChange={setTheme}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Typography">
+                        <SettingsSegment
+                          ariaLabel="Typography"
+                          value={fontMode}
+                          options={[
+                            { value: "default" as const, label: "Sans" },
+                            { value: "mono" as const, label: "Mono" },
+                          ]}
+                          onChange={setFontMode}
+                        />
+                      </SettingsRow>
+                      <SettingsRow label="Orbit theme" divider={false}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isOrbital ? <OrbitalBadge tone="cyan">Active</OrbitalBadge> : null}
+                          <Button
+                            variant={isOrbital ? "default" : "outline"}
+                            size="sm"
+                            onClick={toggleOrbital}
+                            className="border-hairline-soft"
+                          >
+                            {isOrbital ? "Disable" : "Enable"}
+                          </Button>
+                        </div>
+                      </SettingsRow>
+                    </div>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="export"
+                    icon={Download}
+                    title="Export"
+                    description="Download bookmarks with tags and notes."
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                      <ExportLink
+                        icon={Braces}
+                        title="JSON"
+                        href="/api/export?format=json"
+                      />
+                      <ExportLink
+                        icon={Table2}
+                        title="CSV"
+                        href="/api/export?format=csv"
+                      />
+                    </div>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="account"
+                    icon={LogOut}
+                    title="Account"
+                    tone="danger"
+                  >
+                    <SettingsRow
+                      label="Sign out"
+                      description="Clears this browser session. Your synced data stays until you revoke access on X."
+                      divider={false}
+                    >
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                      >
+                        <LogOut className="size-4" />
+                        Sign out
+                      </Button>
+                    </SettingsRow>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="tags"
+                    icon={Tag}
+                    title="Tags"
+                    description="Rename, recolor, or balance tags across your library."
+                    action={
+                      tags.length > 1 ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 border-hairline-soft"
+                          onClick={handleBalanceTagColors}
+                          disabled={
+                            balancingTagColors || balancedTagColorUpdates.length === 0
+                          }
+                        >
+                          {balancingTagColors ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Palette className="size-3.5" />
+                          )}
+                          Balance colors
+                        </Button>
+                      ) : null
+                    }
+                  >
+                    {tags.length > 0 ? (
+                      <div className="relative mb-3">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          placeholder="Search tags…"
+                          className="h-9 border-hairline-soft bg-surface-2 pl-9"
+                          aria-label="Search tags"
+                        />
+                      </div>
+                    ) : null}
+
+                    {tagsLoading ? (
+                      <TagListSkeleton />
+                    ) : tags.length === 0 ? (
+                      <div className="rounded-sm border border-dashed border-hairline-soft px-4 py-10 text-center">
+                        <Tag className="mx-auto mb-2 size-7 text-muted-foreground/40" />
+                        <p className="text-sm font-medium">No tags yet</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Tags appear here as you organize bookmarks on the dashboard.
+                        </p>
+                      </div>
+                    ) : filteredTags.length === 0 ? (
+                      <div className="rounded-sm border border-hairline-soft px-4 py-6 text-center text-sm text-muted-foreground">
+                        No tags match &ldquo;{tagSearch.trim()}&rdquo;
+                      </div>
+                    ) : (
+                      <div className="max-h-[min(28rem,50vh)] overflow-y-auto rounded-sm border border-hairline-soft bg-surface-2/50">
+                        {filteredTags.map((tag, index) =>
+                          editingTag === tag.id ? (
+                            <TagEditRow
+                              key={tag.id}
+                              tag={tag}
+                              index={index}
+                              initialName={editTagName}
+                              initialColor={editTagColor}
+                              onSave={handleUpdateTag}
+                              onCancel={handleCancelEdit}
+                            />
+                          ) : (
+                            <TagRow
+                              key={tag.id}
+                              tag={tag}
+                              index={index}
+                              onStartEdit={handleStartEdit}
+                              onDelete={handleDeleteTag}
+                            />
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {!tagsLoading && tags.length > 0 ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {filteredTags.length.toLocaleString()} of {tags.length.toLocaleString()} tags
+                        {tagSearch.trim() ? " shown" : ""}
+                      </p>
+                    ) : null}
+                  </SettingsSection>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -515,22 +524,44 @@ export default function SettingsPage() {
   );
 }
 
-function TrustItem({
+function ExportLink({
   icon: Icon,
-  label,
-  copy,
+  title,
+  href,
 }: {
   icon: LucideIcon;
-  label: string;
-  copy: string;
+  title: string;
+  href: string;
 }) {
   return (
-    <div className="rounded-xl border border-hairline-soft bg-surface-2 p-3">
-      <div className="flex items-center gap-2">
-        <Icon className="size-3.5 text-primary" aria-hidden />
-        <p className="text-sm font-medium text-foreground">{label}</p>
-      </div>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy}</p>
+    <a
+      href={href}
+      className={cn(
+        "inline-flex flex-1 items-center gap-2 rounded-sm border border-hairline-soft px-3 py-2.5 text-sm font-medium transition-colors",
+        "hover:border-primary/25 hover:bg-accent-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      )}
+    >
+      <Icon className="size-4 text-primary" aria-hidden />
+      Download {title}
+    </a>
+  );
+}
+
+function TagListSkeleton() {
+  return (
+    <div className="space-y-0 rounded-sm border border-hairline-soft">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex items-center gap-3 px-4 py-3",
+            i > 0 && "border-t border-hairline-soft"
+          )}
+        >
+          <div className="size-3.5 rounded-full skeleton-shimmer" />
+          <div className="h-3 w-24 flex-1 rounded skeleton-shimmer" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -543,34 +574,6 @@ function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
   if (!issue) return "/api/orbit/status";
   const params = new URLSearchParams({ lastFailure: issue });
   return `/api/orbit/status?${params.toString()}`;
-}
-
-function OrbitStatusBadge({
-  status,
-}: {
-  status: OrbitXaiStatusPayload | undefined;
-}) {
-  if (!status) {
-    return (
-      <span className="inline-flex items-center rounded-full border border-hairline-soft bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground">
-        Checking
-      </span>
-    );
-  }
-
-  const ready = status.state === "ready";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
-        ready
-          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-100"
-      )}
-    >
-      {ready ? "Ready" : "Misconfigured"}
-    </span>
-  );
 }
 
 function OrbitGrokStatusPanel({
@@ -586,60 +589,48 @@ function OrbitGrokStatusPanel({
 }) {
   if (loading) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-12 rounded-2xl border border-hairline-soft bg-surface-2 skeleton-shimmer"
-          />
+      <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-10 rounded skeleton-shimmer" />
         ))}
-      </div>
+      </dl>
     );
   }
 
   if (error || !status) {
     return (
-      <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              Orbit status could not be checked
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {error?.message ?? "Please try again."}
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p className="text-muted-foreground">
+          {error?.message ?? "Orbit status could not be checked."}
+        </p>
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
       </div>
     );
   }
 
   const privacyLabel = status.privacy.storeDisabled
-    ? "Response storage disabled"
-    : "Response storage enabled";
+    ? "Response storage off"
+    : "Response storage on";
   const zeroDataRetentionLabel =
     status.privacy.zeroDataRetention === true
-      ? "Zero data retention confirmed"
+      ? "Zero retention"
       : status.privacy.zeroDataRetention === false
-        ? "Zero data retention not active"
-        : "Zero data retention not reported";
+        ? "Retention active"
+        : "Retention unknown";
 
   return (
     <div className="space-y-3">
       {status.issues.length > 0 ? (
-        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4">
-          <div className="flex gap-3">
+        <div className="rounded-sm border border-amber-500/25 bg-amber-500/10 px-3 py-2.5">
+          <div className="flex gap-2">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" />
             <div className="space-y-2">
               {status.issues.map((issue) => (
                 <div key={issue.code}>
-                  <p className="text-sm font-medium text-foreground">
-                    {issue.title}
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  <p className="text-sm font-medium text-foreground">{issue.title}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
                     {issue.message}
                   </p>
                 </div>
@@ -649,68 +640,54 @@ function OrbitGrokStatusPanel({
         </div>
       ) : null}
 
-      <div className="grid gap-2">
-        <OrbitStatusItem
-          icon={Sparkles}
-          label="Grok model"
-          value={`${status.model} ${
-            status.modelSource === "environment" ? "from env" : "default"
-          }`}
+      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <OrbitStatusRow
+          label="Model"
+          value={`${status.model}${status.modelSource === "environment" ? " · env" : ""}`}
         />
-        <OrbitStatusItem
-          icon={ShieldCheck}
+        <OrbitStatusRow
           label="Privacy"
           value={`${privacyLabel} · ${zeroDataRetentionLabel}`}
         />
-        <OrbitStatusItem
-          icon={KeyRound}
+        <OrbitStatusRow
           label="xAI key"
           value={status.apiKeyConfigured ? "Configured" : "Missing"}
+          highlight={!status.apiKeyConfigured}
         />
-        <OrbitStatusItem
-          icon={ServerCog}
+        <OrbitStatusRow
           label="Endpoint"
-          value={`${status.baseUrl} ${
-            status.baseUrlSource === "environment" ? "from env" : "default"
-          }`}
+          value={`${status.baseUrl}${status.baseUrlSource === "environment" ? " · env" : ""}`}
         />
-      </div>
+      </dl>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pt-1">
         <Button size="sm" variant="outline" onClick={onRetry}>
-          Refresh status
+          Refresh
         </Button>
         <Link
           href="/orbit"
-          className="inline-flex h-7 items-center justify-center rounded-md border border-hairline-soft bg-transparent px-2.5 text-[0.8rem] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft"
+          className="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          Return to Orbit
+          Open Orbit queue
         </Link>
       </div>
     </div>
   );
 }
 
-function OrbitStatusItem({
-  icon: Icon,
+function OrbitStatusRow({
   label,
   value,
+  highlight = false,
 }: {
-  icon: LucideIcon;
   label: string;
   value: string;
+  highlight?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-hairline-soft bg-surface-2 p-3">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 break-words text-sm font-medium text-foreground">
-          {value}
-        </p>
-      </div>
+    <div className={cn(highlight && "text-amber-700 dark:text-amber-200")}>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
     </div>
   );
 }

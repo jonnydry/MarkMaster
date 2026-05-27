@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps, ReactNode } from "react";
-import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
@@ -47,13 +47,13 @@ export function PageHeader({
           appChromeFrostedClassName,
           isOrbital && "shadow-[inset_0_-1px_0_var(--accent-glow)]"
         ),
-    sticky && "sticky top-0 z-10",
+    sticky && "sticky top-0 z-[var(--z-sticky-header)]",
     className
   );
 
   return (
     <header className={mergedHeaderClassName} {...props}>
-      <div className={cn("px-4 py-3 sm:px-5", bodyClassName)}>
+      <div className={cn(appContentGutterClassName, "py-3", bodyClassName)}>
         {hasHeaderRow ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 flex-1 items-start gap-3">
