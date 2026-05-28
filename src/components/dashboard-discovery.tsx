@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Compass } from "lucide-react";
-import { PerformanceHighlights } from "@/components/performance-highlights";
-import { WeeklyDigestPanel } from "@/components/weekly-digest-panel";
+import { Compass, Sparkles, RotateCcw, Plus } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
+import {
+  HighlightScrollSlide,
+  HighlightScrollStrip,
+} from "@/components/highlight-scroll-strip";
+import { HighlightCard } from "@/components/highlight-card";
+import { Button } from "@/components/ui/button";
 import {
   useDashboardDiscovery,
   type DashboardDiscoveryParentData,
@@ -18,6 +21,8 @@ import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital } from "@/components/orbital";
 import type { BookmarkWithRelations } from "@/types";
+import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
+import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
 
 export interface DashboardDiscoveryProps {
   feedReady?: boolean;
@@ -26,7 +31,6 @@ export interface DashboardDiscoveryProps {
   onSelectBookmark?: (id: string) => void;
   onFocusForTriage?: (id: string) => void;
   onSaveAsCollection?: (bookmarks: BookmarkWithRelations[], suggestedName: string) => void;
-  quickPicksSubtitle?: string;
   /** Override default Discovery header copy (e.g. collections context). */
   explainer?: string;
   /** flush — span parent width without outer gutter/max-width (collections). */
@@ -46,7 +50,6 @@ export function DashboardDiscovery({
   onSelectBookmark,
   onFocusForTriage,
   onSaveAsCollection,
-  quickPicksSubtitle,
   explainer,
   variant = "default",
   className,
@@ -56,18 +59,40 @@ export function DashboardDiscovery({
   const t = useTypography();
 
   const {
-    quickPicks,
-    quickPickIds,
-    rawTotal,
-    libraryGems,
-    hasDigestBatch,
+    rawTotal = 0,
     isLoading,
     hasError,
     refetch,
+    discoveryCarouselItems = [],
+    ritualBatch = [],
+    ritualTotal = 0,
+    resurfacedCount = 0,
+    discoveryEngagement = 0,
+    itemLabels = {},
   } = useDashboardDiscovery({ feedReady, parentData });
 
-  const defaultDigestCollapsed = useMemo(() => !hasDigestBatch, [hasDigestBatch]);
   const shellClass = variantShellClass[variant];
+
+  // Shared ritual logic (nurtured count, celebration, batch handlers).
+  // Extracted to eliminate duplication with WeeklyDigestPanel while keeping
+  // identical behavior and telemetry.
+  const {
+    nurturedCount,
+    celebration,
+    handleReviewInOrbit,
+    handleSaveAsCollection,
+  } = useDiscoveryRitual({
+    batch: ritualBatch,
+    onSaveAsCollection,
+  });
+
+  const handleOrbitReview = (id: string) => {
+    trackFlywheelEvent("cta.review_in_orbit", {
+      source: "discovery",
+      bookmarkId: id,
+    });
+    router.push(`/orbit?highlightId=${id}`);
+  };
 
   if (isLoading) {
     return (
@@ -95,10 +120,26 @@ export function DashboardDiscovery({
     );
   }
 
-  const showQuickPicks = quickPicks.length > 0;
-  const showModule = showQuickPicks || feedReady;
+  // Updated for unified carousel (raw front-loaded high-performers + curated resurfaced/strong).
+  // Replaces prior showQuickPicks + embedded WeeklyDigestPanel stack.
+  // showModule now requires actual mix content (prevents empty frosted card shell when
+  // feedReady=true but builder yields zero items/ritualBatch after load). Loading skeleton
+  // still covers the fetch window; zero-content case returns null cleanly (no empty UI).
+  const showModule = discoveryCarouselItems.length > 0 || ritualTotal > 0;
 
   if (!showModule) return null;
+
+  // Unified single-carousel renderer for the Discovery card (dashboard + collections flush).
+  // One HighlightScrollStrip combining raw high-performers (front-loaded, isRawMode) +
+  // resurfaced/strong curated items (itemLabel badges for visual distinction).
+  // Header pill + Ritual Anchor (final slide) are the first-class batch ritual CTAs.
+  // All use the exact same machinery as before: handleReviewInOrbit, nurtured, celebration,
+  // digestIds + source=weekly-gems, onSaveAsCollection("This Week’s Gems"), track cta.digest_review_together.
+  // No changes to HighlightsDigest, non-embedded WeeklyDigestPanel, PerformanceHighlights component,
+  // usePerformanceHighlights, or perf SQL. ParentData + flush variant fully supported.
+  // See Unified-High-Engagement-Discovery-Carousel-Plan.md (Phase 1).
+  const hasRitual = ritualTotal > 0;
+  const itemCountForStrip = discoveryCarouselItems.length + (hasRitual ? 1 : 0);
 
   return (
     <section
@@ -112,72 +153,172 @@ export function DashboardDiscovery({
         )}
       >
         <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
-          <div className="flex items-start gap-3">
-            <div
-              className={
-                isOrbital
-                  ? cn(orbital.icon, "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm")
-                  : "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary"
-              }
-            >
-              <Compass className="h-4 w-4" />
-            </div>
-            <div>
-              <p
-                className={cn(
-                  t.sectionLabel,
-                  "mb-0 text-primary/70",
-                  !isOrbital && "text-muted-foreground"
-                )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div
+                className={
+                  isOrbital
+                    ? cn(orbital.icon, "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm")
+                    : "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary"
+                }
               >
-                Discovery
-              </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {explainer ??
-                  "High-performing posts from X — quick picks to triage, plus a weekly mix when you want a batch pass."}
-              </p>
+                <Compass className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={cn(
+                    t.sectionLabel,
+                    "mb-0 text-primary/70",
+                    !isOrbital && "text-muted-foreground"
+                  )}
+                >
+                  Discovery
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {explainer ??
+                    "Highest-engagement posts from your library — prioritized for review."}
+                </p>
+                {hasRitual && (
+                  <p className="mt-1 text-[10px] text-muted-foreground/70">
+                    {ritualTotal} high-engagement • {rawTotal.toLocaleString()} untouched • {resurfacedCount} resurfaced
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Always-visible header pill CTA — primary ritual entry (prominent per Product guardrail) */}
+            {hasRitual && (
+              <button
+                type="button"
+                onClick={handleReviewInOrbit}
+                className={cn(
+                  "shrink-0 rounded-full border border-hairline-soft bg-surface-1/60 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 active:bg-accent-soft/60",
+                  t.monoNative && t.label
+                )}
+                aria-label={`Review full mix of ${ritualTotal} gems in Orbit`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  <RotateCcw className="h-3 w-3" />
+                  Review full mix ({ritualTotal})
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
         <div className="px-4 pt-3 sm:px-5">
-          {showQuickPicks ? (
-            <PerformanceHighlights
-              title="Quick picks"
-              subtitle={
-                quickPicksSubtitle ??
-                `${rawTotal.toLocaleString()} untouched high-performers`
-              }
-              bookmarks={quickPicks}
-              total={rawTotal}
-              activeBookmarkId={activeBookmarkId}
-              onSelect={onSelectBookmark}
-              onFocusForTriage={onFocusForTriage}
-              onOrbitReview={(id) => {
-                trackFlywheelEvent("cta.review_in_orbit", {
-                  source: "highlights",
-                  bookmarkId: id,
-                });
-                router.push(`/orbit?highlightId=${id}`);
-              }}
-              isRawMode={true}
-              layout="strip"
-              className="px-0 pb-0 pt-0"
-            />
+          {/* Celebration banner (exact markup preserved for ritual reinforcement UX) */}
+          {celebration ? (
+            <div className="mb-3 rounded-sm border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 text-sm">
+              <div className="flex items-center gap-2 text-emerald-200">
+                <Sparkles className="h-4 w-4" />
+                <span>
+                  Ritual reinforced — nurtured{" "}
+                  <span className="font-medium tabular-nums">{celebration.gems}</span> gems
+                  {celebration.engagement > 0 && (
+                    <>
+                      {" "}
+                      · ~
+                      <span className="font-medium tabular-nums">
+                        {celebration.engagement.toLocaleString()}
+                      </span>{" "}
+                      engagement impact
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
           ) : null}
 
-          {feedReady ? (
-            <WeeklyDigestPanel
-              rawGems={quickPicks}
-              libraryGems={libraryGems}
-              rawTotal={rawTotal}
-              excludeIds={quickPickIds}
-              defaultCollapsed={defaultDigestCollapsed}
-              embedded={showQuickPicks}
-              onSaveAsCollection={onSaveAsCollection}
-              onSelectBookmark={onSelectBookmark}
-              className={showQuickPicks ? undefined : "border-t-0 pt-0"}
-            />
+          {itemCountForStrip > 0 ? (
+            <HighlightScrollStrip
+              ariaLabel="High-engagement discovery mix"
+              itemCount={itemCountForStrip}
+            >
+              {discoveryCarouselItems.map((item: DiscoveryCarouselItem, index: number) => (
+                <HighlightScrollSlide key={item.bookmark.id} index={index} desktopTwoUp>
+                  <HighlightCard
+                    bookmark={item.bookmark}
+                    index={index}
+                    active={activeBookmarkId === item.bookmark.id}
+                    itemLabel={itemLabels[item.bookmark.id]}
+                    isRawMode={item.context === "raw"}
+                    onSelect={onSelectBookmark}
+                    onFocusForTriage={onFocusForTriage}
+                    onOrbitReview={handleOrbitReview}
+                  />
+                </HighlightScrollSlide>
+              ))}
+
+              {/* Ritual Anchor as final slide — visually distinct strong CTA (second complementary affordance) */}
+              {hasRitual && (
+                <HighlightScrollSlide key="ritual-anchor" index={discoveryCarouselItems.length}>
+                  <div
+                    className={cn(
+                      "flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left",
+                      isOrbital
+                        ? "border-primary/30 bg-surface-1/70"
+                        : "border-primary/20 hover:border-primary/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span
+                        className={cn(
+                          "text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+                          t.monoNative && t.label
+                        )}
+                      >
+                        Weekly Ritual
+                      </span>
+                    </div>
+                    <p
+                      className={cn(
+                        "mt-1.5 line-clamp-2 text-sm font-semibold leading-5 text-foreground",
+                        t.monoNative && "text-mono-data"
+                      )}
+                    >
+                      Review full mix together in Orbit
+                    </p>
+                    <div
+                      className={cn(
+                        "mt-1 text-[10px] text-muted-foreground/70",
+                        t.monoNative && t.label
+                      )}
+                    >
+                      {ritualTotal} gems
+                      {resurfacedCount > 0 ? ` · ${resurfacedCount} resurfaced` : ""}
+                      {discoveryEngagement > 0
+                        ? ` · ~${discoveryEngagement.toLocaleString()} engagements`
+                        : ""}
+                      {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
+                    </div>
+
+                    <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1 px-2.5 text-[10px]"
+                        onClick={handleReviewInOrbit}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Review all
+                      </Button>
+                      {onSaveAsCollection ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 px-2.5 text-[10px]"
+                          onClick={handleSaveAsCollection}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Save as collection
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </HighlightScrollSlide>
+              )}
+            </HighlightScrollStrip>
           ) : null}
         </div>
       </div>

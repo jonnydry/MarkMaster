@@ -219,9 +219,6 @@ function DashboardContent() {
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
 
-  const highlightBookmarks: BookmarkWithRelations[] = highlightData?.bookmarks ?? EMPTY_BOOKMARKS;
-  const unsortedTotal: number = highlightData?.total || 0;
-
   const performanceFocusedId = filters.bookmarkId ? filters.bookmarkId : null;
   const {
     setSelectedTags,
@@ -454,19 +451,6 @@ function DashboardContent() {
 
   const dbUser = session?.dbUser;
 
-  // Compute temporal freshness for Highlights using last sync (Phase 1, still powers 8 signals)
-  const lastSyncAtForHighlights = dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null;
-  const newSinceLastSync = lastSyncAtForHighlights
-    ? highlightBookmarks.filter((b) => new Date(b.bookmarkedAt) > lastSyncAtForHighlights).length
-    : 0;
-
-  const quickPicksSubtitle =
-    typeof unsortedTotal === "number"
-      ? `${unsortedTotal.toLocaleString()} untouched high-performers${
-          newSinceLastSync > 0 ? ` • ${newSinceLastSync} new since last sync` : ""
-        }`
-      : undefined;
-
   const handleCommandPaletteFilter = useCallback(
     (filter: { mediaFilter?: MediaFilter; selectedTag?: string }) => {
       if (filter.mediaFilter) {
@@ -617,7 +601,6 @@ function DashboardContent() {
             onSelectBookmark={setActiveBookmarkId}
             onFocusForTriage={focusPerformanceHighlight}
             onSaveAsCollection={handleSaveGemsAsCollection}
-            quickPicksSubtitle={quickPicksSubtitle}
             className={inspectorActive ? "lg:max-w-[640px] lg:mx-0" : undefined}
           />
 

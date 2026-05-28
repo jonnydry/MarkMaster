@@ -342,15 +342,22 @@ export default function SettingsPage() {
                   >
                     <div className="rounded-sm border border-hairline-soft bg-surface-2/40 px-4">
                       <SettingsRow label="Color mode" divider={false}>
-                        <SettingsSegment
-                          ariaLabel="Color mode"
-                          value={theme}
-                          options={[
-                            { value: "dark" as const, label: "Dark" },
-                            { value: "light" as const, label: "Light" },
-                          ]}
-                          onChange={setTheme}
-                        />
+                        <div className="flex flex-col items-end gap-1.5">
+                          <SettingsSegment
+                            ariaLabel="Color mode"
+                            value={theme}
+                            options={[
+                              { value: "dark" as const, label: "Dark" },
+                              { value: "light" as const, label: "Light" },
+                            ]}
+                            onChange={setTheme}
+                          />
+                          {isOrbital ? (
+                            <p className="max-w-[16rem] text-right text-[10px] text-muted-foreground/70">
+                              Light uses the Polar Observatory palette when Orbit theme is on.
+                            </p>
+                          ) : null}
+                        </div>
                       </SettingsRow>
                       <SettingsRow label="Typography">
                         <SettingsSegment

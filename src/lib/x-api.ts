@@ -40,6 +40,12 @@ export interface XMedia {
   preview_image_url?: string;
   width?: number;
   height?: number;
+  duration_ms?: number;
+  variants?: Array<{
+    bit_rate?: number;
+    content_type: string;
+    url: string;
+  }>;
 }
 
 export interface XTweet {
@@ -84,7 +90,7 @@ function buildTweetQueryParams(ids?: string[]) {
     "tweet.fields": "created_at,public_metrics,entities,referenced_tweets,attachments,author_id",
     "user.fields": "name,username,profile_image_url,verified",
     expansions: "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id",
-    "media.fields": "type,url,preview_image_url,width,height",
+    "media.fields": "type,url,preview_image_url,width,height,variants,duration_ms",
   });
 
   if (ids && ids.length > 0) {

@@ -235,44 +235,9 @@ export async function __syncBookmarksLegacy(
 
         if (newBookmarks.length > 0) {
           await prisma.bookmark.createMany({
-            data: newBookmarks.map((entry) => ({
-              userId,
-              tweetId: entry.data.tweet.id,
-              authorId: entry.data.author.id,
-              authorUsername: entry.data.author.username,
-              authorDisplayName: entry.data.author.name,
-              authorProfileImage: entry.data.author.profile_image_url || null,
-              authorVerified: entry.data.author.verified || false,
-              tweetText: entry.data.tweet.text,
-              publicMetrics: entry.data.tweet.public_metrics ?? Prisma.JsonNull,
-              media:
-                entry.data.media.length > 0
-                  ? entry.data.media.map((m) => ({
-                      type: m.type,
-                      url: m.url || m.preview_image_url,
-                      preview_image_url: m.preview_image_url,
-                      width: m.width,
-                      height: m.height,
-                    }))
-                  : Prisma.JsonNull,
-              urls: entry.data.tweet.entities?.urls ?? Prisma.JsonNull,
-              quotedTweet: entry.data.quotedTweet
-                ? {
-                    id: entry.data.quotedTweet.id,
-                    text: entry.data.quotedTweet.text,
-                    author: entry.data.quotedTweet.author
-                      ? {
-                          name: entry.data.quotedTweet.author.name,
-                          username: entry.data.quotedTweet.author.username,
-                          profile_image_url:
-                            entry.data.quotedTweet.author.profile_image_url,
-                        }
-                      : null,
-                  }
-                : Prisma.JsonNull,
-              tweetCreatedAt: new Date(entry.data.tweet.created_at),
-              syncedAt: new Date(),
-            })),
+            data: newBookmarks.map((entry) =>
+              buildBookmarkCreateData(userId, entry.data)
+            ),
             skipDuplicates: true,
           });
 
@@ -353,44 +318,9 @@ export async function __syncBookmarksLegacy(
 
         if (folderNewBookmarks.length > 0) {
           await prisma.bookmark.createMany({
-            data: folderNewBookmarks.map((entry) => ({
-              userId,
-              tweetId: entry.data.tweet.id,
-              authorId: entry.data.author.id,
-              authorUsername: entry.data.author.username,
-              authorDisplayName: entry.data.author.name,
-              authorProfileImage: entry.data.author.profile_image_url || null,
-              authorVerified: entry.data.author.verified || false,
-              tweetText: entry.data.tweet.text,
-              publicMetrics: entry.data.tweet.public_metrics ?? Prisma.JsonNull,
-              media:
-                entry.data.media.length > 0
-                  ? entry.data.media.map((m) => ({
-                      type: m.type,
-                      url: m.url || m.preview_image_url,
-                      preview_image_url: m.preview_image_url,
-                      width: m.width,
-                      height: m.height,
-                    }))
-                  : Prisma.JsonNull,
-              urls: entry.data.tweet.entities?.urls ?? Prisma.JsonNull,
-              quotedTweet: entry.data.quotedTweet
-                ? {
-                    id: entry.data.quotedTweet.id,
-                    text: entry.data.quotedTweet.text,
-                    author: entry.data.quotedTweet.author
-                      ? {
-                          name: entry.data.quotedTweet.author.name,
-                          username: entry.data.quotedTweet.author.username,
-                          profile_image_url:
-                            entry.data.quotedTweet.author.profile_image_url,
-                        }
-                      : null,
-                  }
-                : Prisma.JsonNull,
-              tweetCreatedAt: new Date(entry.data.tweet.created_at),
-              syncedAt: new Date(),
-            })),
+            data: folderNewBookmarks.map((entry) =>
+              buildBookmarkCreateData(userId, entry.data)
+            ),
             skipDuplicates: true,
           });
           result.newBookmarks += folderNewBookmarks.length;

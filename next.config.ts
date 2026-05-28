@@ -21,6 +21,7 @@ const contentSecurityPolicy = [
   // 'unsafe-inline' for styles is still required due to Tailwind v4 + shadcn/ui.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https://pbs.twimg.com https://abs.twimg.com",
+  "media-src 'self' https://video.twimg.com https://pbs.twimg.com",
   "font-src 'self' data:",
   // API connections needed for X (Twitter) and xAI (Grok/Orbit)
   `connect-src 'self' https://api.x.ai https://api.twitter.com https://x.com https://twitter.com${

@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
 import { OrbitReviewEditSheet } from "@/components/orbit/orbit-review-edit-sheet";
@@ -809,6 +810,24 @@ export function OrbitReviewDialog({
                     )}>
                       {preview}
                     </div>
+
+                    {bookmark?.media && bookmark.media.length > 0 ? (
+                      <div className={cn("px-4 pb-2", isQuick && "px-3")}>
+                        <BookmarkPostPreview
+                          mediaOnly
+                          tweetText=""
+                          authorUsername={bookmark.authorUsername}
+                          media={bookmark.media}
+                          tweetLink={{
+                            authorUsername: bookmark.authorUsername,
+                            tweetId: bookmark.tweetId,
+                          }}
+                          bookmarkKey={bookmark.id}
+                          variant="inline"
+                          galleryClassName="!mt-0 max-h-40"
+                        />
+                      </div>
+                    ) : null}
 
                     {/* B: surface prior feedback history for digest gems (closed loop) */}
                     {(() => {

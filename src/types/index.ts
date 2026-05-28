@@ -1,3 +1,5 @@
+import type { BookmarkMediaJson } from "@/lib/bookmark-media";
+
 export type SortField =
   | "bookmarkedAt"
   | "tweetCreatedAt"
@@ -41,13 +43,7 @@ export interface BookmarkWithRelations {
     bookmark_count: number;
     impression_count?: number;
   } | null;
-  media: Array<{
-    type: string;
-    url?: string;
-    preview_image_url?: string;
-    width?: number;
-    height?: number;
-  }> | null;
+  media: BookmarkMediaJson[] | null;
   urls: Array<{
     url: string;
     expanded_url: string;

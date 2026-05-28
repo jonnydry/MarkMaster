@@ -11,6 +11,8 @@ export interface ShareContent {
   itemCount: number;
 }
 
+import { getBookmarkTweetUrl } from "./bookmark-url";
+
 const X_TWEET_MAX_LENGTH = 280;
 
 interface BookmarkForShare {
@@ -30,7 +32,7 @@ function buildBookmarkTweet(
   index: number,
   total: number
 ): string {
-  const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
+  const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const tweetText = truncate(bookmark.tweetText, 200);
 
   let tweet = `📌 ${index + 1}/${total}\n\n`;

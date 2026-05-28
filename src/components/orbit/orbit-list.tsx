@@ -36,6 +36,9 @@ function OrbitListRowSkeleton({ isOrbital }: { isOrbital: boolean }) {
         <div className="h-3.5 w-full rounded skeleton-shimmer" />
         <div className="h-3.5 w-full rounded skeleton-shimmer" />
         <div className="h-3.5 w-4/5 rounded skeleton-shimmer" />
+        <div className="flex justify-end pt-0.5">
+          <div className="h-20 w-20 shrink-0 rounded-sm skeleton-shimmer" />
+        </div>
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="h-4 w-16 rounded skeleton-shimmer" />
           <div className="h-7 w-16 rounded-full skeleton-shimmer" />

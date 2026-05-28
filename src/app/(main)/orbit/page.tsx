@@ -78,6 +78,7 @@ import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { getBookmarkTweetUrl, openBookmarkOnX } from "@/lib/bookmark-url";
 import { fetchJson } from "@/lib/fetch-json";
 import {
   ORBIT_ALL_PAGE_SIZE,
@@ -931,12 +932,10 @@ export default function OrbitPage() {
 
   const handleMenuAction = (id: string, action: string) => {
     const bookmark = bookmarks.find((b) => b.id === id);
-    const tweetUrl = bookmark
-      ? `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`
-      : null;
+    const tweetUrl = bookmark ? getBookmarkTweetUrl(bookmark) : undefined;
 
-    if (action === "open-x" && tweetUrl) {
-      window.open(tweetUrl, "_blank", "noopener,noreferrer");
+    if (action === "open-x" && bookmark) {
+      openBookmarkOnX(bookmark);
     } else if (action === "copy-link" && tweetUrl) {
       void navigator.clipboard.writeText(tweetUrl).then(
         () => toast.success("Link copied"),

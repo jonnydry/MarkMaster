@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
 
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetClose } from "@/components/ui/sheet";
 import {
@@ -199,6 +200,25 @@ export function OrbitReviewEditSheet({
 
           <div className="flex-1 overflow-auto">
             <div className={cn("space-y-6 p-5", isQuick && "space-y-3 p-4")}>
+              {bookmark ? (
+                <BookmarkPostPreview
+                  tweetText={bookmark.tweetText}
+                  authorUsername={bookmark.authorUsername}
+                  media={bookmark.media}
+                  tweetLink={{
+                    authorUsername: bookmark.authorUsername,
+                    tweetId: bookmark.tweetId,
+                  }}
+                  bookmarkKey={bookmark.id}
+                  variant="inline"
+                  textClassName={cn(
+                    "text-sm leading-relaxed whitespace-pre-wrap",
+                    rcx.bodyDim
+                  )}
+                  galleryClassName="!mt-2"
+                />
+              ) : null}
+
               {/* Full Grok Reasoning */}
               <div>
                 <button

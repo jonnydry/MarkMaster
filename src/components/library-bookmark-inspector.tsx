@@ -8,6 +8,8 @@ import {
   OrbitalCard,
   TelemetryStat,
 } from "@/components/orbital";
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { getBookmarkTweetUrl, openBookmarkOnX } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -31,9 +33,7 @@ export function LibraryBookmarkInspector({
   const author =
     bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
   const handle = bookmark.authorUsername ? `@${bookmark.authorUsername}` : "";
-  const tweetUrl = bookmark.authorUsername
-    ? `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`
-    : null;
+  const tweetUrl = getBookmarkTweetUrl(bookmark) ?? null;
 
   const handleCopyLink = () => {
     if (!tweetUrl) return;
@@ -61,14 +61,22 @@ export function LibraryBookmarkInspector({
 
       <div className="space-y-5 px-4 py-4">
         <div>
-          <div
-            className={cn(
+          <BookmarkPostPreview
+            tweetText={bookmark.tweetText || "Bookmark"}
+            authorUsername={bookmark.authorUsername}
+            media={bookmark.media}
+            tweetLink={{
+              authorUsername: bookmark.authorUsername,
+              tweetId: bookmark.tweetId,
+            }}
+            bookmarkKey={bookmark.id}
+            variant="inline"
+            textClassName={cn(
               orbital.label,
-              "line-clamp-3 normal-case text-[15px] font-medium leading-tight tracking-normal text-foreground"
+              "line-clamp-6 normal-case text-[15px] font-medium leading-tight tracking-normal text-foreground"
             )}
-          >
-            {bookmark.tweetText?.slice(0, 180) || "Bookmark"}
-          </div>
+            galleryClassName="!mt-2"
+          />
           <div
             className={cn(
               orbital.data,
@@ -205,9 +213,7 @@ export function LibraryBookmarkInspector({
             <div className="mt-3 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() =>
-                  window.open(tweetUrl, "_blank", "noopener,noreferrer")
-                }
+                onClick={() => openBookmarkOnX(bookmark)}
                 className={cn(
                   orbital.label,
                   "inline-flex items-center gap-1 text-primary/55 hover:text-primary"

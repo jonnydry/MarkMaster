@@ -20,6 +20,8 @@ import {
   XPostRepostIcon,
 } from "@/components/brands/x-post-metric-icons";
 import { Button } from "@/components/ui/button";
+import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
+import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
@@ -204,7 +206,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
-  const tweetUrl = `https://x.com/${bookmark.authorUsername}/status/${bookmark.tweetId}`;
+  const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const isInteractive = selectionMode || Boolean(onSelect);
   const highlighter = useMemo(
     () => createTextHighlighter(searchQuery),
@@ -612,49 +614,17 @@ export const BookmarkCard = memo(function BookmarkCard({
           </div>
 
           {mediaItems && mediaItems.length > 0 && (
-            <div
-              className={`mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent ${
-                mediaItems.length === 1 ? "" : "grid grid-cols-2 gap-0.5"
-              }`}
-            >
-              {mediaItems.slice(0, 4).map((m, i) => {
-                const url = m.url || m.preview_image_url;
-                if (!url || imageError.has(url)) return null;
-                const isLastTile = i === 3;
-                const extraCount = mediaItems.length - 4;
-                const showOverlay = isLastTile && extraCount > 0;
-                return (
-                  <div key={i} className="relative">
-                    <Image
-                      src={url}
-                      alt={`Media ${i + 1} from @${bookmark.authorUsername}`}
-                      width={m.width || 1200}
-                      height={m.height || 900}
-                      sizes={
-                        mediaItems.length === 1
-                          ? `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`
-                          : `(max-width: 768px) 50vw, ${Math.round(BOOKMARK_FEED_MAX_WIDTH_PX / 2)}px`
-                      }
-                      className={`w-full object-cover ${
-                        mediaItems.length === 1 ? "max-h-80" : "aspect-square"
-                      }`}
-                      priority={priorityMedia && i === 0}
-                      onError={() =>
-                        setImageError((prev) => new Set(prev).add(url))
-                      }
-                    />
-                    {showOverlay && (
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white"
-                      >
-                        +{extraCount}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <BookmarkMediaGallery
+              media={mediaItems}
+              authorUsername={bookmark.authorUsername}
+              variant="feed"
+              bookmarkKey={bookmark.id}
+              priority={priorityMedia}
+              tweetLink={{
+                authorUsername: bookmark.authorUsername,
+                tweetId: bookmark.tweetId,
+              }}
+            />
           )}
 
           {bookmark.quotedTweet && (

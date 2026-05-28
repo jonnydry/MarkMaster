@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Check } from "lucide-react";
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
@@ -96,6 +97,12 @@ export const OrbitListRow = memo(function OrbitListRow({
 
   const excerpt = bookmark.tweetText?.trim() || "Untitled bookmark";
   const checkboxLabel = `${author}: ${excerpt.slice(0, 80)}`;
+  const mediaItems = bookmark.media;
+  const hasMedia = Boolean(mediaItems?.length);
+  const tweetLink = {
+    authorUsername: bookmark.authorUsername,
+    tweetId: bookmark.tweetId,
+  };
 
   return (
     <div
@@ -195,15 +202,20 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
         </div>
 
-        <p
-          className={cn(
+        <BookmarkPostPreview
+          tweetText={excerpt}
+          authorUsername={bookmark.authorUsername}
+          media={hasMedia ? mediaItems : null}
+          tweetLink={tweetLink}
+          bookmarkKey={bookmark.id}
+          variant="compact"
+          stopClickPropagation
+          textClassName={cn(
             "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
             isOrbital ? "text-foreground" : "text-white",
             queueStatus === "dismissed" && "line-through decoration-white/30"
           )}
-        >
-          {excerpt}
-        </p>
+        />
 
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">

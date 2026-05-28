@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
 import { ChevronDown, ChevronRight, Sparkles, Plus, RotateCcw } from "lucide-react";
 import { DiscoveryBatchBar } from "@/components/discovery-batch-bar";
 import { HighlightCard } from "@/components/highlight-card";
@@ -20,8 +21,6 @@ import { cn } from "@/lib/utils";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital } from "@/components/orbital";
 import type { BookmarkWithRelations } from "@/types";
-
-const NURTURED_STORAGE_KEY = "markmaster:digest-nurtured";
 
 export interface WeeklyDigestPanelProps {
   rawGems: BookmarkWithRelations[];
@@ -51,14 +50,6 @@ export function WeeklyDigestPanel({
   const { isOrbital } = useOrbitalTheme();
   const [expanded, setExpanded] = useState(false);
   const [digestOpen, setDigestOpen] = useState(!defaultCollapsed);
-  const [nurturedCount, setNurturedCount] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    const n = parseInt(localStorage.getItem(NURTURED_STORAGE_KEY) || "0", 10);
-    return Number.isFinite(n) ? n : 0;
-  });
-  const [celebration, setCelebration] = useState<null | { gems: number; engagement: number }>(
-    null
-  );
 
   const curation = useMemo(
     () => buildWeeklyGemsCuration(rawGems, libraryGems, { expanded, excludeIds }),
@@ -77,7 +68,7 @@ export function WeeklyDigestPanel({
 
   const itemLabels = buildDigestItemLabels(resurfacedGems);
   const hasGems = allGems.length > 0 || overlapWithQuickPicks > 0;
-  const totalEngagement = computeDigestEngagement(allGems);
+  const totalEngagement = computeDigestEngagement(batchGems);
   const totalMixCount = allGems.length + overlapWithQuickPicks;
   const extraBeyondQuickPicks = allGems.length;
   const showExtrasStrip = displayGems.length >= 2;
@@ -92,36 +83,17 @@ export function WeeklyDigestPanel({
       }`
     : undefined;
 
-  const incrementNurtured = (delta: number) => {
-    const next = nurturedCount + delta;
-    setNurturedCount(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(NURTURED_STORAGE_KEY, String(next));
-    }
-  };
-
-  const handleReviewInOrbit = () => {
-    const gemsCount = batchGems.length;
-    const eng = computeDigestEngagement(batchGems);
-    incrementNurtured(gemsCount);
-    trackFlywheelEvent("cta.digest_review_together", { gems: gemsCount });
-    setCelebration({ gems: gemsCount, engagement: eng });
-    setTimeout(() => {
-      setCelebration(null);
-      const ids = batchGems.map((b) => b.id).join(",");
-      router.push(`/orbit?digestIds=${ids}&source=weekly-gems`);
-    }, 400);
-  };
-
-  const handleSaveAsCollection = () => {
-    if (!onSaveAsCollection) return;
-    const gemsCount = batchGems.length;
-    const eng = computeDigestEngagement(batchGems);
-    incrementNurtured(gemsCount);
-    setCelebration({ gems: gemsCount, engagement: eng });
-    setTimeout(() => setCelebration(null), 3800);
-    onSaveAsCollection(batchGems, "This Week’s Gems");
-  };
+  // Use shared ritual hook (eliminates duplication with dashboard-discovery.tsx
+  // while preserving identical behavior, telemetry, and side effects).
+  const {
+    nurturedCount,
+    celebration,
+    handleReviewInOrbit,
+    handleSaveAsCollection,
+  } = useDiscoveryRitual({
+    batch: batchGems,
+    onSaveAsCollection,
+  });
 
   const handleSelectBookmark = (id: string) => {
     if (onSelectBookmark) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exportQuerySchema } from "@/lib/validations";
+import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const EXPORT_LIMIT = 10_000;
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
         const tags = b.tags.map((t) => t.tag.name).join("; ");
         const note = b.notes[0]?.content || "";
         const text = sanitizeCsvField(b.tweetText);
-        const url = `https://x.com/${b.authorUsername}/status/${b.tweetId}`;
+        const url = getBookmarkTweetUrl(b) ?? "";
         return `${escapeCsvField(b.tweetId)},${escapeCsvField(b.authorDisplayName)},${escapeCsvField("@" + b.authorUsername)},${text},${metrics?.like_count || 0},${metrics?.retweet_count || 0},${metrics?.reply_count || 0},${escapeCsvField(tags)},${sanitizeCsvField(note)},${escapeCsvField(b.tweetCreatedAt.toISOString())},${escapeCsvField(b.bookmarkedAt.toISOString())},${escapeCsvField(url)}`;
       })
       .join("\n");
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
     note: b.notes[0]?.content || null,
     tweetDate: b.tweetCreatedAt,
     bookmarkedDate: b.bookmarkedAt,
-    url: `https://x.com/${b.authorUsername}/status/${b.tweetId}`,
+    url: getBookmarkTweetUrl(b) ?? "",
   }));
 
   return new NextResponse(JSON.stringify(data, null, 2), {

@@ -129,6 +129,47 @@ describe("sync-utils", () => {
       expect(result.publicMetrics).toEqual({ like_count: 10, retweet_count: 2, reply_count: 1 });
       expect(result.media).toHaveLength(1);
     });
+
+    it("persists playback_url from video variants", () => {
+      const data: BookmarkData = {
+        ...makeBookmarkData("video-1"),
+        media: [
+          {
+            media_key: "v1",
+            type: "video",
+            preview_image_url: "https://pbs.twimg.com/poster.jpg",
+            width: 1280,
+            height: 720,
+            duration_ms: 30000,
+            variants: [
+              {
+                bit_rate: 256000,
+                content_type: "video/mp4",
+                url: "https://video.twimg.com/low.mp4",
+              },
+              {
+                bit_rate: 2176000,
+                content_type: "video/mp4",
+                url: "https://video.twimg.com/high.mp4",
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = buildBookmarkUpdateData(data);
+      expect(result.media).toEqual([
+        {
+          type: "video",
+          url: "https://pbs.twimg.com/poster.jpg",
+          preview_image_url: "https://pbs.twimg.com/poster.jpg",
+          width: 1280,
+          height: 720,
+          playback_url: "https://video.twimg.com/high.mp4",
+          duration_ms: 30000,
+        },
+      ]);
+    });
   });
 
   describe("getExistingTweetIdsForUserAndTweets", () => {

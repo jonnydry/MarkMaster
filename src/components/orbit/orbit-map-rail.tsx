@@ -27,6 +27,7 @@ import type {
   OrbitGraphPayload,
 } from "@/types";
 
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbital } from "@/components/orbital";
 
@@ -521,14 +522,42 @@ function SelectedClusterBody({
             </p>
           </div>
         </div>
-        <p className={cn(
-          "text-sm",
-          isOrbital ? "text-primary/80" : "text-white/70"
-        )}>
-          {focusedBookmarkLoading && !focusedBookmark
-            ? "Loading…"
-            : focusedBookmark?.tweetText ?? node.title}
-        </p>
+        {focusedBookmarkLoading && !focusedBookmark ? (
+          <p
+            className={cn(
+              "text-sm",
+              isOrbital ? "text-primary/80" : "text-white/70"
+            )}
+          >
+            Loading…
+          </p>
+        ) : focusedBookmark ? (
+          <BookmarkPostPreview
+            tweetText={focusedBookmark.tweetText}
+            authorUsername={focusedBookmark.authorUsername}
+            media={focusedBookmark.media}
+            tweetLink={{
+              authorUsername: focusedBookmark.authorUsername,
+              tweetId: focusedBookmark.tweetId,
+            }}
+            bookmarkKey={focusedBookmark.id}
+            variant="inline"
+            textClassName={cn(
+              "text-sm line-clamp-5 whitespace-pre-wrap",
+              isOrbital ? "text-primary/80" : "text-white/70"
+            )}
+            galleryClassName="!mt-2"
+          />
+        ) : (
+          <p
+            className={cn(
+              "text-sm",
+              isOrbital ? "text-primary/80" : "text-white/70"
+            )}
+          >
+            {node.title}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"

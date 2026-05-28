@@ -8,6 +8,7 @@ import {
 import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
 import {
   buildWeeklyGemsCuration,
+  buildDiscoveryCarouselItems,
 } from "@/lib/weekly-gems-curation";
 export type DashboardDiscoveryParentData = {
   rawData?: PerformanceHighlightsResponse;
@@ -85,6 +86,19 @@ export function useDashboardDiscovery(options: {
   const hasDigestBatch = curation.allGems.length > 0;
   const hasDigestExtras = digestDisplayGems.length > 0;
 
+  // Unified discovery carousel data (Phase 1 of Master Plan). Computed with useMemo.
+  // Provides flat ordered list (raw front-loaded) + full ritualBatch preserving
+  // exact batch construction, nurtured, cta.digest_review_together, digestIds + source=weekly-gems,
+  // and onSaveAsCollection contract. Only DashboardDiscovery (default/flush) consumes the new fields.
+  // HighlightsDigest / standalone WeeklyDigestPanel / perf SQL path untouched.
+  const discovery = useMemo(
+    () =>
+      buildDiscoveryCarouselItems(rawGems, libraryGems, {
+        excludeIdsForBatch: quickPickIds,
+      }),
+    [rawGems, libraryGems, quickPickIds]
+  );
+
   return {
     quickPicks,
     quickPickIds,
@@ -94,6 +108,17 @@ export function useDashboardDiscovery(options: {
     digestDisplayGems,
     hasDigestBatch,
     hasDigestExtras,
+    // New unified carousel fields (additive only; old returns + buildWeeklyGemsCuration path
+    // retained verbatim for safety / standalone surfaces per Master Plan). This increases
+    // hook surface but was the minimal transition that avoided breaking any call sites or
+    // future drift on the old curation contract. Only consumed by DashboardDiscovery.
+    discoveryCarouselItems: discovery.carouselItems,
+    ritualBatch: discovery.ritualBatch,
+    ritualTotal: discovery.totalMixCount,
+    resurfacedCount: discovery.resurfacedCount,
+    discoveryEngagement: discovery.totalEngagement,
+    itemLabels: discovery.itemLabels,
+    hasMixContent: discovery.carouselItems.length > 0 || discovery.ritualBatch.length > 0,
     isLoading,
     hasError,
     refetch,

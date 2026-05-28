@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { Prisma } from "@prisma/client";
 import type { BookmarkData } from "./x-api";
+import { mapStoredBookmarkMedia } from "./bookmark-media";
 
 /** Keep serverless/Postgres poolers from getting a burst of hundreds of updates. */
 export const BOOKMARK_UPDATE_BATCH_SIZE = 10;
@@ -21,13 +22,7 @@ export function buildBookmarkUpdateData(data: BookmarkData) {
     publicMetrics: data.tweet.public_metrics ?? Prisma.JsonNull,
     media:
       data.media.length > 0
-        ? data.media.map((m) => ({
-            type: m.type,
-            url: m.url || m.preview_image_url,
-            preview_image_url: m.preview_image_url,
-            width: m.width,
-            height: m.height,
-          }))
+        ? mapStoredBookmarkMedia(data.media)
         : Prisma.JsonNull,
     urls: data.tweet.entities?.urls ?? Prisma.JsonNull,
     quotedTweet: data.quotedTweet
@@ -95,13 +90,7 @@ export function buildBookmarkCreateData(userId: string, data: BookmarkData) {
     publicMetrics: data.tweet.public_metrics ?? Prisma.JsonNull,
     media:
       data.media.length > 0
-        ? data.media.map((m) => ({
-            type: m.type,
-            url: m.url || m.preview_image_url,
-            preview_image_url: m.preview_image_url,
-            width: m.width,
-            height: m.height,
-          }))
+        ? mapStoredBookmarkMedia(data.media)
         : Prisma.JsonNull,
     urls: data.tweet.entities?.urls ?? Prisma.JsonNull,
     quotedTweet: data.quotedTweet

@@ -20,7 +20,7 @@ export const orbital = {
       ? "border-primary/40 bg-primary/10 text-primary"
       : tone === "bronze"
         ? "border-bronze/30 bg-bronze/10 text-bronze"
-        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-600",
   pill: "inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary",
   icon: "bg-primary/10 text-primary",
   menu: "rounded-sm border border-hairline-soft bg-[var(--surface-1)] shadow-xl py-1 text-[13px] min-w-[136px]",
@@ -30,7 +30,7 @@ export const orbital = {
     "inline-flex items-center gap-px rounded-full border border-primary/20 bg-[var(--surface-1)]/95 px-1 py-0.5 shadow-sm backdrop-blur",
   sectionLabel: orbitalTypography.sectionLabel,
   slideIn:
-    "glass-orbital border-l-2 border-primary/40 shadow-[-14px_0_40px_-16px_rgba(0,0,0,0.65)]",
+    "glass-orbital orbital-slide-in-shadow border-l-2 border-primary/40",
 };
 
 export function OrbitalCard({

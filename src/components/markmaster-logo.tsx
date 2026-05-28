@@ -21,7 +21,7 @@ export function MarkMasterLogo({
       alt="MarkMaster"
       width={width}
       height={height}
-      className={cn("block object-contain", className)}
+      className={cn("markmaster-logo block object-contain", className)}
       priority={priority}
     />
   );

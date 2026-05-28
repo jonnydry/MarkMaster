@@ -10,11 +10,11 @@ import {
   Tag as TagIcon,
   Users,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { ShareBookmarkRow } from "@/components/share-bookmark-row";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ const publicBookmarkSelect = {
   authorDisplayName: true,
   authorProfileImage: true,
   tweetText: true,
+  media: true,
   tweetCreatedAt: true,
   tags: {
     select: {
@@ -301,76 +302,23 @@ export default async function PublicSharePage({
         <div className="space-y-0">
           {collection.items.map((item) => {
             const b = item.bookmark;
-            const tweetUrl = `https://x.com/${b.authorUsername}/status/${b.tweetId}`;
+            const media = Array.isArray(b.media)
+              ? (b.media as BookmarkMediaJson[])
+              : null;
 
             return (
-              <div
+              <ShareBookmarkRow
                 key={item.id}
-                className="py-4 border-b border-border last:border-0"
-              >
-                <div className="flex gap-3">
-                  {b.authorProfileImage && (
-                    <Image
-                      src={b.authorProfileImage}
-                      alt={`${b.authorDisplayName} avatar`}
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm">
-                        {b.authorDisplayName}
-                      </span>
-                      <span className="text-muted-foreground text-sm">
-                        @{b.authorUsername}
-                      </span>
-                      <span className="text-muted-foreground text-sm">·</span>
-                      <span className="text-muted-foreground text-xs">
-                        {formatDistanceToNow(new Date(b.tweetCreatedAt), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-sm mt-1 whitespace-pre-wrap leading-relaxed">
-                      {b.tweetText}
-                    </p>
-                    {b.tags.length > 0 && (
-                      <div className="flex gap-1.5 mt-2">
-                        {b.tags.map(
-                          ({
-                            tag,
-                          }: {
-                            tag: { id: string; name: string; color: string };
-                          }) => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary text-xs font-medium text-muted-foreground"
-                            >
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: tag.color }}
-                                aria-hidden="true"
-                              />
-                              {tag.name}
-                            </span>
-                          )
-                        )}
-                      </div>
-                    )}
-                    <a
-                      href={tweetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
-                    >
-                      View on X
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              </div>
+                id={b.id}
+                tweetId={b.tweetId}
+                authorUsername={b.authorUsername}
+                authorDisplayName={b.authorDisplayName}
+                authorProfileImage={b.authorProfileImage}
+                tweetText={b.tweetText}
+                tweetCreatedAt={b.tweetCreatedAt}
+                media={media}
+                tags={b.tags}
+              />
             );
           })}
         </div>

@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
+import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { orbital, OrbitalCard } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
 import { orbitLabelClass } from "@/lib/orbit-route-chrome";
@@ -98,6 +99,10 @@ export function OrbitSlideInPanel({
   const author = bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
   const handle = bookmark.authorUsername ? `@${bookmark.authorUsername}` : "";
   const postText = bookmark.tweetText?.trim() || "Bookmark content";
+  const tweetLink = {
+    authorUsername: bookmark.authorUsername,
+    tweetId: bookmark.tweetId,
+  };
   const hasPrimarySuggestion = Boolean(decision?.primary);
   const applyLabel =
     decision?.primary?.kind === "collection"
@@ -154,6 +159,17 @@ export function OrbitSlideInPanel({
             key={bookmark.id}
             text={postText}
             isOrbital={isOrbital}
+          />
+          <BookmarkPostPreview
+            mediaOnly
+            tweetText=""
+            authorUsername={bookmark.authorUsername}
+            media={bookmark.media}
+            tweetLink={tweetLink}
+            bookmarkKey={bookmark.id}
+            variant="inline"
+            galleryClassName="!mt-0 mb-4"
+            stopClickPropagation
           />
           <div className={cn(orbital.data, "-mt-3 mb-5 normal-case text-[11px] text-primary/60")}>
             {author} {handle && <span className="text-primary/40">{handle}</span>}
