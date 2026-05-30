@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { buttonVariants } from "@/components/ui/button";
 import { ShareBookmarkRow } from "@/components/share-bookmark-row";
 import { MarkMasterLogo } from "@/components/markmaster-logo";

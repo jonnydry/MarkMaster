@@ -3,6 +3,7 @@ import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getUserIdFromRequest } from "@/lib/auth-edge";
+import { getClientIp } from "@/lib/client-ip";
 
 // === Global Safety Limiter ===
 // Protects the entire system from abuse (e.g. one IP hammering the API)
@@ -42,13 +43,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // === Global Safety Limit ===
-  // Improved IP extraction (still trusts first hop — document proxy chain in production)
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const ip =
-    forwardedFor?.split(",")[0]?.trim() ||
-    realIp?.trim() ||
-    "unknown";
+  // Resolve the client IP without trusting client-spoofable x-forwarded-for hops.
+  // Tune TRUSTED_PROXY_HOPS to your deployment's proxy chain (see lib/client-ip.ts).
+  const ip = getClientIp(request.headers);
 
   // Safely check global rate limit. If Redis is down or misconfigured, fail open.
   if (globalLimiter) {

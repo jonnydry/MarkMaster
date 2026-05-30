@@ -54,7 +54,6 @@ import {
   SettingsRow,
   SettingsSection,
   SettingsSegment,
-  settingsSurfaceClass,
 } from "./settings-primitives";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 

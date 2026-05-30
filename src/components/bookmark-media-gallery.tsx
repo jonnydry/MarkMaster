@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, type MouseEvent } from "react";
+import { useState, useCallback, type MouseEvent } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
@@ -242,10 +242,16 @@ export function BookmarkMediaGallery({
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const [playingKey, setPlayingKey] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Reset transient gallery state when switching to a different bookmark.
+  // Adjusting state during render (rather than in an effect) avoids cascading
+  // re-renders and applies synchronously before paint. See React docs:
+  // "You Might Not Need an Effect" → resetting state when a prop changes.
+  const [prevBookmarkKey, setPrevBookmarkKey] = useState(bookmarkKey);
+  if (bookmarkKey !== prevBookmarkKey) {
+    setPrevBookmarkKey(bookmarkKey);
     setPlayingKey(null);
     setImageError(new Set());
-  }, [bookmarkKey]);
+  }
 
   const onImageError = useCallback((url: string) => {
     setImageError((prev) => new Set(prev).add(url));

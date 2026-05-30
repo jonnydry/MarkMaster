@@ -128,12 +128,19 @@ export function usePerformanceHighlights(
         });
       }
 
-      // Final sort by boosted score
-      processed.sort((a, b) => (((b as { _boost?: number })._boost || 1) - ((a as { _boost?: number })._boost || 1)));
+      // Final sort by boosted score.
+      // Copy before sorting: when no boosts apply, `processed` is still the same
+      // array reference React Query holds in cache, and sorting in place would
+      // corrupt the cached result on subsequent reads/refetches.
+      const sorted = [...processed].sort(
+        (a, b) =>
+          ((b as { _boost?: number })._boost || 1) -
+          ((a as { _boost?: number })._boost || 1)
+      );
 
       return {
         ...data,
-        bookmarks: processed,
+        bookmarks: sorted,
       };
     },
     staleTime: 1000 * 60 * 2,

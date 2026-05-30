@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -213,19 +214,19 @@ export async function PATCH(
       return { missingIds } as const;
     }
 
-    await Promise.all(
-      parsed.data.items.map((item) =>
-        tx.collectionItem.update({
-          where: {
-            collectionId_bookmarkId: {
-              collectionId,
-              bookmarkId: item.bookmarkId,
-            },
-          },
-          data: { sortOrder: item.sortOrder },
-        })
-      )
+    // Single bulk UPDATE instead of up to MAX_REORDER_ITEMS individual round-trips.
+    // Scoped to collectionId so it can only touch rows already validated above.
+    const valueTuples = parsed.data.items.map(
+      (item) => Prisma.sql`(${item.bookmarkId}, ${item.sortOrder}::int)`
     );
+
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "CollectionItem" AS ci
+      SET "sortOrder" = v.sort_order
+      FROM (VALUES ${Prisma.join(valueTuples)}) AS v(bookmark_id, sort_order)
+      WHERE ci."collectionId" = ${collectionId}
+        AND ci."bookmarkId" = v.bookmark_id
+    `);
 
     return { missingIds: [] } as const;
   });

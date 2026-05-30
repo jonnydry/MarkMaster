@@ -12,6 +12,19 @@ import { NextResponse } from "next/server";
 
 export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write" | "csp-report";
 
+/**
+ * Actions exposed by the debug reset endpoint.
+ * Excludes "csp-report" (public/IP-keyed) and the global limiters.
+ */
+export const DEBUG_RATE_LIMIT_ACTIONS = [
+  "sync",
+  "orbit",
+  "api:read",
+  "api:write",
+] as const satisfies readonly RateLimitAction[];
+
+export type DebugRateLimitAction = (typeof DEBUG_RATE_LIMIT_ACTIONS)[number];
+
 interface RateLimitPolicy {
   requests: number;
   window: `${number} ${"s" | "m" | "h" | "d"}`;
@@ -233,6 +246,33 @@ export async function checkRateLimit(
  */
 export function getRateLimitDescription(action: RateLimitAction): string {
   return POLICIES[action].description;
+}
+
+/**
+ * Clears the sliding-window state for a user+action (debug tooling only).
+ * Uses Upstash's supported `resetUsedTokens` so the real bucket is cleared,
+ * unlike a throwaway probe key. No-op when Upstash is not configured.
+ */
+export async function resetUserRateLimit(
+  action: DebugRateLimitAction,
+  userId: string
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isRateLimitingEnabled) {
+    return { ok: true, message: "Rate limiting disabled; nothing to reset." };
+  }
+
+  const ratelimiter = getRatelimiters()?.[action];
+  if (!ratelimiter) {
+    return { ok: false, message: "Rate limiter unavailable." };
+  }
+
+  try {
+    await ratelimiter.resetUsedTokens(userId);
+    return { ok: true };
+  } catch (error) {
+    console.error(`[RateLimit] resetUserRateLimit failed for "${action}":`, error);
+    return { ok: false, message: "Failed to reset rate limit." };
+  }
 }
 
 /**
