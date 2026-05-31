@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useColorTheme, useFontMode } from "@/components/providers";
 import { COLOR_THEMES } from "@/lib/color-themes";
 import { TYPOGRAPHY_PRESETS } from "@/lib/typography-presets";
+import { TagDot } from "@/components/tag-dot";
 import { useTypography } from "@/hooks/use-typography";
 import type { TagWithCount, MediaFilter } from "@/types";
 
@@ -327,10 +328,7 @@ export function CommandPalette({
                     </>
                   ) : item.kind === "tag" ? (
                     <>
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
+                      <TagDot name={item.name} color={item.color} size={12} />
                       <span className="flex-1 text-left">{item.name}</span>
                       <span className={cn(t.data, "text-xs text-muted-foreground")}>{item.count}</span>
                     </>

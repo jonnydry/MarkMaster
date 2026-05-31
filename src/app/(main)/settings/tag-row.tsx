@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TagWithCount } from "@/types";
+import { TagDot } from "@/components/tag-dot";
 
 interface TagRowProps {
   tag: TagWithCount;
@@ -26,10 +27,11 @@ export const TagRow = React.memo(function TagRow({
         index > 0 && "border-t border-hairline-soft"
       )}
     >
-      <span
-        className="size-3.5 shrink-0 rounded-full ring-1 ring-hairline-soft ring-offset-1 ring-offset-surface-2"
-        style={{ backgroundColor: tag.color }}
-        aria-hidden
+      <TagDot
+        name={tag.name}
+        color={tag.color}
+        size={14}
+        className="shrink-0 ring-1 ring-hairline-soft ring-offset-1 ring-offset-surface-2"
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{tag.name}</p>

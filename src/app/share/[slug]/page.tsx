@@ -4,7 +4,6 @@ import { cache, type ReactElement } from "react";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import Image from "next/image";
-
 import { ShareBookmarkRow } from "@/components/share-bookmark-row";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
@@ -14,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { AppPublicPage } from "@/components/app-page-shell";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
+import { TagDot } from "@/components/tag-dot";
 
 const PUBLIC_SHARE_PAGE_SIZE = 50;
 const MAX_PUBLIC_SHARE_PAGE = 200;
@@ -286,11 +286,7 @@ export default async function PublicSharePage({
                   key={tag.id}
                   className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground"
                 >
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                    aria-hidden
-                  />
+                  <TagDot name={tag.name} color={tag.color} size={8} />
                   {tag.name}
                   <span className="text-muted-foreground/60">{tag.count}</span>
                 </span>

@@ -11,6 +11,7 @@ import {
   appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
+import { TagDot } from "@/components/tag-dot";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import type { OrbitGraphNode } from "@/types";
 
@@ -140,10 +141,7 @@ function SearchResultButton({
     >
       {node.kind === "tag" && (
         <>
-          <span
-            className="inline-block size-2 rounded-full"
-            style={{ backgroundColor: node.color }}
-          />
+          <TagDot name={node.name} color={node.color} size={8} />
           <span className="truncate">{node.name}</span>
           <ResultKindLabel>Tag</ResultKindLabel>
         </>
