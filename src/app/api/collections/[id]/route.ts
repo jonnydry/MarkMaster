@@ -116,6 +116,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limit collection deletions (destructive)
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const collection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
     select: { type: true },

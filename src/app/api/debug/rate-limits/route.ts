@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
-import { checkRateLimit, getRateLimitDescription, type RateLimitAction } from "@/lib/rate-limit";
+import { debugAccessDeniedResponse } from "@/lib/debug-access";
+import {
+  checkRateLimit,
+  getRateLimitDescription,
+  resetUserRateLimit,
+  DEBUG_RATE_LIMIT_ACTIONS,
+  type DebugRateLimitAction,
+} from "@/lib/rate-limit";
 
-const ACTIONS: RateLimitAction[] = ["sync", "orbit", "api:read", "api:write"];
+const ACTIONS = DEBUG_RATE_LIMIT_ACTIONS;
 
 /**
  * Debug endpoint to view current rate limit status for the logged-in user.
@@ -17,13 +24,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Restrict in production (optional but recommended)
-  if (process.env.NODE_ENV === "production") {
-    const ownerUserId = process.env.OWNER_USER_ID;
-    if (ownerUserId && user.id !== ownerUserId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  const denied = debugAccessDeniedResponse(user);
+  if (denied) return denied;
 
   const results = await Promise.all(
     ACTIONS.map(async (action) => {
@@ -58,25 +60,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (process.env.NODE_ENV === "production") {
-    const ownerUserId = process.env.OWNER_USER_ID;
-    if (ownerUserId && user.id !== ownerUserId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  }
+  const denied = debugAccessDeniedResponse(user);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
-  const action = body.action as RateLimitAction;
+  const action = body.action as DebugRateLimitAction;
 
   if (!ACTIONS.includes(action)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  // Reset mechanism: By using a unique identifier (timestamp), we force the creation
-  // of a new rate limit bucket for this user+action, effectively resetting their limit.
-  // This is a pragmatic solution for the internal debug tool.
-  // For a production admin tool, consider using Upstash's REST API for proper bucket deletion.
-  await checkRateLimit(action, `${user.id}:reset-${Date.now()}`);
+  const reset = await resetUserRateLimit(action, user.id);
+  if (!reset.ok) {
+    return NextResponse.json(
+      { error: reset.message ?? "Reset failed" },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({
     message: `Rate limit for "${action}" has been reset for this user.`,

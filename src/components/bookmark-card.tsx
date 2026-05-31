@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
-import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 import { orbital } from "@/components/orbital";

@@ -42,7 +42,7 @@ import {
 
 import type { OrbitGraphPayload, OrbitGraphNode, OrbitGraphEdge } from '@/types';
 import type { GraphFilter, OrbitMapSelection } from '@/lib/orbit-worker-protocol';
-import { Container, Graphics, Text, BitmapFont, BitmapText } from 'pixi.js';
+import { Container, Graphics, Text, BitmapFont, BitmapFontManager, BitmapText } from 'pixi.js';
 import {
   forceSimulation,
   forceLink,
@@ -381,8 +381,8 @@ function handleInit(msg: InitMessage) {
           fontSize: 12,
           fill: 0xe2e8f0,
         },
-        // @ts-expect-error Pixi v8 BitmapFont charset API
-        chars: BitmapFont.ASCII,
+        // Charset constants live on BitmapFontManager in Pixi v8 (BitmapFont has no static ASCII).
+        chars: BitmapFontManager.ASCII,
       });
 
       // Basic ticker (the real render + simulation loop is driven from startSimulationLoop)
@@ -801,12 +801,13 @@ function renderSceneFromSimulation() {
     let label = labelMap.get(nodeId);
 
     if (!label) {
-      // Create new label using BitmapText for much better performance
-      // @ts-expect-error Pixi v8 BitmapText constructor differences
+      // Create new label using BitmapText for much better performance.
+      // In Pixi v8 the installed BitmapFont is referenced via style.fontFamily
+      // (its install `name`), not the v7 `fontName` property.
       label = new BitmapText({
         text: labelText,
         style: {
-          fontName: 'OrbitLabel',
+          fontFamily: 'OrbitLabel',
         },
       });
 

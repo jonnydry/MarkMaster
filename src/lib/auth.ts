@@ -355,9 +355,14 @@ export async function getUserTokens(userId: string) {
     select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
   });
   if (!user) return null;
-  return {
-    accessToken: decrypt(user.accessToken),
-    refreshToken: decrypt(user.refreshToken),
-    tokenExpiresAt: user.tokenExpiresAt,
-  };
+  try {
+    return {
+      accessToken: decrypt(user.accessToken),
+      refreshToken: decrypt(user.refreshToken),
+      tokenExpiresAt: user.tokenExpiresAt,
+    };
+  } catch (e) {
+    console.error("[auth] getUserTokens decrypt failed:", e);
+    return null;
+  }
 }

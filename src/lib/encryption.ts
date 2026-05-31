@@ -27,7 +27,24 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(data: string): string {
-  const [ivHex, tagHex, encrypted] = data.split(":");
+  if (typeof data !== "string" || data.length === 0) {
+    throw new Error("Invalid encrypted payload: expected a non-empty string");
+  }
+
+  const parts = data.split(":");
+  if (parts.length !== 3) {
+    throw new Error(
+      `Invalid encrypted payload: expected 3 colon-separated segments (iv:tag:ciphertext), got ${parts.length}`
+    );
+  }
+
+  const [ivHex, tagHex, encrypted] = parts;
+  if (!ivHex || !tagHex || !encrypted) {
+    throw new Error(
+      "Invalid encrypted payload: empty iv, tag, or ciphertext segment"
+    );
+  }
+
   const iv = Buffer.from(ivHex, "hex");
   const tag = Buffer.from(tagHex, "hex");
   const decipher = createDecipheriv(ALGORITHM, getKey(), iv);

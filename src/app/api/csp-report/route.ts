@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
+import { debugAccessDeniedResponse } from "@/lib/debug-access";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 interface CspReport {
@@ -28,8 +29,8 @@ export const recentCspViolations: Array<{
  *
  * - POST: Receives reports from the browser (public, as browsers send these unauthenticated).
  * - GET:  Returns recent violations for the internal debug UI.
- *         Requires authentication. If OWNER_USER_ID is set in the environment,
- *         access is further restricted to that specific user (recommended for shared dev/staging).
+ *         Requires authentication. In production this fails closed unless
+ *         OWNER_USER_ID is set and matches the caller (see debug-access.ts).
  */
 export async function POST(req: NextRequest) {
   try {
@@ -96,11 +97,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Restrict to owner only when OWNER_USER_ID is configured (works in both dev and prod)
-  const ownerUserId = process.env.OWNER_USER_ID;
-  if (ownerUserId && user.id !== ownerUserId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Fail-closed in production (requires OWNER_USER_ID match); owner-only in dev when set.
+  const denied = debugAccessDeniedResponse(user);
+  if (denied) return denied;
 
   // Return recent CSP violations for the debug page (authenticated users only)
   return NextResponse.json({

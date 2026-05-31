@@ -241,10 +241,12 @@ After completing Subphases 1–3 and performing an extensive multi-agent bughunt
 **Build Status**: ✅ Clean (`npm run build` succeeds with no TypeScript errors).
 
 **Current Recommended Posture**:
-- CSP remains in **Report-Only** mode for now (safe and recommended until real usage data is collected via `/debug/rate-limits`).
+- CSP **mode is env-driven** via `CSP_MODE` (defaults to Report-Only). Collect real usage data via `/debug/rate-limits`, then set `CSP_MODE=enforce` in the production environment to serve an enforcing `Content-Security-Policy` header. Flip back to `report-only` at any time for instant rollback — no code change required.
+- The global rate-limiter resolves the client IP via `getClientIp` (`src/lib/client-ip.ts`), which ignores client-spoofable `x-forwarded-for` hops. Set `TRUSTED_PROXY_HOPS` to match your deployment's proxy chain (default 1 for Vercel/Cloudflare/single proxy; 0 if the app is directly exposed).
 - All other security headers are active and production-appropriate.
 - Auth cookies are properly hardened.
 - Rate limiting is active and resilient.
+- Internal debug tools (`/api/debug/rate-limits`, `GET /api/csp-report`) fail **closed** in production: they require `OWNER_USER_ID` to be set and to match the caller, otherwise they return 404.
 
 #### Completed Hardening Checklist
 
@@ -264,9 +266,9 @@ After completing Subphases 1–3 and performing an extensive multi-agent bughunt
 
 #### Remaining Recommendations
 
-1. **CSP Enforcement**: After heavy real-world usage (especially Orbit map + sync + collections), review violation reports in `/debug/rate-limits` and consider enabling the enforcing `Content-Security-Policy` header.
-2. **Orbit Map Worker**: While the build is now clean, the new PixiJS worker path still contains some `as any` casts and incomplete event wiring. A dedicated polish pass on the worker would be valuable before relying on it heavily.
-3. **Rate Limiting Coverage**: Some routes (e.g. `/api/export`, `/api/analytics`, `/api/notes`) still lack explicit per-user rate limits. Consider adding them for expensive operations.
+1. **CSP Enforcement**: After heavy real-world usage (especially Orbit map + sync + collections), review violation reports in `/debug/rate-limits`. When clean, enable enforcement by setting `CSP_MODE=enforce` in the production environment (the header switches from `Content-Security-Policy-Report-Only` to `Content-Security-Policy` automatically).
+2. **Orbit Map Worker**: The two Pixi v8 `@ts-expect-error` suppressions have been removed by fixing the underlying API usage (`BitmapFontManager.ASCII` for the charset; `style.fontFamily` instead of the v7 `fontName` to reference the installed bitmap font). Remaining polish: incomplete event wiring could still use a dedicated pass before relying on the worker heavily.
+3. **Rate Limiting Coverage**: All destructive/write API handlers now carry explicit per-user `api:write` limits (including `tags` DELETE/PATCH and `collections/[id]` DELETE, previously relying only on the proxy). Heavy reads (`/api/export`, `/api/analytics`, `/api/orbit/graph`) carry explicit `api:read` limits; lightweight CRUD reads continue to rely on the proxy-level limiter by design.
 4. **Documentation**: Consider adding a short `docs/security.md` or expanding the README with the current security posture for open-source contributors.
 
 ---

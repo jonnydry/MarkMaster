@@ -38,17 +38,22 @@ const contentSecurityPolicy = [
   "report-to default;",
 ].join("; ");
 
+// === CSP Strategy ===
+//
+// We default to Report-Only so we can observe real violation data (via the
+// protected /api/csp-report and /debug/rate-limits tools) without breaking the
+// app. Flip to enforcing mode per-environment by setting CSP_MODE=enforce
+// (e.g. in Vercel project env vars) once violation reports are clean. This is a
+// pure config toggle with instant rollback — no code change or redeploy of the
+// app logic required.
+const cspEnforce = process.env.CSP_MODE === "enforce";
+const cspHeaderKey = cspEnforce
+  ? "Content-Security-Policy"
+  : "Content-Security-Policy-Report-Only";
+
 const securityHeaders = [
-  // === CSP Strategy ===
-  //
-  // We run in Report-Only mode by default so we can observe real violation data
-  // (via the protected /api/csp-report and /debug/rate-limits tools) without
-  // breaking the application during development and early production rollout.
-  //
-  // The enforcing Content-Security-Policy can be enabled by uncommenting the block below
-  // once violation reports are clean.
   {
-    key: "Content-Security-Policy-Report-Only",
+    key: cspHeaderKey,
     value: contentSecurityPolicy,
   },
   // Required for modern Reporting API (pairs with report-to in CSP)
@@ -56,13 +61,6 @@ const securityHeaders = [
     key: "Reporting-Endpoints",
     value: 'default="/api/csp-report"',
   },
-  // Enforcing CSP (commented out by default for safe rollout).
-  // Uncomment when violation reports via the protected debug tools are clean:
-  // {
-  //   key: "Content-Security-Policy",
-  //   value: contentSecurityPolicy,
-  // },
-
   {
     key: "Referrer-Policy",
     value: "strict-origin-when-cross-origin",
