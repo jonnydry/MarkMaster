@@ -130,7 +130,7 @@ export function HighlightScrollSlide({
     <div
       data-strip-slide={index}
       className={cn(
-        "flex w-[min(280px,85vw)] shrink-0 snap-start",
+        "flex min-w-0 w-[min(280px,85vw)] shrink-0 snap-start [&>*]:min-w-0 [&>*]:w-full",
         desktopTwoUp && "lg:w-[calc(50%-0.25rem)]",
         className
       )}

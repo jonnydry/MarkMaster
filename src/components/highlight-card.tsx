@@ -49,6 +49,7 @@ export interface HighlightCardProps {
   onSelect?: (id: string) => void;
   onFocusForTriage?: (id: string) => void;
   onOrbitReview?: (id: string) => void;
+  layout?: "default" | "carousel";
   className?: string;
 }
 
@@ -61,12 +62,92 @@ export function HighlightCard({
   onSelect,
   onFocusForTriage,
   onOrbitReview,
+  layout = "default",
   className,
 }: HighlightCardProps) {
   const { isOrbital } = useOrbitalTheme();
   const t = useTypography();
   const [, setFeedbackTick] = useState(0);
   const label = getHighlightLabel(bookmark);
+  const isCarouselLayout = layout === "carousel";
+  const feedback = getHighlightFeedback(bookmark.id);
+
+  const reviewButton = onOrbitReview ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onOrbitReview(bookmark.id);
+      }}
+      className={cn(
+        "self-start text-[10px] uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none",
+        t.monoNative && t.label
+      )}
+    >
+      Review in Orbit →
+    </button>
+  ) : null;
+
+  const feedbackControls =
+    feedback === "good" ? (
+      <span className="text-emerald-400/90">
+        You marked Great
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            removeLikedHighlightId(bookmark.id);
+            setFeedbackTick((n) => n + 1);
+          }}
+          className="ml-1 underline hover:no-underline"
+        >
+          undo
+        </button>
+      </span>
+    ) : feedback === "not_relevant" ? (
+      <span className="text-amber-400/90">
+        Not relevant to you
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            removeDislikedHighlightId(bookmark.id);
+            setFeedbackTick((n) => n + 1);
+          }}
+          className="ml-1 underline hover:no-underline"
+        >
+          undo
+        </button>
+      </span>
+    ) : (
+      <>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            addLikedHighlightId(bookmark.id);
+            setFeedbackTick((n) => n + 1);
+            toast.success("Boosted for future Highlights & Digests");
+          }}
+          className="text-emerald-300 hover:text-emerald-200 hover:underline focus-visible:outline-none"
+        >
+          Good
+        </button>
+        <span className="text-muted-foreground/40">·</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            addDislikedHighlightId(bookmark.id);
+            setFeedbackTick((n) => n + 1);
+            toast.success("Deprioritized in future Highlights");
+          }}
+          className="text-amber-300 hover:text-amber-200 hover:underline focus-visible:outline-none"
+        >
+          Not relevant
+        </button>
+      </>
+    );
 
   return (
     <article
@@ -83,7 +164,8 @@ export function HighlightCard({
         }
       }}
       className={cn(
-        "group flex h-full min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
+        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
+        isCarouselLayout ? "min-h-[10rem] p-3.5" : "min-h-[8.5rem] p-3",
         active
           ? "border-primary/45 bg-accent-soft/60"
           : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1",
@@ -125,7 +207,9 @@ export function HighlightCard({
       </div>
       <p
         className={cn(
-          "mt-2 line-clamp-3 text-sm font-bold leading-5 text-foreground",
+          isCarouselLayout
+            ? "mt-2 line-clamp-2 min-h-10 text-[13px] font-semibold leading-5 text-foreground sm:text-sm"
+            : "mt-2 line-clamp-3 text-sm font-bold leading-5 text-foreground",
           t.monoNative && "text-mono-data"
         )}
       >
@@ -134,7 +218,9 @@ export function HighlightCard({
 
       <div
         className={cn(
-          "mt-1 text-[10px] text-muted-foreground/70",
+          isCarouselLayout
+            ? "mt-1.5 line-clamp-1 text-[10px] text-muted-foreground/65"
+            : "mt-1 text-[10px] text-muted-foreground/70",
           t.monoNative && t.label,
           "normal-case"
         )}
@@ -144,7 +230,14 @@ export function HighlightCard({
           : "Top performer across your library by X saves & discussion"}
       </div>
 
-      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3",
+          isCarouselLayout
+            ? "mt-3 border-t border-hairline-soft/70 pt-2.5"
+            : "mt-auto items-end pt-3"
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2">
           {bookmark.authorProfileImage ? (
             <Image
@@ -176,7 +269,10 @@ export function HighlightCard({
         </div>
         <span
           className={cn(
-            "shrink-0 text-[10px] uppercase tracking-[0.05em] text-muted-foreground/75",
+            "shrink-0 text-[10px] text-muted-foreground/75",
+            isCarouselLayout
+              ? "normal-case tracking-[0.02em]"
+              : "uppercase tracking-[0.05em]",
             t.monoNative && t.data
           )}
         >
@@ -184,98 +280,31 @@ export function HighlightCard({
         </span>
       </div>
 
-      {onOrbitReview ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOrbitReview(bookmark.id);
-          }}
+      {isCarouselLayout ? (
+        <div
           className={cn(
-            "mt-1 self-start text-[10px] uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none",
+            "mt-2 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70",
             t.monoNative && t.label
           )}
+          onClick={(e) => e.stopPropagation()}
         >
-          Review in Orbit →
-        </button>
-      ) : null}
-
-      <div
-        className={cn(
-          "mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70",
-          t.monoNative && t.label
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {(() => {
-          const fb = getHighlightFeedback(bookmark.id);
-          if (fb === "good") {
-            return (
-              <span className="text-emerald-400/90">
-                You marked Great
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeLikedHighlightId(bookmark.id);
-                    setFeedbackTick((n) => n + 1);
-                  }}
-                  className="ml-1 underline hover:no-underline"
-                >
-                  undo
-                </button>
-              </span>
-            );
-          }
-          if (fb === "not_relevant") {
-            return (
-              <span className="text-amber-400/90">
-                Not relevant to you
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeDislikedHighlightId(bookmark.id);
-                    setFeedbackTick((n) => n + 1);
-                  }}
-                  className="ml-1 underline hover:no-underline"
-                >
-                  undo
-                </button>
-              </span>
-            );
-          }
-          return (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addLikedHighlightId(bookmark.id);
-                  setFeedbackTick((n) => n + 1);
-                  toast.success("Boosted for future Highlights & Digests");
-                }}
-                className="text-emerald-300 hover:text-emerald-200 hover:underline focus-visible:outline-none"
-              >
-                Good
-              </button>
-              <span className="text-muted-foreground/40">·</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addDislikedHighlightId(bookmark.id);
-                  setFeedbackTick((n) => n + 1);
-                  toast.success("Deprioritized in future Highlights");
-                }}
-                className="text-amber-300 hover:text-amber-200 hover:underline focus-visible:outline-none"
-              >
-                Not relevant
-              </button>
-            </>
-          );
-        })()}
-      </div>
+          {reviewButton}
+          <div className="ml-auto flex min-w-0 items-center gap-2">{feedbackControls}</div>
+        </div>
+      ) : (
+        <>
+          {reviewButton ? <div className="mt-1">{reviewButton}</div> : null}
+          <div
+            className={cn(
+              "mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70",
+              t.monoNative && t.label
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {feedbackControls}
+          </div>
+        </>
+      )}
     </article>
   );
 }

@@ -649,10 +649,10 @@ function DashboardContent() {
               {performanceFocusedId && (
                 <div
                   className={cn(
-                    "px-4 pb-2",
+                    "pb-2",
                     inspectorActive
                       ? "lg:max-w-[640px] lg:mx-0"
-                      : "mx-auto w-full max-w-[960px]"
+                      : bookmarkFeedColumnClassName
                   )}
                 >
                   <div

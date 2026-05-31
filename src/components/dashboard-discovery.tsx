@@ -18,7 +18,8 @@ import {
 import { useTypography } from "@/hooks/use-typography";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
-import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { useOrbitalTheme } from "@/components/providers";
 import type { BookmarkWithRelations } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
@@ -33,13 +34,13 @@ export interface DashboardDiscoveryProps {
   onSaveAsCollection?: (bookmarks: BookmarkWithRelations[], suggestedName: string) => void;
   /** Override default Discovery header copy (e.g. collections context). */
   explainer?: string;
-  /** flush — span parent width without outer gutter/max-width (collections). */
+  /** default — align with the dashboard feed column; flush — span parent width (collections). */
   variant?: "default" | "flush";
   className?: string;
 }
 
 const variantShellClass: Record<NonNullable<DashboardDiscoveryProps["variant"]>, string> = {
-  default: cn("mx-auto mb-3 max-w-[960px]", appContentGutterClassName),
+  default: cn("mb-3", bookmarkFeedColumnClassName),
   flush: "mb-0 max-w-none px-0",
 };
 
@@ -140,6 +141,7 @@ export function DashboardDiscovery({
   // See Unified-High-Engagement-Discovery-Carousel-Plan.md (Phase 1).
   const hasRitual = ritualTotal > 0;
   const itemCountForStrip = discoveryCarouselItems.length + (hasRitual ? 1 : 0);
+  const isFeedIntegrated = variant === "default";
 
   return (
     <section
@@ -148,14 +150,20 @@ export function DashboardDiscovery({
     >
       <div
         className={cn(
-          "overflow-hidden rounded-sm border border-hairline-strong pb-4 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
-          appChromeFrostedClassName
+          "overflow-hidden rounded-sm border",
+          isFeedIntegrated
+            ? "border-hairline-soft bg-background/55 shadow-none supports-[backdrop-filter]:bg-background/45"
+            : cn(
+                "border-hairline-strong pb-4 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
+                appChromeFrostedClassName
+              )
         )}
       >
         <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
           <ModuleHeader
             icon={Compass}
             eyebrow="Discovery"
+            className="flex-col gap-2 sm:flex-row sm:gap-3"
             description={
               explainer ??
               "Highest-engagement posts from your library — prioritized for review."
@@ -172,6 +180,7 @@ export function DashboardDiscovery({
                 onClick={handleReviewInOrbit}
                 className={cn(
                   "inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft bg-surface-1/60 px-2.5 text-[10px] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-accent-soft/60",
+                  "max-sm:w-full max-sm:justify-center",
                   t.monoNative && t.label
                 )}
                 aria-label={`Review full mix of ${ritualTotal} gems in Orbit`}
@@ -216,13 +225,19 @@ export function DashboardDiscovery({
               itemCount={itemCountForStrip}
             >
               {discoveryCarouselItems.map((item: DiscoveryCarouselItem, index: number) => (
-                <HighlightScrollSlide key={item.bookmark.id} index={index} desktopTwoUp>
+                <HighlightScrollSlide
+                  key={item.bookmark.id}
+                  index={index}
+                  desktopTwoUp={!isFeedIntegrated}
+                  className={isFeedIntegrated ? "w-full" : undefined}
+                >
                   <HighlightCard
                     bookmark={item.bookmark}
                     index={index}
                     active={activeBookmarkId === item.bookmark.id}
                     itemLabel={itemLabels[item.bookmark.id]}
                     isRawMode={item.context === "raw"}
+                    layout="carousel"
                     onSelect={onSelectBookmark}
                     onFocusForTriage={onFocusForTriage}
                     onOrbitReview={handleOrbitReview}
@@ -232,20 +247,32 @@ export function DashboardDiscovery({
 
               {/* Ritual Anchor as final slide — visually distinct strong CTA (second complementary affordance) */}
               {hasRitual && (
-                <HighlightScrollSlide key="ritual-anchor" index={discoveryCarouselItems.length}>
+                <HighlightScrollSlide
+                  key="ritual-anchor"
+                  index={discoveryCarouselItems.length}
+                  className={isFeedIntegrated ? "w-full" : undefined}
+                >
                   <div
                     className={cn(
-                      "flex h-full min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left",
+                      "relative flex h-full min-h-[10rem] flex-col items-center justify-center rounded-sm border bg-surface-1/55 p-3.5 text-center",
                       isOrbital
                         ? "border-primary/30 bg-surface-1/70"
                         : "border-primary/20 hover:border-primary/30"
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
+                    <span
+                      className={cn(
+                        t.data,
+                        "absolute right-3.5 top-3.5 text-[10px] font-bold text-muted-foreground/55"
+                      )}
+                    >
+                      {itemCountForStrip} / {itemCountForStrip}
+                    </span>
+                    <div className="flex max-w-full items-center justify-center gap-2">
+                      <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                       <span
                         className={cn(
-                          "text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+                          "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
                           t.monoNative && t.label
                         )}
                       >
@@ -254,7 +281,7 @@ export function DashboardDiscovery({
                     </div>
                     <p
                       className={cn(
-                        "mt-1.5 line-clamp-2 text-sm font-semibold leading-5 text-foreground",
+                        "mt-2 line-clamp-2 max-w-md text-[13px] font-semibold leading-5 text-foreground sm:text-sm",
                         t.monoNative && "text-mono-data"
                       )}
                     >
@@ -262,7 +289,7 @@ export function DashboardDiscovery({
                     </p>
                     <div
                       className={cn(
-                        "mt-1 text-[10px] text-muted-foreground/70",
+                        "mt-1.5 line-clamp-1 max-w-md text-[10px] text-muted-foreground/65",
                         t.monoNative && t.label
                       )}
                     >
@@ -274,7 +301,7 @@ export function DashboardDiscovery({
                       {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
                     </div>
 
-                    <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+                    <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft/70 pt-2.5">
                       <Button
                         size="sm"
                         className="h-7 gap-1 px-2.5 text-[10px]"
