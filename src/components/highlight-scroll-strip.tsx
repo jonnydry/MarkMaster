@@ -77,7 +77,7 @@ export function HighlightScrollStrip({
         aria-label={ariaLabel}
         className={cn(
           "flex items-stretch gap-2 overflow-x-auto pb-1",
-          "snap-x snap-mandatory scroll-px-2",
+          "snap-x snap-mandatory",
           "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         )}
       >
@@ -130,7 +130,7 @@ export function HighlightScrollSlide({
     <div
       data-strip-slide={index}
       className={cn(
-        "flex min-w-0 w-[min(280px,85vw)] shrink-0 snap-start [&>*]:min-w-0 [&>*]:w-full",
+        "flex min-w-0 w-[min(280px,85vw)] shrink-0 snap-start snap-always [&>*]:min-w-0 [&>*]:w-full",
         desktopTwoUp && "lg:w-[calc(50%-0.25rem)]",
         className
       )}

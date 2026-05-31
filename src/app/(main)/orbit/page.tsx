@@ -1172,7 +1172,9 @@ export default function OrbitPage() {
                     <span
                       className={cn(
                         orbitLabelClass(isOrbital),
-                        isOrbital ? "text-primary/80" : "text-white/80"
+                        isOrbital
+                          ? "text-primary/80"
+                          : "text-foreground/80 dark:text-white/80"
                       )}
                     >
                       {selectedBookmarkIds.size} selected
@@ -1181,7 +1183,9 @@ export default function OrbitPage() {
                       <span
                         className={cn(
                           "text-[10px]",
-                          isOrbital ? "text-amber-300/90" : "text-amber-200/90"
+                          isOrbital
+                            ? "text-amber-300/90"
+                            : "text-amber-700 dark:text-amber-200/90"
                         )}
                       >
                         Grok will process the first{" "}
@@ -1197,7 +1201,7 @@ export default function OrbitPage() {
                         "h-8 text-xs",
                         isOrbital
                           ? "text-primary/70 hover:text-primary"
-                          : "text-white/60 hover:text-white"
+                          : "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
                       )}
                       onClick={handleSelectAllOnPage}
                       disabled={bookmarks.length === 0}
@@ -1230,11 +1234,7 @@ export default function OrbitPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className={
-                        isOrbital
-                          ? "h-8 gap-1.5 border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft"
-                          : "h-8 gap-1.5 border-white/15 bg-white/5 text-white hover:bg-white/10"
-                      }
+                      className={cn("h-8 gap-1.5", orbitGhostButtonClass(isOrbital))}
                       onClick={handleBulkAddToCollection}
                     >
                       <Folder className="size-3.5" />
@@ -1570,11 +1570,13 @@ function getScanFailurePresentation(error: OrbitScanFailure, isOrbital: boolean)
         label: "Request",
         badgeClassName: isOrbital
           ? "border-hairline-soft bg-surface-2/80 text-foreground/80"
-          : "border-white/20 bg-white/[0.08] text-white/80",
+          : "border-hairline-soft bg-surface-2/80 text-foreground/80 dark:border-white/20 dark:bg-white/[0.08] dark:text-white/80",
         panelClassName: isOrbital
           ? "border-hairline-soft bg-surface-2/60"
-          : "border-white/14 bg-white/[0.055]",
-        iconClassName: isOrbital ? "text-muted-foreground" : "text-white/75",
+          : "border-hairline-soft bg-surface-2/60 dark:border-white/14 dark:bg-white/[0.055]",
+        iconClassName: isOrbital
+          ? "text-muted-foreground"
+          : "text-muted-foreground dark:text-white/75",
         helper: "Refresh the page scope or scan a selected subset.",
       };
     case "provider":
@@ -1623,8 +1625,10 @@ function OrbitScanFailureNotice({
       <div className="flex min-w-0 gap-3">
         <div
           className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border bg-black/15",
-            isOrbital ? "border-hairline-soft bg-surface-2/80" : "border-white/12"
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border",
+            isOrbital
+              ? "border-hairline-soft bg-surface-2/80"
+              : "border-hairline-soft bg-surface-2/80 dark:border-white/12 dark:bg-black/15"
           )}
         >
           <Icon className={cn("size-4", presentation.iconClassName)} />
@@ -1643,7 +1647,7 @@ function OrbitScanFailureNotice({
             <p
               className={cn(
                 "text-sm font-semibold",
-                isOrbital ? "text-foreground" : "text-white"
+                isOrbital ? "text-foreground" : "text-foreground dark:text-white"
               )}
             >
               {error.title}
@@ -1652,7 +1656,9 @@ function OrbitScanFailureNotice({
           <p
             className={cn(
               "mt-1 text-sm leading-6",
-              isOrbital ? "text-muted-foreground" : "text-white/80"
+              isOrbital
+                ? "text-muted-foreground"
+                : "text-muted-foreground dark:text-white/80"
             )}
           >
             {error.message}
@@ -1676,7 +1682,7 @@ function OrbitScanFailureNotice({
           className={
             isOrbital
               ? "h-9 rounded-sm border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft"
-              : "h-9 rounded-lg border-white/20 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+              : "h-9 rounded-lg border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
           }
           disabled={scanning || retryTargetCount === 0}
           onClick={onRetry}
@@ -1694,7 +1700,7 @@ function OrbitScanFailureNotice({
             href={error.recoveryHref}
             className={cn(
               buttonVariants({ size: "sm", variant: "outline" }),
-              "h-9 rounded-lg border-white/25 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+              "h-9 rounded-lg border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
             )}
           >
             <Settings2 className="size-3.5" />
@@ -1706,7 +1712,7 @@ function OrbitScanFailureNotice({
           <Button
             type="button"
             size="sm"
-            className="h-9 rounded-lg bg-white text-slate-950 hover:bg-white/90"
+            className="h-9 rounded-lg bg-foreground text-background hover:bg-foreground/90"
             disabled={scanning || selectionTargetCount === 0}
             onClick={onRescanCurrentSelection}
           >

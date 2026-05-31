@@ -62,7 +62,7 @@ export function OrbitScanHero({
             orbitControlRadius(isOrbital),
             isOrbital
               ? "border-primary/40 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-              : "border-white/80 bg-foreground text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
+              : "border-foreground/80 bg-foreground text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
           )}
           disabled={queueIsLoading || scanning || scanTargetCount === 0}
           onClick={onScan}
@@ -82,7 +82,7 @@ export function OrbitScanHero({
               size="sm"
               variant="outline"
               className={cn(
-                "h-9 px-3 text-emerald-100 hover:border-emerald-400/45 hover:bg-emerald-400/15 hover:text-foreground",
+                "h-9 px-3 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 hover:text-foreground dark:text-emerald-100",
                 orbitControlRadius(isOrbital),
                 "border-emerald-400/25 bg-emerald-400/10"
               )}

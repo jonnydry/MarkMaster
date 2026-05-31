@@ -46,7 +46,9 @@ function StrategyLines({
       <div
         className={cn(
           "space-y-2 text-xs leading-relaxed",
-          isOrbital ? "text-muted-foreground" : "text-white/60"
+          isOrbital
+            ? "text-muted-foreground"
+            : "text-muted-foreground dark:text-white/60"
         )}
       >
         <p>
@@ -103,6 +105,7 @@ export function OrbitScanOverviewStrip({
     <section
       className={cn(
         orbital.glass,
+        !isOrbital && "rounded-sm border border-hairline-soft bg-surface-2/70",
         className
       )}
     >
@@ -121,7 +124,7 @@ export function OrbitScanOverviewStrip({
           <p className={cn(orbital.label, "text-primary/80")}>
             Grok pass overview
           </p>
-          <p className="mt-0.5 truncate text-sm font-medium text-white/90">
+          <p className="mt-0.5 truncate text-sm font-medium text-foreground/90 dark:text-white/90">
             {open
               ? overview.summary
               : `Grok plan · ${tagRollups.length} tags · ${collectionRollups.length} collections · ${modelLine}`}
@@ -137,7 +140,10 @@ export function OrbitScanOverviewStrip({
             {summary.bookmarksWithTags} with tags ·{" "}
             {summary.bookmarksWithCollections} collection
             {summary.bookmarksWithCollections === 1 ? "" : "s"}
-            <span className="text-white/35"> · {modelLine}</span>
+            <span className="text-muted-foreground/70 dark:text-white/35">
+              {" "}
+              · {modelLine}
+            </span>
           </p>
 
           <StrategyLines
@@ -148,14 +154,14 @@ export function OrbitScanOverviewStrip({
 
           {tagRollups.length > 0 ? (
             <div>
-              <p className={cn(orbital.label, "mb-2 text-white/45")}>
+              <p className={cn(orbital.label, "mb-2 text-muted-foreground dark:text-white/45")}>
                 Tags this pass
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {tagRollups.map((tag) => (
                   <span
                     key={tag.name}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/5 px-2.5 py-1 text-[11px] text-white/80"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline-soft bg-surface-1/80 px-2.5 py-1 text-[11px] text-foreground/80 dark:border-white/12 dark:bg-white/5 dark:text-white/80"
                   >
                     <span
                       className="size-2 shrink-0 rounded-full"
@@ -163,7 +169,7 @@ export function OrbitScanOverviewStrip({
                       aria-hidden
                     />
                     <span>{tag.name}</span>
-                    <span className="tabular-nums text-white/45">
+                    <span className="tabular-nums text-muted-foreground dark:text-white/45">
                       ×{tag.count}
                     </span>
                     {tag.reuseExisting ? (
@@ -183,17 +189,17 @@ export function OrbitScanOverviewStrip({
 
           {collectionRollups.length > 0 ? (
             <div>
-              <p className={cn(orbital.label, "mb-2 text-white/45")}>
+              <p className={cn(orbital.label, "mb-2 text-muted-foreground dark:text-white/45")}>
                 Collections this pass
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {collectionRollups.map((col) => (
                   <span
                     key={col.name}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/5 px-2.5 py-1 text-[11px] text-white/80"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline-soft bg-surface-1/80 px-2.5 py-1 text-[11px] text-foreground/80 dark:border-white/12 dark:bg-white/5 dark:text-white/80"
                   >
                     <span>{col.name}</span>
-                    <span className="tabular-nums text-white/45">
+                    <span className="tabular-nums text-muted-foreground dark:text-white/45">
                       ×{col.count}
                     </span>
                     {col.reuseExisting ? (

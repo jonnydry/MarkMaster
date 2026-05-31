@@ -36,7 +36,7 @@ export function OrbitQueueToolbar({
   const { isOrbital } = useOrbitalTheme();
   const controlShell = isOrbital
     ? "inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 p-1"
-    : "inline-flex items-center gap-1 rounded-sm border border-white/10 bg-white/5 p-1";
+    : "inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 p-1 dark:border-white/10 dark:bg-white/5";
 
   if (!canSelect) return null;
 
@@ -63,7 +63,7 @@ export function OrbitQueueToolbar({
                 ? "bg-primary text-primary-foreground"
                 : isOrbital
                   ? "text-muted-foreground hover:text-foreground"
-                  : "text-white/60 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
             )}
           >
             Recent
@@ -81,7 +81,7 @@ export function OrbitQueueToolbar({
                 ? "bg-primary text-primary-foreground"
                 : isOrbital
                   ? "text-muted-foreground hover:text-foreground"
-                  : "text-white/60 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
             )}
           >
             All
@@ -102,7 +102,7 @@ export function OrbitQueueToolbar({
                 ? "bg-primary text-primary-foreground"
                 : isOrbital
                   ? "text-muted-foreground hover:text-foreground"
-                  : "text-white/60 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
             )}
           >
             Newest
@@ -117,7 +117,7 @@ export function OrbitQueueToolbar({
                 ? "bg-primary text-primary-foreground"
                 : isOrbital
                   ? "text-muted-foreground hover:text-foreground"
-                  : "text-white/60 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
             )}
           >
             Oldest
@@ -142,7 +142,7 @@ export function OrbitQueueToolbar({
                 : "border-primary/30 bg-primary/15 text-primary"
               : isOrbital
                 ? "bg-surface-2/70 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                : "bg-surface-2/70 text-muted-foreground hover:bg-accent-soft hover:text-foreground dark:bg-white/5 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
           )}
         >
           {selectionMode ? "Done" : "Select"}

@@ -119,8 +119,8 @@ export const OrbitListRow = memo(function OrbitListRow({
         !selectionMode &&
           selected &&
           (isOrbital
-            ? "border-primary/10 bg-[#0F0F0F] shadow-[inset_3px_0_0_0_#5CE1C7]"
-            : "border-primary/10 bg-[#0F0F0F] shadow-[inset_3px_0_0_0_#38bdf8]"),
+            ? "border-primary/20 bg-primary/10 shadow-[inset_3px_0_0_0_var(--primary)]"
+            : "border-primary/20 bg-primary/10 shadow-[inset_3px_0_0_0_#2563eb] dark:border-primary/10 dark:bg-[#0F0F0F] dark:shadow-[inset_3px_0_0_0_#38bdf8]"),
         selectionMode && bulkSelected && "bg-primary/5",
         queueStatus === "dismissed" && "opacity-50",
         queueStatus === "applied" && "opacity-70"
@@ -152,21 +152,23 @@ export const OrbitListRow = memo(function OrbitListRow({
         <div
           className={cn(
             "flex min-w-0 items-center gap-1.5 truncate text-[10px]",
-            isOrbital ? "text-primary/65" : "text-white/65"
+            isOrbital
+              ? "text-primary/65"
+              : "text-muted-foreground dark:text-white/65"
           )}
         >
           <span
             className={cn(
               orbitLabelClass(isOrbital),
               "shrink-0 normal-case font-medium tracking-normal",
-              isOrbital ? "text-foreground/90" : "text-white/90"
+              isOrbital ? "text-foreground/90" : "text-foreground/90 dark:text-white/90"
             )}
           >
             {author}
           </span>
           {handle ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-white/25"}>
+              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
               <span className={cn(orbitDataClass(isOrbital), "truncate normal-case")}>
@@ -176,7 +178,7 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
           {timeAgo ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-white/25"}>
+              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
               <span className={cn(orbitDataClass(isOrbital), "shrink-0 tabular-nums")}>
@@ -186,14 +188,14 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
           {engagement ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-white/25"}>
+              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
               <span
                 className={cn(
                   orbitDataClass(isOrbital),
                   "hidden shrink-0 tabular-nums sm:inline",
-                  isOrbital ? "text-primary/50" : "text-white/50"
+                  isOrbital ? "text-primary/50" : "text-muted-foreground dark:text-white/50"
                 )}
               >
                 {engagement}
@@ -212,8 +214,9 @@ export const OrbitListRow = memo(function OrbitListRow({
           stopClickPropagation
           textClassName={cn(
             "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
-            isOrbital ? "text-foreground" : "text-white",
-            queueStatus === "dismissed" && "line-through decoration-white/30"
+            isOrbital ? "text-foreground" : "text-foreground dark:text-white",
+            queueStatus === "dismissed" &&
+              "line-through decoration-foreground/30 dark:decoration-white/30"
           )}
         />
 
@@ -225,7 +228,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                   "inline-flex rounded-sm border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
                   isOrbital
                     ? "border-primary/25 bg-primary/10 text-primary"
-                    : "border-sky-400/25 bg-sky-400/10 text-sky-200"
+                    : "border-sky-400/25 bg-sky-400/10 text-sky-700 dark:text-sky-200"
                 )}
               >
                 {statusChip}
@@ -240,7 +243,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 Applied
               </span>
             ) : queueStatus === "dismissed" ? (
-              <span className="text-[10px] text-white/40">Skipped</span>
+              <span className="text-[10px] text-muted-foreground dark:text-white/40">Skipped</span>
             ) : null}
           </div>
 
@@ -267,7 +270,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 "rounded p-1",
                 isOrbital
                   ? "text-primary/40 hover:text-primary/70"
-                  : "text-white/40 hover:text-sky-200"
+                  : "text-muted-foreground hover:text-primary dark:text-white/40 dark:hover:text-sky-200"
               )}
               title="More actions"
               aria-label="More actions"

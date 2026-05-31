@@ -42,7 +42,7 @@ function OrbitSlideInPostBody({
       <p
         className={cn(
           "normal-case text-[15px] font-medium leading-relaxed tracking-normal whitespace-pre-wrap break-words",
-          isOrbital ? "text-foreground" : "text-white",
+          isOrbital ? "text-foreground" : "text-foreground dark:text-white",
           isLong && !expanded && "line-clamp-12"
         )}
       >
@@ -129,7 +129,7 @@ export function OrbitSlideInPanel({
           "animate-orbit-slide-in-right orbital-slide-in",
           isOrbital
             ? cn("border-l border-primary/30 bg-background", orbital.slideIn)
-            : "border-l border-white/10 bg-[#0b0f1a] text-white"
+            : "border-l border-hairline-soft bg-background text-foreground dark:border-white/10 dark:bg-[#0b0f1a] dark:text-white"
         )}
       >
         <div className="flex items-center justify-between border-b border-primary/20 px-5 py-4">
@@ -138,7 +138,7 @@ export function OrbitSlideInPanel({
             className={cn(
               orbitLabelClass(isOrbital),
               "tracking-[0.18em]",
-              isOrbital ? "text-primary/80" : "text-white/80"
+              isOrbital ? "text-primary/80" : "text-foreground/80 dark:text-white/80"
             )}
           >
             Quick review
@@ -175,7 +175,12 @@ export function OrbitSlideInPanel({
             {author} {handle && <span className="text-primary/40">{handle}</span>}
           </div>
 
-          <OrbitalCard className="mb-6 p-4">
+          <OrbitalCard
+            className={cn(
+              "mb-6 p-4",
+              !isOrbital && "border border-hairline-soft bg-surface-2/70"
+            )}
+          >
             <div className={cn(orbital.sectionLabel, "mb-2")}>Grok suggestion</div>
 
             {decision?.primary ? (
@@ -281,7 +286,7 @@ export function OrbitSlideInPanel({
               <button
                 type="button"
                 onClick={() => bookmark.id && onDecision?.(bookmark.id, "keep-tag")}
-                className="w-full rounded-sm bg-primary py-2.5 text-sm font-medium text-[#0A0A0A] hover:bg-primary/90"
+                className="w-full rounded-sm bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 {applyLabel}
               </button>
