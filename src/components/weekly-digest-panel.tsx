@@ -10,6 +10,7 @@ import {
   HighlightScrollSlide,
   HighlightScrollStrip,
 } from "@/components/highlight-scroll-strip";
+import { ModuleHeader } from "@/components/module-header";
 import { Button } from "@/components/ui/button";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import {
@@ -18,8 +19,6 @@ import {
   computeDigestEngagement,
 } from "@/lib/weekly-gems-curation";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 import type { BookmarkWithRelations } from "@/types";
 
 export interface WeeklyDigestPanelProps {
@@ -47,7 +46,6 @@ export function WeeklyDigestPanel({
   className,
 }: WeeklyDigestPanelProps) {
   const router = useRouter();
-  const { isOrbital } = useOrbitalTheme();
   const [expanded, setExpanded] = useState(false);
   const [digestOpen, setDigestOpen] = useState(!defaultCollapsed);
 
@@ -113,7 +111,7 @@ export function WeeklyDigestPanel({
 
   const body = !hasGems ? (
     <div className="rounded-sm border border-dashed border-hairline-soft p-6 text-center">
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-sm bg-primary/10">
         <Sparkles className="h-5 w-5 text-primary" />
       </div>
       <p className="text-sm font-medium text-foreground">No weekly gems yet</p>
@@ -271,42 +269,15 @@ export function WeeklyDigestPanel({
 
   return (
     <section className={cn("mx-auto w-full max-w-[960px] px-4 pb-8 sm:px-5", className)}>
-      <div className="mb-5 flex items-center gap-3">
-        <div
-          className={
-            isOrbital
-              ? cn(orbital.icon, "flex h-9 w-9 items-center justify-center rounded-sm")
-              : "flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          }
-        >
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div className="flex-1">
-          <h2
-            className={
-              isOrbital
-                ? cn(orbital.label, "text-xl font-semibold tracking-tight text-primary/90")
-                : "text-xl font-semibold tracking-tight"
-            }
-          >
-            This Week&apos;s Gems
-          </h2>
-          <p
-            className={
-              isOrbital
-                ? cn(orbital.label, "mt-0.5 text-[11px] text-primary/70")
-                : "mt-0.5 text-sm text-muted-foreground"
-            }
-          >
-            A mix of untouched high-performers, resurfaced older gems, and strong library items.
-          </p>
-          {hasGems ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {rawTotal.toLocaleString()} untouched high-performers in pool
-            </p>
-          ) : null}
-        </div>
-      </div>
+      <ModuleHeader
+        icon={Sparkles}
+        eyebrow="Weekly digest"
+        title="This Week's Gems"
+        description="A mix of untouched high-performers, resurfaced older gems, and strong library items."
+        meta={hasGems ? `${rawTotal.toLocaleString()} untouched high-performers in pool` : undefined}
+        className="mb-5"
+        iconClassName="h-9 w-9"
+      />
       {body}
     </section>
   );

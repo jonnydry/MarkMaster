@@ -83,7 +83,7 @@ export function HighlightCard({
         }
       }}
       className={cn(
-        "group flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
+        "group flex h-full min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
         active
           ? "border-primary/45 bg-accent-soft/60"
           : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1",

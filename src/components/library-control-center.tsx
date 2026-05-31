@@ -13,6 +13,7 @@ import {
   Tags,
 } from "lucide-react";
 
+import { ModuleHeader } from "@/components/module-header";
 import { buttonVariants } from "@/components/ui/button";
 import { SyncButton } from "@/components/sync-button";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
@@ -100,32 +101,24 @@ export function LibraryControlCenter({
     >
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
         <div className="min-w-0 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className={cn(
-                "text-[11px] font-semibold uppercase tracking-[0.14em]",
-                t.monoNative ? cn(t.label, "text-primary/80") : "text-muted-foreground"
-              )}>
-                Library control center
-              </p>
-              <h2 className="mt-2 heading-font text-xl font-semibold tracking-tight text-foreground">
-                {allOrganized ? "Your library is in shape" : "Make the next move obvious"}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                {primaryCopy}
-              </p>
-            </div>
-            <Link
-              href={primaryHref}
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "h-9 shrink-0 gap-1.5"
-              )}
-            >
-              {primaryLabel}
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
+          <ModuleHeader
+            icon={Bookmark}
+            eyebrow="Library control center"
+            title={allOrganized ? "Your library is in shape" : "Make the next move obvious"}
+            description={primaryCopy}
+            action={
+              <Link
+                href={primaryHref}
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "h-9 shrink-0 gap-1.5"
+                )}
+              >
+                {primaryLabel}
+                <ArrowRight className="size-3.5" />
+              </Link>
+            }
+          />
 
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             <ControlMetric

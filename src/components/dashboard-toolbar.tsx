@@ -87,7 +87,7 @@ export function DashboardToolbar({
             type="button"
             onClick={onResetPrimaryFilter}
             aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-hairline-strong border-l-2 border-l-primary bg-background/35 px-2.5 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-hairline-strong border-l-2 border-l-primary bg-background/35 px-2.5 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <span className="hidden sm:inline">{primaryFilterLabel}</span>
             <span className="sm:hidden">{primaryFilterCompactLabel}</span>
@@ -101,7 +101,7 @@ export function DashboardToolbar({
               key={tag.id}
               type="button"
               onClick={() => onTagToggle(tag.id)}
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/15"
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-primary/25 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/15"
             >
               #{tag.name}
               <span className="text-primary/60" aria-hidden>

@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
+import { StatusBadge } from "@/components/ui/chip";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 import type { OrbitXaiStatusPayload } from "@/types";
@@ -27,7 +28,7 @@ export function SettingsNav({ className }: { className?: string }) {
           key={id}
           href={`#${id}`}
           className={cn(
-            "block rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors",
+            "block rounded-sm px-2.5 py-1.5 text-sm text-muted-foreground transition-colors",
             "hover:bg-accent-soft/70 hover:text-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           )}
@@ -230,27 +231,24 @@ export function OrbitReadyBadge({
 }) {
   if (!status) {
     return (
-      <span className="inline-flex items-center rounded-full border border-hairline-soft bg-surface-2 px-2.5 py-0.5 text-xs text-muted-foreground">
+      <StatusBadge tone="neutral" className="font-normal">
         Checking
-      </span>
+      </StatusBadge>
     );
   }
 
   const ready = status.state === "ready";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-        ready
-          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-100"
-      )}
+    <StatusBadge
+      tone={ready ? "success" : "warning"}
+      dot={
+        <span
+          className={cn("size-1.5 rounded-full", ready ? "bg-emerald-500" : "bg-amber-500")}
+          aria-hidden
+        />
+      }
     >
-      <span
-        className={cn("size-1.5 rounded-full", ready ? "bg-emerald-500" : "bg-amber-500")}
-        aria-hidden
-      />
       {ready ? "Ready" : "Needs attention"}
-    </span>
+    </StatusBadge>
   );
 }

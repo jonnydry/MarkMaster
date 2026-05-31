@@ -2,6 +2,7 @@
 
 import { Image, Video, Link, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import type { MediaFilter, TagWithCount } from "@/types";
 
@@ -73,20 +74,14 @@ export function FilterPanel({
           </label>
           <div id="filter-media" className="flex flex-wrap gap-1.5">
             {MEDIA_OPTIONS.map(({ value, label, icon: Icon }) => (
-              <Button
+              <FilterChip
                 key={value}
-                variant="outline"
-                size="sm"
-                className={`h-7 gap-1.5 rounded-sm text-xs ${
-                  mediaFilter === value
-                    ? "border-primary/35 bg-primary/10 text-foreground"
-                    : "border-hairline-soft bg-transparent text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground"
-                }`}
+                active={mediaFilter === value}
                 onClick={() => onMediaFilterChange(value)}
               >
                 <Icon className="w-3 h-3" />
                 {label}
-              </Button>
+              </FilterChip>
             ))}
           </div>
         </div>
@@ -138,19 +133,14 @@ export function FilterPanel({
             </label>
             <div id="filter-tags" className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
-                <button
+                <FilterChip
                   key={tag.id}
-                  className={`rounded-sm border border-transparent px-2 py-1 text-xs font-semibold transition-colors ${
-                    selectedTags.includes(tag.id)
-                      ? "border-primary/35 bg-primary/10 text-foreground"
-                      : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-                  }`}
+                  active={selectedTags.includes(tag.id)}
                   onClick={() => onTagToggle(tag.id)}
-                  aria-pressed={selectedTags.includes(tag.id)}
                 >
                   {tag.name}
                   <span className="ml-1 opacity-60">{tag._count.bookmarks}</span>
-                </button>
+                </FilterChip>
               ))}
             </div>
           </div>

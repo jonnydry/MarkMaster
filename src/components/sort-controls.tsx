@@ -47,12 +47,12 @@ export function SortControls({
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
         <SelectTrigger
-          size="lg"
+          size="default"
           className={cn(
             "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong bg-background/35 font-semibold hover:border-primary/30",
             compact
-              ? "size-9 shrink-0 justify-center p-0 sm:h-9 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
-              : "min-w-[100px] flex-1 sm:flex-none"
+              ? "h-9 w-9 shrink-0 justify-center p-0 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
+              : "h-9 min-w-[100px] flex-1 sm:flex-none"
           )}
         >
           <ArrowDownUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />

@@ -67,7 +67,7 @@ export function OrbitQueueToolbar({
             )}
           >
             Recent
-            <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] tabular-nums">
+            <span className="rounded-sm bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] tabular-nums">
               {Math.min(total, ORBIT_RECENT_PAGE_SIZE).toLocaleString()}
             </span>
           </button>
@@ -85,7 +85,7 @@ export function OrbitQueueToolbar({
             )}
           >
             All
-            <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] tabular-nums">
+            <span className="rounded-sm bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] tabular-nums">
               {total.toLocaleString()}
             </span>
           </button>

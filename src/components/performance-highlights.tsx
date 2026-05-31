@@ -1,12 +1,14 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-import { useTypography } from "@/hooks/use-typography";
 import { HighlightCard } from "@/components/highlight-card";
 import {
   HighlightScrollSlide,
   HighlightScrollStrip,
 } from "@/components/highlight-scroll-strip";
+import { ModuleHeader } from "@/components/module-header";
 import type { BookmarkWithRelations } from "@/types";
 
 interface PerformanceHighlightsProps {
@@ -42,7 +44,6 @@ export function PerformanceHighlights({
   layout = "grid",
   maxItems = 4,
 }: PerformanceHighlightsProps) {
-  const t = useTypography();
   const highlightBookmarks = bookmarks.slice(0, maxItems);
   if (highlightBookmarks.length === 0) return null;
 
@@ -67,14 +68,12 @@ export function PerformanceHighlights({
       )}
     >
       {(title || displaySubtitle) && (
-        <div className="mb-2 flex items-center gap-2">
-          {title ? (
-            <h2 className={cn(t.sectionLabel, "mb-0 text-muted-foreground")}>
-              {title}
-            </h2>
-          ) : null}
-          <span className={cn(t.label, "text-muted-foreground/70")}>{displaySubtitle}</span>
-        </div>
+        <ModuleHeader
+          icon={Sparkles}
+          eyebrow={title ?? "Highlights"}
+          meta={displaySubtitle}
+          className="mb-2"
+        />
       )}
 
       {layout === "strip" ? (

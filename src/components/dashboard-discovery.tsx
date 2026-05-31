@@ -9,6 +9,7 @@ import {
   HighlightScrollStrip,
 } from "@/components/highlight-scroll-strip";
 import { HighlightCard } from "@/components/highlight-card";
+import { ModuleHeader } from "@/components/module-header";
 import { Button } from "@/components/ui/button";
 import {
   useDashboardDiscovery,
@@ -19,7 +20,6 @@ import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
 import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 import type { BookmarkWithRelations } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
 import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
@@ -153,46 +153,25 @@ export function DashboardDiscovery({
         )}
       >
         <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div
-                className={
-                  isOrbital
-                    ? cn(orbital.icon, "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm")
-                    : "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary"
-                }
-              >
-                <Compass className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p
-                  className={cn(
-                    t.sectionLabel,
-                    "mb-0 text-primary/70",
-                    !isOrbital && "text-muted-foreground"
-                  )}
-                >
-                  Discovery
-                </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {explainer ??
-                    "Highest-engagement posts from your library — prioritized for review."}
-                </p>
-                {hasRitual && (
-                  <p className="mt-1 text-[10px] text-muted-foreground/70">
-                    {ritualTotal} high-engagement • {rawTotal.toLocaleString()} untouched • {resurfacedCount} resurfaced
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Always-visible header pill CTA — primary ritual entry (prominent per Product guardrail) */}
-            {hasRitual && (
+          <ModuleHeader
+            icon={Compass}
+            eyebrow="Discovery"
+            description={
+              explainer ??
+              "Highest-engagement posts from your library — prioritized for review."
+            }
+            meta={
+              hasRitual
+                ? `${ritualTotal} high-engagement • ${rawTotal.toLocaleString()} untouched • ${resurfacedCount} resurfaced`
+                : undefined
+            }
+            action={
+              hasRitual ? (
               <button
                 type="button"
                 onClick={handleReviewInOrbit}
                 className={cn(
-                  "shrink-0 rounded-full border border-hairline-soft bg-surface-1/60 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 active:bg-accent-soft/60",
+                  "inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft bg-surface-1/60 px-2.5 text-[10px] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-accent-soft/60",
                   t.monoNative && t.label
                 )}
                 aria-label={`Review full mix of ${ritualTotal} gems in Orbit`}
@@ -202,8 +181,9 @@ export function DashboardDiscovery({
                   Review full mix ({ritualTotal})
                 </span>
               </button>
-            )}
-          </div>
+              ) : null
+            }
+          />
         </div>
 
         <div className="px-4 pt-3 sm:px-5">
@@ -255,7 +235,7 @@ export function DashboardDiscovery({
                 <HighlightScrollSlide key="ritual-anchor" index={discoveryCarouselItems.length}>
                   <div
                     className={cn(
-                      "flex min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left",
+                      "flex h-full min-h-[8.5rem] flex-col rounded-sm border bg-surface-1/55 p-3 text-left",
                       isOrbital
                         ? "border-primary/30 bg-surface-1/70"
                         : "border-primary/20 hover:border-primary/30"

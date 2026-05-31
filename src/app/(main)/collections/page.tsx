@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/chip";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -326,7 +327,7 @@ export default function CollectionsPage() {
                 <Button
                   size="sm"
                   onClick={() => setCreateOpen(true)}
-                  className="h-10 gap-2 px-3 text-sm"
+                  className="h-9 gap-2 px-3 text-sm"
                 >
                   <Plus className="size-4" />
                   New
@@ -676,7 +677,7 @@ function CollectionsControlBar({
 
   return (
     <section className="flex flex-col gap-3 border-y border-hairline-soft py-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/20 lg:max-w-md">
+      <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/20 lg:max-w-md">
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <input
           aria-label="Search collections"
@@ -700,21 +701,16 @@ function CollectionsControlBar({
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <div
           aria-label="Collection filters"
-          className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-sm border border-hairline-soft bg-background/35 p-1"
+          className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-sm border border-hairline-soft bg-background/35 p-0.5"
         >
           {filters.map((filter) => {
             const active = filter.value === activeFilter;
             return (
-              <button
+              <FilterChip
                 key={filter.value}
-                type="button"
-                aria-pressed={active}
+                active={active}
                 onClick={() => onFilterChange(filter.value)}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-sm px-2 text-xs font-semibold transition-colors ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                }`}
+                className={active ? "border-primary bg-primary text-primary-foreground" : undefined}
               >
                 <span>{filter.label}</span>
                 <span
@@ -726,7 +722,7 @@ function CollectionsControlBar({
                 >
                   {filter.count}
                 </span>
-              </button>
+              </FilterChip>
             );
           })}
         </div>

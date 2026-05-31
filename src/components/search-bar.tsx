@@ -78,7 +78,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass
               ? "rounded-sm border-0 bg-transparent shadow-none focus:border-transparent focus:shadow-none focus:ring-2 focus:ring-primary/25 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-transparent"
-              : "rounded-md border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
+              : "rounded-sm border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
             inputClassName
           )}
         />

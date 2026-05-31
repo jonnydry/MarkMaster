@@ -282,7 +282,7 @@ export default function SettingsPage() {
                       <a
                         key={id}
                         href={`#${id}`}
-                        className="shrink-0 rounded-full border border-hairline-soft px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
+                        className="inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
                       >
                         {label}
                       </a>
@@ -672,7 +672,7 @@ function OrbitGrokStatusPanel({
         </Button>
         <Link
           href="/orbit"
-          className="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex h-8 items-center rounded-sm px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           Open Orbit queue
         </Link>

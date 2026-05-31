@@ -248,7 +248,7 @@ export default function CollectionDetailPage({
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-md border border-hairline-soft bg-surface-1 px-4 py-4"
+                className="rounded-sm border border-hairline-soft bg-surface-1 px-4 py-4"
               >
                 <div className="flex gap-3">
                   <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
@@ -270,7 +270,7 @@ export default function CollectionDetailPage({
     const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
     return (
       <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
-        <div className="rounded-md border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
+        <div className="rounded-sm border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
           <p className="text-sm font-medium text-foreground">
             {isNotFound
               ? "Collection not found"
@@ -331,7 +331,7 @@ export default function CollectionDetailPage({
                   ) : (
                     <button
                       type="button"
-                      className="max-w-full truncate rounded-md text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       onClick={() => {
                         setName(collection.name ?? "");
                         setEditingName(true);

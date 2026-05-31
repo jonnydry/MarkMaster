@@ -45,7 +45,7 @@ export function PaginationControls({
             "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
             isLibrary
               ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              : "rounded-lg bg-surface-1 shadow-sm hover:bg-surface-2"
+              : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
           )}
         >
           <ChevronLeft className="size-4" aria-hidden />
@@ -82,7 +82,7 @@ export function PaginationControls({
             "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
             isLibrary
               ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              : "rounded-lg bg-surface-1 shadow-sm hover:bg-surface-2"
+              : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
           )}
         >
           <ChevronRight className="size-4" aria-hidden />
