@@ -30,6 +30,7 @@ import {
   orbitMetaSoft} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
+import { TagDot } from "@/components/tag-dot";
 import type {
   BookmarkWithRelations,
   OrbitGraphNode,
@@ -465,10 +466,7 @@ function SelectedClusterBody({
                       key={t.id}
                       className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground/85"
                     >
-                      <span
-                        className="inline-block size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: t.color }}
-                      />
+                      <TagDot name={t.name} color={t.color} size={8} />
                       <span className="min-w-0 truncate">{t.name}</span>
                     </span>
                   ) : null

@@ -14,6 +14,7 @@ import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OrbitScanResponsePayload } from "@/types";
+import { TagDot } from "@/components/tag-dot";
 
 import {
   orbitDataClass,
@@ -100,11 +101,7 @@ function TagRollupChip({
         "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
       )}
     >
-      <span
-        className="size-2 shrink-0 rounded-sm"
-        style={{ backgroundColor: tag.color }}
-        aria-hidden
-      />
+      <TagDot name={tag.name} color={tag.color} size={8} />
       <span className="min-w-0 max-w-[13rem] truncate">{tag.name}</span>
       <span
         className={cn(

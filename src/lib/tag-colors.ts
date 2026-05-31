@@ -237,3 +237,11 @@ export function assignBalancedTagColors<TTag extends RecolorableTag>(
     color: assignedColorById.get(tag.id) ?? tag.color,
   }));
 }
+
+export function getTagDotVariant(
+  name: string | null | undefined,
+  totalVariants = 64,
+): number {
+  const key = normalizeKey(name || "untitled-tag");
+  return hashString(key) % totalVariants;
+}

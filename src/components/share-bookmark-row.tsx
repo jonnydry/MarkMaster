@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
+import { TagDot } from "@/components/tag-dot";
 
 export interface ShareBookmarkRowProps {
   id: string;
@@ -76,11 +77,7 @@ export function ShareBookmarkRow({
                   key={tag.id}
                   className="inline-flex items-center gap-1.5 surface-inset px-2 py-0.5 text-xs font-medium text-muted-foreground"
                 >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                    aria-hidden
-                  />
+                  <TagDot name={tag.name} color={tag.color} size={8} />
                   {tag.name}
                 </span>
               ))}

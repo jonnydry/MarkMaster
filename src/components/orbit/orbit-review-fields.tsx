@@ -14,6 +14,7 @@ import { LibrarySearchPicker } from "@/components/library-search-picker";
 import { buttonVariants } from "@/components/ui/button";
 import { highlightSegmentActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
+import { TagDot } from "@/components/tag-dot";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import type { TagWithCount, CollectionWithCount } from "@/types";
@@ -104,11 +105,7 @@ export function OrbitReviewTagField({
           disabled: taken || atTagCap,
           label: (
             <>
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: tag.color }}
-                aria-hidden
-              />
+              <TagDot name={tag.name} color={tag.color} size={8} />
               {tag.name}
             </>
           ),
@@ -132,10 +129,10 @@ export function OrbitReviewTagField({
               key={`${label}-${idx}`}
               className="inline-flex items-center gap-1 surface-inset-strong py-0.5 pl-2 pr-1 text-xs text-foreground"
             >
-              <span
-                className="size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: tagColorForDisplay(label) }}
-                aria-hidden
+              <TagDot
+                name={label}
+                color={tagColorForDisplay(label)}
+                size={6}
               />
               {label}
               <button

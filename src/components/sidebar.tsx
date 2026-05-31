@@ -20,6 +20,7 @@ import { MarkMasterLogo } from "@/components/markmaster-logo";
 import { hasFeedPageWatermark } from "@/lib/feed-page-watermark";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
+import { TagDot } from "@/components/tag-dot";
 import { useTypography } from "@/hooks/use-typography";
 import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
 import { useTagsQuery, useCollectionsQuery } from "@/hooks/use-library-data";
@@ -242,12 +243,13 @@ export function Sidebar({
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              aria-hidden
-                              className={`h-1.5 w-1.5 shrink-0 rounded-full transition-transform motion-reduce:transition-none ${
+                            <TagDot
+                              name={tag.name}
+                              color={tag.color}
+                              size={6}
+                              className={`shrink-0 transition-transform motion-reduce:transition-none ${
                                 isSelected ? "ring-2 ring-primary/25 scale-110" : ""
                               }`}
-                              style={{ backgroundColor: tag.color }}
                             />
                             <span className="truncate">{tag.name}</span>
                           </span>
