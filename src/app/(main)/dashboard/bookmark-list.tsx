@@ -1,7 +1,22 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
+
+const GridBookmarkCard = dynamic(
+  () =>
+    import("@/components/grid-bookmark-card").then((m) => m.GridBookmarkCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mb-3 h-48 break-inside-avoid rounded-sm border border-hairline-soft bg-surface-1/55" />
+    ),
+  }
+);
 
 interface BookmarkListProps {
   bookmarks: BookmarkWithRelations[];
@@ -38,14 +53,32 @@ export function BookmarkList({
   onDelete,
   performanceHighlightId,
 }: BookmarkListProps) {
+  const [expandedCompactBookmarkIds, setExpandedCompactBookmarkIds] = useState<
+    Set<string>
+  >(() => new Set());
+
+  const handleCompactExpandedChange = useCallback(
+    (bookmarkId: string, expanded: boolean) => {
+      setExpandedCompactBookmarkIds((current) => {
+        const next = new Set(current);
+        if (expanded) {
+          next.add(bookmarkId);
+        } else {
+          next.delete(bookmarkId);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   if (viewMode === "grid") {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3">
+      <div className="columns-1 gap-3 p-3 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
         {bookmarks.map((bookmark, i) => (
-          <BookmarkCard
+          <GridBookmarkCard
             key={bookmark.id}
             bookmark={bookmark}
-            viewMode={viewMode}
             searchQuery={searchQuery}
             priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
             selected={
@@ -60,7 +93,6 @@ export function BookmarkList({
             onAddTag={onAddTag}
             onAddToCollection={onAddToCollection}
             onAddNote={onAddNote}
-            onDelete={(id) => onDelete(id)}
             className={getStaggerClass(i, "animate-fade-in-up")}
             isPerformanceHighlight={performanceHighlightId === bookmark.id}
           />
@@ -96,6 +128,12 @@ export function BookmarkList({
           onDelete={(id) => onDelete(id)}
           className={getStaggerClass(i, "animate-fade-in")}
           isPerformanceHighlight={performanceHighlightId === bookmark.id}
+          compactExpanded={
+            viewMode === "compact" && expandedCompactBookmarkIds.has(bookmark.id)
+          }
+          onCompactExpandedChange={
+            viewMode === "compact" ? handleCompactExpandedChange : undefined
+          }
         />
       ))}
     </div>

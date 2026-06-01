@@ -28,8 +28,7 @@ export function useDashboardDiscovery(options: {
   const dislikedIds = getDislikedHighlightIds();
   const likedIds = getLikedHighlightIds();
 
-  const useParent =
-    parentData?.rawData !== undefined && parentData?.libraryData !== undefined;
+  const useParent = parentData !== undefined;
 
   const {
     data: rawFetched,

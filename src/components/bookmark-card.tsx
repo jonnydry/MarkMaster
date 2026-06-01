@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
+import { useMemo, memo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
@@ -31,7 +31,7 @@ import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
   bookmark: BookmarkWithRelations;
-  viewMode: ViewMode;
+  viewMode: Exclude<ViewMode, "grid">;
   searchQuery?: string;
   onTagClick?: (tagId: string) => void;
   onAddTag?: (bookmarkId: string) => void;
@@ -49,6 +49,9 @@ interface BookmarkCardProps {
   priorityMedia?: boolean;
   /** The card is the currently focused performance highlight (single-item triage view). */
   isPerformanceHighlight?: boolean;
+  /** Compact rows can open into the regular feed card without changing the whole list view. */
+  compactExpanded?: boolean;
+  onCompactExpandedChange?: (bookmarkId: string, expanded: boolean) => void;
 }
 
 function formatCount(n: number): string {
@@ -199,14 +202,16 @@ export const BookmarkCard = memo(function BookmarkCard({
   rank,
   priorityMedia = false,
   isPerformanceHighlight = false,
+  compactExpanded = false,
+  onCompactExpandedChange,
 }: BookmarkCardProps) {
   const { isOrbital } = useOrbitalTheme();
   const t = useTypography();
-  const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
-  const isInteractive = selectionMode || Boolean(onSelect);
+  const canExpandCompact = viewMode === "compact" && Boolean(onCompactExpandedChange);
+  const isInteractive = selectionMode || Boolean(onSelect) || canExpandCompact;
   const highlighter = useMemo(
     () => createTextHighlighter(searchQuery),
     [searchQuery]
@@ -214,6 +219,11 @@ export const BookmarkCard = memo(function BookmarkCard({
   const handleCardActivation = () => {
     if (selectionMode) {
       onSelectionChange?.(bookmark.id, !selected);
+      return;
+    }
+
+    if (canExpandCompact) {
+      onCompactExpandedChange?.(bookmark.id, !compactExpanded);
       return;
     }
 
@@ -246,7 +256,7 @@ export const BookmarkCard = memo(function BookmarkCard({
     return highlighter.plain(firstNoteContent, "note");
   }, [firstNoteContent, highlighter]);
 
-  if (viewMode === "compact") {
+  if (viewMode === "compact" && !compactExpanded) {
     return (
       <div
         className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:80px] hover:bg-accent-soft/40 ${
@@ -261,9 +271,12 @@ export const BookmarkCard = memo(function BookmarkCard({
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
         aria-pressed={isInteractive ? selected : undefined}
+        aria-expanded={canExpandCompact ? false : undefined}
         aria-label={
           isInteractive
-            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            ? `${
+                canExpandCompact ? "Expand bookmark from" : "Bookmark from"
+              } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
             : undefined
         }
         onClick={isInteractive ? handleCardActivation : undefined}
@@ -344,145 +357,6 @@ export const BookmarkCard = memo(function BookmarkCard({
     );
   }
 
-  if (viewMode === "grid") {
-    const firstMedia = mediaItems?.[0];
-    const firstMediaUrl = firstMedia?.url || firstMedia?.preview_image_url;
-    const hasTag = bookmark.tags.length > 0;
-    const hasCollection = bookmark.collectionItems && bookmark.collectionItems.length > 0;
-
-    return (
-      <div
-        className={`group relative overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/70 transition-colors duration-150 hover:border-primary/30 ${
-          isInteractive ? "cursor-pointer" : ""
-        } ${
-          selected || isPerformanceHighlight
-            ? isPerformanceHighlight
-              ? "border-primary/70 ring-2 ring-primary/40 shadow-sm"
-              : "border-primary/45 ring-1 ring-primary/35"
-            : ""
-        }${className ? ` ${className}` : ""}`}
-        role={isInteractive ? "button" : undefined}
-        tabIndex={isInteractive ? 0 : undefined}
-        aria-pressed={isInteractive ? selected : undefined}
-        aria-label={
-          isInteractive
-            ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
-            : undefined
-        }
-        onClick={isInteractive ? handleCardActivation : undefined}
-        onKeyDown={handleCardKeyDown}
-      >
-        {selectionMode && (
-          <div className="absolute top-2 right-2 z-10">
-            <SelectionToggle
-              selected={selected}
-              onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
-            />
-          </div>
-        )}
-        <XLogoMark
-          className={`pointer-events-none absolute top-2.5 z-[5] h-3.5 w-3.5 text-muted-foreground ${
-            selectionMode ? "right-11" : "right-2.5"
-          }`}
-          title="Post from X"
-        />
-        {firstMediaUrl && !imageError.has(firstMediaUrl) && (
-          <div className="relative aspect-video bg-muted overflow-hidden">
-            <Image
-              src={firstMediaUrl}
-              alt={`Media from @${bookmark.authorUsername}`}
-              fill
-              sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-              className="object-cover"
-              priority={priorityMedia}
-              onError={() => {
-                setImageError((prev) => new Set(prev).add(firstMediaUrl));
-              }}
-            />
-          </div>
-        )}
-        <div className="p-2.5">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            {bookmark.authorProfileImage && (
-              <Image
-                src={bookmark.authorProfileImage}
-                alt={`${bookmark.authorDisplayName} avatar`}
-                width={20}
-                height={20}
-                className="w-5 h-5 rounded-full"
-              />
-            )}
-            <span className="text-xs font-medium text-muted-foreground truncate">
-              @{highlightedUsername}
-            </span>
-          </div>
-          <p className="text-sm text-foreground line-clamp-3">
-            {highlightedText}
-          </p>
-          {bookmark.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {bookmark.tags.map(({ tag }) => (
-                <TagPill
-                  key={tag.id}
-                  name={tag.name}
-                  onClick={() => onTagClick?.(tag.id)}
-                  isOrbital={isOrbital}
-                />
-              ))}
-            </div>
-          )}
-          <div className="mt-2 flex items-center gap-1 border-t border-hairline-soft pt-2">
-            {onAddTag && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddTag(bookmark.id);
-                }}
-                className={`h-7 px-2 text-xs gap-1 ${hasTag ? "text-primary" : "text-muted-foreground"}`}
-                aria-label={hasTag ? "Edit tags" : "Add tags"}
-                title={hasTag ? "Edit tags" : "Add tags"}
-              >
-                <Tags className="w-3 h-3" />
-              </Button>
-            )}
-            {onAddToCollection && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCollection(bookmark.id);
-                }}
-                className={`h-7 px-2 text-xs gap-1 ${hasCollection ? "text-primary" : "text-muted-foreground"}`}
-                aria-label={
-                  hasCollection ? "Change collection" : "Add to collection"
-                }
-                title={hasCollection ? "Change collection" : "Add to collection"}
-              >
-                <FolderInput className="w-3 h-3" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(tweetUrl, "_blank");
-              }}
-              className="h-7 px-2 text-xs gap-1 text-muted-foreground ml-auto"
-              aria-label="Open on X"
-              title="Open on X"
-            >
-              <ArrowUpRight className="w-3 h-3" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
@@ -497,13 +371,24 @@ export const BookmarkCard = memo(function BookmarkCard({
               ? "border-l-2 border-l-primary/70 bg-primary/[0.04] " + orbital.glass
               : "border-l-2 border-l-primary bg-primary/[0.04]"
           : ""
+      } ${
+        compactExpanded
+          ? "bg-surface-1/80 ring-1 ring-inset ring-primary/15"
+          : ""
       }${className ? ` ${className}` : ""}`}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       aria-pressed={isInteractive ? selected : undefined}
+      aria-expanded={canExpandCompact ? compactExpanded : undefined}
       aria-label={
         isInteractive
-          ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+          ? `${
+              canExpandCompact
+                ? compactExpanded
+                  ? "Collapse bookmark from"
+                  : "Expand bookmark from"
+                : "Bookmark from"
+            } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
           : undefined
       }
       onClick={isInteractive ? handleCardActivation : undefined}
@@ -564,7 +449,14 @@ export const BookmarkCard = memo(function BookmarkCard({
                 title="Post from X"
               />
             </div>
-            <div className="flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+            <div
+              className={cn(
+                "flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto",
+                compactExpanded
+                  ? "sm:opacity-100"
+                  : "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              )}
+            >
               {onAddTag && (
                 <ActionButton
                   icon={Tags}

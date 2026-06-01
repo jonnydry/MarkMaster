@@ -367,7 +367,20 @@ export function Sidebar({
           </div>
         </>
       ) : (
-        <div className="min-h-0 flex-1" aria-hidden />
+        <>
+          <div className="min-h-0 flex-1" aria-hidden />
+          <div
+            className="mt-auto shrink-0 border-t border-sidebar-border pt-3"
+            data-sidebar-no-toggle
+          >
+            <SyncButton
+              lastSyncAt={lastSyncAt ?? null}
+              onSyncComplete={onSyncComplete}
+              bookmarkCount={totalBookmarks}
+              layout="icon"
+            />
+          </div>
+        </>
       )}
     </aside>
   );

@@ -64,6 +64,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const [useFallback, setUseFallback] = useState(false);
+    const [workerGeneration, setWorkerGeneration] = useState(0);
     const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
     const activeFilter = filter ?? internalFilter;
     const layoutScope = props.layoutScope ?? 'library';
@@ -120,162 +121,175 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         return;
       }
 
-      let worker: Worker;
+      let initTimer: number | null = window.setTimeout(() => {
+        initTimer = null;
+        let pendingWorker: Worker | null = null;
 
-      try {
-        worker = new Worker(
-          new URL('../../workers/orbit-map-worker.ts', import.meta.url),
-          { type: 'module' }
-        );
-        workerRef.current = worker;
+        try {
+          pendingWorker = new Worker(
+            new URL('../../workers/orbit-map-worker.ts', import.meta.url),
+            { type: 'module' }
+          );
 
-        // Transfer control of the canvas to the worker
-        const offscreen = canvas.transferControlToOffscreen();
+          // Transfer control of the canvas to the worker
+          const offscreen = canvas.transferControlToOffscreen();
+          const worker = pendingWorker;
+          pendingWorker = null;
+          workerRef.current = worker;
 
-        // Send initialization message with transferred canvas
-        const initMessage: WorkerMessage = {
-          type: WorkerMessageType.INIT,
-          protocolVersion: 1,
-          canvas: offscreen,
-          width: canvas.clientWidth,
-          height: canvas.clientHeight,
-          dpr: window.devicePixelRatio || 1,
-        };
+          // Send initialization message with transferred canvas
+          const initMessage: WorkerMessage = {
+            type: WorkerMessageType.INIT,
+            protocolVersion: 1,
+            canvas: offscreen,
+            width: canvas.clientWidth,
+            height: canvas.clientHeight,
+            dpr: window.devicePixelRatio || 1,
+          };
 
-        worker.postMessage(initMessage, [offscreen]);
+          worker.postMessage(initMessage, [offscreen]);
+          setWorkerGeneration((generation) => generation + 1);
 
-        // Listen for messages from worker
-        worker.onmessage = (event: MessageEvent) => {
-          const msg = event.data;
+          // Listen for messages from worker
+          worker.onmessage = (event: MessageEvent) => {
+            const msg = event.data;
 
-          switch (msg.type) {
-            case MainMessageType.READY:
-              if (propsRef.current.graph && propsRef.current.graph.nodes.length > 0) {
-                // Send graph cleanly, including any known positions for layout stability
-                const initialPositions = getRelevantPositions(propsRef.current.graph);
-                const graphMessage: SetGraphMessage = {
-                  type: WorkerMessageType.SET_GRAPH,
-                  protocolVersion: 1,
-                  graph: propsRef.current.graph,
-                  ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
-                };
-                workerRef.current?.postMessage(graphMessage);
-                lastGraphKey.current = `${propsRef.current.graph.nodes.length}-${propsRef.current.graph.edges.length}`;
-
-                // Then send the current filter
-                const filterMessage = {
-                  type: WorkerMessageType.SET_FILTER,
-                  protocolVersion: 1,
-                  filter: propsRef.current.filter ?? 'all',
-                };
-                workerRef.current?.postMessage(filterMessage);
-              }
-              if (propsRef.current.selection) {
-                workerRef.current?.postMessage({
-                  type: WorkerMessageType.SET_SELECTION,
-                  protocolVersion: 1,
-                  selection: propsRef.current.selection,
-                });
-              }
-              break;
-
-            case MainMessageType.CAMERA_CHANGED:
-              if (msg.camera) {
-                // Could expose via a prop later for minimap / URL sync
-                // console.log('[OrbitMapHost] Camera changed:', msg.camera);
-              }
-              break;
-
-            case MainMessageType.SELECTION_CHANGED:
-              propsRef.current.onSelectionChange?.(msg.selection ?? null);
-              break;
-
-            case MainMessageType.HOVER_CHANGED:
-              propsRef.current.onHoverChange?.(
-                msg.selection ?? null,
-                msg.canvasX !== undefined && msg.canvasY !== undefined
-                  ? { x: msg.canvasX, y: msg.canvasY }
-                  : undefined
-              );
-              break;
-
-            case MainMessageType.ANIMATE_ASSIGN_COMPLETE:
-              // The promise in animateAssign now listens directly for this message.
-              break;
-
-            case MainMessageType.OPEN_BOOKMARK:
-              if (msg.bookmarkId) {
-                propsRef.current.onOpenBookmark?.(msg.bookmarkId);
-              }
-              break;
-
-            case MainMessageType.LAYOUT_UPDATED:
-              if (msg.nodeIds && msg.positions) {
-                const updated: Record<string, { x: number; y: number }> = {};
-
-                for (let i = 0; i < msg.nodeIds.length; i++) {
-                  updated[msg.nodeIds[i]] = {
-                    x: msg.positions[i * 2],
-                    y: msg.positions[i * 2 + 1],
+            switch (msg.type) {
+              case MainMessageType.READY:
+                if (propsRef.current.graph && propsRef.current.graph.nodes.length > 0) {
+                  // Send graph cleanly, including any known positions for layout stability
+                  const initialPositions = getRelevantPositions(propsRef.current.graph);
+                  const graphMessage: SetGraphMessage = {
+                    type: WorkerMessageType.SET_GRAPH,
+                    protocolVersion: 1,
+                    graph: propsRef.current.graph,
+                    ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
                   };
+                  workerRef.current?.postMessage(graphMessage);
+                  lastGraphKey.current = `${propsRef.current.graph.nodes.length}-${propsRef.current.graph.edges.length}`;
+
+                  // Then send the current filter
+                  const filterMessage = {
+                    type: WorkerMessageType.SET_FILTER,
+                    protocolVersion: 1,
+                    filter: propsRef.current.filter ?? 'all',
+                  };
+                  workerRef.current?.postMessage(filterMessage);
                 }
+                if (propsRef.current.selection) {
+                  workerRef.current?.postMessage({
+                    type: WorkerMessageType.SET_SELECTION,
+                    protocolVersion: 1,
+                    selection: propsRef.current.selection,
+                  });
+                }
+                break;
 
-                // Always keep the most recent positions (live updates)
-                latestPositionsRef.current = {
-                  ...latestPositionsRef.current,
-                  ...updated,
-                };
+              case MainMessageType.CAMERA_CHANGED:
+                if (msg.camera) {
+                  // Could expose via a prop later for minimap / URL sync
+                  // console.log('[OrbitMapHost] Camera changed:', msg.camera);
+                }
+                break;
 
-                // Only update the stable snapshot when the worker says the layout has settled
-                if (msg.stabilized) {
-                  stablePositionsRef.current = {
-                    ...stablePositionsRef.current,
+              case MainMessageType.SELECTION_CHANGED:
+                propsRef.current.onSelectionChange?.(msg.selection ?? null);
+                break;
+
+              case MainMessageType.HOVER_CHANGED:
+                propsRef.current.onHoverChange?.(
+                  msg.selection ?? null,
+                  msg.canvasX !== undefined && msg.canvasY !== undefined
+                    ? { x: msg.canvasX, y: msg.canvasY }
+                    : undefined
+                );
+                break;
+
+              case MainMessageType.ANIMATE_ASSIGN_COMPLETE:
+                // The promise in animateAssign now listens directly for this message.
+                break;
+
+              case MainMessageType.OPEN_BOOKMARK:
+                if (msg.bookmarkId) {
+                  propsRef.current.onOpenBookmark?.(msg.bookmarkId);
+                }
+                break;
+
+              case MainMessageType.LAYOUT_UPDATED:
+                if (msg.nodeIds && msg.positions) {
+                  const updated: Record<string, { x: number; y: number }> = {};
+
+                  for (let i = 0; i < msg.nodeIds.length; i++) {
+                    updated[msg.nodeIds[i]] = {
+                      x: msg.positions[i * 2],
+                      y: msg.positions[i * 2 + 1],
+                    };
+                  }
+
+                  // Always keep the most recent positions (live updates)
+                  latestPositionsRef.current = {
+                    ...latestPositionsRef.current,
                     ...updated,
                   };
 
-                  // Notify parent for persistence (e.g. localStorage)
-                  propsRef.current.onLayoutUpdated?.({ ...stablePositionsRef.current });
+                  // Only update the stable snapshot when the worker says the layout has settled
+                  if (msg.stabilized) {
+                    stablePositionsRef.current = {
+                      ...stablePositionsRef.current,
+                      ...updated,
+                    };
+
+                    // Notify parent for persistence (e.g. localStorage)
+                    propsRef.current.onLayoutUpdated?.({ ...stablePositionsRef.current });
+                  }
                 }
+                break;
+
+              case MainMessageType.CURSOR_CHANGED: {
+                // Apply cursor to the container for better UX (visible even near canvas edges)
+                const container = canvas.parentElement;
+                if (container) {
+                  container.style.cursor = msg.cursor;
+                }
+                break;
               }
-              break;
 
-            case MainMessageType.CURSOR_CHANGED: {
-              // Apply cursor to the container for better UX (visible even near canvas edges)
-              const container = canvas.parentElement;
-              if (container) {
-                container.style.cursor = msg.cursor;
+              case MainMessageType.ERROR: {
+                console.error('[OrbitMapHost] Worker error:', msg);
+                const container = canvas.parentElement;
+                if (container) container.style.cursor = 'default';
+                setUseFallback(true);
+                worker.terminate();
+                if (workerRef.current === worker) workerRef.current = null;
+                break;
               }
-              break;
+
+              default:
+                // Unknown message type
+                break;
             }
+          };
 
-            case MainMessageType.ERROR: {
-              console.error('[OrbitMapHost] Worker error:', msg);
-              const container = canvas.parentElement;
-              if (container) container.style.cursor = 'default';
-              setUseFallback(true);
-              worker.terminate();
-              break;
-            }
-
-            default:
-              // Unknown message type
-              break;
-          }
-        };
-
-        worker.onerror = (err) => {
-          console.error('[OrbitMapHost] Worker crashed:', err);
-          canvas.style.cursor = 'default';
+          worker.onerror = (err) => {
+            console.error('[OrbitMapHost] Worker crashed:', err);
+            canvas.style.cursor = 'default';
+            setUseFallback(true);
+            worker.terminate();
+            if (workerRef.current === worker) workerRef.current = null;
+          };
+        } catch (err) {
+          pendingWorker?.terminate();
+          console.error('[OrbitMapHost] Failed to create worker:', err);
           setUseFallback(true);
-          worker.terminate();
-        };
-      } catch (err) {
-        console.error('[OrbitMapHost] Failed to create worker:', err);
-        setUseFallback(true);
-      }
+        }
+      }, 0);
 
       // Cleanup
       return () => {
+        if (initTimer !== null) {
+          window.clearTimeout(initTimer);
+          initTimer = null;
+        }
         const container = canvas?.parentElement;
         if (container) container.style.cursor = 'default';
         if (workerRef.current) {
@@ -321,7 +335,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         ...filterMessage,
         filter: activeFilter,
       });
-    }, [graph, activeFilter, filter, useFallback]);
+    }, [graph, activeFilter, filter, useFallback, workerGeneration]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
@@ -330,7 +344,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         protocolVersion: 1,
         selection: props.selection ?? null,
       });
-    }, [props.selection, useFallback]);
+    }, [props.selection, useFallback, workerGeneration]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback || !props.focus) return;
@@ -344,7 +358,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         protocolVersion: 1,
         nodeId: props.focus.predictedAnchorId,
       });
-    }, [props.focus, useFallback]);
+    }, [props.focus, useFallback, workerGeneration]);
 
     // Forward resize to worker
     useEffect(() => {
@@ -366,7 +380,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       observer.observe(canvas);
 
       return () => observer.disconnect();
-    }, [useFallback]);
+    }, [useFallback, workerGeneration]);
 
     const canvasPoint = (clientX: number, clientY: number) => {
       const canvas = canvasRef.current;
@@ -523,7 +537,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         canvas.removeEventListener('touchstart', handleTouchStart);
         canvas.removeEventListener('touchmove', handleTouchMove);
       };
-    }, [useFallback]);
+    }, [useFallback, workerGeneration]);
 
     const handleFilterChange = (next: GraphFilter) => {
       setInternalFilter(next);

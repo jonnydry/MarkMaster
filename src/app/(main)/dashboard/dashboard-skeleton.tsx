@@ -10,11 +10,11 @@ interface DashboardSkeletonProps {
 export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
   if (viewMode === "grid") {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-3" role="status" aria-live="polite" aria-label="Loading bookmarks">
+      <div className="columns-1 gap-3 p-3 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5" role="status" aria-live="polite" aria-label="Loading bookmarks">
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
-            className={`rounded-sm border border-hairline-soft bg-surface-1/70 p-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
+            className={`mb-3 inline-block w-full break-inside-avoid rounded-sm border border-hairline-soft bg-surface-1/70 p-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
           >
             <div className="aspect-video w-full rounded-md skeleton-shimmer mb-3" />
             <div className="space-y-2">

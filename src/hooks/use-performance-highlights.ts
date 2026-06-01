@@ -65,8 +65,8 @@ export function usePerformanceHighlights(
   }, []);
 
   let highlightUrl = raw
-    ? "/api/bookmarks?raw=true&sortField=performance&sortDirection=desc&limit=4&page=1"
-    : "/api/bookmarks?sortField=performance&sortDirection=desc&limit=4&page=1";
+    ? "/api/bookmarks/highlights?raw=true&limit=4"
+    : "/api/bookmarks/highlights?limit=4";
   if (usePersonalBoost) {
     highlightUrl += "&personalBoost=true";
   }

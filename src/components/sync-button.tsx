@@ -15,6 +15,7 @@ interface SyncButtonProps {
   /** Shown in the status line after the sync message, e.g. " · 99 bookmarks". */
   bookmarkCount?: number;
   detail?: "compact" | "full";
+  layout?: "panel" | "icon";
 }
 
 export function SyncButton({
@@ -22,6 +23,7 @@ export function SyncButton({
   onSyncComplete,
   bookmarkCount,
   detail = "compact",
+  layout = "panel",
 }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
@@ -118,6 +120,50 @@ export function SyncButton({
       setSyncing(false);
     }
   };
+
+  const statusLabel = syncStatusError
+    ? "Could not load sync status"
+    : (statusCopy?.label ?? (lastSyncAt ? "Up to date" : "Not synced"));
+  const statusDotClass = syncStatusError
+    ? "bg-destructive"
+    : (statusCopy?.dotClass ??
+      (lastSyncAt ? "bg-emerald" : "bg-muted-foreground/40"));
+  const buttonLabel = isRateLimited
+    ? `Rate limited${countdown ? ` ${countdown}` : ""}`
+    : isAnySyncRunning
+      ? "Syncing bookmarks"
+      : "Sync bookmarks";
+  const bookmarkCountLabel =
+    bookmarkCount !== undefined ? `${bookmarkCount.toLocaleString()} bookmarks` : null;
+  const syncTitle = [buttonLabel, statusLabel, bookmarkCountLabel]
+    .filter(Boolean)
+    .join(" · ");
+
+  if (layout === "icon") {
+    return (
+      <div className="flex justify-center">
+        <Button
+          type="button"
+          onClick={handleSync}
+          aria-label={buttonLabel}
+          aria-busy={isAnySyncRunning}
+          title={syncTitle}
+          variant="outline"
+          disabled={isRateLimited}
+          className="relative h-10 w-10 border-primary/45 bg-primary/10 p-0 text-foreground hover:border-primary/70 hover:bg-primary/15 disabled:opacity-70"
+        >
+          <RefreshCw
+            className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
+            aria-hidden
+          />
+          <span
+            className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${statusDotClass}`}
+            aria-hidden
+          />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full shrink-0 flex-col gap-1.5 border border-sidebar-border bg-transparent p-2">
