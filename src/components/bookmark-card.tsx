@@ -9,6 +9,8 @@ import {
   Tags,
   FolderInput,
   NotebookPen,
+  Maximize2,
+  Minimize2,
   BadgeCheck,
   Check,
 } from "lucide-react";
@@ -52,6 +54,8 @@ interface BookmarkCardProps {
   /** Compact rows can open into the regular feed card without changing the whole list view. */
   compactExpanded?: boolean;
   onCompactExpandedChange?: (bookmarkId: string, expanded: boolean) => void;
+  /** Opens the shared full bookmark overlay used by the grid view. */
+  onOpenExpanded?: (bookmarkId: string) => void;
 }
 
 function formatCount(n: number): string {
@@ -204,6 +208,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   isPerformanceHighlight = false,
   compactExpanded = false,
   onCompactExpandedChange,
+  onOpenExpanded,
 }: BookmarkCardProps) {
   const { isOrbital } = useOrbitalTheme();
   const t = useTypography();
@@ -223,7 +228,16 @@ export const BookmarkCard = memo(function BookmarkCard({
     }
 
     if (canExpandCompact) {
-      onCompactExpandedChange?.(bookmark.id, !compactExpanded);
+      if (compactExpanded) {
+        if (onOpenExpanded) {
+          onOpenExpanded(bookmark.id);
+          return;
+        }
+        onCompactExpandedChange?.(bookmark.id, false);
+        return;
+      }
+
+      onCompactExpandedChange?.(bookmark.id, true);
       return;
     }
 
@@ -268,6 +282,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               : "border-l-2 border-l-primary bg-primary/[0.04]"
             : ""
         }${className ? ` ${className}` : ""}`}
+        data-dashboard-bookmark-id={bookmark.id}
         role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
         aria-pressed={isInteractive ? selected : undefined}
@@ -376,6 +391,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           ? "bg-surface-1/80 ring-1 ring-inset ring-primary/15"
           : ""
       }${className ? ` ${className}` : ""}`}
+      data-dashboard-bookmark-id={bookmark.id}
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       aria-pressed={isInteractive ? selected : undefined}
@@ -385,7 +401,9 @@ export const BookmarkCard = memo(function BookmarkCard({
           ? `${
               canExpandCompact
                 ? compactExpanded
-                  ? "Collapse bookmark from"
+                  ? onOpenExpanded
+                    ? "Open expanded bookmark from"
+                    : "Collapse bookmark from"
                   : "Expand bookmark from"
                 : "Bookmark from"
             } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
@@ -457,6 +475,20 @@ export const BookmarkCard = memo(function BookmarkCard({
                   : "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
               )}
             >
+              {compactExpanded && canExpandCompact && (
+                <ActionButton
+                  icon={Minimize2}
+                  label="Collapse compact preview"
+                  onClick={() => onCompactExpandedChange?.(bookmark.id, false)}
+                />
+              )}
+              {onOpenExpanded && (
+                <ActionButton
+                  icon={Maximize2}
+                  label="Open expanded view"
+                  onClick={() => onOpenExpanded(bookmark.id)}
+                />
+              )}
               {onAddTag && (
                 <ActionButton
                   icon={Tags}
@@ -478,7 +510,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               {onAddNote && (
                 <ActionButton
                   icon={NotebookPen}
-                  label="Add note"
+                  label={bookmark.notes.length > 0 ? "Edit note" : "Add note"}
                   onClick={() => onAddNote(bookmark.id)}
                   shortcut="N"
                   active={bookmark.notes.length > 0}

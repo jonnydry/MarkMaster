@@ -1,6 +1,13 @@
 "use client";
 
-import { ExternalLink, Link2, Tag, X } from "lucide-react";
+import {
+  CircleSlash2,
+  ExternalLink,
+  Link2,
+  RotateCcw,
+  Tag,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { orbital, OrbitalMenu, OrbitalActionPill } from "@/components/orbital";
@@ -58,23 +65,20 @@ export function OrbitActionPill({
   suggestionDismissed?: boolean;
 }) {
   const skipLabel = suggestionDismissed
-    ? "Restore Grok suggestion"
-    : "Skip Grok suggestion";
+    ? "Restore suggestion"
+    : "Keep in Orbit";
 
   const actions = [
     {
       key: "keep",
       label: skipLabel,
-      icon: (
-        <div
-          className={cn(
-            "size-3 rounded-full",
-            suggestionDismissed ? "bg-primary/40 ring-2 ring-primary/60" : "bg-primary"
-          )}
-        />
+      icon: suggestionDismissed ? (
+        <RotateCcw className="size-3.5 text-primary" />
+      ) : (
+        <CircleSlash2 className="size-3.5 text-primary" />
       ),
     },
-    { key: "tag", label: "Add tag", icon: <Tag className="size-3 text-bronze" /> },
+    { key: "tag", label: "Add tag", icon: <Tag className="size-3.5 text-bronze" /> },
   ];
 
   return (
@@ -89,7 +93,7 @@ export function OrbitActionPill({
             onAction?.(bookmarkId, action.key);
           }}
           className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-full transition-all",
+            "flex h-7 w-7 items-center justify-center rounded-sm transition-all",
             "hover:bg-primary/10 active:bg-primary/15",
             action.key === "keep" &&
               (suggestionDismissed

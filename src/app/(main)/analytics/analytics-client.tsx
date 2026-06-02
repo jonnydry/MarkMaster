@@ -11,11 +11,16 @@ import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
@@ -26,6 +31,7 @@ import {
   AnalyticsHero,
   AnalyticsRangeSegment,
   AnalyticsTabs,
+  RANGE_OPTIONS,
   FlywheelSignalsPanel,
   parseAnalyticsTab,
   type AnalyticsTab,
@@ -58,6 +64,27 @@ const TimelineCard = dynamic(
   { ssr: false }
 );
 
+const ANALYTICS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Analytics Tabs",
+    shortcuts: [
+      { id: "tab-overview", keys: ["1"], label: "Overview" },
+      { id: "tab-composition", keys: ["2"], label: "Composition" },
+      { id: "tab-activity", keys: ["3"], label: "Activity" },
+      { id: "tab-signals", keys: ["4"], label: "Signals" },
+    ],
+  },
+  {
+    title: "Analysis Actions",
+    shortcuts: [
+      { id: "range-previous", keys: ["["], label: "Previous time range" },
+      { id: "range-next", keys: ["]"], label: "Next time range" },
+      { id: "open-orbit", keys: ["O"], label: "Open Orbit triage" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+];
+
 export default function AnalyticsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,6 +92,7 @@ export default function AnalyticsPage() {
   const { data: session } = useSession();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
   const activeTab = parseAnalyticsTab(searchParams.get("tab"));
 
@@ -116,6 +144,18 @@ export default function AnalyticsPage() {
     [router, searchParams]
   );
 
+  const changeRangeByOffset = useCallback(
+    (offset: -1 | 1) => {
+      const currentIndex = RANGE_OPTIONS.findIndex((option) => option.value === range);
+      const nextIndex = Math.max(
+        0,
+        Math.min(RANGE_OPTIONS.length - 1, currentIndex + offset)
+      );
+      setRange(RANGE_OPTIONS[nextIndex]?.value ?? range);
+    },
+    [range]
+  );
+
   const triagedPct = useMemo(() => {
     if (!analytics || analytics.totalBookmarks === 0) return 0;
     const triaged = analytics.totalBookmarks - analytics.untaggedCount;
@@ -135,6 +175,20 @@ export default function AnalyticsPage() {
     if (!analytics || analytics.totalBookmarks === 0) return 0;
     return (analytics.notedCount / analytics.totalBookmarks) * 100;
   }, [analytics]);
+
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: ANALYTICS_SHORTCUT_GROUPS,
+    actions: {
+      "tab-overview": () => handleTabChange("overview"),
+      "tab-composition": () => handleTabChange("composition"),
+      "tab-activity": () => handleTabChange("activity"),
+      "tab-signals": () => handleTabChange("signals"),
+      "range-previous": () => changeRangeByOffset(-1),
+      "range-next": () => changeRangeByOffset(1),
+      "open-orbit": () => router.push(oldestOrbitHref),
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+    },
+  });
 
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
@@ -172,6 +226,12 @@ export default function AnalyticsPage() {
             }
             actions={
               <div className="flex items-center gap-2">
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={setKeyboardShortcutsOpen}
+                  groups={ANALYTICS_SHORTCUT_GROUPS}
+                  description="Analytics tab, range, and Orbit triage shortcuts."
+                />
                 {!showAnalyticsSkeleton && analytics && analytics.totalBookmarks > 0 ? (
                   <AnalyticsRangeSegment value={range} onChange={setRange} />
                 ) : null}

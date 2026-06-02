@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 
 import { useOrbitalTheme } from "@/components/providers";
@@ -11,9 +11,27 @@ import {
 import { orbitHairlineBorder, orbitMetaMuted } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
+const TRIAGE_HINT_CHANGE_EVENT = "markmaster-orbit-triage-hint-change";
+
+function subscribeToTriageHint(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener("storage", callback);
+  window.addEventListener(TRIAGE_HINT_CHANGE_EVENT, callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(TRIAGE_HINT_CHANGE_EVENT, callback);
+  };
+}
+
 export function OrbitTriageHint({ className }: { className?: string }) {
   const { isOrbital } = useOrbitalTheme();
-  const [dismissed, setDismissed] = useState(() => isOrbitTriageHintDismissed());
+  const dismissed = useSyncExternalStore(
+    subscribeToTriageHint,
+    isOrbitTriageHintDismissed,
+    () => false
+  );
 
   if (dismissed) return null;
 
@@ -32,7 +50,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
         type="button"
         onClick={() => {
           dismissOrbitTriageHint();
-          setDismissed(true);
+          window.dispatchEvent(new Event(TRIAGE_HINT_CHANGE_EVENT));
         }}
         className={cn(
           "absolute right-1.5 top-1.5 rounded p-0.5",
@@ -58,7 +76,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
           <strong className={isOrbital ? "text-foreground/90" : "text-foreground/80 dark:text-white/80"}>
             Row click
           </strong>{" "}
-          — quick review in the side panel
+          — quick review in the expanded overlay
         </li>
         <li>
           <strong className={isOrbital ? "text-foreground/90" : "text-foreground/80 dark:text-white/80"}>

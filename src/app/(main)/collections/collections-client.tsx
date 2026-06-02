@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -24,9 +24,15 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { useSession } from "next-auth/react";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  scrollDataElementIntoView,
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { sendJson } from "@/lib/fetch-json";
 import {
@@ -62,6 +68,29 @@ const CollectionsDiscoveryPanel = dynamic(
 );
 
 type CollectionFilter = "all" | "mine" | "public" | "x_folders";
+
+const COLLECTION_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Navigation",
+    shortcuts: [
+      { id: "next", keys: ["J"], label: "Next collection" },
+      { id: "previous", keys: ["K"], label: "Previous collection" },
+      { id: "open", keys: ["O"], label: "Open selected collection" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+  {
+    title: "Collections",
+    shortcuts: [
+      { id: "search", keys: ["/"], label: "Search collections" },
+      { id: "new", keys: ["N"], label: "New collection" },
+      { id: "filter-all", keys: ["1"], label: "Filter: All" },
+      { id: "filter-mine", keys: ["2"], label: "Filter: Mine" },
+      { id: "filter-public", keys: ["3"], label: "Filter: Public" },
+      { id: "filter-x", keys: ["4"], label: "Filter: X folders" },
+    ],
+  },
+];
 
 function getCollectionItemCount(collection: CollectionWithCount) {
   return collection._count?.items ?? 0;
@@ -155,8 +184,11 @@ export default function CollectionsPage() {
   const queryClient = useQueryClient();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<CollectionFilter>("all");
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: collections = [],
@@ -223,6 +255,13 @@ export default function CollectionsPage() {
     userCollections: visibleUserCollections,
     xFolders: visibleXFolders,
   } = useMemo(() => splitCollections(filteredCollections), [filteredCollections]);
+  const visibleCollectionIds = useMemo(
+    () => [
+      ...visibleUserCollections.map((collection) => collection.id),
+      ...visibleXFolders.map((collection) => collection.id),
+    ],
+    [visibleUserCollections, visibleXFolders]
+  );
   const hasActiveFilters = activeFilter !== "all" || normalizedSearch.length > 0;
   const collectionsSummary =
     !isLoading &&
@@ -240,6 +279,26 @@ export default function CollectionsPage() {
   const handleNavigate = useCallback(
     (collectionId: string) => router.push(`/collections/${collectionId}`),
     [router]
+  );
+
+  const selectCollectionByOffset = useCallback(
+    (offset: -1 | 1) => {
+      if (visibleCollectionIds.length === 0) return;
+      const currentIndex = activeCollectionId
+        ? visibleCollectionIds.indexOf(activeCollectionId)
+        : -1;
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : Math.max(0, Math.min(visibleCollectionIds.length - 1, currentIndex + offset));
+      const nextId = visibleCollectionIds[nextIndex];
+      if (!nextId) return;
+      setActiveCollectionId(nextId);
+      requestAnimationFrame(() =>
+        scrollDataElementIntoView("data-collection-id", nextId)
+      );
+    },
+    [activeCollectionId, visibleCollectionIds]
   );
 
   const handleCopy = useCallback(
@@ -280,6 +339,28 @@ export default function CollectionsPage() {
     setActiveFilter("all");
   }, []);
 
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: COLLECTION_SHORTCUT_GROUPS,
+    actions: {
+      next: () => selectCollectionByOffset(1),
+      previous: () => selectCollectionByOffset(-1),
+      open: () => {
+        const targetId =
+          activeCollectionId && visibleCollectionIds.includes(activeCollectionId)
+            ? activeCollectionId
+            : visibleCollectionIds[0];
+        if (targetId) handleNavigate(targetId);
+      },
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+      search: () => searchInputRef.current?.focus(),
+      new: () => setCreateOpen(true),
+      "filter-all": () => setActiveFilter("all"),
+      "filter-mine": () => setActiveFilter("mine"),
+      "filter-public": () => setActiveFilter("public"),
+      "filter-x": () => setActiveFilter("x_folders"),
+    },
+  });
+
   return (
     <div className="app-shell-bg app-viewport flex overflow-hidden">
       <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
@@ -318,6 +399,12 @@ export default function CollectionsPage() {
             }
             actions={
               <>
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={setKeyboardShortcutsOpen}
+                  groups={COLLECTION_SHORTCUT_GROUPS}
+                  description="Collection browsing, filtering, and creation shortcuts."
+                />
                 <Button
                   size="sm"
                   onClick={() => setCreateOpen(true)}
@@ -390,6 +477,7 @@ export default function CollectionsPage() {
                   xFolderCount={xFolders.length}
                   filteredCount={filteredCollections.length}
                   hasActiveFilters={hasActiveFilters}
+                  searchInputRef={searchInputRef}
                   onSearchChange={setSearchQuery}
                   onFilterChange={setActiveFilter}
                   onClear={clearCollectionFilters}
@@ -412,6 +500,7 @@ export default function CollectionsPage() {
                             maxItems={collectionStats.maxItems}
                             onNavigate={handleNavigate}
                             onDelete={handleDelete}
+                            selected={activeCollectionId === col.id}
                           />
                         ))}
                       </CollectionsSection>
@@ -430,6 +519,7 @@ export default function CollectionsPage() {
                             maxItems={collectionStats.maxItems}
                             onNavigate={handleNavigate}
                             onCopy={handleCopy}
+                            selected={activeCollectionId === col.id}
                           />
                         ))}
                       </CollectionsSection>
@@ -626,6 +716,7 @@ function CollectionsControlBar({
   xFolderCount,
   filteredCount,
   hasActiveFilters,
+  searchInputRef,
   onSearchChange,
   onFilterChange,
   onClear,
@@ -638,6 +729,7 @@ function CollectionsControlBar({
   xFolderCount: number;
   filteredCount: number;
   hasActiveFilters: boolean;
+  searchInputRef: RefObject<HTMLInputElement | null>;
   onSearchChange: (value: string) => void;
   onFilterChange: (value: CollectionFilter) => void;
   onClear: () => void;
@@ -658,6 +750,7 @@ function CollectionsControlBar({
       <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/20 lg:max-w-md">
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <input
+          ref={searchInputRef}
           aria-label="Search collections"
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}

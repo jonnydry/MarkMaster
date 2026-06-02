@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -31,6 +31,12 @@ import {
 } from "@/lib/bookmark-feed-layout";
 import { invalidateCollectionQueries } from "@/lib/query-invalidation";
 import { PageHeader } from "@/components/page-header";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
+import {
+  scrollDataElementIntoView,
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 import type { ShareContent } from "@/lib/share-content";
@@ -39,6 +45,25 @@ const ShareDialog = dynamic(
   () => import("@/components/share-dialog").then((m) => m.ShareDialog),
   { ssr: false }
 );
+
+const COLLECTION_DETAIL_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Bookmarks",
+    shortcuts: [
+      { id: "next", keys: ["J"], label: "Next bookmark" },
+      { id: "previous", keys: ["K"], label: "Previous bookmark" },
+      { id: "open", keys: ["O"], label: "Open selected bookmark" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+  {
+    title: "Collection",
+    shortcuts: [
+      { id: "back", keys: ["B"], label: "Back to collections" },
+      { id: "edit-name", keys: ["E"], label: "Edit collection name" },
+    ],
+  },
+];
 
 type CollectionItemRow = {
   id: string;
@@ -71,6 +96,8 @@ export default function CollectionDetailClient({
   const [reordering, setReordering] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareContent, setShareContent] = useState<ShareContent | null>(null);
+  const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
 
   const {
     data: collection,
@@ -97,6 +124,10 @@ export default function CollectionDetailClient({
       collection ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder) : [],
     [collection]
   );
+  const sortedBookmarkIds = useMemo(
+    () => sortedItems.map((item) => item.bookmark.id),
+    [sortedItems]
+  );
   const aboveFoldMediaBookmarkId = useMemo(() => {
     const row = sortedItems.find((item) => {
       const m = item.bookmark.media?.[0];
@@ -106,6 +137,26 @@ export default function CollectionDetailClient({
   }, [sortedItems]);
   const isSyncedFromX = collection?.type === "x_folder";
   const isUserCollection = collection?.type === "user_collection";
+
+  const selectBookmarkByOffset = useCallback(
+    (offset: -1 | 1) => {
+      if (sortedBookmarkIds.length === 0) return;
+      const currentIndex = activeBookmarkId
+        ? sortedBookmarkIds.indexOf(activeBookmarkId)
+        : -1;
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : Math.max(0, Math.min(sortedBookmarkIds.length - 1, currentIndex + offset));
+      const nextId = sortedBookmarkIds[nextIndex];
+      if (!nextId) return;
+      setActiveBookmarkId(nextId);
+      requestAnimationFrame(() =>
+        scrollDataElementIntoView("data-dashboard-bookmark-id", nextId)
+      );
+    },
+    [activeBookmarkId, sortedBookmarkIds]
+  );
 
   const cancelEditingName = () => {
     if (!collection) return;
@@ -187,6 +238,28 @@ export default function CollectionDetailClient({
       );
     }
   };
+
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: COLLECTION_DETAIL_SHORTCUT_GROUPS,
+    actions: {
+      next: () => selectBookmarkByOffset(1),
+      previous: () => selectBookmarkByOffset(-1),
+      open: () => {
+        const targetId =
+          activeBookmarkId && sortedBookmarkIds.includes(activeBookmarkId)
+            ? activeBookmarkId
+            : sortedBookmarkIds[0];
+        if (targetId) router.push(`/dashboard?bookmark=${encodeURIComponent(targetId)}`);
+      },
+      back: () => router.push("/collections"),
+      "edit-name": () => {
+        if (!collection || !isUserCollection) return;
+        setName(collection.name ?? "");
+        setEditingName(true);
+      },
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+    },
+  });
 
   const handleUpdateName = async () => {
     if (!collection) return;
@@ -429,6 +502,12 @@ export default function CollectionDetailClient({
                     )}
                   </>
                 )}
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={setKeyboardShortcutsOpen}
+                  groups={COLLECTION_DETAIL_SHORTCUT_GROUPS}
+                  description="Collection bookmark navigation and collection actions."
+                />
               </>
             }
           />
@@ -516,6 +595,8 @@ export default function CollectionDetailClient({
                     bookmark={item.bookmark}
                     viewMode="feed"
                     priorityMedia={item.bookmark.id === aboveFoldMediaBookmarkId}
+                    selected={activeBookmarkId === item.bookmark.id}
+                    onSelect={setActiveBookmarkId}
                     onDelete={
                       isSyncedFromX
                         ? undefined

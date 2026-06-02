@@ -7,10 +7,10 @@ import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const bookmarkInclude = {
-  tags: { include: { tag: true } },
+  tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
   notes: { select: { id: true, content: true } },
   collectionItems: {
-    include: { collection: { select: { id: true, name: true } } },
+    select: { collection: { select: { id: true, name: true } } },
   },
 } as const;
 

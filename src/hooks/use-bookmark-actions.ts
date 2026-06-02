@@ -180,6 +180,46 @@ export function useBookmarkActions() {
     },
   });
 
+  const deleteNoteMutation = useMutation({
+    mutationFn: async ({ noteId }: { noteId: string }) => {
+      await sendJson("/api/notes", {
+        method: "DELETE",
+        body: { noteId },
+      });
+    },
+    onMutate: async ({ noteId }) => {
+      await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
+      const previous = queryClient.getQueriesData<BookmarkQueryData>({
+        queryKey: ["bookmarks"],
+      });
+
+      queryClient.setQueriesData<BookmarkQueryData>(
+        { queryKey: ["bookmarks"] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            bookmarks: old.bookmarks.map((bookmark) => ({
+              ...bookmark,
+              notes: bookmark.notes.filter((note) => note.id !== noteId),
+            })),
+          };
+        }
+      );
+
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      context?.previous?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data);
+      });
+      toast.error(err instanceof Error ? err.message : "Could not delete note");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+  });
+
   const addToCollectionMutation = useMutation({
     mutationFn: async ({
       bookmarkIds,
@@ -259,6 +299,8 @@ export function useBookmarkActions() {
         removeTagMutation.mutateAsync({ bookmarkIds: asBookmarkIds(bookmarkIds), tagId }),
       handleAddNote: (bookmarkId: string, content: string) =>
         addNoteMutation.mutateAsync({ bookmarkId, content }),
+      handleDeleteNote: (noteId: string) =>
+        deleteNoteMutation.mutateAsync({ noteId }),
       handleAddToCollection: (bookmarkIds: string | string[], collectionId: string) =>
         addToCollectionMutation.mutateAsync({
           bookmarkIds: asBookmarkIds(bookmarkIds),
@@ -269,6 +311,7 @@ export function useBookmarkActions() {
       isAddingTag: addTagMutation.isPending,
       isRemovingTag: removeTagMutation.isPending,
       isAddingNote: addNoteMutation.isPending,
+      isDeletingNote: deleteNoteMutation.isPending,
       isAddingToCollection: addToCollectionMutation.isPending,
       isDeletingBookmark: deleteBookmarkMutation.isPending,
     }),
@@ -277,6 +320,7 @@ export function useBookmarkActions() {
       addTagMutation,
       removeTagMutation,
       addNoteMutation,
+      deleteNoteMutation,
       addToCollectionMutation,
       deleteBookmarkMutation,
     ]

@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject, ReactNode } from "react";
-import { CheckSquare, SlidersHorizontal } from "lucide-react";
+import { CheckSquare, Keyboard, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
@@ -27,6 +27,7 @@ interface DashboardToolbarProps {
   hasActiveFilters: boolean;
   selectionMode: boolean;
   onToggleSelectionMode: () => void;
+  onOpenKeyboardShortcuts: () => void;
   sortField: SortField;
   viewMode: ViewMode;
   onSortFieldChange: (field: SortField) => void;
@@ -50,6 +51,7 @@ export function DashboardToolbar({
   hasActiveFilters,
   selectionMode,
   onToggleSelectionMode,
+  onOpenKeyboardShortcuts,
   sortField,
   viewMode,
   onSortFieldChange,
@@ -123,6 +125,12 @@ export function DashboardToolbar({
               showIndicator={hasActiveFilters}
             />
           </div>
+
+          <ToolbarIconButton
+            label="Keyboard shortcuts"
+            icon={Keyboard}
+            onClick={onOpenKeyboardShortcuts}
+          />
 
           <ToolbarIconButton
             active={selectionMode}

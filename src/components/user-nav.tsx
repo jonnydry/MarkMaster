@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTheme, useOrbitalTheme, useFontMode } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import { orbital } from "@/components/orbital";
@@ -73,7 +74,7 @@ export function UserNav({ user }: UserNavProps) {
           )}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={toggleOrbital}>
-          <span className={cn("w-4 h-4 mr-2", isOrbital && orbital.icon)} />
+          <OrbitLogoMark className={cn("w-4 h-4 mr-2", isOrbital && orbital.icon)} />
           {isOrbital ? "Disable Orbit Theme" : "Enable Orbit Theme"}
           {isOrbital && <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>}
         </DropdownMenuItem>

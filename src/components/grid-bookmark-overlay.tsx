@@ -7,13 +7,13 @@ import {
   FolderInput,
   Link2,
   NotebookPen,
-  Orbit,
   Tags,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   X_POST_METRIC_ICON_CLASS,
@@ -115,7 +115,7 @@ export function GridBookmarkOverlay({
           {bookmark ? `Expanded bookmark from ${bookmark.authorDisplayName}` : "Expanded bookmark"}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          Full bookmark content and available tools for grid view.
+          Full bookmark content and available tools.
         </DialogDescription>
 
         {bookmark ? (
@@ -267,7 +267,7 @@ export function GridBookmarkOverlay({
                     onClick={() => closeAndRun(() => onAddNote(bookmark.id))}
                   />
                   <OverlayToolButton
-                    icon={Orbit}
+                    icon={OrbitLogoMark}
                     label="Review in Orbit"
                     onClick={() => closeAndRun(() => onReviewInOrbit(bookmark.id))}
                   />

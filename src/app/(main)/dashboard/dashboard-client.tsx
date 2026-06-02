@@ -15,7 +15,10 @@ import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
-import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import {
+  DASHBOARD_SHORTCUT_GROUPS,
+  useKeyboardShortcuts,
+} from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson } from "@/lib/fetch-json";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
@@ -110,6 +113,14 @@ const GridBookmarkOverlay = dynamic(
   { ssr: false }
 );
 
+const KeyboardShortcutsDialog = dynamic(
+  () =>
+    import("@/components/keyboard-shortcuts-dialog").then(
+      (m) => m.KeyboardShortcutsDialog
+    ),
+  { ssr: false }
+);
+
 function getSharedTagIds(bookmarks: BookmarkWithRelations[]) {
   if (bookmarks.length === 0) return [];
 
@@ -175,6 +186,7 @@ function DashboardContent() {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [gridOverlayBookmarkId, setGridOverlayBookmarkId] = useState<string | null>(null);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<string[]>([]);
@@ -403,19 +415,31 @@ function DashboardContent() {
     setNoteDialogOpen(true);
   }, []);
 
+  const handleExpandedBookmarkOpen = useCallback((id: string) => {
+    setActiveBookmarkId(id);
+    setGridOverlayBookmarkId(id);
+  }, []);
+
   const handleBookmarkSelect = useCallback(
     (id: string) => {
       if (viewMode === "grid") {
-        setActiveBookmarkId(id);
-        setGridOverlayBookmarkId(id);
+        handleExpandedBookmarkOpen(id);
         return;
       }
 
       if (inspectorActive) {
+        if (activeBookmarkIdForView === id) {
+          handleExpandedBookmarkOpen(id);
+          return;
+        }
+
         setActiveBookmarkId(id);
+        return;
       }
+
+      handleExpandedBookmarkOpen(id);
     },
-    [inspectorActive, viewMode]
+    [activeBookmarkIdForView, handleExpandedBookmarkOpen, inspectorActive, viewMode]
   );
 
   const handleGridOverlayOpenChange = useCallback((open: boolean) => {
@@ -454,6 +478,7 @@ function DashboardContent() {
     activeBookmarkId: selectionMode ? null : activeBookmarkIdForView,
     bookmarks: selectionMode ? [] : bookmarks,
     onNavigate: setActiveBookmarkId,
+    onOpen: handleExpandedBookmarkOpen,
     onSearch: () => searchInputRef.current?.focus(),
     onTag: () => {
       if (!activeBookmarkIdForView) return;
@@ -466,6 +491,7 @@ function DashboardContent() {
       setCollectionDialogOpen(true);
     },
     onNote: () => setNoteDialogOpen(true),
+    onShowShortcuts: () => setKeyboardShortcutsOpen(true),
   });
 
   useEffect(() => {
@@ -591,6 +617,7 @@ function DashboardContent() {
                       setSelectionMode(true);
                     }
                   }}
+                  onOpenKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
                   sortField={filters.sortField}
                   viewMode={viewMode}
                   onSortFieldChange={filters.setSortField}
@@ -766,18 +793,16 @@ function DashboardContent() {
                     selectionMode={selectionMode}
                     selectedBookmarkIdSet={selectedBookmarkIdSet}
                     activeBookmarkId={
-                      viewMode === "grid"
-                        ? gridOverlayBookmarkId
-                        : inspectorActive
-                          ? activeBookmarkIdForView
-                          : null
+                      selectionMode ? null : activeBookmarkIdForView
                     }
+                    inspectorLayoutActive={inspectorActive}
                     onSelect={handleBookmarkSelect}
                     onSelectionChange={toggleBookmarkSelection}
                     onTagClick={filters.toggleTag}
                     onAddTag={handleBookmarkAddTag}
                     onAddToCollection={handleBookmarkAddToCollection}
                     onAddNote={handleBookmarkAddNote}
+                    onOpenExpanded={handleExpandedBookmarkOpen}
                     onDelete={actions.handleDeleteBookmark}
                     performanceHighlightId={performanceFocusedId}
                   />
@@ -814,67 +839,90 @@ function DashboardContent() {
         </div>
       </div>
 
-      <AddTagDialog
-        open={tagDialogOpen}
-        onOpenChange={(open) => {
-          setTagDialogOpen(open);
-          if (!open) {
-            setTagTargetIds([]);
-          }
-        }}
-        bookmarkIds={tagTargetIds}
-        existingTags={tags}
-        onAddTag={actions.handleAddTag}
-        onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={getSharedTagIds(tagDialogBookmarks)}
-      />
+      {tagDialogOpen ? (
+        <AddTagDialog
+          open
+          onOpenChange={(open) => {
+            setTagDialogOpen(open);
+            if (!open) {
+              setTagTargetIds([]);
+            }
+          }}
+          bookmarkIds={tagTargetIds}
+          existingTags={tags}
+          onAddTag={actions.handleAddTag}
+          onRemoveTag={actions.handleRemoveTag}
+          bookmarkTags={getSharedTagIds(tagDialogBookmarks)}
+        />
+      ) : null}
 
-      <GridBookmarkOverlay
-        open={viewMode === "grid" && Boolean(gridOverlayBookmark)}
-        onOpenChange={handleGridOverlayOpenChange}
-        bookmark={gridOverlayBookmark}
-        onAddTag={handleBookmarkAddTag}
-        onAddToCollection={handleBookmarkAddToCollection}
-        onAddNote={handleBookmarkAddNote}
-        onReviewInOrbit={handleGridOverlayReviewInOrbit}
-        onDelete={actions.handleDeleteBookmark}
-      />
+      {keyboardShortcutsOpen ? (
+        <KeyboardShortcutsDialog
+          open
+          onOpenChange={setKeyboardShortcutsOpen}
+          groups={DASHBOARD_SHORTCUT_GROUPS}
+          description="Dashboard navigation and quick actions."
+        />
+      ) : null}
 
-      <AddNoteDialog
-        open={noteDialogOpen}
-        onOpenChange={setNoteDialogOpen}
-        bookmarkId={activeBookmarkIdForView}
-        existingNote={activeBookmark ? activeBookmark.notes[0]?.content : undefined}
-        onSave={actions.handleAddNote}
-      />
+      {gridOverlayBookmark ? (
+        <GridBookmarkOverlay
+          open
+          onOpenChange={handleGridOverlayOpenChange}
+          bookmark={gridOverlayBookmark}
+          onAddTag={handleBookmarkAddTag}
+          onAddToCollection={handleBookmarkAddToCollection}
+          onAddNote={handleBookmarkAddNote}
+          onReviewInOrbit={handleGridOverlayReviewInOrbit}
+          onDelete={actions.handleDeleteBookmark}
+        />
+      ) : null}
 
-      <AddToCollectionDialog
-        open={collectionDialogOpen}
-        onOpenChange={(open) => {
-          setCollectionDialogOpen(open);
-          if (!open) {
-            setCollectionTargetIds([]);
-          }
-        }}
-        bookmarkIds={collectionTargetIds}
-        collections={collections}
-        bookmarkCollections={getSharedCollectionIds(collectionDialogBookmarks)}
-        onAddToCollection={actions.handleAddToCollection}
-        onCreateCollection={createCollectionQuick}
-      />
+      {noteDialogOpen ? (
+        <AddNoteDialog
+          open
+          onOpenChange={setNoteDialogOpen}
+          bookmarkId={activeBookmarkIdForView}
+          existingNoteId={activeBookmark?.notes[0]?.id}
+          existingNote={activeBookmark ? activeBookmark.notes[0]?.content : undefined}
+          onSave={actions.handleAddNote}
+          onDelete={actions.handleDeleteNote}
+        />
+      ) : null}
 
-      <CreateCollectionDialog
-        open={createCollectionOpen}
-        onOpenChange={setCreateCollectionOpen}
-        onCreateCollection={createCollection}
-      />
+      {collectionDialogOpen ? (
+        <AddToCollectionDialog
+          open
+          onOpenChange={(open) => {
+            setCollectionDialogOpen(open);
+            if (!open) {
+              setCollectionTargetIds([]);
+            }
+          }}
+          bookmarkIds={collectionTargetIds}
+          collections={collections}
+          bookmarkCollections={getSharedCollectionIds(collectionDialogBookmarks)}
+          onAddToCollection={actions.handleAddToCollection}
+          onCreateCollection={createCollectionQuick}
+        />
+      ) : null}
 
-      <CommandPalette
-        open={commandPaletteOpen}
-        onOpenChange={setCommandPaletteOpen}
-        tags={tags}
-        onFilterChange={handleCommandPaletteFilter}
-      />
+      {createCollectionOpen ? (
+        <CreateCollectionDialog
+          open
+          onOpenChange={setCreateCollectionOpen}
+          onCreateCollection={createCollection}
+        />
+      ) : null}
+
+      {commandPaletteOpen ? (
+        <CommandPalette
+          open
+          onOpenChange={setCommandPaletteOpen}
+          tags={tags}
+          onFilterChange={handleCommandPaletteFilter}
+        />
+      ) : null}
     </div>
   );
 }

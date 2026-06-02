@@ -38,9 +38,14 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
@@ -98,6 +103,28 @@ const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> = new Set([
   "core",
   "overflow",
 ]);
+
+const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Graph Navigation",
+    shortcuts: [
+      { id: "search", keys: ["/"], label: "Search graph" },
+      { id: "scope-library", keys: ["L"], label: "Full library scope" },
+      { id: "scope-orbit", keys: ["Q"], label: "Orbit queue scope" },
+      { id: "back", keys: ["B"], label: "Back to Orbit queue" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+  {
+    title: "Selected Bookmark",
+    shortcuts: [
+      { id: "assign", keys: ["A"], label: "Assign selected tag or collection" },
+      { id: "tag", keys: ["T"], label: "Add tag" },
+      { id: "collection", keys: ["C"], label: "Add to collection" },
+      { id: "clear", keys: ["X"], label: "Clear graph selection" },
+    ],
+  },
+];
 
 export default function OrbitMapPage() {
   const { isOrbital } = useOrbitalTheme();
@@ -174,8 +201,10 @@ export default function OrbitMapPage() {
     null
   );
   const [search, setSearch] = useState("");
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const searchDeferred = useDeferredValue(search.trim().toLowerCase());
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: graph,
@@ -481,6 +510,25 @@ export default function OrbitMapPage() {
     }`;
   }, [graphScope, stats, truncatedCount]);
 
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: ORBIT_MAP_SHORTCUT_GROUPS,
+    actions: {
+      search: () => searchInputRef.current?.focus(),
+      "scope-library": () => handleScopeChange("library"),
+      "scope-orbit": () => handleScopeChange("orbit"),
+      back: () => router.push("/orbit"),
+      assign: () => {
+        if (activeSelectionNode && selectedBookmarkId) {
+          void handleAssign();
+        }
+      },
+      tag: () => openTagDialog(),
+      collection: () => openCollectionDialog(),
+      clear: () => handleSelectionChange(null),
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+    },
+  });
+
   return (
     <div className={orbitShellClass(isOrbital)}>
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
@@ -521,6 +569,12 @@ export default function OrbitMapPage() {
           }
           actions={
             <div className="flex items-center gap-2">
+              <KeyboardShortcutsHelpButton
+                open={keyboardShortcutsOpen}
+                onOpenChange={setKeyboardShortcutsOpen}
+                groups={ORBIT_MAP_SHORTCUT_GROUPS}
+                description="Orbit graph search, scope, and assignment shortcuts."
+              />
               <Link
                 href="/orbit"
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
@@ -663,6 +717,7 @@ export default function OrbitMapPage() {
                     <Search className="size-4 text-white/40" />
                   </div>
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}

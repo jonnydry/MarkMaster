@@ -26,12 +26,14 @@ interface BookmarkListProps {
   selectionMode: boolean;
   selectedBookmarkIdSet: Set<string>;
   activeBookmarkId: string | null;
+  inspectorLayoutActive?: boolean;
   onSelect: (id: string) => void;
   onSelectionChange: (id: string, selected: boolean) => void;
   onTagClick: (tagId: string) => void;
   onAddTag: (id: string) => void;
   onAddToCollection: (id: string) => void;
   onAddNote: (id: string) => void;
+  onOpenExpanded: (id: string) => void;
   onDelete: (bookmarkIds: string | string[]) => void;
   performanceHighlightId?: string | null;
 }
@@ -44,12 +46,14 @@ export function BookmarkList({
   selectionMode,
   selectedBookmarkIdSet,
   activeBookmarkId,
+  inspectorLayoutActive = false,
   onSelect,
   onSelectionChange,
   onTagClick,
   onAddTag,
   onAddToCollection,
   onAddNote,
+  onOpenExpanded,
   onDelete,
   performanceHighlightId,
 }: BookmarkListProps) {
@@ -101,7 +105,10 @@ export function BookmarkList({
     );
   }
 
-  const listContainerClass = getBookmarkListContainerClassName(!!activeBookmarkId, viewMode);
+  const listContainerClass = getBookmarkListContainerClassName(
+    inspectorLayoutActive,
+    viewMode
+  );
 
   return (
     <div className={listContainerClass}>
@@ -125,6 +132,7 @@ export function BookmarkList({
           onAddTag={onAddTag}
           onAddToCollection={onAddToCollection}
           onAddNote={onAddNote}
+          onOpenExpanded={onOpenExpanded}
           onDelete={(id) => onDelete(id)}
           className={getStaggerClass(i, "animate-fade-in")}
           isPerformanceHighlight={performanceHighlightId === bookmark.id}

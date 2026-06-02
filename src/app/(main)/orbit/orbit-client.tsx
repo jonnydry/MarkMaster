@@ -41,6 +41,7 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 const OrbitReviewDialog = dynamic(
   () =>
     import("@/components/orbit/orbit-review-dialog").then((m) => m.OrbitReviewDialog),
@@ -54,7 +55,6 @@ import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 // New clean-list + slide-in + overlays components (new Orbit model)
 import { OrbitList } from "@/components/orbit/orbit-list";
 import { OrbitContextualMenu } from "@/components/orbit/orbit-quick-actions";
-import { OrbitSlideInPanel } from "@/components/orbit/orbit-slide-in-panel";
 
 import { orbital } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
@@ -74,6 +74,11 @@ import { appContentGutterClassName } from "@/lib/app-chrome";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  scrollDataElementIntoView,
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
@@ -110,6 +115,27 @@ type OrbitScanRequest = {
 };
 
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
+
+const ORBIT_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Queue Navigation",
+    shortcuts: [
+      { id: "next", keys: ["J", "ArrowDown"], label: "Next queue item" },
+      { id: "previous", keys: ["K", "ArrowUp"], label: "Previous queue item" },
+      { id: "search", keys: ["/"], label: "Search Orbit" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+  {
+    title: "Orbit Actions",
+    shortcuts: [
+      { id: "scan", keys: ["G"], label: "Run Grok scan" },
+      { id: "review", keys: ["V"], label: "Open Review pass" },
+      { id: "tag", keys: ["T"], label: "Add tag to selected item" },
+      { id: "collection", keys: ["C"], label: "Add selected item to collection" },
+    ],
+  },
+];
 
 function buildOrbitScanContextKey(args: {
   orbitView: OrbitView;
@@ -166,6 +192,14 @@ const CreateCollectionDialog = dynamic(
   () =>
     import("@/components/create-collection-dialog").then(
       (m) => m.CreateCollectionDialog
+    ),
+  { ssr: false }
+);
+
+const OrbitBookmarkOverlay = dynamic(
+  () =>
+    import("@/components/orbit/orbit-bookmark-overlay").then(
+      (m) => m.OrbitBookmarkOverlay
     ),
   { ssr: false }
 );
@@ -281,6 +315,7 @@ export default function OrbitPage() {
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
   const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
@@ -330,6 +365,7 @@ export default function OrbitPage() {
   // Refs to guard one-time URL-intent handling (prevents sync setState lint + re-entrancy)
   const hasHandledHighlightRef = useRef(false);
   const hasHandledDigestRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [scanContextAtLastRun, setScanContextAtLastRun] = useState<string | null>(
     null
@@ -512,30 +548,10 @@ export default function OrbitPage() {
     );
   };
 
-  // Keyboard navigation for the clean list (arrow keys + Enter/Esc)
+  // Escape closes transient queue UI. J/K and arrow navigation use the shared shortcut hook.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return;
-      if (!bookmarks.length) return;
-
-      const currentIndex = bookmarks.findIndex((b) => b.id === resolvedActiveBookmarkId);
-
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const next = currentIndex < bookmarks.length - 1 ? currentIndex + 1 : 0;
-        setActiveBookmarkId(bookmarks[next].id);
-      }
-
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const prev = currentIndex > 0 ? currentIndex - 1 : bookmarks.length - 1;
-        setActiveBookmarkId(bookmarks[prev].id);
-      }
-
-      if (e.key === "Enter" && resolvedActiveBookmarkId) {
-        e.preventDefault();
-        setActiveBookmarkId(resolvedActiveBookmarkId);
-      }
 
       if (e.key === "Escape") {
         if (menuForId) {
@@ -549,7 +565,7 @@ export default function OrbitPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [bookmarks, resolvedActiveBookmarkId, activeBookmarkId, menuForId]);
+  }, [activeBookmarkId, menuForId]);
 
   useEffect(() => {
     if (!resolvedActiveBookmarkId) return;
@@ -560,6 +576,33 @@ export default function OrbitPage() {
   }, [resolvedActiveBookmarkId]);
 
   const activeDecision = activeBookmark ? scan.getDecision(activeBookmark.id) : null;
+  const orbitOverlayOpen =
+    !!activeBookmarkId &&
+    !!activeBookmark &&
+    !selectionMode &&
+    !tagDialogOpen &&
+    !collectionDialogOpen &&
+    !reviewOpen;
+
+  const selectOrbitBookmarkByOffset = useCallback(
+    (offset: -1 | 1) => {
+      if (bookmarks.length === 0) return;
+      const currentIndex = bookmarks.findIndex(
+        (bookmark) => bookmark.id === resolvedActiveBookmarkId
+      );
+      const nextIndex =
+        currentIndex === -1
+          ? 0
+          : Math.max(0, Math.min(bookmarks.length - 1, currentIndex + offset));
+      const nextId = bookmarks[nextIndex]?.id;
+      if (!nextId) return;
+      setActiveBookmarkId(nextId);
+      requestAnimationFrame(() =>
+        scrollDataElementIntoView("data-orbit-row-id", nextId)
+      );
+    },
+    [bookmarks, resolvedActiveBookmarkId]
+  );
 
   const orbitMapHref = useMemo(() => {
     if (!resolvedActiveBookmarkId) return "/orbit/map?scope=orbit";
@@ -884,7 +927,7 @@ export default function OrbitPage() {
         toast.success("Grok suggestion restored for this bookmark.");
         return true;
       }
-      toast("Skipped Grok suggestion for this pass.");
+      toast("Kept in Orbit for this pass.");
       return false;
     },
     [scan]
@@ -1022,6 +1065,30 @@ export default function OrbitPage() {
     }`;
   })();
 
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: ORBIT_SHORTCUT_GROUPS,
+    actions: {
+      next: () => selectOrbitBookmarkByOffset(1),
+      previous: () => selectOrbitBookmarkByOffset(-1),
+      search: () => searchInputRef.current?.focus(),
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+      scan: () => {
+        if (!scan.scanning && scanTargetIds.length > 0) {
+          void handleScan();
+        }
+      },
+      review: () => {
+        if (scan.plan) handleOpenReviewAll();
+      },
+      tag: () => {
+        if (activeBookmark) handleBookmarkAddTag(activeBookmark.id);
+      },
+      collection: () => {
+        if (activeBookmark) handleBookmarkAddToCollection(activeBookmark.id);
+      },
+    },
+  });
+
   return (
     <div className={orbitShellClass(isOrbital)}>
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
@@ -1070,7 +1137,17 @@ export default function OrbitPage() {
                 />
               </div>
             }
-            actions={dbUser ? <UserNavDynamic user={dbUser} /> : null}
+            actions={
+              <>
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={setKeyboardShortcutsOpen}
+                  groups={ORBIT_SHORTCUT_GROUPS}
+                  description="Orbit queue navigation and review actions."
+                />
+                {dbUser ? <UserNavDynamic user={dbUser} /> : null}
+              </>
+            }
           >
             <OrbitHeaderLogoAccent />
             <div
@@ -1255,28 +1332,37 @@ export default function OrbitPage() {
 
               {showQueueTools && (
                 <>
-                  <div className="relative w-full overflow-hidden border-b border-hairline-soft">
-                    <SearchBar
-                      glass
-                      value={search}
-                      onChange={handleSearchChange}
-                      placeholder="Search Orbit by author, text, or notes…"
-                      inputClassName="h-11 rounded-none"
-                    />
-                  </div>
-
                   <div
                     className={cn(
-                      "flex items-center justify-between text-[11px]",
-                      orbitMetaMuted(isOrbital)
+                      "overflow-hidden rounded-sm border",
+                      orbitHairlineBorder(isOrbital),
+                      isOrbital ? "glass-orbital" : "bg-surface-1/70 dark:bg-white/[0.035]"
                     )}
                   >
-                    <span className="text-mono-data">{visibleStatusLabel}</span>
-                    {(isFetching || isSearchPending) && !isLoading && (
-                      <span className="flex items-center gap-1">
-                        <Loader2 className="size-3 animate-spin" /> Updating…
-                      </span>
-                    )}
+                    <div className="relative w-full overflow-hidden border-b border-hairline-soft">
+                      <SearchBar
+                        ref={searchInputRef}
+                        glass
+                        value={search}
+                        onChange={handleSearchChange}
+                        placeholder="Search Orbit by author, text, or notes…"
+                        inputClassName="h-10 rounded-none"
+                      />
+                    </div>
+
+                    <div
+                      className={cn(
+                        "flex items-center justify-between gap-3 px-3 py-2 text-[11px]",
+                        orbitMetaMuted(isOrbital)
+                      )}
+                    >
+                      <span className="text-mono-data">{visibleStatusLabel}</span>
+                      {(isFetching || isSearchPending) && !isLoading && (
+                        <span className="flex shrink-0 items-center gap-1">
+                          <Loader2 className="size-3 animate-spin" /> Updating…
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -1432,23 +1518,23 @@ export default function OrbitPage() {
                   </div>
                 )}
 
-                {/* Elegant slide-in review panel — simple, fast, premium feel */}
-                <OrbitSlideInPanel
-                  bookmark={activeBookmark}
-                  isOpen={!!activeBookmarkId && !!activeBookmark && !selectionMode}
-                  onClose={() => setActiveBookmarkId(null)}
-                  decision={activeDecision}
-                  suggestionDismissed={
-                    activeBookmark
-                      ? scan.dismissedBookmarkIds.has(activeBookmark.id)
-                      : false
-                  }
-                  onFullReview={(id) => handleOpenBookmarkReview(id)}
-                  onDecision={handleSlideInDecision}
-                  onAddTag={handleBookmarkAddTag}
-                  onAddToCollection={handleBookmarkAddToCollection}
-                  showFullReview={!!scan.plan}
-                />
+                {/* Expanded Orbit review overlay */}
+                {orbitOverlayOpen ? (
+                  <OrbitBookmarkOverlay
+                    bookmark={activeBookmark}
+                    open
+                    onOpenChange={(open) => {
+                      if (!open) setActiveBookmarkId(null);
+                    }}
+                    decision={activeDecision}
+                    suggestionDismissed={scan.dismissedBookmarkIds.has(activeBookmark.id)}
+                    onFullReview={(id) => handleOpenBookmarkReview(id)}
+                    onDecision={handleSlideInDecision}
+                    onAddTag={handleBookmarkAddTag}
+                    onAddToCollection={handleBookmarkAddToCollection}
+                    showFullReview={!!scan.plan}
+                  />
+                ) : null}
                 </>
               )}
             </section>
@@ -1456,58 +1542,66 @@ export default function OrbitPage() {
         </div>
       </div>
 
-      <AddTagDialog
-        open={tagDialogOpen}
-        onOpenChange={(open) => {
-          setTagDialogOpen(open);
-          if (!open) {
-            setTagTargetIds([]);
-          }
-        }}
-        bookmarkIds={tagTargetIds}
-        existingTags={tags}
-        onAddTag={actions.handleAddTag}
-        onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={getSharedTagIds(tagDialogBookmarks)}
-      />
+      {tagDialogOpen ? (
+        <AddTagDialog
+          open
+          onOpenChange={(open) => {
+            setTagDialogOpen(open);
+            if (!open) {
+              setTagTargetIds([]);
+            }
+          }}
+          bookmarkIds={tagTargetIds}
+          existingTags={tags}
+          onAddTag={actions.handleAddTag}
+          onRemoveTag={actions.handleRemoveTag}
+          bookmarkTags={getSharedTagIds(tagDialogBookmarks)}
+        />
+      ) : null}
 
-      <AddToCollectionDialog
-        open={collectionDialogOpen}
-        onOpenChange={(open) => {
-          setCollectionDialogOpen(open);
-          if (!open) {
-            setCollectionTargetIds([]);
-          }
-        }}
-        bookmarkIds={collectionTargetIds}
-        collections={collections}
-        bookmarkCollections={getSharedCollectionIds(collectionDialogBookmarks)}
-        onAddToCollection={actions.handleAddToCollection}
-        onCreateCollection={createCollectionQuick}
-      />
+      {collectionDialogOpen ? (
+        <AddToCollectionDialog
+          open
+          onOpenChange={(open) => {
+            setCollectionDialogOpen(open);
+            if (!open) {
+              setCollectionTargetIds([]);
+            }
+          }}
+          bookmarkIds={collectionTargetIds}
+          collections={collections}
+          bookmarkCollections={getSharedCollectionIds(collectionDialogBookmarks)}
+          onAddToCollection={actions.handleAddToCollection}
+          onCreateCollection={createCollectionQuick}
+        />
+      ) : null}
 
-      <CreateCollectionDialog
-        open={createCollectionOpen}
-        onOpenChange={setCreateCollectionOpen}
-        onCreateCollection={createCollection}
-      />
+      {createCollectionOpen ? (
+        <CreateCollectionDialog
+          open
+          onOpenChange={setCreateCollectionOpen}
+          onCreateCollection={createCollection}
+        />
+      ) : null}
 
-      <OrbitReviewDialog
-        open={reviewOpen}
-        onOpenChange={handleReviewOpenChange}
-        plan={scan.plan}
-        bookmarks={bookmarks}
-        dismissedBookmarkIds={scan.dismissedBookmarkIds}
-        existingTags={tags}
-        existingCollections={collections}
-        applying={scan.applyingBatch}
-        focusBookmarkId={reviewBookmarkId}
-        reviewSessionId={reviewSessionId}
-        onApply={handleApplyReviewedPlan}
-        // Phase 2: Pass the set of bookmarks that came from a Highlights Digest
-        digestBookmarkIds={activeDigestBookmarkIds}
-        feedbackById={feedbackById}
-      />
+      {reviewOpen ? (
+        <OrbitReviewDialog
+          open
+          onOpenChange={handleReviewOpenChange}
+          plan={scan.plan}
+          bookmarks={bookmarks}
+          dismissedBookmarkIds={scan.dismissedBookmarkIds}
+          existingTags={tags}
+          existingCollections={collections}
+          applying={scan.applyingBatch}
+          focusBookmarkId={reviewBookmarkId}
+          reviewSessionId={reviewSessionId}
+          onApply={handleApplyReviewedPlan}
+          // Phase 2: Pass the set of bookmarks that came from a Highlights Digest
+          digestBookmarkIds={activeDigestBookmarkIds}
+          feedbackById={feedbackById}
+        />
+      ) : null}
     </div>
   );
 }

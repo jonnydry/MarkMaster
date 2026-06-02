@@ -107,6 +107,8 @@ export function SyncButton({
         toast.error("Rate limit reached", {
           description: `Please wait ${Math.ceil(retryAfter / 60)} minute(s) before syncing again.`,
         });
+        void refetchSyncStatus();
+        onSyncComplete?.();
         return;
       }
 

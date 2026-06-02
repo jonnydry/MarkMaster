@@ -28,6 +28,7 @@ interface UserCollectionCardProps {
   maxItems: number;
   onNavigate: (id: string) => void;
   onDelete: (id: string) => void;
+  selected?: boolean;
 }
 
 function formatCollectionDate(value: Date | string) {
@@ -63,6 +64,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
   maxItems,
   onNavigate,
   onDelete,
+  selected = false,
 }: UserCollectionCardProps) {
   const { isOrbital } = useOrbitalTheme();
   const itemCount = collection._count?.items ?? 0;
@@ -71,9 +73,14 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
 
   return (
     <article
-      className={isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName}
+      data-collection-id={collection.id}
+      className={cn(
+        isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName,
+        selected && "border-primary/55 ring-2 ring-primary/30"
+      )}
       role="button"
       tabIndex={0}
+      aria-pressed={selected}
       aria-label={`Open collection ${collection.name}`}
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
@@ -164,6 +171,7 @@ interface XFolderCardProps {
   maxItems: number;
   onNavigate: (id: string) => void;
   onCopy: (id: string) => void;
+  selected?: boolean;
 }
 
 export const XFolderCard = React.memo(function XFolderCard({
@@ -171,6 +179,7 @@ export const XFolderCard = React.memo(function XFolderCard({
   maxItems,
   onNavigate,
   onCopy,
+  selected = false,
 }: XFolderCardProps) {
   const { isOrbital } = useOrbitalTheme();
   const itemCount = collection._count?.items ?? 0;
@@ -179,9 +188,14 @@ export const XFolderCard = React.memo(function XFolderCard({
 
   return (
     <article
-      className={isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName}
+      data-collection-id={collection.id}
+      className={cn(
+        isOrbital ? cn(orbital.glass, "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-primary/10 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]") : compactCardClassName,
+        selected && "border-primary/55 ring-2 ring-primary/30"
+      )}
       role="button"
       tabIndex={0}
+      aria-pressed={selected}
       aria-label={`Open collection ${collection.name}`}
       onClick={() => onNavigate(collection.id)}
       onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}

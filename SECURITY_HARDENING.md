@@ -39,12 +39,9 @@
 - This means the browser **enforces** the rules while also sending reports. This defeats the purpose of "Report-Only" mode for safe auditing.
 - The Report-Only value also has a duplicated `report-to default;`.
 
-**2. Known Inline Script Requirement**
-- `src/app/layout.tsx` (lines 41-45) contains one `dangerouslySetInnerHTML` script for instant theme initialization:
-  ```html
-  <script dangerouslySetInnerHTML={{ __html: "(function(){try{var t=localStorage.getItem('markmaster-theme')||'dark';..." }} />
-  ```
-- This is the main reason broad `'unsafe-inline'` is currently required on `script-src`.
+**2. First-Party Theme Bootstrap**
+- `src/app/layout.tsx` loads `/theme-init` with `next/script` and `strategy="beforeInteractive"` for instant theme initialization.
+- `/theme-init` is served by `src/app/theme-init/route.ts`, so `script-src` can remain self-only without an inline hash or broad `'unsafe-inline'`.
 - No other `dangerouslySetInnerHTML` or `eval`/`new Function` usage exists in the codebase.
 
 **3. Style-src Reality**
@@ -63,7 +60,7 @@
 
 Given the constraints of a real production app (Next.js App Router, Tailwind, component libraries, Web Workers, instant theme switching), the following is the **practical maximum strictness**:
 
-- **script-src**: Move toward `'self' 'strict-dynamic'` + nonce (or hash for the known theme script) in production. Keep `'unsafe-inline'` as fallback during transition.
+- **script-src**: Keep `'self'` in production. The theme bootstrap is first-party and loaded from `/theme-init`.
 - **style-src**: Keep `'self' 'unsafe-inline'` (pragmatic reality).
 - **worker-src**: Keep `'self' blob:` (required).
 - Use **Report-Only** as the primary mechanism during the hardening phase.
@@ -252,7 +249,7 @@ After completing Subphases 1–3 and performing an extensive multi-agent bughunt
 
 - [x] CSP Report-Only strategy implemented with proper reporting endpoint
 - [x] `Reporting-Endpoints` header added
-- [x] Script-src tightened with SHA-256 hash for theme script
+- [x] Script-src tightened to self-only with first-party `/theme-init` bootstrap
 - [x] Permissions-Policy significantly expanded
 - [x] All Auth.js cookies explicitly hardened
 - [x] Session maxAge reduced to 14 days

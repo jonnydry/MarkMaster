@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Check } from "lucide-react";
+import { Check, MoreHorizontal } from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -113,7 +113,7 @@ export const OrbitListRow = memo(function OrbitListRow({
       onClick={handleRowClick}
       onKeyDown={handleRowKeyDown}
       className={cn(
-        "group flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm transition-all",
+        "group flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all",
         orbitHairlineBorder(isOrbital),
         orbitHoverRowClass(isOrbital),
         !selectionMode &&
@@ -267,15 +267,15 @@ export const OrbitListRow = memo(function OrbitListRow({
                 onQuickAction?.(bookmark.id, "menu", e);
               }}
               className={cn(
-                "rounded p-1",
+                "flex h-7 w-7 items-center justify-center rounded-sm border border-transparent transition-colors",
                 isOrbital
-                  ? "text-primary/40 hover:text-primary/70"
-                  : "text-muted-foreground hover:text-primary dark:text-white/40 dark:hover:text-sky-200"
+                  ? "text-primary/45 hover:border-primary/20 hover:bg-primary/10 hover:text-primary"
+                  : "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-sky-200"
               )}
               title="More actions"
               aria-label="More actions"
             >
-              ⋯
+              <MoreHorizontal className="size-4" aria-hidden />
             </button>
           </div>
         </div>

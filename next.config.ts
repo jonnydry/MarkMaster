@@ -1,23 +1,16 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
-import crypto from "node:crypto";
-import { THEME_INIT_SCRIPT } from "./src/lib/theme-init";
 
 // Avoid wrong workspace root when a parent directory also has a lockfile.
 const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
 
-// Compute SHA-256 hash of the theme initialization script for CSP
-// This allows us to remove 'unsafe-inline' from script-src while keeping the FOUC-prevention script.
-const THEME_SCRIPT_HASH =
-  "sha256-" + crypto.createHash("sha256").update(THEME_INIT_SCRIPT).digest("base64");
-
 const contentSecurityPolicy = [
   "default-src 'self'",
-  // 'unsafe-inline' removed from script-src by using a hash for the single known inline script.
+  // The theme bootstrap is served as a first-party script route, so script-src can stay self-only.
   // 'unsafe-eval' is only allowed in development (Turbopack + React Refresh).
-  `script-src 'self' '${THEME_SCRIPT_HASH}'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self'${isDev ? " 'unsafe-eval'" : ""}`,
   // 'unsafe-inline' for styles is still required due to Tailwind v4 + shadcn/ui.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https://pbs.twimg.com https://abs.twimg.com",

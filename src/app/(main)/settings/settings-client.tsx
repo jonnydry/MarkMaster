@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
@@ -32,10 +32,15 @@ import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { useTheme, useFontMode, useOrbitalTheme } from "@/components/providers";
 import { OrbitalBadge } from "@/components/orbital";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useSurfaceKeyboardShortcuts,
+  type KeyboardShortcutGroup,
+} from "@/hooks/use-keyboard-shortcuts";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import {
   invalidateLibraryQueries,
@@ -65,18 +70,43 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
+const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
+  {
+    title: "Sections",
+    shortcuts: [
+      { id: "connection", keys: ["1"], label: "Connection" },
+      { id: "orbit-grok", keys: ["2"], label: "Orbit Grok" },
+      { id: "appearance", keys: ["3"], label: "Appearance" },
+      { id: "export", keys: ["4"], label: "Export" },
+      { id: "tags", keys: ["5"], label: "Tags" },
+      { id: "account", keys: ["6"], label: "Account" },
+    ],
+  },
+  {
+    title: "Settings Actions",
+    shortcuts: [
+      { id: "search-tags", keys: ["/"], label: "Search tags" },
+      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+];
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { fontMode, setFontMode } = useFontMode();
   const { isOrbital, toggleOrbital } = useOrbitalTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+  const tagSearchRef = useRef<HTMLInputElement>(null);
   const orbitIssue = parseOrbitIssue(searchParams.get("orbitIssue"));
+  const dbUser = session?.dbUser;
+  const lastSyncAt = dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null;
 
   const {
     data: tags = [],
@@ -194,6 +224,36 @@ export default function SettingsPage() {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
   };
 
+  const handleSyncComplete = useCallback(() => {
+    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
+    void updateSession({ refresh: "lastSyncAt" });
+  }, [queryClient, updateSession]);
+
+  const scrollToSettingsSection = useCallback((sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+      inline: "nearest",
+    });
+  }, []);
+
+  useSurfaceKeyboardShortcuts({
+    shortcutGroups: SETTINGS_SHORTCUT_GROUPS,
+    actions: {
+      connection: () => scrollToSettingsSection("connection"),
+      "orbit-grok": () => scrollToSettingsSection("orbit-grok"),
+      appearance: () => scrollToSettingsSection("appearance"),
+      export: () => scrollToSettingsSection("export"),
+      tags: () => scrollToSettingsSection("tags"),
+      account: () => scrollToSettingsSection("account"),
+      "search-tags": () => {
+        scrollToSettingsSection("tags");
+        requestAnimationFrame(() => tagSearchRef.current?.focus());
+      },
+      shortcuts: () => setKeyboardShortcutsOpen(true),
+    },
+  });
+
   const hasSettingsError = tagsError || collectionsError;
   const settingsErrorMessage =
     tagsErrorValue instanceof Error
@@ -211,12 +271,8 @@ export default function SettingsPage() {
           selectedTags={[]}
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={() => setCreateOpen(true)}
-          lastSyncAt={
-            session?.dbUser?.lastSyncAt
-              ? new Date(session.dbUser.lastSyncAt)
-              : null
-          }
-          onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
+          lastSyncAt={lastSyncAt}
+          onSyncComplete={handleSyncComplete}
         />
       </div>
 
@@ -234,19 +290,28 @@ export default function SettingsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={() => setCreateOpen(true)}
-                  onSyncComplete={() => void invalidateLibraryQueries(queryClient, { refetchType: "all" })}
+                  lastSyncAt={lastSyncAt}
+                  onSyncComplete={handleSyncComplete}
                 />
               </div>
             }
             actions={
-              session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : undefined
+              <>
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={setKeyboardShortcutsOpen}
+                  groups={SETTINGS_SHORTCUT_GROUPS}
+                  description="Settings section navigation and tag search shortcuts."
+                />
+                {dbUser ? <UserNavDynamic user={dbUser} /> : null}
+              </>
             }
           />
 
           <div className="p-4 sm:p-5">
             <div data-settings-page className="mx-auto max-w-4xl">
               <SettingsHero
-                user={session?.dbUser}
+                user={dbUser}
                 tagCount={tags.length}
                 collectionCount={collections.length}
               />
@@ -307,14 +372,8 @@ export default function SettingsPage() {
                         </li>
                       </ul>
                       <SyncButton
-                        lastSyncAt={
-                          session?.dbUser?.lastSyncAt
-                            ? new Date(session.dbUser.lastSyncAt)
-                            : null
-                        }
-                        onSyncComplete={() =>
-                          void invalidateLibraryQueries(queryClient, { refetchType: "all" })
-                        }
+                        lastSyncAt={lastSyncAt}
+                        onSyncComplete={handleSyncComplete}
                       />
                     </div>
                   </SettingsSection>
@@ -458,6 +517,7 @@ export default function SettingsPage() {
                       <div className="relative mb-3">
                         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                          ref={tagSearchRef}
                           value={tagSearch}
                           onChange={(e) => setTagSearch(e.target.value)}
                           placeholder="Search tags…"

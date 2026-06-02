@@ -205,7 +205,7 @@ export function LibraryBookmarkInspector({
               onClick={() => onAddNote(bookmark.id)}
               className="rounded-sm border border-primary/20 py-2 text-sm text-primary/70 hover:bg-accent-soft"
             >
-              ADD NOTE
+              {bookmark.notes.length > 0 ? "EDIT NOTE" : "ADD NOTE"}
             </button>
           </div>
 

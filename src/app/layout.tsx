@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, DM_Sans, IBM_Plex_Mono } from "next/font/google";
+import Script from "next/script";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
-import { THEME_INIT_SCRIPT } from "@/lib/theme-init";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,14 +45,12 @@ export default async function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} ${dmSans.variable} ${ibmPlexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: THEME_INIT_SCRIPT,
-          }}
-        />
-      </head>
       <body className="min-h-full flex flex-col">
+        <Script
+          id="markmaster-theme-init"
+          src="/theme-init"
+          strategy="beforeInteractive"
+        />
         <Providers>
           {children}
           <Toaster />

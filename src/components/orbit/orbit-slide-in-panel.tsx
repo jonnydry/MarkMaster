@@ -110,6 +110,11 @@ export function OrbitSlideInPanel({
       : decision?.primary?.kind === "tag"
         ? `Apply tag · ${decision.primary.label}`
         : "Apply suggestion";
+  const suggestionStateLabel = suggestionDismissed
+    ? "Suggestion skipped"
+    : hasPrimarySuggestion
+      ? "Suggestion ready"
+      : "No suggestion";
 
   return (
     <>
@@ -125,36 +130,61 @@ export function OrbitSlideInPanel({
         aria-modal="true"
         aria-labelledby="orbit-slide-in-title"
         className={cn(
-          "fixed inset-y-0 right-0 z-40 w-full max-w-full sm:w-[460px] sm:max-w-[460px]",
+          "fixed inset-y-0 right-0 z-40 flex w-full max-w-full flex-col sm:w-[460px] sm:max-w-[460px]",
           "animate-orbit-slide-in-right orbital-slide-in",
           isOrbital
             ? cn("border-l border-primary/30 bg-background", orbital.slideIn)
             : "border-l border-hairline-soft bg-background text-foreground dark:border-white/10 dark:bg-[#0b0f1a] dark:text-white"
         )}
       >
-        <div className="flex items-center justify-between border-b border-primary/20 px-5 py-4">
-          <div
-            id="orbit-slide-in-title"
-            className={cn(
-              orbitLabelClass(isOrbital),
-              "tracking-[0.18em]",
-              isOrbital ? "text-primary/80" : "text-foreground/80 dark:text-white/80"
-            )}
-          >
-            Quick review
+        <div className="flex items-start justify-between gap-3 border-b border-primary/20 px-5 py-4">
+          <div className="min-w-0">
+            <div
+              id="orbit-slide-in-title"
+              className={cn(
+                orbitLabelClass(isOrbital),
+                "tracking-[0.18em]",
+                isOrbital ? "text-primary/80" : "text-foreground/80 dark:text-white/80"
+              )}
+            >
+              Quick review
+            </div>
+            <div
+              className={cn(
+                "mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs",
+                isOrbital ? "text-primary/55" : "text-muted-foreground dark:text-white/55"
+              )}
+            >
+              <span className="max-w-[15rem] truncate text-foreground/85">
+                {author}
+              </span>
+              {handle ? <span>{handle}</span> : null}
+              <span
+                className={cn(
+                  "rounded-sm border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em]",
+                  suggestionDismissed
+                    ? "border-primary/25 bg-primary/10 text-primary/70"
+                    : hasPrimarySuggestion
+                      ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-500"
+                      : "border-hairline-soft bg-surface-2/70 text-muted-foreground"
+                )}
+              >
+                {suggestionStateLabel}
+              </span>
+            </div>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="rounded-sm p-1 text-primary/60 transition-colors hover:bg-primary/10 hover:text-primary"
+            className="shrink-0 rounded-sm p-1 text-primary/60 transition-colors hover:bg-primary/10 hover:text-primary"
             aria-label="Close review panel"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="flex h-[calc(100%-56px)] flex-col overflow-y-auto px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-sm">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-sm">
           <OrbitSlideInPostBody
             key={bookmark.id}
             text={postText}
@@ -171,9 +201,6 @@ export function OrbitSlideInPanel({
             galleryClassName="!mt-0 mb-4"
             stopClickPropagation
           />
-          <div className={cn(orbital.data, "-mt-3 mb-5 normal-case text-[11px] text-primary/60")}>
-            {author} {handle && <span className="text-primary/40">{handle}</span>}
-          </div>
 
           <OrbitalCard
             className={cn(
@@ -286,7 +313,7 @@ export function OrbitSlideInPanel({
               <button
                 type="button"
                 onClick={() => bookmark.id && onDecision?.(bookmark.id, "keep-tag")}
-                className="w-full rounded-sm bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                className="h-10 w-full rounded-sm bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 {applyLabel}
               </button>
@@ -295,7 +322,7 @@ export function OrbitSlideInPanel({
               type="button"
               onClick={() => bookmark.id && onDecision?.(bookmark.id, "dismiss")}
               className={cn(
-                "w-full rounded-sm border py-2.5 text-sm transition-colors",
+                "h-10 w-full rounded-sm border px-3 text-sm font-medium transition-colors",
                 suggestionDismissed
                   ? "border-primary/40 bg-primary/15 text-primary hover:bg-primary/20"
                   : hasPrimarySuggestion
@@ -303,12 +330,12 @@ export function OrbitSlideInPanel({
                     : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
               )}
             >
-              {suggestionDismissed ? "Restore suggestion" : "Skip suggestion"}
+              {suggestionDismissed ? "Restore suggestion" : "Keep in Orbit"}
             </button>
             <button
               type="button"
               onClick={() => bookmark.id && onDecision?.(bookmark.id, "discard")}
-              className="w-full rounded-sm border border-primary/20 py-2 text-sm text-primary/70 hover:bg-accent-soft"
+              className="h-9 w-full rounded-sm border border-primary/20 px-3 text-sm text-primary/70 transition-colors hover:bg-accent-soft"
             >
               Discard bookmark
             </button>

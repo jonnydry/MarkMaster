@@ -160,7 +160,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   return (
     <div
       className={cn(
-        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden rounded-sm border border-hairline-soft/80 bg-surface-1/72 text-left shadow-[0_18px_48px_-42px_color-mix(in_srgb,var(--foreground)_75%,transparent)] transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/30 hover:bg-surface-1 hover:shadow-[0_22px_58px_-42px_color-mix(in_srgb,var(--primary)_70%,transparent)]",
+        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden rounded-sm border border-hairline-soft/80 bg-surface-1/72 text-left shadow-[0_18px_48px_-42px_color-mix(in_srgb,var(--foreground)_75%,transparent)] [content-visibility:auto] [contain-intrinsic-size:auto_280px] transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/30 hover:bg-surface-1 hover:shadow-[0_22px_58px_-42px_color-mix(in_srgb,var(--primary)_70%,transparent)]",
         isInteractive && "cursor-pointer",
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
@@ -170,6 +170,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
         className
       )}
       role={isInteractive ? "button" : undefined}
+      data-dashboard-bookmark-id={bookmark.id}
       data-grid-bookmark-card={bookmark.id}
       data-grid-card-variant={hasVisual ? "media" : "text"}
       tabIndex={isInteractive ? 0 : undefined}
