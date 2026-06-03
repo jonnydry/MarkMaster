@@ -51,22 +51,31 @@ export interface OrbitScanHeroProps {
 const BATCH_OPTIONS: Array<{
   mode: OrbitScanBatchMode;
   label: string;
+  compactLabel: string;
   title: string;
 }> = [
-  { mode: "auto", label: "Auto", title: "Adaptive batch size" },
+  {
+    mode: "auto",
+    label: "Auto",
+    compactLabel: "Auto",
+    title: "Adaptive batch size",
+  },
   {
     mode: "quick",
     label: `Quick ${ORBIT_SCAN_BATCH_PROFILES.quick.size}`,
+    compactLabel: `${ORBIT_SCAN_BATCH_PROFILES.quick.size}`,
     title: "Fastest Grok pass",
   },
   {
     mode: "balanced",
     label: `Balanced ${ORBIT_SCAN_BATCH_PROFILES.balanced.size}`,
+    compactLabel: `${ORBIT_SCAN_BATCH_PROFILES.balanced.size}`,
     title: "Larger Grok pass when quality is reliable",
   },
   {
     mode: "deep",
     label: `Deep ${ORBIT_SCAN_BATCH_PROFILES.deep.size}`,
+    compactLabel: `${ORBIT_SCAN_BATCH_PROFILES.deep.size}`,
     title: "Largest Grok pass",
   },
 ];
@@ -123,7 +132,7 @@ export function OrbitScanHero({
       role="group"
       aria-label="Grok batch size"
       className={cn(
-        "inline-flex max-w-full overflow-x-auto rounded-sm border border-hairline-soft bg-surface-2/60 p-0.5",
+        "grid w-full grid-cols-4 gap-1 rounded-sm border border-hairline-soft bg-surface-2/60 p-1 sm:w-auto sm:min-w-[19rem]",
         orbitControlRadius(isOrbital)
       )}
     >
@@ -143,14 +152,15 @@ export function OrbitScanHero({
             title={disabled ? deepLockedReason : `${option.title}${resolved}`}
             onClick={() => onBatchModeChange(option.mode)}
             className={cn(
-              "h-7 shrink-0 rounded-sm px-2 text-[10px] font-semibold transition-colors",
+              "h-7 min-w-0 rounded-sm px-1.5 text-[10px] font-semibold transition-colors sm:px-2",
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-accent-soft hover:text-foreground",
               disabled && "cursor-not-allowed opacity-45 hover:bg-transparent"
             )}
           >
-            {option.label}
+            <span className="hidden sm:inline">{option.label}</span>
+            <span className="sm:hidden">{option.compactLabel}</span>
           </button>
         );
       })}
@@ -171,7 +181,7 @@ export function OrbitScanHero({
       >
         {scanning ? <OrbitScanProgressBar /> : null}
 
-        <div className="flex min-h-12 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-2 px-3 py-2 sm:px-3.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span
               className={cn(
@@ -191,15 +201,15 @@ export function OrbitScanHero({
             >
               {suggestionLabel}
             </span>
-            {batchSelector}
+            <div className="w-full min-w-0 sm:w-auto">{batchSelector}</div>
           </div>
 
-          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 lg:justify-end">
             <Button
               type="button"
               size="sm"
               className={cn(
-                "h-8 shrink-0 gap-1.5 px-3 text-xs",
+                "h-8 min-w-[8.5rem] flex-1 gap-1.5 px-3 text-xs sm:flex-none",
                 orbitControlRadius(isOrbital),
                 "bg-primary text-primary-foreground hover:bg-primary/90"
               )}
@@ -337,7 +347,7 @@ export function OrbitScanHero({
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:justify-end">
-          {batchSelector}
+          <div className="w-full min-w-0 sm:w-auto">{batchSelector}</div>
 
           {hasScanPlan ? (
             <Button
