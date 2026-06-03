@@ -67,6 +67,7 @@ import type {
   CollectionWithCount,
   OrbitApplyResult,
   OrbitBookmarkSuggestion,
+  OrbitDecisionEventPayload,
   OrbitScanPlan,
   OrbitScanResponsePayload,
   TagWithCount,
@@ -85,7 +86,11 @@ interface OrbitReviewDialogProps {
   reviewSessionId: number;
   onApply: (
     reviewedPlan: OrbitScanPlan,
-    opts: { createCollections: boolean; keptBookmarkIds: string[] }
+    opts: {
+      createCollections: boolean;
+      keptBookmarkIds: string[];
+      decisionEvents: OrbitDecisionEventPayload[];
+    }
   ) => Promise<OrbitApplyResult | null>;
   digestBookmarkIds?: string[] | null;
   source?: string | null;
@@ -251,6 +256,26 @@ export function OrbitReviewModal({
     });
   }, [effectiveDrafts, existingCollections, existingTags, sourcePlan]);
 
+  const reviewedSuggestionById = useMemo(() => {
+    if (!reviewedPlan) return new Map<string, OrbitBookmarkSuggestion>();
+    return new Map(
+      reviewedPlan.suggestions.map((suggestion) => [
+        suggestion.bookmarkId,
+        suggestion,
+      ])
+    );
+  }, [reviewedPlan]);
+
+  const originalSuggestionById = useMemo(() => {
+    if (!sourcePlan) return new Map<string, OrbitBookmarkSuggestion>();
+    return new Map(
+      sourcePlan.suggestions.map((suggestion) => [
+        suggestion.bookmarkId,
+        suggestion,
+      ])
+    );
+  }, [sourcePlan]);
+
   const keptBookmarkIds = useMemo(
     () =>
       effectiveDrafts
@@ -258,6 +283,42 @@ export function OrbitReviewModal({
         .map((draft) => draft.bookmarkId),
     [effectiveDrafts]
   );
+
+  const decisionEvents = useMemo<OrbitDecisionEventPayload[]>(() => {
+    if (!sourcePlan) return [];
+    const eventSource =
+      source ?? (digestBookmarkIds && digestBookmarkIds.length > 0
+        ? "weekly-gems"
+        : "orbit-review");
+
+    return effectiveDrafts.map((draft) => {
+      const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
+      const reviewed = reviewedSuggestionById.get(draft.bookmarkId) ?? null;
+      const action: OrbitDecisionEventPayload["action"] =
+        draft.decision === "keep"
+          ? "kept"
+          : draftHasChanges(draft, original)
+            ? "edited"
+            : "accepted";
+
+      return {
+        bookmarkId: draft.bookmarkId,
+        action,
+        source: eventSource,
+        mode: reviewMode,
+        originalSuggestion: original,
+        reviewedSuggestion: reviewed,
+      };
+    });
+  }, [
+    digestBookmarkIds,
+    effectiveDrafts,
+    originalSuggestionById,
+    reviewedSuggestionById,
+    reviewMode,
+    source,
+    sourcePlan,
+  ]);
 
   const reviewStats = useMemo(() => {
     const tagAssignments =
@@ -276,16 +337,6 @@ export function OrbitReviewModal({
       collectionMoves,
     };
   }, [effectiveDrafts.length, keptBookmarkIds.length, reviewedPlan]);
-
-  const originalSuggestionById = useMemo(() => {
-    if (!sourcePlan) return new Map<string, OrbitBookmarkSuggestion>();
-    return new Map(
-      sourcePlan.suggestions.map((suggestion) => [
-        suggestion.bookmarkId,
-        suggestion,
-      ])
-    );
-  }, [sourcePlan]);
 
   const impact = useMemo(() => {
     let addedTagCount = 0;
@@ -394,10 +445,18 @@ export function OrbitReviewModal({
     const applied = await onApply(reviewedPlan, {
       createCollections,
       keptBookmarkIds,
+      decisionEvents,
     });
 
     if (applied) onOpenChange(false);
-  }, [createCollections, keptBookmarkIds, onApply, onOpenChange, reviewedPlan]);
+  }, [
+    createCollections,
+    decisionEvents,
+    keptBookmarkIds,
+    onApply,
+    onOpenChange,
+    reviewedPlan,
+  ]);
 
   const moveActiveDraft = useCallback(
     (offset: -1 | 1) => {

@@ -645,6 +645,103 @@ describe("buildOrbitPromptPayload", () => {
     expect(payload.bookmarks[0]).toMatchObject({
       id: "b1",
       sourceFolders: [{ name: "AI Papers" }],
+      signals: {
+        sourceFolders: ["AI Papers"],
+      },
+    });
+  });
+
+  it("includes structured X topics, alt text, vocabulary matches, and learning hints", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "A sparse save about evals.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: [
+            {
+              expanded_url: "https://arxiv.org/abs/2501.00001",
+              display_url: "arxiv.org/abs/2501.00001",
+              title: "AI evaluation benchmark",
+              description: "A paper on model evaluation.",
+            },
+          ],
+          quotedTweet: null,
+          notes: [],
+          xFolderHints: [{ name: "AI Papers" }],
+          xMetadata: {
+            tweet: {
+              note_tweet: {
+                text: "Full note tweet about AI benchmark evaluation systems.",
+              },
+              context_annotations: [
+                {
+                  domain: { name: "Technology" },
+                  entity: {
+                    name: "Artificial Intelligence",
+                    description: "AI systems",
+                  },
+                },
+              ],
+            },
+            media: [
+              {
+                media_key: "m1",
+                type: "photo",
+                alt_text: "Chart comparing AI benchmark scores",
+              },
+            ],
+          },
+        },
+      ],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 10 }],
+      existingCollections: [
+        { name: "AI Papers", description: "Research papers", bookmarkCount: 5 },
+      ],
+      learningHints: [
+        {
+          bookmarkId: "b1",
+          matchingTags: ["AI"],
+          matchingCollections: ["AI Papers"],
+          avoidTags: ["Article"],
+          avoidCollections: [],
+          reasons: ["same link domain: arxiv.org"],
+        },
+      ],
+    });
+
+    expect(payload.signalPriority).toEqual(
+      expect.arrayContaining([expect.stringContaining("signals.localLearning")])
+    );
+    expect(payload.bookmarks[0].signals).toMatchObject({
+      primaryText: "Full note tweet about AI benchmark evaluation systems.",
+      xTopics: [
+        {
+          domain: "Technology",
+          entity: "Artificial Intelligence",
+          description: "AI systems",
+        },
+      ],
+      visualContext: {
+        altTexts: ["Chart comparing AI benchmark scores"],
+      },
+      existingVocabularyMatches: {
+        tags: ["AI"],
+        collections: ["AI Papers"],
+      },
+      localLearning: {
+        matchingTags: ["AI"],
+        matchingCollections: ["AI Papers"],
+        avoidTags: ["Article"],
+        reasons: ["same link domain: arxiv.org"],
+      },
     });
   });
 

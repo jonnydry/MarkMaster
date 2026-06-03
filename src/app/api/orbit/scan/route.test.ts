@@ -12,6 +12,10 @@ vi.mock("@/lib/orbit-author-history", () => ({
   getAuthorPriorHintsForScan: vi.fn(async () => []),
 }));
 
+vi.mock("@/lib/orbit-decision-events", () => ({
+  getOrbitLearningHintsForScan: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     bookmark: {
@@ -204,6 +208,7 @@ describe("/api/orbit/scan", () => {
           },
         ],
         authorPriorHints: [],
+        learningHints: [],
       })
     );
   });

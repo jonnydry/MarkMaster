@@ -29,8 +29,16 @@ export interface XUser {
   id: string;
   name: string;
   username: string;
+  description?: string;
   profile_image_url?: string;
   verified?: boolean;
+  verified_type?: string;
+  public_metrics?: {
+    followers_count: number;
+    following_count: number;
+    tweet_count: number;
+    listed_count: number;
+  };
 }
 
 export interface XMedia {
@@ -41,6 +49,10 @@ export interface XMedia {
   width?: number;
   height?: number;
   duration_ms?: number;
+  alt_text?: string;
+  public_metrics?: {
+    view_count?: number;
+  };
   variants?: Array<{
     bit_rate?: number;
     content_type: string;
@@ -48,11 +60,46 @@ export interface XMedia {
   }>;
 }
 
+export interface XTweetEntities {
+  urls?: Array<{
+    start: number;
+    end: number;
+    url: string;
+    expanded_url: string;
+    display_url: string;
+    title?: string;
+    description?: string;
+    images?: Array<{ url: string; width: number; height: number }>;
+  }>;
+  mentions?: Array<{ start: number; end: number; username: string }>;
+}
+
 export interface XTweet {
   id: string;
   text: string;
   created_at: string;
   author_id: string;
+  lang?: string;
+  possibly_sensitive?: boolean;
+  conversation_id?: string;
+  community_id?: string;
+  context_annotations?: Array<{
+    domain?: {
+      id?: string;
+      name?: string;
+      description?: string;
+    };
+    entity?: {
+      id?: string;
+      name?: string;
+      description?: string;
+    };
+  }>;
+  note_tweet?: {
+    text?: string;
+    entities?: XTweetEntities;
+  };
+  article?: unknown;
   public_metrics?: {
     retweet_count: number;
     reply_count: number;
@@ -62,19 +109,7 @@ export interface XTweet {
     impression_count: number;
   };
   attachments?: { media_keys?: string[] };
-  entities?: {
-    urls?: Array<{
-      start: number;
-      end: number;
-      url: string;
-      expanded_url: string;
-      display_url: string;
-      title?: string;
-      description?: string;
-      images?: Array<{ url: string; width: number; height: number }>;
-    }>;
-    mentions?: Array<{ start: number; end: number; username: string }>;
-  };
+  entities?: XTweetEntities;
   referenced_tweets?: Array<{ type: string; id: string }>;
 }
 
@@ -87,10 +122,13 @@ export interface BookmarkData {
 
 function buildTweetQueryParams(ids?: string[]) {
   const params = new URLSearchParams({
-    "tweet.fields": "created_at,public_metrics,entities,referenced_tweets,attachments,author_id",
-    "user.fields": "name,username,profile_image_url,verified",
+    "tweet.fields":
+      "created_at,public_metrics,entities,referenced_tweets,attachments,author_id,context_annotations,lang,possibly_sensitive,conversation_id,community_id,note_tweet,article",
+    "user.fields":
+      "name,username,description,profile_image_url,verified,verified_type,public_metrics",
     expansions: "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id",
-    "media.fields": "type,url,preview_image_url,width,height,variants,duration_ms",
+    "media.fields":
+      "type,url,preview_image_url,width,height,variants,duration_ms,alt_text,public_metrics",
   });
 
   if (ids && ids.length > 0) {

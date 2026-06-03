@@ -305,9 +305,20 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
   const topEntrySources = analytics.flywheelTopEntrySources ?? [];
   const quickKeeps = analytics.flywheelQuickKeepCount ?? 0;
   const quickKeepRate = analytics.flywheelQuickPassKeepRate ?? 0;
+  const orbitAccepted = analytics.orbitDecisionAccepted ?? 0;
+  const orbitEdited = analytics.orbitDecisionEdited ?? 0;
+  const orbitKept = analytics.orbitDecisionKept ?? 0;
+  const orbitRejected = analytics.orbitDecisionRejected ?? 0;
+  const orbitTotal =
+    analytics.orbitDecisionTotal ??
+    orbitAccepted + orbitEdited + orbitKept + orbitRejected;
+  const orbitAcceptRate = analytics.orbitDecisionAcceptRate ?? 0;
+  const orbitEditRate = analytics.orbitDecisionEditRate ?? 0;
+  const orbitHighConfidenceAcceptRate = analytics.orbitHighConfidenceAcceptRate ?? 0;
   const sourceLabel = (src: string) => SOURCE_LABELS[src] || src;
 
-  const totalSignals = cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps;
+  const totalSignals =
+    cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps + orbitTotal;
   if (totalSignals === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -329,8 +340,16 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
         <SignalRow label="Quick Pass toggles" value={quick} />
         <SignalRow label="Deep Review toggles" value={deep} />
         <SignalRow label="Digest sessions" value={sessions} />
+        <SignalRow label="Orbit accepted" value={orbitAccepted} />
+        <SignalRow label="Orbit edited" value={orbitEdited} />
+        <SignalRow label="Orbit kept" value={orbitKept} />
+        <SignalRow label="Orbit rejected" value={orbitRejected} />
       </dl>
-      {(digestCta > 0 || quick + deep > 0 || topEntrySources.length > 0 || quickKeeps > 0) && (
+      {(digestCta > 0 ||
+        quick + deep > 0 ||
+        topEntrySources.length > 0 ||
+        quickKeeps > 0 ||
+        orbitTotal > 0) && (
         <div className="border-t border-hairline-soft pt-3 text-xs text-muted-foreground">
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {digestCta > 0 ? (
@@ -364,6 +383,30 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
                 Quick Pass keep rate{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(quickKeepRate * 100)}%
+                </span>
+              </span>
+            ) : null}
+            {orbitTotal > 0 ? (
+              <span>
+                Orbit accept rate{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {Math.round(orbitAcceptRate * 100)}%
+                </span>
+              </span>
+            ) : null}
+            {orbitTotal > 0 ? (
+              <span>
+                Orbit edit rate{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {Math.round(orbitEditRate * 100)}%
+                </span>
+              </span>
+            ) : null}
+            {orbitTotal > 0 ? (
+              <span>
+                High-confidence accept{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {Math.round(orbitHighConfidenceAcceptRate * 100)}%
                 </span>
               </span>
             ) : null}

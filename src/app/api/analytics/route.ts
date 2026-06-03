@@ -212,6 +212,28 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Orbit decision aggregates are optional for the same migration-stagger reason.
+  let orbitDecisionRows: { action: string; confidence: string | null; count: bigint }[] = [];
+  try {
+    orbitDecisionRows = await prisma.$queryRaw<
+      { action: string; confidence: string | null; count: bigint }[]
+    >`
+      SELECT
+        "action",
+        COALESCE("originalSuggestion"->>'confidence', '') AS confidence,
+        COUNT(*)::bigint as count
+      FROM "OrbitDecisionEvent"
+      WHERE "userId" = ${user.id}
+      ${fwTimeFilter}
+      GROUP BY "action", COALESCE("originalSuggestion"->>'confidence', '')
+    `;
+  } catch (err) {
+    console.warn(
+      "[analytics] OrbitDecisionEvent query failed — run prisma migrate deploy",
+      err
+    );
+  }
+
   const mediaCounts = mediaCountsRows[0] ?? {
     totalBookmarks: BigInt(0),
     mediaOnly: BigInt(0),
@@ -306,6 +328,35 @@ export async function GET(req: NextRequest) {
   const quickKeeps = fwCounts["quick.keep"] ?? 0;
   const quickPassKeepRate = quick > 0 ? Math.min(1, quickKeeps / quick) : 0;
 
+  const orbitDecisionCounts: Record<string, number> = {};
+  let orbitHighConfidenceDecisions = 0;
+  let orbitHighConfidenceAccepted = 0;
+  for (const row of orbitDecisionRows) {
+    const action = row.action || "";
+    const count = Number(row.count);
+    orbitDecisionCounts[action] = (orbitDecisionCounts[action] || 0) + count;
+    if (row.confidence === "high") {
+      orbitHighConfidenceDecisions += count;
+      if (action === "accepted") {
+        orbitHighConfidenceAccepted += count;
+      }
+    }
+  }
+  const orbitDecisionAccepted = orbitDecisionCounts.accepted ?? 0;
+  const orbitDecisionEdited = orbitDecisionCounts.edited ?? 0;
+  const orbitDecisionKept = orbitDecisionCounts.kept ?? 0;
+  const orbitDecisionRejected = orbitDecisionCounts.rejected ?? 0;
+  const orbitDecisionTotal =
+    orbitDecisionAccepted + orbitDecisionEdited + orbitDecisionKept + orbitDecisionRejected;
+  const orbitDecisionAcceptRate =
+    orbitDecisionTotal > 0 ? orbitDecisionAccepted / orbitDecisionTotal : 0;
+  const orbitDecisionEditRate =
+    orbitDecisionTotal > 0 ? orbitDecisionEdited / orbitDecisionTotal : 0;
+  const orbitHighConfidenceAcceptRate =
+    orbitHighConfidenceDecisions > 0
+      ? orbitHighConfidenceAccepted / orbitHighConfidenceDecisions
+      : 0;
+
   return NextResponse.json({
     topAuthors,
     mediaBreakdown: buildMediaBreakdown({
@@ -341,5 +392,13 @@ export async function GET(req: NextRequest) {
     flywheelTopEntrySources: topEntrySources,
     flywheelQuickKeepCount: quickKeeps,
     flywheelQuickPassKeepRate: quickPassKeepRate,
+    orbitDecisionAccepted,
+    orbitDecisionEdited,
+    orbitDecisionKept,
+    orbitDecisionRejected,
+    orbitDecisionTotal,
+    orbitDecisionAcceptRate,
+    orbitDecisionEditRate,
+    orbitHighConfidenceAcceptRate,
   });
 }

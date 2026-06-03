@@ -9,6 +9,10 @@ export type BookmarkMediaJson = {
   height?: number;
   playback_url?: string;
   duration_ms?: number;
+  alt_text?: string;
+  public_metrics?: {
+    view_count?: number;
+  };
 };
 
 export function isVideoLikeMediaType(type: string): boolean {
@@ -60,6 +64,8 @@ export function mapStoredBookmarkMedia(media: XMedia[]): BookmarkMediaJson[] {
       height: m.height,
       ...(playback_url ? { playback_url } : {}),
       ...(m.duration_ms != null ? { duration_ms: m.duration_ms } : {}),
+      ...(m.alt_text ? { alt_text: m.alt_text } : {}),
+      ...(m.public_metrics ? { public_metrics: m.public_metrics } : {}),
     };
   });
 }

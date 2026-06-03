@@ -30,6 +30,25 @@ export function shouldCreateCollectionsForPlan(plan: OrbitScanPlan): boolean {
   );
 }
 
+/**
+ * Guardrail for one-click/batch automation: only auto-apply high-confidence
+ * suggestions that reuse the user's existing vocabulary or collections.
+ * New labels can still be applied through Review, where the user can inspect them.
+ */
+export function isSafeAutoApplySuggestion(
+  suggestion: OrbitBookmarkSuggestion
+): boolean {
+  if (suggestion.confidence !== "high") return false;
+
+  const hasReusableTag =
+    suggestion.tags.length > 0 && suggestion.tags.every((tag) => tag.reuseExisting);
+  const hasReusableCollection = Boolean(
+    suggestion.collection && suggestion.collection.reuseExisting
+  );
+
+  return hasReusableTag || hasReusableCollection;
+}
+
 function tagDecision(
   tag: OrbitBookmarkSuggestion["tags"][number],
   confidence: OrbitScanConfidence

@@ -61,6 +61,12 @@ export interface BookmarkWithRelations {
       profile_image_url?: string;
     } | null;
   } | null;
+  xMetadata: {
+    schemaVersion?: number;
+    tweet?: Record<string, unknown>;
+    author?: Record<string, unknown>;
+    media?: Array<Record<string, unknown>>;
+  } | null;
   tweetCreatedAt: string;
   bookmarkedAt: string;
   tags: Array<{ tag: { id: string; name: string; color: string } }>;
@@ -132,6 +138,16 @@ export interface AnalyticsData {
   flywheelTopEntrySources: Array<{ source: string; count: number; pct: number }>;
   flywheelQuickKeepCount: number;
   flywheelQuickPassKeepRate: number;
+
+  // Orbit AI review outcomes, captured from reviewer actions and used to monitor sorting/tagging quality.
+  orbitDecisionAccepted: number;
+  orbitDecisionEdited: number;
+  orbitDecisionKept: number;
+  orbitDecisionRejected: number;
+  orbitDecisionTotal: number;
+  orbitDecisionAcceptRate: number;
+  orbitDecisionEditRate: number;
+  orbitHighConfidenceAcceptRate: number;
 }
 
 export type SyncRunStatus = "RUNNING" | "COMPLETED" | "RATE_LIMITED" | "FAILED";
@@ -223,6 +239,21 @@ export interface OrbitBookmarkSuggestion {
   reasoning: string;
   tags: OrbitTagSuggestion[];
   collection: OrbitCollectionSuggestion | null;
+}
+
+export type OrbitDecisionEventAction =
+  | "accepted"
+  | "edited"
+  | "kept"
+  | "rejected";
+
+export interface OrbitDecisionEventPayload {
+  bookmarkId: string;
+  action: OrbitDecisionEventAction;
+  source?: string | null;
+  mode?: "quick" | "deep" | string | null;
+  originalSuggestion?: OrbitBookmarkSuggestion | null;
+  reviewedSuggestion?: OrbitBookmarkSuggestion | null;
 }
 
 export interface OrbitScanOverview {

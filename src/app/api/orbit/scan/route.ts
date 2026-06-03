@@ -8,6 +8,7 @@ import {
   scanOrbitBookmarksWithXai,
 } from "@/lib/orbit-grok";
 import { getAuthorPriorHintsForScan } from "@/lib/orbit-author-history";
+import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
@@ -118,6 +119,17 @@ export async function POST(req: NextRequest) {
         })
       );
 
+      const [authorPriorHints, learningHints] = await Promise.all([
+        getAuthorPriorHintsForScan(
+          user.id,
+          bookmarksWithFolderHints.map((bookmark) => bookmark.authorUsername)
+        ),
+        getOrbitLearningHintsForScan({
+          userId: user.id,
+          bookmarks: bookmarksWithFolderHints,
+        }),
+      ]);
+
       const scan = await scanOrbitBookmarksWithXai({
         bookmarks: bookmarksWithFolderHints,
         existingTags: tags.map((tag) => ({
@@ -132,10 +144,8 @@ export async function POST(req: NextRequest) {
           description: collection.description,
           bookmarkCount: collection._count.items,
         })),
-        authorPriorHints: await getAuthorPriorHintsForScan(
-          user.id,
-          bookmarksWithFolderHints.map((bookmark) => bookmark.authorUsername)
-        ),
+        authorPriorHints,
+        learningHints,
       });
 
       return NextResponse.json(scan);

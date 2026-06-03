@@ -10,6 +10,71 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function safeJsonValue(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return undefined;
+  }
+}
+
+function hasOwnData(value: Record<string, unknown>) {
+  return Object.keys(value).length > 0;
+}
+
+export function buildBookmarkXMetadata(
+  data: BookmarkData
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const tweet: Record<string, unknown> = {};
+  const author: Record<string, unknown> = {};
+
+  if (data.tweet.lang) tweet.lang = data.tweet.lang;
+  if (typeof data.tweet.possibly_sensitive === "boolean") {
+    tweet.possibly_sensitive = data.tweet.possibly_sensitive;
+  }
+  if (data.tweet.conversation_id) {
+    tweet.conversation_id = data.tweet.conversation_id;
+  }
+  if (data.tweet.community_id) {
+    tweet.community_id = data.tweet.community_id;
+  }
+  if (data.tweet.context_annotations?.length) {
+    tweet.context_annotations = data.tweet.context_annotations;
+  }
+
+  const noteTweet = safeJsonValue(data.tweet.note_tweet);
+  if (noteTweet !== undefined) tweet.note_tweet = noteTweet;
+
+  const article = safeJsonValue(data.tweet.article);
+  if (article !== undefined) tweet.article = article;
+
+  if (data.author.description) author.description = data.author.description;
+  if (data.author.verified_type) author.verified_type = data.author.verified_type;
+  if (data.author.public_metrics) {
+    author.public_metrics = data.author.public_metrics;
+  }
+
+  const media = data.media.flatMap((item) => {
+    const metadata: Record<string, unknown> = {
+      media_key: item.media_key,
+      type: item.type,
+    };
+    if (item.alt_text) metadata.alt_text = item.alt_text;
+    if (item.public_metrics) metadata.public_metrics = item.public_metrics;
+    return hasOwnData(metadata) && Object.keys(metadata).length > 2 ? [metadata] : [];
+  });
+
+  const metadata: Record<string, unknown> = { schemaVersion: 1 };
+  if (hasOwnData(tweet)) metadata.tweet = tweet;
+  if (hasOwnData(author)) metadata.author = author;
+  if (media.length > 0) metadata.media = media;
+
+  return Object.keys(metadata).length > 1
+    ? (JSON.parse(JSON.stringify(metadata)) as Prisma.InputJsonValue)
+    : Prisma.JsonNull;
+}
+
 export function buildBookmarkUpdateData(data: BookmarkData) {
   return {
     tweetId: data.tweet.id,
@@ -38,6 +103,7 @@ export function buildBookmarkUpdateData(data: BookmarkData) {
             : null,
         }
       : Prisma.JsonNull,
+    xMetadata: buildBookmarkXMetadata(data),
     tweetCreatedAt: new Date(data.tweet.created_at),
     syncedAt: new Date(),
   };
@@ -106,6 +172,7 @@ export function buildBookmarkCreateData(userId: string, data: BookmarkData) {
             : null,
         }
       : Prisma.JsonNull,
+    xMetadata: buildBookmarkXMetadata(data),
     tweetCreatedAt: new Date(data.tweet.created_at),
     syncedAt: new Date(),
   };

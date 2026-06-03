@@ -20,13 +20,14 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  bookmarks       Bookmark[]
-  hiddenBookmarks HiddenBookmark[]
-  tags            Tag[]
-  collections     Collection[]
-  notes           Note[]
-  syncRuns        SyncRun[]
-  flywheelEvents  FlywheelEvent[]
+  bookmarks           Bookmark[]
+  hiddenBookmarks     HiddenBookmark[]
+  tags                Tag[]
+  collections         Collection[]
+  notes               Note[]
+  syncRuns            SyncRun[]
+  flywheelEvents      FlywheelEvent[]
+  orbitDecisionEvents OrbitDecisionEvent[]
 }
 
 enum CollectionType {
@@ -55,14 +56,16 @@ model Bookmark {
   media              Json?
   urls               Json?
   quotedTweet        Json?
+  xMetadata          Json?
   tweetCreatedAt     DateTime
   bookmarkedAt       DateTime @default(now())
   syncedAt           DateTime @default(now())
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tags            BookmarkTag[]
-  collectionItems CollectionItem[]
-  notes           Note[]
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags                BookmarkTag[]
+  collectionItems     CollectionItem[]
+  notes               Note[]
+  orbitDecisionEvents OrbitDecisionEvent[]
 
   @@unique([userId, tweetId])
   @@index([userId, bookmarkedAt(sort: Desc)])
@@ -93,17 +96,17 @@ model BookmarkTag {
 }
 
 model Collection {
-  id               String        @id @default(cuid())
+  id               String         @id @default(cuid())
   userId           String
   name             String
   description      String?
   type             CollectionType @default(user_collection)
-  isPublic         Boolean       @default(false)
-  shareSlug        String?       @unique
+  isPublic         Boolean        @default(false)
+  shareSlug        String?        @unique
   externalSource   String?
   externalSourceId String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CollectionItem[]
@@ -189,4 +192,23 @@ model FlywheelEvent {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, eventType, createdAt(sort: Desc)])
+}
+
+model OrbitDecisionEvent {
+  id                 String   @id @default(cuid())
+  userId             String
+  bookmarkId         String
+  action             String
+  source             String?
+  mode               String?
+  originalSuggestion Json?
+  reviewedSuggestion Json?
+  createdAt          DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, bookmarkId, createdAt(sort: Desc)])
+  @@index([userId, action, createdAt(sort: Desc)])
 }

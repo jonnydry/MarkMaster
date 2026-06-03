@@ -4,6 +4,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRESET_COLORS } from "@/lib/constants";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import {
+  extractOrbitBookmarkSignals,
+  type OrbitLearningHint,
+} from "@/lib/orbit-signal-extraction";
 import { getTagColorSpectrum } from "@/lib/tag-colors";
 import type {
   OrbitApplyResult,
@@ -189,6 +193,7 @@ export interface OrbitBookmarkForScan {
   media: unknown;
   urls: unknown;
   quotedTweet: unknown;
+  xMetadata?: unknown;
   notes: Array<{ id: string; content: string }>;
   xFolderHints?: Array<{ id?: string; name: string }>;
 }
@@ -632,10 +637,16 @@ function asXFolderHints(input: OrbitBookmarkForScan["xFolderHints"]) {
   return Array.from(deduped.values()).slice(0, MAX_X_FOLDER_HINTS_PER_BOOKMARK);
 }
 
-function buildBookmarkPayload(
-  bookmark: OrbitBookmarkForScan,
-  authorPriorHint?: OrbitAuthorPriorHint
-) {
+function buildBookmarkPayload(args: {
+  bookmark: OrbitBookmarkForScan;
+  existingTags: OrbitTagContext[];
+  existingCollections: OrbitCollectionContext[];
+  authorPriorHint?: OrbitAuthorPriorHint;
+  learningHint?: OrbitLearningHint;
+}) {
+  const { bookmark, authorPriorHint, existingTags, existingCollections, learningHint } =
+    args;
+
   return {
     id: bookmark.id,
     author: {
@@ -652,6 +663,12 @@ function buildBookmarkPayload(
     quotedTweet: asQuotedTweet(bookmark.quotedTweet),
     sourceFolders: asXFolderHints(bookmark.xFolderHints),
     metrics: asPublicMetrics(bookmark.publicMetrics),
+    signals: extractOrbitBookmarkSignals({
+      bookmark,
+      existingTags,
+      existingCollections,
+      learningHint,
+    }),
     ...(authorPriorHint
       ? {
           priorDecisions: {
@@ -669,6 +686,7 @@ export function buildOrbitPromptPayload(args: {
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
   authorPriorHints?: OrbitAuthorPriorHint[];
+  learningHints?: OrbitLearningHint[];
 }) {
   const palette = getTagColorSpectrum(
     Math.min(
@@ -686,6 +704,9 @@ export function buildOrbitPromptPayload(args: {
       hint,
     ])
   );
+  const learningHintByBookmarkId = new Map(
+    (args.learningHints ?? []).map((hint) => [hint.bookmarkId, hint])
+  );
 
   const promptTags = trimTagsForOrbitPrompt(args.existingTags);
   const promptCollections = trimCollectionsForOrbitPrompt(args.existingCollections);
@@ -695,8 +716,12 @@ export function buildOrbitPromptPayload(args: {
       "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
 
     signalPriority: [
+      "Start with bookmarks[].signals: xTopics, existingVocabularyMatches, sourceFolders, linkContext, visualContext.altTexts, and localLearning are deterministic hints extracted before the model call.",
       "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
       "When a bookmark includes priorDecisions, treat frequentTags/frequentCollections as strong hints for that author — but never override explicit tweet/quote/note topic.",
+      "When signals.localLearning appears, treat matchingTags/matchingCollections as strong local preference signals and avoidTags/avoidCollections as negative examples.",
+      "Use signals.existingVocabularyMatches as preferred candidates when they fit the content; do not copy them if the bookmark topic does not support them.",
+      "Use signals.xTopics and signals.visualContext.altTexts as strong context when tweet text is sparse.",
       "Use sourceFolders as weak-but-useful context because they are synced X folder names for that bookmark.",
       "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
       "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
@@ -840,10 +865,15 @@ export function buildOrbitPromptPayload(args: {
     ],
 
     bookmarks: args.bookmarks.map((bookmark) =>
-      buildBookmarkPayload(
+      buildBookmarkPayload({
         bookmark,
-        authorHintByUsername.get(normalizeKey(bookmark.authorUsername))
-      )
+        existingTags: args.existingTags,
+        existingCollections: args.existingCollections,
+        authorPriorHint: authorHintByUsername.get(
+          normalizeKey(bookmark.authorUsername)
+        ),
+        learningHint: learningHintByBookmarkId.get(bookmark.id),
+      })
     ),
   };
 }
@@ -1258,6 +1288,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
   authorPriorHints?: OrbitAuthorPriorHint[];
+  learningHints?: OrbitLearningHint[];
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitGrokError(

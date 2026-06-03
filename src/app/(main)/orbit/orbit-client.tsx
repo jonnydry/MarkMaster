@@ -71,6 +71,7 @@ import {
   orbitShellClass,
 } from "@/lib/orbit-route-chrome";
 import { appContentGutterClassName } from "@/lib/app-chrome";
+import { planOrbitScanBatch } from "@/lib/orbit-batch-planner";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
@@ -81,10 +82,11 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import { useOrbitScan, type OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
+import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { getBookmarkTweetUrl, openBookmarkOnX } from "@/lib/bookmark-url";
-import { fetchJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson, type JsonValue } from "@/lib/fetch-json";
 import {
   ORBIT_ALL_PAGE_SIZE,
   ORBIT_RECENT_PAGE_SIZE,
@@ -99,6 +101,7 @@ import type { DbUser } from "@/lib/auth";
 import type {
   BookmarkWithRelations,
   OrbitApplyResult,
+  OrbitDecisionEventPayload,
   OrbitScanPlan,
 } from "@/types";
 
@@ -429,21 +432,21 @@ export default function OrbitPage() {
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
   );
-  const visibleBookmarkIds = useMemo(
-    () => bookmarks.map((b) => b.id),
+  const defaultScanPlan = useMemo(
+    () => planOrbitScanBatch(bookmarks, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
     [bookmarks]
   );
-  const defaultScanTargetIds = useMemo(
-    () => visibleBookmarkIds.slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
-    [visibleBookmarkIds]
-  );
-  const selectedScanTargetIds = useMemo(
-    () =>
-      Array.from(selectedBookmarkIds)
-        .filter((bookmarkId) => bookmarkById.has(bookmarkId))
-        .slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
-    [bookmarkById, selectedBookmarkIds]
-  );
+  const defaultScanTargetIds = defaultScanPlan.bookmarkIds;
+  const selectedScanTargetIds = useMemo(() => {
+    const selectedBookmarks = Array.from(selectedBookmarkIds).flatMap((bookmarkId) => {
+      const bookmark = bookmarkById.get(bookmarkId);
+      return bookmark ? [bookmark] : [];
+    });
+    return planOrbitScanBatch(
+      selectedBookmarks,
+      ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN
+    ).bookmarkIds;
+  }, [bookmarkById, selectedBookmarkIds]);
   const scanningSelection = selectionMode && selectedScanTargetIds.length > 0;
   const scanTargetIds = scanningSelection
     ? selectedScanTargetIds
@@ -537,8 +540,7 @@ export default function OrbitPage() {
     return scan.plan.plan.suggestions.some(
       (suggestion) =>
         !scan.dismissedBookmarkIds.has(suggestion.bookmarkId) &&
-        suggestion.confidence === "high" &&
-        (suggestion.tags.length > 0 || suggestion.collection !== null)
+        isSafeAutoApplySuggestion(suggestion)
     );
   }, [scan.plan, scan.dismissedBookmarkIds]);
 
@@ -932,7 +934,11 @@ export default function OrbitPage() {
   const handleApplyReviewedPlan = useCallback(
     async (
       reviewedPlan: OrbitScanPlan,
-      opts: { createCollections: boolean; keptBookmarkIds: string[] }
+      opts: {
+        createCollections: boolean;
+        keptBookmarkIds: string[];
+        decisionEvents: OrbitDecisionEventPayload[];
+      }
     ) => {
       try {
         const hasMutations = reviewedPlan.suggestions.length > 0;
@@ -943,6 +949,19 @@ export default function OrbitPage() {
           : null;
 
         if (hasMutations && !applied) return null;
+
+        if (opts.decisionEvents.length > 0) {
+          try {
+            await sendJson("/api/orbit/decision-events", {
+              method: "POST",
+              body: JSON.parse(
+                JSON.stringify({ events: opts.decisionEvents })
+              ) as JsonValue,
+            });
+          } catch (err) {
+            console.warn("[orbit] decision event write failed:", err);
+          }
+        }
 
         for (const bookmarkId of opts.keptBookmarkIds) {
           scan.dismiss(bookmarkId);
@@ -995,11 +1014,14 @@ export default function OrbitPage() {
 
   const handleApplyStrongMatches = useCallback(async () => {
     try {
-      const applied = await scan.applyPlanSubset({ minConfidence: "high" });
+      const applied = await scan.applyPlanSubset({
+        minConfidence: "high",
+        safeExistingOnly: true,
+      });
       if (applied) {
         toast.success(`Applied strong matches · ${formatAppliedToast(applied)}`);
       } else {
-        toast.message("No strong matches left to apply in this pass.");
+        toast.message("No reusable strong matches left to apply in this pass.");
       }
     } catch {
       // Inline failure state is rendered near the Orbit scan controls.

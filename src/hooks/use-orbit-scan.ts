@@ -7,6 +7,7 @@ import { FetchJsonError, sendJson, type JsonValue } from "@/lib/fetch-json";
 import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
+  isSafeAutoApplySuggestion,
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
@@ -65,6 +66,7 @@ export interface OrbitScanHandle extends OrbitScanState {
   }) => Promise<OrbitApplyResult | null>;
   applyPlanSubset: (opts: {
     minConfidence: OrbitScanConfidence;
+    safeExistingOnly?: boolean;
   }) => Promise<OrbitApplyResult | null>;
   /** Skip this bookmark for the current Grok pass (idempotent). */
   dismiss: (bookmarkId: string) => void;
@@ -323,7 +325,10 @@ export function useOrbitScan(): OrbitScanHandle {
   );
 
   const applyPlanSubset = useCallback(
-    async (opts: { minConfidence: OrbitScanConfidence }) => {
+    async (opts: {
+      minConfidence: OrbitScanConfidence;
+      safeExistingOnly?: boolean;
+    }) => {
       if (!plan) return null;
 
       const pool = plan.plan.suggestions.filter(
@@ -332,6 +337,7 @@ export function useOrbitScan(): OrbitScanHandle {
       const filtered = pool.filter(
         (suggestion) =>
           suggestion.confidence === opts.minConfidence &&
+          (!opts.safeExistingOnly || isSafeAutoApplySuggestion(suggestion)) &&
           (suggestion.tags.length > 0 || suggestion.collection !== null)
       );
       if (filtered.length === 0) return null;

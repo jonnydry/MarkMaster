@@ -89,6 +89,7 @@ describe("sync-utils", () => {
         ],
         urls: [{ url: "https://example.com" }],
         quotedTweet: Prisma.JsonNull,
+        xMetadata: Prisma.JsonNull,
         tweetCreatedAt: new Date("2024-01-01T00:00:00Z"),
         syncedAt: expect.any(Date),
       });
@@ -117,6 +118,74 @@ describe("sync-utils", () => {
       expect(result.media).toBe(Prisma.JsonNull);
       expect(result.urls).toBe(Prisma.JsonNull);
       expect(result.quotedTweet).toBe(Prisma.JsonNull);
+      expect(result.xMetadata).toBe(Prisma.JsonNull);
+    });
+
+    it("preserves richer X metadata for Orbit signal extraction", () => {
+      const data: BookmarkData = {
+        ...makeBookmarkData("rich-1"),
+        tweet: {
+          ...makeBookmarkData("rich-1").tweet,
+          lang: "en",
+          possibly_sensitive: false,
+          conversation_id: "conversation-1",
+          context_annotations: [
+            {
+              domain: { id: "1", name: "Technology" },
+              entity: {
+                id: "2",
+                name: "Artificial Intelligence",
+                description: "AI topic",
+              },
+            },
+          ],
+          note_tweet: {
+            text: "A longer note tweet about AI evaluation systems.",
+          },
+        },
+        author: {
+          ...makeBookmarkData("rich-1").author,
+          description: "Researcher building evaluation tools",
+          public_metrics: {
+            followers_count: 1000,
+            following_count: 100,
+            tweet_count: 500,
+            listed_count: 10,
+          },
+        },
+        media: [
+          {
+            media_key: "m-rich",
+            type: "photo",
+            url: "https://example.com/photo.jpg",
+            alt_text: "Diagram of an evaluation pipeline",
+          },
+        ],
+      };
+
+      const result = buildBookmarkCreateData("user-1", data);
+
+      expect(result.xMetadata).toMatchObject({
+        schemaVersion: 1,
+        tweet: {
+          lang: "en",
+          possibly_sensitive: false,
+          conversation_id: "conversation-1",
+          note_tweet: {
+            text: "A longer note tweet about AI evaluation systems.",
+          },
+        },
+        author: {
+          description: "Researcher building evaluation tools",
+        },
+        media: [
+          {
+            media_key: "m-rich",
+            type: "photo",
+            alt_text: "Diagram of an evaluation pipeline",
+          },
+        ],
+      });
     });
   });
 
