@@ -408,6 +408,11 @@ html.theme-orbital:not(.dark) {
   100% { background-position: 250% 0; }
 }
 
+@keyframes orbit-scan-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(330%); }
+}
+
 @keyframes slide-down-fade {
   from {
     opacity: 0;
@@ -689,6 +694,15 @@ html.theme-orbital:not(.dark) {
     .skeleton-shimmer {
       animation: none;
       background-image: none;
+    }
+  }
+  .orbit-scan-progress-bar {
+    animation: orbit-scan-progress 1.15s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orbit-scan-progress-bar {
+      animation: none;
+      transform: translateX(100%);
     }
   }
   .animate-slide-down-fade {

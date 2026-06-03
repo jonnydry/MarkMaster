@@ -3,41 +3,47 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
+  ArrowRight,
   CheckCircle2,
+  FolderInput,
+  ListChecks,
   Loader2,
   RotateCcw,
   Sparkles,
+  Tags,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { GrokMark } from "@/components/brands/grok-mark";
-import { Button } from "@/components/ui/button";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { OrbitReviewEditSheet } from "@/components/orbit/orbit-review-edit-sheet";
-import type {
-  AuthorDecisionHistory,
-  AuthorDecisionHistoryData,
-} from "@/lib/orbit-author-history";
-import type {
-  SimilarCollections,
-  SimilarCollectionsData,
-} from "@/lib/orbit-similar-collections";
 import {
-  OrbitReviewTagField,
   OrbitReviewCollectionField,
   OrbitReviewDecisionControl,
+  OrbitReviewTagField,
   getDecisionLabel,
 } from "@/components/orbit/orbit-review-fields";
-
+import { useOrbitalTheme } from "@/components/providers";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import { fetchJson } from "@/lib/fetch-json";
+import { trackFlywheelEvent } from "@/lib/flywheel";
+import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
+import type {
+  AuthorDecisionHistory,
+  AuthorDecisionHistoryData,
+} from "@/lib/orbit-author-history";
+import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
 import {
   buildReviewedOrbitPlan,
   createOrbitReviewDraft,
@@ -50,16 +56,12 @@ import {
   type OrbitReviewDecision,
   type OrbitReviewSuggestionDraft,
 } from "@/lib/orbit-review";
-import { confidenceLabel, formatConfidence } from "@/lib/orbit-decision";
-import { cn } from "@/lib/utils";
-import { fetchJson } from "@/lib/fetch-json";
-
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 import { reviewChrome } from "@/lib/orbit-review-chrome";
-import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
-import { trackFlywheelEvent } from "@/lib/flywheel";
-import { toast } from "sonner";
+import type {
+  SimilarCollections,
+  SimilarCollectionsData,
+} from "@/lib/orbit-similar-collections";
+import { cn } from "@/lib/utils";
 import type {
   BookmarkWithRelations,
   CollectionWithCount,
@@ -85,12 +87,9 @@ interface OrbitReviewDialogProps {
     reviewedPlan: OrbitScanPlan,
     opts: { createCollections: boolean; keptBookmarkIds: string[] }
   ) => Promise<OrbitApplyResult | null>;
-
-  // Phase 2: When the user clicked "Review all" from a Highlights Digest
   digestBookmarkIds?: string[] | null;
-
-  // Phase 2: User feedback from the queue (good / not_relevant)
-  feedbackById?: Record<string, 'good' | 'not_relevant'>;
+  source?: string | null;
+  feedbackById?: Record<string, "good" | "not_relevant">;
 }
 
 function getPreviewText(
@@ -102,7 +101,44 @@ function getPreviewText(
   return "Bookmark preview unavailable.";
 }
 
-export function OrbitReviewDialog({
+function formatReviewDate(value: Date | string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getAuthorLabel(bookmark: BookmarkWithRelations | null): string {
+  return bookmark?.authorDisplayName || bookmark?.authorUsername || "Unknown";
+}
+
+function getHandleLabel(bookmark: BookmarkWithRelations | null): string {
+  return bookmark?.authorUsername ? `@${bookmark.authorUsername}` : "";
+}
+
+function draftHasChanges(
+  draft: OrbitReviewSuggestionDraft,
+  original: OrbitBookmarkSuggestion | null
+) {
+  const originalDecision = original ? deriveReviewDecision(original) : "keep";
+  const originalTagNames = original ? original.tags.map((tag) => tag.name) : [];
+  const currentTagNames = splitTagNames(draft.tagNames);
+  const originalTagSet = new Set(originalTagNames);
+  const currentTagSet = new Set(currentTagNames);
+  const tagsChanged =
+    originalTagSet.size !== currentTagSet.size ||
+    [...originalTagSet].some((tag) => !currentTagSet.has(tag));
+  const originalCollection = original?.collection?.name || "";
+
+  return (
+    draft.decision !== originalDecision ||
+    tagsChanged ||
+    draft.collectionName.trim() !== originalCollection
+  );
+}
+
+export function OrbitReviewModal({
   open,
   onOpenChange,
   plan,
@@ -115,9 +151,13 @@ export function OrbitReviewDialog({
   reviewSessionId,
   onApply,
   digestBookmarkIds,
+  source,
   feedbackById = {},
 }: OrbitReviewDialogProps) {
   const { isOrbital } = useOrbitalTheme();
+  const rcx = reviewChrome(isOrbital);
+  const queryClient = useQueryClient();
+
   const [draftState, setDraftState] = useState<{
     key: string;
     drafts: OrbitReviewSuggestionDraft[];
@@ -126,34 +166,23 @@ export function OrbitReviewDialog({
     key: string;
     value: boolean;
   }>(() => ({ key: "empty", value: true }));
-
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [sheetBookmarkId, setSheetBookmarkId] = useState<string | null>(null);
-  const [, setFeedbackTick] = useState(0); // for refreshing per-draft history IIFEs after batch Mark Good
-
-  // reviewMode uses the same keyed-state pattern as draftState / createCollectionsState
-  // (keyed by reviewSessionId). This guarantees:
-  // - Fresh "deep" default for every new review session (when parent bumps reviewSessionId
-  //   before opening the dialog, or on first mount).
-  // - Toggled value persists for the duration of the current reviewSessionId (while dialog open).
-  // - No setState-in-effect needed; derivation handles reset automatically.
-  // Slice 2: within-session memory means once user picks Quick Pass, all subsequent
-  // card previews + Details sheets in this review respect quick visuals/defaults (no retoggle).
-  // (assuming parent bumped reviewSessionId on open, as the primary handlers do)
-  // Matches "default to 'deep' to preserve current behavior" + reset on new session/close+reopen.
   const [reviewModeState, setReviewModeState] = useState<{
     key: string;
     mode: "quick" | "deep";
   }>(() => ({ key: "empty", mode: "deep" }));
+  const [activeDraftState, setActiveDraftState] = useState<{
+    key: string;
+    id: string | null;
+  }>(() => ({ key: "empty", id: null }));
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const [sheetBookmarkId, setSheetBookmarkId] = useState<string | null>(null);
+  const [, setFeedbackTick] = useState(0);
 
   const reviewMode: "quick" | "deep" =
-    reviewModeState.key === String(reviewSessionId) ? reviewModeState.mode : "deep";
+    reviewModeState.key === String(reviewSessionId)
+      ? reviewModeState.mode
+      : "deep";
   const isQuick = reviewMode === "quick";
-
-  // For reading cached Item 9 author/similar data (populated only on-demand by the sheet queries).
-  // Enables getQuickSmartPatch to return history-aware patches in list cards *without any new API calls*.
-  // If an author/bookmark was never opened in Details during this session, cache miss -> pure original fallback.
-  const queryClient = useQueryClient();
 
   const bookmarkById = useMemo(
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
@@ -165,7 +194,9 @@ export function OrbitReviewDialog({
 
     const suggestions = plan.plan.suggestions.filter((suggestion) => {
       if (dismissedBookmarkIds.has(suggestion.bookmarkId)) return false;
-      if (focusBookmarkId) return suggestion.bookmarkId === focusBookmarkId;
+      if (focusBookmarkId && !(digestBookmarkIds && digestBookmarkIds.length > 0)) {
+        return suggestion.bookmarkId === focusBookmarkId;
+      }
       return true;
     });
 
@@ -173,7 +204,7 @@ export function OrbitReviewDialog({
       overview: plan.plan.overview,
       suggestions,
     };
-  }, [dismissedBookmarkIds, focusBookmarkId, plan]);
+  }, [digestBookmarkIds, dismissedBookmarkIds, focusBookmarkId, plan]);
 
   const draftKey = useMemo(() => {
     if (!sourcePlan) return "empty";
@@ -191,39 +222,44 @@ export function OrbitReviewDialog({
     return createOrbitReviewDraft(sourcePlan);
   }, [draftKey, draftState, sourcePlan]);
 
-  // Phase 2: Filter for Digest mode + user feedback
   const effectiveDrafts = useMemo(() => {
     let result = drafts;
 
-    // 1. Filter to only the gems from the current Digest (if any)
     if (digestBookmarkIds && digestBookmarkIds.length > 0) {
       const digestSet = new Set(digestBookmarkIds);
-      result = result.filter((d) => digestSet.has(d.bookmarkId));
+      result = result.filter((draft) => digestSet.has(draft.bookmarkId));
     }
 
-    // 2. Respect inline feedback from the queue (hide "not relevant")
-    result = result.filter((d) => feedbackById[d.bookmarkId] !== 'not_relevant');
-
-    return result;
+    return result.filter(
+      (draft) => feedbackById[draft.bookmarkId] !== "not_relevant"
+    );
   }, [drafts, digestBookmarkIds, feedbackById]);
 
   const createCollections =
-    createCollectionsState.key === draftKey ? createCollectionsState.value : true;
+    createCollectionsState.key === draftKey
+      ? createCollectionsState.value
+      : true;
 
   const reviewedPlan = useMemo(() => {
     if (!sourcePlan) return null;
 
     return buildReviewedOrbitPlan({
       sourcePlan,
-      drafts: effectiveDrafts,   // only the filtered gems when in digest mode
+      drafts: effectiveDrafts,
       existingTags,
       existingCollections,
     });
   }, [effectiveDrafts, existingCollections, existingTags, sourcePlan]);
 
+  const keptBookmarkIds = useMemo(
+    () =>
+      effectiveDrafts
+        .filter((draft) => draft.decision === "keep")
+        .map((draft) => draft.bookmarkId),
+    [effectiveDrafts]
+  );
+
   const reviewStats = useMemo(() => {
-    const keptBookmarks = effectiveDrafts.filter((draft) => draft.decision === "keep")
-      .length;
     const tagAssignments =
       reviewedPlan?.suggestions.reduce(
         (total, suggestion) => total + suggestion.tags.length,
@@ -234,34 +270,101 @@ export function OrbitReviewDialog({
         .length ?? 0;
 
     return {
-      applyableBookmarks: effectiveDrafts.length, // only count what the user is actually reviewing right now
-      keptBookmarks,
+      applyableBookmarks: effectiveDrafts.length,
+      keptBookmarks: keptBookmarkIds.length,
       tagAssignments,
       collectionMoves,
     };
-  }, [effectiveDrafts, reviewedPlan]);
+  }, [effectiveDrafts.length, keptBookmarkIds.length, reviewedPlan]);
 
-  const keptBookmarkIds = useMemo(
+  const originalSuggestionById = useMemo(() => {
+    if (!sourcePlan) return new Map<string, OrbitBookmarkSuggestion>();
+    return new Map(
+      sourcePlan.suggestions.map((suggestion) => [
+        suggestion.bookmarkId,
+        suggestion,
+      ])
+    );
+  }, [sourcePlan]);
+
+  const impact = useMemo(() => {
+    let addedTagCount = 0;
+    let addedCollectionCount = 0;
+
+    effectiveDrafts.forEach((draft) => {
+      const original = originalSuggestionById.get(draft.bookmarkId);
+      if (!original) return;
+
+      const originalTags = original.tags.map((tag) => tag.name);
+      splitTagNames(draft.tagNames).forEach((tag) => {
+        if (!originalTags.includes(tag)) addedTagCount += 1;
+      });
+
+      if (draft.collectionName.trim() && !original.collection) {
+        addedCollectionCount += 1;
+      }
+    });
+
+    return { addedTagCount, addedCollectionCount };
+  }, [effectiveDrafts, originalSuggestionById]);
+
+  const activeDraftKey = useMemo(
     () =>
-      effectiveDrafts
-        .filter((draft) => draft.decision === "keep")
-        .map((draft) => draft.bookmarkId),
-    [effectiveDrafts]
+      [
+        reviewSessionId,
+        focusBookmarkId ?? "all",
+        effectiveDrafts.map((draft) => draft.bookmarkId).join("|"),
+      ].join(":"),
+    [effectiveDrafts, focusBookmarkId, reviewSessionId]
   );
+
+  const defaultActiveDraftId =
+    effectiveDrafts.length === 0
+      ? null
+      : focusBookmarkId &&
+          effectiveDrafts.some((draft) => draft.bookmarkId === focusBookmarkId)
+        ? focusBookmarkId
+        : effectiveDrafts[0]?.bookmarkId ?? null;
+
+  const activeDraftId =
+    activeDraftState.key === activeDraftKey &&
+    activeDraftState.id &&
+    effectiveDrafts.some((draft) => draft.bookmarkId === activeDraftState.id)
+      ? activeDraftState.id
+      : defaultActiveDraftId;
+
+  const activeDraftIndex = useMemo(() => {
+    if (!activeDraftId) return effectiveDrafts.length > 0 ? 0 : -1;
+    const index = effectiveDrafts.findIndex(
+      (draft) => draft.bookmarkId === activeDraftId
+    );
+    return index === -1 && effectiveDrafts.length > 0 ? 0 : index;
+  }, [activeDraftId, effectiveDrafts]);
+
+  const activeDraft =
+    activeDraftIndex >= 0 ? effectiveDrafts[activeDraftIndex] ?? null : null;
+  const activeBookmark = activeDraft
+    ? bookmarkById.get(activeDraft.bookmarkId) ?? null
+    : null;
+  const activeOriginal = activeDraft
+    ? originalSuggestionById.get(activeDraft.bookmarkId) ?? null
+    : null;
+  const activeHasChanges = activeDraft
+    ? draftHasChanges(activeDraft, activeOriginal)
+    : false;
 
   const updateDraft = useCallback(
     (bookmarkId: string, patch: Partial<OrbitReviewSuggestionDraft>) => {
-      // Phase 3 Item 12 Slice 3: lightweight outcome instrumentation for Quick Pass keep decisions.
-      // Fires only on explicit keep while Quick Pass active (follows all existing trackFlywheelEvent patterns).
-      // Zero UI, zero perf, zero user-visible impact — pure measurement for the elegant keep-rate signal.
       if (patch.decision === "keep" && isQuick) {
         trackFlywheelEvent("quick.keep", { via: "decision" });
       }
+
       setDraftState((prev) => {
         const activeDrafts =
           prev.key === draftKey && prev.drafts.length > 0
             ? prev.drafts
             : drafts;
+
         return {
           key: draftKey,
           drafts: activeDrafts.map((draft) =>
@@ -287,61 +390,54 @@ export function OrbitReviewDialog({
     ) {
       return;
     }
+
     const applied = await onApply(reviewedPlan, {
       createCollections,
       keptBookmarkIds,
     });
-    if (applied) {
-      onOpenChange(false);
-    }
+
+    if (applied) onOpenChange(false);
   }, [createCollections, keptBookmarkIds, onApply, onOpenChange, reviewedPlan]);
 
-  const title = focusBookmarkId ? "Review bookmark move" : "Review Orbit pass";
-  const canApply = Boolean(
-    reviewedPlan &&
-      (reviewedPlan.suggestions.length > 0 || keptBookmarkIds.length > 0)
+  const moveActiveDraft = useCallback(
+    (offset: -1 | 1) => {
+      if (effectiveDrafts.length === 0) return;
+
+      setActiveDraftState((current) => {
+        const currentId =
+          current.key === activeDraftKey ? current.id : activeDraftId;
+        const currentIndex = currentId
+          ? effectiveDrafts.findIndex((draft) => draft.bookmarkId === currentId)
+          : 0;
+        const nextIndex = Math.max(
+          0,
+          Math.min(
+            effectiveDrafts.length - 1,
+            (currentIndex === -1 ? 0 : currentIndex) + offset
+          )
+        );
+        return {
+          key: activeDraftKey,
+          id: effectiveDrafts[nextIndex]?.bookmarkId ?? currentId,
+        };
+      });
+    },
+    [activeDraftId, activeDraftKey, effectiveDrafts]
   );
 
-  // Supporting state derived for the refined native review UI (impact bar + per-card diffing)
-  const originalSuggestionById = useMemo(() => {
-    if (!sourcePlan) return new Map<string, OrbitBookmarkSuggestion>();
-    return new Map(
-      sourcePlan.suggestions.map((s) => [s.bookmarkId, s] as const)
-    );
-  }, [sourcePlan]);
-
-  const impact = useMemo(() => {
-    let addedTagCount = 0;
-    let addedCollectionCount = 0;
-    effectiveDrafts.forEach((draft) => {
-      const original = originalSuggestionById.get(draft.bookmarkId);
-      if (!original) return;
-      const origTagNames = original.tags.map((t) => t.name);
-      const currTagNames = splitTagNames(draft.tagNames);
-      currTagNames.forEach((t) => {
-        if (!origTagNames.includes(t)) addedTagCount += 1;
-      });
-      const hadCol = Boolean(original.collection);
-      const hasCol = Boolean(draft.collectionName.trim());
-      if (hasCol && !hadCol) addedCollectionCount += 1;
-    });
-    return { addedTagCount, addedCollectionCount };
-  }, [effectiveDrafts, originalSuggestionById]);
-
-  // Real historical author decision context (Phase 3 Item 9 Slice 2, Approach A).
-  // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
-  // opens for a bookmark. Delivers highest-quality library signals (real tags +
-  // user collections from prior bookmarks by same author, ordered by freq+recency
-  // in the DB aggregation). Loading state handled for graceful UX. No heavy
-  // pre-caching; natural react-query staleTime provides light reuse.
   const sheetAuthor = useMemo(() => {
     if (!sheetBookmarkId) return null;
     return bookmarkById.get(sheetBookmarkId)?.authorUsername ?? null;
-  }, [sheetBookmarkId, bookmarkById]);
+  }, [bookmarkById, sheetBookmarkId]);
 
   const normalizedSheetAuthor = sheetAuthor?.trim().toLowerCase() ?? null;
 
-  const { data, isLoading, isFetching, isError: authorHistoryError } = useQuery<AuthorDecisionHistoryData>({
+  const {
+    data: authorData,
+    isLoading: authorLoading,
+    isFetching: authorFetching,
+    isError: authorHistoryError,
+  } = useQuery<AuthorDecisionHistoryData>({
     queryKey: ["orbit", "author-history", normalizedSheetAuthor],
     queryFn: async () => {
       if (!sheetAuthor) return null;
@@ -351,62 +447,59 @@ export function OrbitReviewDialog({
       );
     },
     enabled: isEditSheetOpen && !!normalizedSheetAuthor,
-    staleTime: 5 * 60 * 1000, // 5 min — light natural reuse across quick re-opens
+    staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
   const authorHistoryForSheet = useMemo<AuthorDecisionHistory>(() => {
-    if (!sheetAuthor) return null;
-    if (authorHistoryError) return null;
-    if (isLoading || isFetching) {
+    if (!sheetAuthor || authorHistoryError) return null;
+    if (authorLoading || authorFetching) {
       return { authorUsername: sheetAuthor, loading: true };
     }
-    return data ?? null;
-  }, [sheetAuthor, authorHistoryError, data, isLoading, isFetching]);
+    return authorData ?? null;
+  }, [
+    authorData,
+    authorFetching,
+    authorHistoryError,
+    authorLoading,
+    sheetAuthor,
+  ]);
 
-  // Similar high-performers context (Phase 3 Item 9 Slice 3, Approach A).
-  // Dedicated lightweight query (via useQuery + API) fired when the edit sheet
-  // opens for a bookmark. Delivers real high-signal overlaps on the current
-  // bookmark's collections (primary) + tags (secondary), weighted by the
-  // established performance score + overlap strength. Small limit for quality.
-  // Loading state handled for graceful UX. Reuses exact same on-demand + staleTime
-  // pattern as author history (no pre-compute, no scan changes).
   const {
     data: similarData,
     isLoading: similarLoading,
     isFetching: similarFetching,
     isError: similarCollectionsError,
   } = useQuery<SimilarCollectionsData>({
-      queryKey: ["orbit", "similar-collections", sheetBookmarkId],
-      queryFn: async () => {
-        if (!sheetBookmarkId) return null;
-        return fetchJson<SimilarCollectionsData>(
-          `/api/orbit/similar-collections?bookmarkId=${encodeURIComponent(sheetBookmarkId)}`
-        );
-      },
-      enabled: isEditSheetOpen && !!sheetBookmarkId,
-      staleTime: 5 * 60 * 1000, // 5 min — light natural reuse across quick re-opens
-      gcTime: 10 * 60 * 1000,
-    });
+    queryKey: ["orbit", "similar-collections", sheetBookmarkId],
+    queryFn: async () => {
+      if (!sheetBookmarkId) return null;
+      return fetchJson<SimilarCollectionsData>(
+        `/api/orbit/similar-collections?bookmarkId=${encodeURIComponent(sheetBookmarkId)}`
+      );
+    },
+    enabled: isEditSheetOpen && !!sheetBookmarkId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
 
   const similarCollectionsForSheet = useMemo<SimilarCollections>(() => {
-    if (!sheetBookmarkId) return null;
-    if (similarCollectionsError) return null;
-    if (similarLoading || similarFetching) {
-      return { loading: true };
-    }
+    if (!sheetBookmarkId || similarCollectionsError) return null;
+    if (similarLoading || similarFetching) return { loading: true };
     return similarData ?? null;
-  }, [sheetBookmarkId, similarCollectionsError, similarData, similarLoading, similarFetching]);
+  }, [
+    sheetBookmarkId,
+    similarCollectionsError,
+    similarData,
+    similarFetching,
+    similarLoading,
+  ]);
 
-  // Keyboard shortcut for Quick Pass / Deep Review toggle (Q). Scoped to when the
-  // dialog is open (prevents silent mutations while viewing orbit map/list outside the review).
-  // Also guards BUTTON (decision controls etc.) + INPUT/TEXTAREA/contentEditable.
-  // Uses reviewSessionId for the keyed setter so Q inside an open dialog respects the
-  // current session (reset happens on new reviewSessionId).
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (!open) return;
-      const target = e.target as HTMLElement | null;
+
+      const target = event.target as HTMLElement | null;
       if (target) {
         const tag = target.tagName;
         if (
@@ -418,36 +511,50 @@ export function OrbitReviewDialog({
           return;
         }
       }
-      if (e.key.toLowerCase() === "q") {
-        e.preventDefault();
+
+      const key = event.key.toLowerCase();
+      if (key === "q") {
+        event.preventDefault();
         setReviewModeState((prev) => {
-          const currMode =
+          const currentMode =
             prev.key === String(reviewSessionId) ? prev.mode : "deep";
-          const next = currMode === "quick" ? "deep" : "quick";
-          // Phase 3 Item 12: track Quick Pass / Deep Review keyboard toggle for adoption signal
-          trackFlywheelEvent(next === "quick" ? "mode.quick" : "mode.deep", { via: "keyboard" });
-          return {
-            key: String(reviewSessionId),
-            mode: next,
-          };
+          const next = currentMode === "quick" ? "deep" : "quick";
+          trackFlywheelEvent(next === "quick" ? "mode.quick" : "mode.deep", {
+            via: "keyboard",
+          });
+          return { key: String(reviewSessionId), mode: next };
         });
+      } else if (
+        key === "j" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowRight"
+      ) {
+        event.preventDefault();
+        moveActiveDraft(1);
+      } else if (
+        key === "k" ||
+        event.key === "ArrowUp" ||
+        event.key === "ArrowLeft"
+      ) {
+        event.preventDefault();
+        moveActiveDraft(-1);
       }
     };
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, reviewSessionId]);
+  }, [moveActiveDraft, open, reviewSessionId]);
 
   const handleBulkApplySuggested = useCallback(() => {
     if (!sourcePlan) return;
-    const fresh = createOrbitReviewDraft(sourcePlan);
-    setDraftState({ key: draftKey, drafts: fresh });
+    setDraftState({ key: draftKey, drafts: createOrbitReviewDraft(sourcePlan) });
   }, [draftKey, sourcePlan]);
 
   const handleBulkKeepAll = useCallback(() => {
-    drafts.forEach((d) =>
-      updateDraft(d.bookmarkId, { decision: "keep", included: false })
+    effectiveDrafts.forEach((draft) =>
+      updateDraft(draft.bookmarkId, { decision: "keep", included: false })
     );
-  }, [drafts, updateDraft]);
+  }, [effectiveDrafts, updateDraft]);
 
   const handleBulkTagOnly = useCallback(() => {
     setDraftState((prev) => {
@@ -455,22 +562,30 @@ export function OrbitReviewDialog({
         prev.key === draftKey && prev.drafts.length > 0
           ? prev.drafts
           : drafts;
+      const visibleIds = new Set(
+        effectiveDrafts.map((draft) => draft.bookmarkId)
+      );
+
       return {
         key: draftKey,
-        drafts: activeDrafts.map((d) => ({
-          ...d,
-          decision: "tags" as OrbitReviewDecision,
-          included: true,
-        })),
+        drafts: activeDrafts.map((draft) =>
+          visibleIds.has(draft.bookmarkId)
+            ? {
+                ...draft,
+                decision: "tags" as OrbitReviewDecision,
+                included: true,
+              }
+            : draft
+        ),
       };
     });
-  }, [draftKey, drafts]);
+  }, [draftKey, drafts, effectiveDrafts]);
 
   const handleResetOne = useCallback(
     (bookmarkId: string) => {
-      const orig = originalSuggestionById.get(bookmarkId);
-      if (!orig) return;
-      const fresh = createOrbitReviewDraftFromSuggestion(orig);
+      const original = originalSuggestionById.get(bookmarkId);
+      if (!original) return;
+      const fresh = createOrbitReviewDraftFromSuggestion(original);
       updateDraft(bookmarkId, {
         decision: fresh.decision,
         included: fresh.included,
@@ -482,516 +597,644 @@ export function OrbitReviewDialog({
     [originalSuggestionById, updateDraft]
   );
 
-  // Slice 3: explicit one-click handler for the prominent Quick Pass "Accept Orbit suggestion" button.
-  // Computes smart patch at click time by reading react-query cache (populated by the existing
-  // on-demand sheet queries for author-history / similar-collections). Zero additional network.
-  // - With no cache hit: falls back to original Grok suggestion (pure "Accept Orbit").
-  // - With cache hit (user opened Details for author/item before): applies conservative
-  //   history/similar-derived patch (e.g. preferred tags/collections from past decisions).
-  // Patch applied exactly like manual edits or Reset; downstream reviewedPlan / Apply unchanged.
-  // Smart is *never* auto-applied on render or draft creation — only on this explicit click.
   const handleAcceptOrbitSuggestion = useCallback(
     (bookmarkId: string) => {
-      const orig = originalSuggestionById.get(bookmarkId);
-      if (!orig) return;
+      const original = originalSuggestionById.get(bookmarkId);
+      if (!original) return;
 
-      // Read caches at click time (safe, never triggers fetch; undefined => treat as no signal)
-      const bm = bookmarkById.get(bookmarkId);
-      const auth = bm?.authorUsername?.trim().toLowerCase() ?? null;
-
-      let h: AuthorDecisionHistory | null = null;
-      if (auth) {
-        const cached = queryClient.getQueryData<AuthorDecisionHistoryData>([
-          "orbit",
-          "author-history",
-          auth,
-        ]);
-        if (cached !== undefined) {
-          h = cached; // Data | null (non-loading)
-        }
-      }
-
-      const cachedSim = queryClient.getQueryData<SimilarCollectionsData>([
+      const bookmark = bookmarkById.get(bookmarkId);
+      const author = bookmark?.authorUsername?.trim().toLowerCase() ?? null;
+      const authorHistory = author
+        ? queryClient.getQueryData<AuthorDecisionHistoryData>([
+            "orbit",
+            "author-history",
+            author,
+          ])
+        : undefined;
+      const similarCollections = queryClient.getQueryData<SimilarCollectionsData>([
         "orbit",
         "similar-collections",
         bookmarkId,
       ]);
-      const s: SimilarCollections | null =
-        cachedSim !== undefined ? cachedSim : null;
 
-      const patch = getQuickSmartPatch(orig, h, s);
-      const baseFromOrig = createOrbitReviewDraftFromSuggestion(orig);
-      const finalPatch = patch ?? baseFromOrig;
+      const patch =
+        getQuickSmartPatch(
+          original,
+          authorHistory !== undefined ? authorHistory : null,
+          similarCollections !== undefined ? similarCollections : null
+        ) ?? createOrbitReviewDraftFromSuggestion(original);
 
       updateDraft(bookmarkId, {
-        decision: finalPatch.decision,
-        included: finalPatch.decision !== "keep",
-        tagNames: finalPatch.tagNames ?? "",
-        collectionName: finalPatch.collectionName ?? "",
-        collectionDescription: finalPatch.collectionDescription ?? "",
+        decision: patch.decision,
+        included: patch.decision !== "keep",
+        tagNames: patch.tagNames ?? "",
+        collectionName: patch.collectionName ?? "",
+        collectionDescription: patch.collectionDescription ?? "",
       });
     },
-    [
-      bookmarkById,
-      originalSuggestionById,
-      queryClient,
-      updateDraft,
-    ]
+    [bookmarkById, originalSuggestionById, queryClient, updateDraft]
   );
 
-  const rcx = reviewChrome(isOrbital);
+  const handleMarkRemainingGood = useCallback(() => {
+    let marked = 0;
+    effectiveDrafts.forEach((draft) => {
+      if (getHighlightFeedback(draft.bookmarkId) !== "not_relevant") {
+        addLikedHighlightId(draft.bookmarkId);
+        marked += 1;
+      }
+    });
+
+    if (marked > 0) {
+      toast.success(`Marked ${marked} as Good - boosts future Highlights`);
+    }
+    setFeedbackTick((tick) => tick + 1);
+  }, [effectiveDrafts]);
+
+  const canApply = Boolean(
+    reviewedPlan &&
+      (reviewedPlan.suggestions.length > 0 || keptBookmarkIds.length > 0)
+  );
+  const isDigestReview =
+    source === "weekly-gems" ||
+    Boolean(digestBookmarkIds && digestBookmarkIds.length > 0);
+  const title = focusBookmarkId
+    ? isDigestReview
+      ? "Weekly Gems review"
+      : "Review bookmark move"
+    : isDigestReview
+      ? "Weekly Gems review"
+      : "Review Orbit pass";
+  const activePositionLabel =
+    activeDraftIndex >= 0
+      ? `${activeDraftIndex + 1} / ${effectiveDrafts.length}`
+      : `0 / ${effectiveDrafts.length}`;
+  const activePreview = getPreviewText(activeBookmark, activeOriginal?.reasoning);
+  const activeFeedback = activeDraft
+    ? getHighlightFeedback(activeDraft.bookmarkId) ??
+      feedbackById[activeDraft.bookmarkId]
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={rcx.dialogShell}>
-        <DialogHeader className={cn("border-b px-5 py-4", rcx.headerBorder)}>
-          {digestBookmarkIds && digestBookmarkIds.length > 0 && (
-            <div className={cn("mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm", orbital.badge("cyan"))}>
-              <Sparkles className="h-4 w-4" />
-              <span>
-                Reviewing your Weekly Gems from Highlights ({digestBookmarkIds.length} items)
-              </span>
-            </div>
-          )}
-          <div className="flex items-start gap-3">
-            <span className={cn("mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl", orbital.icon)}>
-              <GrokMark className="size-4" title="Grok" />
-            </span>
-            <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-background/35 supports-backdrop-filter:backdrop-blur-xl dark:bg-black/45"
+        className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1180px] overflow-hidden border border-hairline-strong bg-surface-1/78 p-0 shadow-[0_30px_120px_-50px_rgba(0,0,0,0.95)] supports-[backdrop-filter]:backdrop-blur-2xl sm:max-w-[1180px]"
+      >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <DialogDescription className="sr-only">
+          Review Orbit suggestions, edit destinations, and apply selected
+          decisions.
+        </DialogDescription>
+
+        <div
+          data-orbit-review-modal
+          className="grid max-h-[calc(100dvh-1.5rem)] min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]"
+        >
+          <main className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription className={cn("mt-1", rcx.muted)}>
-                  Choose what to do with each suggestion, then adjust the tags and
-                  destinations that will be applied.
-                </DialogDescription>
-              </div>
-
-              {/* Quick Pass / Deep Review mode toggle + keyboard hint (Phase 3 Item 10 Slice 1).
-                   Title+desc flex keeps toggle right-aligned without overlap (handles long titles + digest banner). */}
-              <div className="shrink-0 pt-0.5">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={cn(
-                      "inline-flex items-center p-0.5 text-[10px]",
-                      rcx.toggleShell,
-                      isQuick && (isOrbital ? "border-primary/30" : "border-primary/30")
-                    )}
-                    role="group"
-                    aria-label="Review mode"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={isQuick}
-                      onClick={() => {
-                        // Phase 3 Item 12: track explicit Quick Pass toggle (adoption + dominance signal)
-                        trackFlywheelEvent("mode.quick", { via: "click" });
-                        setReviewModeState({ key: String(reviewSessionId), mode: "quick" });
-                      }}
-                      className={cn(
-                        "rounded-md px-2.5 py-0.5 font-medium transition-colors",
-                        isQuick ? rcx.toggleActive : rcx.toggleIdle
-                      )}
-                      title="Quick Pass: light path from standouts into Orbit (press Q)"
-                    >
-                      Quick Pass ⚡
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={!isQuick}
-                      onClick={() => {
-                        // Phase 3 Item 12: track explicit Deep Review toggle
-                        trackFlywheelEvent("mode.deep", { via: "click" });
-                        setReviewModeState({ key: String(reviewSessionId), mode: "deep" });
-                      }}
-                      className={cn(
-                        "rounded-md px-2.5 py-0.5 font-medium transition-colors",
-                        !isQuick ? rcx.toggleActive : rcx.toggleIdle
-                      )}
-                      title="Deep Review: full reasoning with context panels (press Q)"
-                    >
-                      Deep Review
-                    </button>
-                  </div>
-                  <kbd
-                    className={cn(orbital.data, "rounded border border-hairline-soft bg-surface-2/80 px-1 py-px text-[9px] text-primary/50")}
-                    aria-hidden="true"
-                    title="Keyboard shortcut"
-                  >
-                    Q
-                  </kbd>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                    <OrbitLogoMark className="size-3" aria-hidden="true" />
+                    {isDigestReview ? "Weekly Gems" : "Orbit review"}
+                  </span>
+                  <span className={cn(rcx.data, "text-muted-foreground")}>
+                    {activePositionLabel}
+                  </span>
+                  {activeOriginal?.confidence ? (
+                    <span className="rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-500">
+                      {confidenceLabel(activeOriginal.confidence)}
+                    </span>
+                  ) : null}
                 </div>
-              </div>
-            </div>
-          </div>
-        </DialogHeader>
-
-        {/* Refined Native-First Orbit Review — vertical list of native-style cards + Impact Bar */}
-        <div className="min-h-0 overflow-hidden px-4 py-3">
-          {/* Global Impact Bar (styled like rail metrics) */}
-          {effectiveDrafts.length > 0 && (
-            <div className={cn("mb-3 p-3", rcx.panel)}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className={cn("flex items-center gap-4 text-[11px]", rcx.data)}>
-                  <div><span className={rcx.soft}>Apply</span> <span className="font-medium tabular-nums">{reviewStats.applyableBookmarks}</span></div>
-                  <div><span className={rcx.soft}>Keep</span> <span className="font-medium tabular-nums">{reviewStats.keptBookmarks}</span></div>
-                  <div><span className="text-primary/80">+{impact.addedTagCount} tags</span></div>
-                  <div><span className="text-bronze/80">+{impact.addedCollectionCount} cols</span></div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Optimized batch actions (incl. "Mark remaining as Good") when reviewing a curated set from Highlights (Phase 2 + B polish) */}
-                  {digestBookmarkIds && digestBookmarkIds.length > 0 ? (
+                <h2 className="mt-3 text-xl font-semibold tracking-tight text-foreground">
+                  {activeBookmark
+                    ? getAuthorLabel(activeBookmark)
+                    : activeDraft
+                      ? "Orbit suggestion"
+                      : title}
+                </h2>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                  {activeBookmark ? (
                     <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 gap-1 px-2 text-xs"
-                        onClick={handleBulkKeepAll}
-                        disabled={applying}
-                      >
-                        Keep remaining
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-7 gap-1 px-2 text-xs bg-white text-slate-950 hover:bg-white/90"
-                        onClick={() => {
-                          // Accept all currently suggested decisions for the digest set
-                          effectiveDrafts.forEach((draft) => {
-                            if (draft.decision !== "keep") {
-                              updateDraft(draft.bookmarkId, { decision: draft.decision });
-                            }
-                          });
-                        }}
-                        disabled={applying}
-                      >
-                        Accept strong suggestions
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 gap-1 px-2 text-xs"
-                        onClick={() => {
-                          let marked = 0;
-                          effectiveDrafts.forEach((draft) => {
-                            const id = draft.bookmarkId;
-                            if (getHighlightFeedback(id) !== "not_relevant") {
-                              addLikedHighlightId(id);
-                              marked++;
-                            }
-                          });
-                          if (marked > 0) {
-                            toast.success(`Marked ${marked} as Good — boosts future Highlights`);
-                          }
-                          setFeedbackTick((t) => t + 1);
-                        }}
-                        disabled={applying}
-                      >
-                        Mark remaining as Good
-                      </Button>
+                      {getHandleLabel(activeBookmark) ? (
+                        <span>{getHandleLabel(activeBookmark)}</span>
+                      ) : null}
+                      <span aria-hidden>·</span>
+                      <span>{formatReviewDate(activeBookmark.tweetCreatedAt)}</span>
                     </>
+                  ) : activeDraft ? (
+                    <span>Bookmark details are outside the current queue page.</span>
                   ) : (
-                    <>
-                      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={handleBulkApplySuggested} disabled={applying}>
-                        <RotateCcw className="mr-1 size-3" /> Restore all
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkKeepAll} disabled={applying}>
-                        Keep all
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={handleBulkTagOnly} disabled={applying}>
-                        Tag all
-                      </Button>
-                    </>
+                    <span>
+                      {sourcePlan
+                        ? "No suggestions are waiting for review."
+                        : "Grok is preparing suggestions for this review."}
+                    </span>
                   )}
-
-                  <div className={cn("ml-2 flex items-center gap-2 border-l pl-3", rcx.headerBorder)}>
-                    <span className={cn("text-xs", rcx.muted)}>New collections</span>
-                    <Switch checked={createCollections} onCheckedChange={handleCreateCollectionsChange} />
-                  </div>
+                  {activeHasChanges ? (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span className="text-amber-500">Edited</span>
+                    </>
+                  ) : null}
                 </div>
               </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onOpenChange(false)}
+                aria-label="Close Orbit review"
+                className="rounded-sm border border-hairline-soft bg-surface-2/60 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </Button>
             </div>
-          )}
 
-          <ScrollArea className="h-[58vh]">
-            <div className={cn("space-y-3 pb-6", isQuick && "space-y-2 pb-4")}>
-              {effectiveDrafts.length === 0 && (
-                <div className={cn("p-6 text-center text-sm", rcx.panel, rcx.soft)}>
-                  {!sourcePlan
-                    ? "Grok is preparing suggestions for this review…"
-                    : "No suggestions are waiting for review."}
+            {activeBookmark ? (
+              <BookmarkPostPreview
+                tweetText={activeBookmark.tweetText}
+                authorUsername={activeBookmark.authorUsername}
+                media={activeBookmark.media}
+                tweetLink={{
+                  authorUsername: activeBookmark.authorUsername,
+                  tweetId: activeBookmark.tweetId,
+                }}
+                bookmarkKey={activeBookmark.id}
+                variant="feed"
+                priorityMedia
+                stopClickPropagation
+                className="mt-5"
+                textClassName="whitespace-pre-wrap break-words text-[17px] leading-8 text-foreground"
+                galleryClassName="!mt-4 border-hairline-strong bg-black/10"
+              />
+            ) : (
+              <div className={cn("mt-5 p-6 text-center text-sm", rcx.panel, rcx.soft)}>
+                {activeDraft
+                  ? activePreview
+                  : !sourcePlan
+                  ? "Grok is preparing suggestions for this review."
+                  : "No suggestions are waiting for review."}
+              </div>
+            )}
+
+            {activeBookmark?.quotedTweet ? (
+              <div className="mt-4 rounded-sm border border-hairline-soft bg-surface-2/45 p-3">
+                <div className="mb-1 flex items-center gap-1.5 text-sm">
+                  <span className="font-medium text-foreground">
+                    {activeBookmark.quotedTweet.author?.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    @{activeBookmark.quotedTweet.author?.username}
+                  </span>
                 </div>
-              )}
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {activeBookmark.quotedTweet.text}
+                </p>
+              </div>
+            ) : null}
 
-              {effectiveDrafts.map((draft) => {
-                const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
-                const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
-                const preview = getPreviewText(bookmark, original?.reasoning);
-
-                const origDecision = original
-                  ? deriveReviewDecision(original)
-                  : null;
-                const origDecisionLabel = origDecision
-                  ? getDecisionLabel(origDecision)
-                  : "—";
-
-                const currDecisionLabel = getDecisionLabel(draft.decision);
-
-                const origTagNames = original ? original.tags.map((t) => t.name) : [];
-                const currTagNames = splitTagNames(draft.tagNames);
-
-                const origTagSet = new Set(origTagNames);
-                const currTagSet = new Set(currTagNames);
-
-                const addedTags = currTagNames.filter((t) => !origTagSet.has(t));
-                const removedTags = origTagNames.filter((t) => !currTagSet.has(t));
-
-                const origCol = original?.collection?.name || null;
-                const currCol = draft.collectionName.trim() || null;
-
-                const origDecisionForHas = original
-                  ? deriveReviewDecision(original)
-                  : "keep";
-                const tagsChanged =
-                  origTagSet.size !== currTagSet.size ||
-                  [...origTagSet].some((t) => !currTagSet.has(t));
-                const hasChanges =
-                  draft.decision !== origDecisionForHas ||
-                  tagsChanged ||
-                  draft.collectionName !== (origCol || "");
-
-                return (
-                  <div
-                    key={draft.bookmarkId}
-                    className={cn(
-                      orbital.glass,
-                      "group relative border border-hairline-soft shadow-sm transition-all",
-                      isQuick && "rounded-xl shadow-none border-white/5",
-                      draft.decision === "keep" && "opacity-75",
-                      sheetBookmarkId === draft.bookmarkId && "border-primary/50 bg-surface-2/70",
-                      "hover:border-white/20 hover:bg-surface-2/50"
-                    )}
-                  >
-                    {/* Header — native to triage card + focus strip */}
-                    <div className={cn(
-                      "flex items-center justify-between px-4 pt-3 pb-1.5",
-                      isQuick && "px-3 pt-2 pb-1"
-                    )}>
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className={cn("truncate text-sm font-medium", rcx.body)}>
-                          @{bookmark?.authorUsername || draft.bookmarkId}
-                        </span>
-                        {original && (
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
-                              original.confidence === "high" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-                              original.confidence === "medium" && "border-primary/30 bg-primary/10 text-primary/80",
-                              original.confidence === "low" && "border-blue-500/30 bg-blue-500/10 text-blue-200"
-                            )}
-                            title={formatConfidence(original.confidence)}
-                          >
-                            {confidenceLabel(original.confidence).split(" ")[0]}
-                          </span>
-                        )}
-                      </div>
-
-                      {hasChanges && (
-                        <span className="rounded bg-amber-400/15 px-1.5 py-px text-[10px] text-amber-300">edited</span>
-                      )}
+            {activeDraft ? (
+              <section className="mt-5 rounded-sm border border-primary/20 bg-primary/[0.07] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                      <GrokMark className="size-3.5" />
+                      Grok suggestion
                     </div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {activeOriginal?.reasoning || activePreview}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      className={rcx.ghostBtn}
+                      onClick={() => moveActiveDraft(-1)}
+                      disabled={activeDraftIndex <= 0}
+                      aria-label="Previous review item"
+                    >
+                      <ArrowLeft className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="outline"
+                      className={rcx.ghostBtn}
+                      onClick={() => moveActiveDraft(1)}
+                      disabled={
+                        activeDraftIndex === -1 ||
+                        activeDraftIndex >= effectiveDrafts.length - 1
+                      }
+                      aria-label="Next review item"
+                    >
+                      <ArrowRight className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
 
-                    {/* Preview */}
-                    <div className={cn(
-                      cn("px-4 pb-2 text-[13px] leading-snug line-clamp-2", rcx.bodyDim),
-                      isQuick && cn("px-3 pb-1 text-[12px] leading-snug line-clamp-1", rcx.muted)
-                    )}>
-                      {preview}
-                    </div>
+                {activeFeedback ? (
+                  <div className="mt-3 text-[11px] text-emerald-500/90">
+                    {activeFeedback === "good"
+                      ? "You marked this Good in Highlights."
+                      : "You marked this Not relevant in Highlights."}
+                  </div>
+                ) : null}
 
-                    {bookmark?.media && bookmark.media.length > 0 ? (
-                      <div className={cn("px-4 pb-2", isQuick && "px-3")}>
-                        <BookmarkPostPreview
-                          mediaOnly
-                          tweetText=""
-                          authorUsername={bookmark.authorUsername}
-                          media={bookmark.media}
-                          tweetLink={{
-                            authorUsername: bookmark.authorUsername,
-                            tweetId: bookmark.tweetId,
-                          }}
-                          bookmarkKey={bookmark.id}
-                          variant="inline"
-                          galleryClassName="!mt-0 max-h-40"
-                        />
-                      </div>
+                <div className="mt-4 rounded-sm border border-hairline-soft bg-surface-1/55 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isQuick ? (
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1.5 border-emerald-400/30 bg-emerald-500/10 text-xs text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-200"
+                        onClick={() =>
+                          handleAcceptOrbitSuggestion(activeDraft.bookmarkId)
+                        }
+                        disabled={applying}
+                      >
+                        <Sparkles className="size-3.5" />
+                        Accept Orbit suggestion
+                      </Button>
                     ) : null}
 
-                    {/* B: surface prior feedback history for digest gems (closed loop) */}
-                    {(() => {
-                      const prior = getHighlightFeedback(draft.bookmarkId) || feedbackById[draft.bookmarkId];
-                      if (prior) {
-                        const label = prior === "good" ? "You marked this Great" : "You marked Not relevant";
-                        return (
-                          <div className={cn("px-4 pb-1 text-[10px] text-emerald-300/80", isQuick && "px-3")}>
-                            {label}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                    <div className="rounded-sm border border-hairline-soft bg-surface-2/70 p-px">
+                      <OrbitReviewDecisionControl
+                        value={activeDraft.decision}
+                        onChange={(decision) =>
+                          updateDraft(activeDraft.bookmarkId, {
+                            decision,
+                            included: decision !== "keep",
+                          })
+                        }
+                      />
+                    </div>
 
-                    {/* Grok reasoning — native meta label (de-emphasized/hidden in Quick Pass for density) */}
-                    {original?.reasoning && !isQuick && (
-                      <div className={cn("px-4 pb-2 text-xs leading-snug", rcx.muted)}>
-                        {original.reasoning}
-                      </div>
-                    )}
-
-                    {/* Compact change summary — elegant native treatment */}
-                    {hasChanges && (
-                      <div className={cn("px-4 pb-2 flex flex-wrap items-center gap-1.5 text-[10px]", isQuick && "px-3")}>
-                        {currDecisionLabel !== origDecisionLabel && (
-                          <span className="rounded bg-amber-400/15 px-1.5 py-px text-amber-300">
-                            Decision changed
-                          </span>
-                        )}
-                        {addedTags.length > 0 && (
-                          <span className="rounded bg-emerald-400/15 px-1.5 py-px text-emerald-300">
-                            +{addedTags.length} tags
-                          </span>
-                        )}
-                        {removedTags.length > 0 && (
-                          <span className="rounded bg-rose-400/15 px-1.5 py-px text-rose-300">
-                            −{removedTags.length} tags
-                          </span>
-                        )}
-                        {origCol !== currCol && (
-                          <span className="rounded bg-amber-400/15 px-1.5 py-px text-amber-300">
-                            Collection changed
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Action footer — exact triage card treatment for native cohesion */}
-                    <div className={cn(
-                      "relative flex flex-col gap-3 border-t border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.55),rgba(10,15,29,0.85))] px-4 py-3 rounded-b-2xl",
-                      isQuick && "gap-2 px-3 py-2 rounded-b-xl"
-                    )}>
-                      <div className="flex items-center gap-2">
-                        {/* Slice 3 Quick Pass: prominent primary one-click action.
-                            "Accept Orbit suggestion" is the fast path — applies conservative smart patch
-                            (Grok original, or history/similar-steered values if context cached from Details).
-                            Only fires on explicit click (no auto on render). Most visually lifted control
-                            in quick cards. Decision control remains for quick manual tweaks; Details for full
-                            override + to load richer signals for future smart patches on this author. */}
-                        {isQuick && (
-                          <Button
-                            size="sm"
-                            className="h-7 gap-1.5 border-emerald-400/30 bg-emerald-500/10 text-[10px] text-emerald-200 hover:bg-emerald-500/20"
-                            onClick={() => handleAcceptOrbitSuggestion(draft.bookmarkId)}
-                            disabled={applying}
-                            title="One-click accept of Orbit suggestion (uses your author history + similar high-performers for smart defaults when you have opened Details for this item). Stays in Quick Pass fast path."
-                          >
-                            <Sparkles className="size-3" />
-                            Accept Orbit suggestion
-                          </Button>
-                        )}
-
-                        <div className={cn(
-                          "rounded-md border border-white/10 bg-black/20 p-px",
-                          isQuick && "ring-1 ring-white/25 bg-black/30"
-                        )}>
-                          <OrbitReviewDecisionControl
-                            value={draft.decision}
-                            onChange={(decision) => updateDraft(draft.bookmarkId, { decision, included: decision !== "keep" })}
-                          />
-                        </div>
-
-                        <div className="ml-auto flex items-center gap-1.5">
-                          {hasChanges && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className={cn("h-7 gap-1 text-[10px]", rcx.muted, "hover:text-foreground")}
-                              onClick={() => handleResetOne(draft.bookmarkId)}
-                              disabled={applying}
-                            >
-                              <RotateCcw className="size-3" /> Reset
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={cn(
-                              cn("h-7 gap-1 text-[10px]", rcx.ghostBtn),
-                              sheetBookmarkId === draft.bookmarkId && "border-primary/60 bg-primary/10 text-primary/80"
-                            )}
-                            onClick={() => {
-                              setSheetBookmarkId(draft.bookmarkId);
-                              setIsEditSheetOpen(true);
-                            }}
-                          >
-                            Details
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Inline editors — refined native treatment inside the action footer */}
-                      {draft.decision !== "keep" && (
-                        <div className="flex flex-col gap-4 pt-2 md:flex-row md:gap-4">
-                          {orbitReviewDecisionUsesTags(draft.decision) && (
-                            <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className={cn(rcx.label, "mb-1.5")}>
-                                Tags
-                              </div>
-                              <OrbitReviewTagField
-                                tagNames={draft.tagNames}
-                                included={true}
-                                existingTags={existingTags}
-                                onTagNamesChange={(n) => updateDraft(draft.bookmarkId, { tagNames: n })}
-                              />
-                            </div>
-                          )}
-                          {orbitReviewDecisionUsesCollection(draft.decision) && (
-                            <div className="flex-1 rounded-lg bg-white/[0.02] p-2.5">
-                              <div className={cn(rcx.label, "mb-1.5")}>
-                                Collection
-                              </div>
-                              <OrbitReviewCollectionField
-                                collectionName={draft.collectionName}
-                                collectionDescription={draft.collectionDescription}
-                                included={true}
-                                namePlaceholder="No collection move"
-                                existingCollections={existingCollections}
-                                onCollectionNameChange={(n) => updateDraft(draft.bookmarkId, { collectionName: n })}
-                                onCollectionDescriptionChange={(d) => updateDraft(draft.bookmarkId, { collectionDescription: d })}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    <div className="ml-auto flex items-center gap-1.5">
+                      {activeHasChanges ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => handleResetOne(activeDraft.bookmarkId)}
+                          disabled={applying}
+                        >
+                          <RotateCcw className="size-3.5" />
+                          Reset
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 border-hairline-soft bg-surface-2 text-xs text-foreground hover:bg-accent-soft"
+                        onClick={() => {
+                          setSheetBookmarkId(activeDraft.bookmarkId);
+                          setIsEditSheetOpen(true);
+                        }}
+                      >
+                        Details
+                      </Button>
                     </div>
                   </div>
-                );
-              })}
+
+                  {activeDraft.decision !== "keep" ? (
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      {orbitReviewDecisionUsesTags(activeDraft.decision) ? (
+                        <div className={rcx.fieldShell}>
+                          <div className={cn(rcx.label, "mb-2 flex items-center gap-1.5")}>
+                            <Tags className="size-3" />
+                            Tags
+                          </div>
+                          <OrbitReviewTagField
+                            tagNames={activeDraft.tagNames}
+                            included
+                            existingTags={existingTags}
+                            onTagNamesChange={(tagNames) =>
+                              updateDraft(activeDraft.bookmarkId, { tagNames })
+                            }
+                          />
+                        </div>
+                      ) : null}
+
+                      {orbitReviewDecisionUsesCollection(activeDraft.decision) ? (
+                        <div className={rcx.fieldShell}>
+                          <div className={cn(rcx.label, "mb-2 flex items-center gap-1.5")}>
+                            <FolderInput className="size-3" />
+                            Collection
+                          </div>
+                          <OrbitReviewCollectionField
+                            collectionName={activeDraft.collectionName}
+                            collectionDescription={
+                              activeDraft.collectionDescription
+                            }
+                            included
+                            namePlaceholder="No collection move"
+                            existingCollections={existingCollections}
+                            onCollectionNameChange={(collectionName) =>
+                              updateDraft(activeDraft.bookmarkId, {
+                                collectionName,
+                              })
+                            }
+                            onCollectionDescriptionChange={(
+                              collectionDescription
+                            ) =>
+                              updateDraft(activeDraft.bookmarkId, {
+                                collectionDescription,
+                              })
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-sm border border-hairline-soft bg-surface-2/45 p-3 text-sm text-muted-foreground">
+                      This bookmark will stay in Orbit unchanged for this pass.
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
+          </main>
+
+          <aside className="flex min-h-0 flex-col border-t border-hairline-soft bg-surface-2/48 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
+            <div className="border-b border-hairline-soft px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className={cn(rcx.label, "flex items-center gap-2")}>
+                    <ListChecks className="size-3.5" />
+                    {title}
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {reviewStats.applyableBookmarks} review item
+                    {reviewStats.applyableBookmarks === 1 ? "" : "s"} ready
+                  </div>
+                </div>
+                <div className={cn(rcx.data, "rounded-sm border border-hairline-soft bg-surface-1/70 px-2 py-1")}>
+                  {activePositionLabel}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+                  <div className={rcx.soft}>Apply</div>
+                  <div className="mt-1 font-semibold text-foreground">
+                    {reviewStats.applyableBookmarks - reviewStats.keptBookmarks}
+                  </div>
+                </div>
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+                  <div className={rcx.soft}>Keep</div>
+                  <div className="mt-1 font-semibold text-foreground">
+                    {reviewStats.keptBookmarks}
+                  </div>
+                </div>
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+                  <div className={rcx.soft}>Tags</div>
+                  <div className="mt-1 font-semibold text-primary">
+                    +{impact.addedTagCount || reviewStats.tagAssignments}
+                  </div>
+                </div>
+                <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+                  <div className={rcx.soft}>Collections</div>
+                  <div className="mt-1 font-semibold text-primary">
+                    +{impact.addedCollectionCount || reviewStats.collectionMoves}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-1.5">
+                <div
+                  className={cn(
+                    "inline-flex items-center p-0.5 text-[10px]",
+                    rcx.toggleShell
+                  )}
+                  role="group"
+                  aria-label="Review mode"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={isQuick}
+                    onClick={() => {
+                      trackFlywheelEvent("mode.quick", { via: "click" });
+                      setReviewModeState({
+                        key: String(reviewSessionId),
+                        mode: "quick",
+                      });
+                    }}
+                    className={cn(
+                      "rounded-sm px-2.5 py-1 font-medium transition-colors",
+                      isQuick ? rcx.toggleActive : rcx.toggleIdle
+                    )}
+                  >
+                    Quick
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={!isQuick}
+                    onClick={() => {
+                      trackFlywheelEvent("mode.deep", { via: "click" });
+                      setReviewModeState({
+                        key: String(reviewSessionId),
+                        mode: "deep",
+                      });
+                    }}
+                    className={cn(
+                      "rounded-sm px-2.5 py-1 font-medium transition-colors",
+                      !isQuick ? rcx.toggleActive : rcx.toggleIdle
+                    )}
+                  >
+                    Deep
+                  </button>
+                </div>
+                <kbd className="rounded border border-hairline-soft bg-surface-1/70 px-1.5 py-1 text-[9px] text-muted-foreground">
+                  Q
+                </kbd>
+              </div>
             </div>
-          </ScrollArea>
+
+            <div className="border-b border-hairline-soft px-4 py-3">
+              <div className="flex flex-wrap gap-2">
+                {isDigestReview ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn("h-8 text-xs", rcx.ghostBtn)}
+                      onClick={handleBulkKeepAll}
+                      disabled={applying}
+                    >
+                      Keep remaining
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 bg-primary text-xs text-primary-foreground hover:bg-primary/90"
+                      onClick={handleBulkApplySuggested}
+                      disabled={applying}
+                    >
+                      Accept strong
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={handleMarkRemainingGood}
+                      disabled={applying}
+                    >
+                      Mark Good
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn("h-8 gap-1.5 text-xs", rcx.ghostBtn)}
+                      onClick={handleBulkApplySuggested}
+                      disabled={applying}
+                    >
+                      <RotateCcw className="size-3.5" />
+                      Restore
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn("h-8 text-xs", rcx.ghostBtn)}
+                      onClick={handleBulkKeepAll}
+                      disabled={applying}
+                    >
+                      Keep all
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn("h-8 text-xs", rcx.ghostBtn)}
+                      onClick={handleBulkTagOnly}
+                      disabled={applying}
+                    >
+                      Tag all
+                    </Button>
+                  </>
+                )}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft pt-3">
+                <span className="text-xs text-muted-foreground">
+                  Create new collections
+                </span>
+                <Switch
+                  checked={createCollections}
+                  onCheckedChange={handleCreateCollectionsChange}
+                />
+              </div>
+            </div>
+
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-2 p-4">
+                {effectiveDrafts.length === 0 ? (
+                  <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-4 text-sm text-muted-foreground">
+                    No suggestions are waiting for review.
+                  </div>
+                ) : null}
+
+                {effectiveDrafts.map((draft, index) => {
+                  const bookmark = bookmarkById.get(draft.bookmarkId) ?? null;
+                  const original =
+                    originalSuggestionById.get(draft.bookmarkId) ?? null;
+                  const changed = draftHasChanges(draft, original);
+                  const selected = draft.bookmarkId === activeDraft?.bookmarkId;
+
+                  return (
+                    <button
+                      key={draft.bookmarkId}
+                      type="button"
+                      onClick={() =>
+                        setActiveDraftState({
+                          key: activeDraftKey,
+                          id: draft.bookmarkId,
+                        })
+                      }
+                      className={cn(
+                        "w-full rounded-sm border p-3 text-left transition-colors",
+                        selected
+                          ? "border-primary/45 bg-primary/10"
+                          : "border-hairline-soft bg-surface-1/55 hover:border-primary/25 hover:bg-accent-soft"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                          {getAuthorLabel(bookmark)}
+                        </span>
+                        <span className={cn(rcx.data, "shrink-0 text-muted-foreground")}>
+                          {index + 1}
+                        </span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        {getPreviewText(bookmark, original?.reasoning)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="rounded-sm border border-hairline-soft bg-surface-2/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {getDecisionLabel(draft.decision)}
+                        </span>
+                        {original?.confidence ? (
+                          <span
+                            className="rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary"
+                            title={formatConfidence(original.confidence)}
+                          >
+                            {original.confidence}
+                          </span>
+                        ) : null}
+                        {changed ? (
+                          <span className="rounded-sm border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300">
+                            edited
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            <div className="border-t border-hairline-soft bg-background/80 px-4 py-4">
+              <Button
+                className="h-10 w-full gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={handleApply}
+                disabled={!canApply || applying}
+              >
+                {applying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Apply decisions
+              </Button>
+            </div>
+          </aside>
         </div>
 
-        {/* Right-side rich editing sheet */}
         <OrbitReviewEditSheet
           open={isEditSheetOpen}
           onOpenChange={(nextOpen) => {
             setIsEditSheetOpen(nextOpen);
             if (!nextOpen) setSheetBookmarkId(null);
           }}
-          draft={drafts.find((d) => d.bookmarkId === sheetBookmarkId) ?? null}
-          original={sheetBookmarkId ? originalSuggestionById.get(sheetBookmarkId) ?? null : null}
-          bookmark={sheetBookmarkId ? bookmarkById.get(sheetBookmarkId) ?? null : null}
+          draft={drafts.find((draft) => draft.bookmarkId === sheetBookmarkId) ?? null}
+          original={
+            sheetBookmarkId
+              ? originalSuggestionById.get(sheetBookmarkId) ?? null
+              : null
+          }
+          bookmark={
+            sheetBookmarkId ? bookmarkById.get(sheetBookmarkId) ?? null : null
+          }
           existingTags={existingTags}
           existingCollections={existingCollections}
           onDraftChange={(id, patch) => updateDraft(id, patch)}
@@ -1001,36 +1244,11 @@ export function OrbitReviewDialog({
           reviewMode={reviewMode}
           reviewSessionId={reviewSessionId}
         />
-
-        <DialogFooter className={cn("px-5 py-4", rcx.footerBar)}>
-          <Button
-            variant="outline"
-            className={rcx.ghostBtn}
-            onClick={() => onOpenChange(false)}
-            disabled={applying}
-          >
-            Cancel
-          </Button>
-          <Button
-            className={cn(
-              "gap-1.5",
-              isOrbital
-                ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "bg-white text-slate-950 hover:bg-white/90"
-            )}
-            onClick={handleApply}
-            disabled={!canApply || applying}
-          >
-            {applying ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-4" />
-            )}
-            Apply decisions
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
+export function OrbitReviewDialog(props: OrbitReviewDialogProps) {
+  return <OrbitReviewModal {...props} />;
+}

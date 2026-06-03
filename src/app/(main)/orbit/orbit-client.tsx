@@ -52,7 +52,7 @@ import { OrbitQueueToolbar } from "@/components/orbit/orbit-queue-toolbar";
 import { OrbitScanHero } from "@/components/orbit/orbit-scan-hero";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 
-// New clean-list + slide-in + overlays components (new Orbit model)
+// Clean-list + expanded overlay components (new Orbit model)
 import { OrbitList } from "@/components/orbit/orbit-list";
 import { OrbitContextualMenu } from "@/components/orbit/orbit-quick-actions";
 
@@ -114,7 +114,23 @@ type OrbitScanRequest = {
   contextKey: string;
 };
 
+type OrbitReviewSession = {
+  open: boolean;
+  focusBookmarkId: string | null;
+  digestBookmarkIds: string[] | null;
+  source: string | null;
+  sessionId: number;
+};
+
 const EMPTY_BOOKMARKS: BookmarkWithRelations[] = [];
+
+const EMPTY_REVIEW_SESSION: OrbitReviewSession = {
+  open: false,
+  focusBookmarkId: null,
+  digestBookmarkIds: null,
+  source: null,
+  sessionId: 0,
+};
 
 const ORBIT_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
@@ -354,13 +370,9 @@ export default function OrbitPage() {
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<Set<string>>(
     () => new Set()
   );
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [reviewBookmarkId, setReviewBookmarkId] = useState<string | null>(null);
+  const [reviewSession, setReviewSession] =
+    useState<OrbitReviewSession>(EMPTY_REVIEW_SESSION);
   const [feedbackById, setFeedbackById] = useState<Record<string, 'good' | 'not_relevant'>>({}); // Phase 2 persisted feedback for the session
-  const [reviewSessionId, setReviewSessionId] = useState(0);
-
-  // Digest mode: Track the current set of bookmarks coming from a Highlights Digest ("Review all") (Phase 2)
-  const [activeDigestBookmarkIds, setActiveDigestBookmarkIds] = useState<string[] | null>(null);
 
   // Refs to guard one-time URL-intent handling (prevents sync setState lint + re-entrancy)
   const hasHandledHighlightRef = useRef(false);
@@ -582,7 +594,7 @@ export default function OrbitPage() {
     !selectionMode &&
     !tagDialogOpen &&
     !collectionDialogOpen &&
-    !reviewOpen;
+    !reviewSession.open;
 
   const selectOrbitBookmarkByOffset = useCallback(
     (offset: -1 | 1) => {
@@ -733,7 +745,7 @@ export default function OrbitPage() {
 
   const runOrbitScan = useCallback(
     async (request: OrbitScanRequest) => {
-      if (request.targetIds.length === 0) return;
+      if (request.targetIds.length === 0) return null;
 
       setLastScanRequest(request);
 
@@ -753,8 +765,10 @@ export default function OrbitPage() {
             }`
           );
         }
+        return result;
       } catch {
         // Inline failure state is rendered near the Orbit scan controls.
+        return null;
       }
     },
     [scan]
@@ -763,6 +777,23 @@ export default function OrbitPage() {
   const handleScan = useCallback(async () => {
     await runOrbitScan(buildScanRequest(scanTargetIds, scanningSelection));
   }, [buildScanRequest, runOrbitScan, scanTargetIds, scanningSelection]);
+
+  const clearConsumedReviewUrlParams = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const hadReviewIntent =
+      params.has("highlightId") || params.has("digestIds") || params.has("source");
+
+    if (!hadReviewIntent) return;
+
+    params.delete("highlightId");
+    params.delete("digestIds");
+    params.delete("source");
+
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `/orbit?${nextQuery}` : "/orbit", {
+      scroll: false,
+    });
+  }, [router, searchParams]);
 
   // Digest flywheel: auto-scan gems from Highlights, then open review when Grok plan is ready
   useEffect(() => {
@@ -780,11 +811,16 @@ export default function OrbitPage() {
 
     queueMicrotask(() => {
       trackFlywheelEvent("digest.session_start", sessionStartPayload);
-      setActiveDigestBookmarkIds(ids);
-      setReviewBookmarkId(ids[0]);
       void (async () => {
-        await runOrbitScan(buildScanRequest(ids, true));
-        setReviewOpen(true);
+        const result = await runOrbitScan(buildScanRequest(ids, true));
+        if (!result) return;
+        setReviewSession((current) => ({
+          open: true,
+          focusBookmarkId: ids[0] ?? null,
+          digestBookmarkIds: ids,
+          source: sourceFromUrl,
+          sessionId: current.sessionId + 1,
+        }));
       })();
     });
   }, [
@@ -803,15 +839,22 @@ export default function OrbitPage() {
     hasHandledHighlightRef.current = true;
 
     queueMicrotask(() => {
-      setReviewBookmarkId(highlightIdFromUrl);
       void (async () => {
-        await runOrbitScan(buildScanRequest([highlightIdFromUrl], true));
-        setReviewOpen(true);
+        const result = await runOrbitScan(buildScanRequest([highlightIdFromUrl], true));
+        if (!result) return;
+        setReviewSession((current) => ({
+          open: true,
+          focusBookmarkId: highlightIdFromUrl,
+          digestBookmarkIds: null,
+          source: sourceFromUrl,
+          sessionId: current.sessionId + 1,
+        }));
       })();
     });
   }, [
     highlightIdFromUrl,
     digestIdsFromUrl,
+    sourceFromUrl,
     scan.scanning,
     buildScanRequest,
     runOrbitScan,
@@ -833,20 +876,33 @@ export default function OrbitPage() {
     await runOrbitScan(buildScanRequest(selectedScanTargetIds, true));
   }, [buildScanRequest, runOrbitScan, selectedScanTargetIds]);
 
-  const handleReviewOpenChange = useCallback((open: boolean) => {
-    setReviewOpen(open);
-    if (!open) {
-      setReviewBookmarkId(null);
-      setActiveDigestBookmarkIds(null);
-      setFeedbackById({});
-    }
-  }, []);
+  const handleReviewOpenChange = useCallback(
+    (open: boolean) => {
+      setReviewSession((current) => ({
+        open,
+        focusBookmarkId: open ? current.focusBookmarkId : null,
+        digestBookmarkIds: open ? current.digestBookmarkIds : null,
+        source: open ? current.source : null,
+        sessionId: current.sessionId,
+      }));
+
+      if (!open) {
+        setFeedbackById({});
+        clearConsumedReviewUrlParams();
+      }
+    },
+    [clearConsumedReviewUrlParams]
+  );
 
   const handleOpenReviewAll = useCallback(() => {
     if (!scan.plan) return;
-    setReviewBookmarkId(null);
-    setReviewSessionId((current) => current + 1);
-    setReviewOpen(true);
+    setReviewSession((current) => ({
+      open: true,
+      focusBookmarkId: null,
+      digestBookmarkIds: null,
+      source: null,
+      sessionId: current.sessionId + 1,
+    }));
   }, [scan.plan]);
 
   const handleClearScanPlan = useCallback(() => {
@@ -862,9 +918,13 @@ export default function OrbitPage() {
         return;
       }
       setActiveBookmarkId(bookmarkId);
-      setReviewBookmarkId(bookmarkId);
-      setReviewSessionId((current) => current + 1);
-      setReviewOpen(true);
+      setReviewSession((current) => ({
+        open: true,
+        focusBookmarkId: bookmarkId,
+        digestBookmarkIds: null,
+        source: null,
+        sessionId: current.sessionId + 1,
+      }));
     },
     [scan.plan]
   );
@@ -889,7 +949,7 @@ export default function OrbitPage() {
         }
 
         // B: after digest review session, auto-boost kept gems as implicit Good (if no prior feedback)
-        if (activeDigestBookmarkIds && opts.keptBookmarkIds.length > 0) {
+        if (reviewSession.digestBookmarkIds && opts.keptBookmarkIds.length > 0) {
           for (const id of opts.keptBookmarkIds) {
             if (getHighlightFeedback(id) === null) {
               addLikedHighlightId(id);
@@ -916,7 +976,7 @@ export default function OrbitPage() {
         return null;
       }
     },
-    [scan, activeDigestBookmarkIds]
+    [scan, reviewSession.digestBookmarkIds]
   );
 
   const handleKeepInOrbit = useCallback(
@@ -946,7 +1006,7 @@ export default function OrbitPage() {
     }
   }, [scan]);
 
-  const handleSlideInDecision = (id: string, kind: string) => {
+  const handleOrbitOverlayDecision = (id: string, kind: string) => {
     const decision = scan.getDecision(id);
     if (kind === "keep-tag" && decision?.primary) {
       scan.applySuggestion(id, "primary")
@@ -1139,12 +1199,6 @@ export default function OrbitPage() {
             }
             actions={
               <>
-                <KeyboardShortcutsHelpButton
-                  open={keyboardShortcutsOpen}
-                  onOpenChange={setKeyboardShortcutsOpen}
-                  groups={ORBIT_SHORTCUT_GROUPS}
-                  description="Orbit queue navigation and review actions."
-                />
                 {dbUser ? <UserNavDynamic user={dbUser} /> : null}
               </>
             }
@@ -1159,6 +1213,16 @@ export default function OrbitPage() {
             >
               <span className={orbitDataClass(isOrbital)}>{total} unsorted</span>
               <span className={orbitDataClass(isOrbital)}>Grok</span>
+              <KeyboardShortcutsHelpButton
+                open={keyboardShortcutsOpen}
+                onOpenChange={setKeyboardShortcutsOpen}
+                groups={ORBIT_SHORTCUT_GROUPS}
+                description="Orbit queue navigation and review actions."
+                className={cn(
+                  "relative z-10 size-7 border-primary/20 bg-surface-1/70 text-primary/80 hover:border-primary/35 hover:bg-primary/10 hover:text-primary",
+                  isOrbital && "shadow-[0_0_18px_rgba(37,99,235,0.08)]"
+                )}
+              />
             </div>
             <OrbitTriageHint className="mt-2" />
           </PageHeader>
@@ -1171,41 +1235,51 @@ export default function OrbitPage() {
                 scanning={scan.scanning}
                 scanTargetCount={scanTargetIds.length}
                 hasScanPlan={!!scan.plan}
+                scanPlanSuggestionCount={scan.plan?.plan.suggestions.length ?? 0}
                 applyingBatch={scan.applyingBatch}
                 canApplyStrongMatches={canApplyStrongMatches}
                 mapHref={orbitMapHref}
                 onScan={handleScan}
                 onApplyStrongMatches={handleApplyStrongMatches}
                 onReviewPass={handleOpenReviewAll}
-                queueToolbar={
-                  <OrbitQueueToolbar
-                    orbitView={orbitView}
-                    total={total}
-                    sortDirection={queueSortDirection}
-                    queueOrderLabel={queueOrderLabel}
-                    onChangeView={handleOrbitViewChange}
-                    onChangeSortDirection={handleQueueSortDirectionChange}
-                    selectionMode={selectionMode}
-                    canSelect={total > 0}
-                    onToggleSelectionMode={toggleSelectionMode}
-                  />
-                }
                 scanError={
                   scan.error ? (
-                  <OrbitScanFailureNotice
-                    error={scan.error}
-                    retryTargetCount={
-                      lastScanRequest?.targetIds.length ?? scanTargetCount
-                    }
-                    selectionTargetCount={selectedScanTargetIds.length}
-                    canRescanCurrentSelection={canRescanCurrentSelection}
-                    scanning={scan.scanning}
-                    onRetry={handleRetryScan}
-                    onRescanCurrentSelection={handleRescanCurrentSelection}
-                  />
-                ) : null
+                    <OrbitScanFailureNotice
+                      error={scan.error}
+                      retryTargetCount={
+                        lastScanRequest?.targetIds.length ?? scanTargetCount
+                      }
+                      selectionTargetCount={selectedScanTargetIds.length}
+                      canRescanCurrentSelection={canRescanCurrentSelection}
+                      scanning={scan.scanning}
+                      onRetry={handleRetryScan}
+                      onRescanCurrentSelection={handleRescanCurrentSelection}
+                    />
+                  ) : null
                 }
               />
+
+              <div
+                className={cn(
+                  "mt-3 rounded-sm border p-2",
+                  orbitHairlineBorder(isOrbital),
+                  isOrbital
+                    ? "glass-orbital"
+                    : "bg-surface-1/70 dark:bg-white/[0.035]"
+                )}
+              >
+                <OrbitQueueToolbar
+                  orbitView={orbitView}
+                  total={total}
+                  sortDirection={queueSortDirection}
+                  queueOrderLabel={queueOrderLabel}
+                  onChangeView={handleOrbitViewChange}
+                  onChangeSortDirection={handleQueueSortDirectionChange}
+                  selectionMode={selectionMode}
+                  canSelect={total > 0}
+                  onToggleSelectionMode={toggleSelectionMode}
+                />
+              </div>
 
               {scan.plan ? (
                 <OrbitScanOverviewStrip payload={scan.plan} className="mt-4" />
@@ -1442,60 +1516,59 @@ export default function OrbitPage() {
               ) : (
                 <>
                   <div className="flex flex-col gap-3">
-                  {/* Note: list stays full-width; slide-in panel is a fixed overlay from the right (new model) */}
-                  {/* Left column — the triage queue */}
-                  <div className="min-w-0 flex-1">
-                    <OrbitList
-                      bookmarks={bookmarks}
-                      selectedId={resolvedActiveBookmarkId}
-                      isLoading={isLoading}
-                      selectionMode={selectionMode}
-                      selectedIds={selectedBookmarkIds}
-                      getDecision={scan.getDecision}
-                      dismissedBookmarkIds={scan.dismissedBookmarkIds}
-                      appliedBookmarkIds={appliedBookmarkIds}
-                      onToggleSelect={(id) =>
-                        handleSelectionChange(id, !selectedBookmarkIds.has(id))
-                      }
-                      onSelect={(id) => {
-                        setActiveBookmarkId(id);
-                        if (menuForId) {
-                          setMenuForId(null);
-                          setMenuPosition(null);
+                    {/* Left column - the triage queue */}
+                    <div className="min-w-0 flex-1">
+                      <OrbitList
+                        bookmarks={bookmarks}
+                        selectedId={resolvedActiveBookmarkId}
+                        isLoading={isLoading}
+                        selectionMode={selectionMode}
+                        selectedIds={selectedBookmarkIds}
+                        getDecision={scan.getDecision}
+                        dismissedBookmarkIds={scan.dismissedBookmarkIds}
+                        appliedBookmarkIds={appliedBookmarkIds}
+                        onToggleSelect={(id) =>
+                          handleSelectionChange(id, !selectedBookmarkIds.has(id))
                         }
-                      }}
-                      onQuickAction={(id, action, event) => {
-                        if (action === "keep") {
-                          const wasDismissed = scan.dismissedBookmarkIds.has(id);
-                          handleKeepInOrbit(id);
-                          if (!wasDismissed) setActiveBookmarkId(null);
-                        } else if (action === "tag") {
-                          handleBookmarkAddTag(id);
-                        } else if (action === "menu" && event) {
-                          const rect = (
-                            event.currentTarget as HTMLElement
-                          ).getBoundingClientRect();
-                          const raw = { x: rect.right + 8, y: rect.top };
-                          setMenuForId(id);
-                          setMenuPosition(clampMenuPosition(raw.x, raw.y));
-                        } else {
+                        onSelect={(id) => {
                           setActiveBookmarkId(id);
-                        }
-                      }}
-                    />
+                          if (menuForId) {
+                            setMenuForId(null);
+                            setMenuPosition(null);
+                          }
+                        }}
+                        onQuickAction={(id, action, event) => {
+                          if (action === "keep") {
+                            const wasDismissed = scan.dismissedBookmarkIds.has(id);
+                            handleKeepInOrbit(id);
+                            if (!wasDismissed) setActiveBookmarkId(null);
+                          } else if (action === "tag") {
+                            handleBookmarkAddTag(id);
+                          } else if (action === "menu" && event) {
+                            const rect = (
+                              event.currentTarget as HTMLElement
+                            ).getBoundingClientRect();
+                            const raw = { x: rect.right + 8, y: rect.top };
+                            setMenuForId(id);
+                            setMenuPosition(clampMenuPosition(raw.x, raw.y));
+                          } else {
+                            setActiveBookmarkId(id);
+                          }
+                        }}
+                      />
 
-                    {orbitView === "all" &&
-                      totalPages > 1 &&
-                      bookmarks.length > 0 && (
-                        <PaginationControls
-                          variant="orbit"
-                          page={page}
-                          totalPages={totalPages}
-                          onPageChange={handlePageChange}
-                        />
-                      )}
+                      {orbitView === "all" &&
+                        totalPages > 1 &&
+                        bookmarks.length > 0 && (
+                          <PaginationControls
+                            variant="orbit"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={handlePageChange}
+                          />
+                        )}
+                    </div>
                   </div>
-                </div>
 
                 {/* Simple floating contextual menu (positioned from the row's ⋯ button) */}
                 {menuForId && menuPosition && (
@@ -1529,7 +1602,7 @@ export default function OrbitPage() {
                     decision={activeDecision}
                     suggestionDismissed={scan.dismissedBookmarkIds.has(activeBookmark.id)}
                     onFullReview={(id) => handleOpenBookmarkReview(id)}
-                    onDecision={handleSlideInDecision}
+                    onDecision={handleOrbitOverlayDecision}
                     onAddTag={handleBookmarkAddTag}
                     onAddToCollection={handleBookmarkAddToCollection}
                     showFullReview={!!scan.plan}
@@ -1584,7 +1657,7 @@ export default function OrbitPage() {
         />
       ) : null}
 
-      {reviewOpen ? (
+      {reviewSession.open ? (
         <OrbitReviewDialog
           open
           onOpenChange={handleReviewOpenChange}
@@ -1594,11 +1667,12 @@ export default function OrbitPage() {
           existingTags={tags}
           existingCollections={collections}
           applying={scan.applyingBatch}
-          focusBookmarkId={reviewBookmarkId}
-          reviewSessionId={reviewSessionId}
+          focusBookmarkId={reviewSession.focusBookmarkId}
+          reviewSessionId={reviewSession.sessionId}
           onApply={handleApplyReviewedPlan}
           // Phase 2: Pass the set of bookmarks that came from a Highlights Digest
-          digestBookmarkIds={activeDigestBookmarkIds}
+          digestBookmarkIds={reviewSession.digestBookmarkIds}
+          source={reviewSession.source}
           feedbackById={feedbackById}
         />
       ) : null}

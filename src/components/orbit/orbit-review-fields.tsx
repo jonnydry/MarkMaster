@@ -102,12 +102,12 @@ export function OrbitReviewTagField({
     <div className="space-y-2">
       <div className="flex min-h-8 flex-wrap gap-1.5">
         {parsed.length === 0 ? (
-          <span className="text-xs text-white/35">No tags yet</span>
+          <span className="text-xs text-muted-foreground/70">No tags yet</span>
         ) : (
           parsed.map((label, idx) => (
             <span
               key={`${label}-${idx}`}
-              className="inline-flex items-center gap-1 rounded-md border border-white/12 bg-white/5 py-0.5 pl-2 pr-1 text-[11px] text-white/85"
+              className="inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 py-0.5 pl-2 pr-1 text-[11px] text-foreground"
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
@@ -117,7 +117,7 @@ export function OrbitReviewTagField({
               {label}
               <button
                 type="button"
-                className="rounded p-0.5 text-white/50 hover:bg-white/10 hover:text-white"
+                className="rounded p-0.5 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
                 aria-label={`Remove ${label}`}
                 disabled={!included}
                 onClick={() =>
@@ -136,22 +136,22 @@ export function OrbitReviewTagField({
             disabled={!included || atTagCap}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "border-white/18 bg-white/[0.06] text-white hover:bg-white/10"
+              "border-hairline-soft bg-surface-2 text-foreground hover:bg-accent-soft"
             )}
           >
             From library
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="w-72 border border-white/15 bg-slate-950 p-0 text-white shadow-2xl"
+            className="w-72 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
           >
-            <Command className="relative max-h-80 rounded-lg border-0 bg-slate-950 text-white [&_[cmdk-input-wrapper]]:border-white/10">
+            <Command className="relative max-h-80 rounded-sm border-0 bg-popover text-popover-foreground [&_[cmdk-input-wrapper]]:border-hairline-soft">
               <CommandInput
                 placeholder="Search tags…"
-                className="text-white placeholder:text-white/35"
+                className="text-popover-foreground placeholder:text-muted-foreground/70"
               />
               <CommandList>
-                <CommandEmpty className="text-white/50">
+                <CommandEmpty className="text-muted-foreground">
                   No matching tags.
                 </CommandEmpty>
                 <CommandGroup heading="Your library">
@@ -164,7 +164,7 @@ export function OrbitReviewTagField({
                         key={tag.id}
                         value={tag.name}
                         disabled={taken || atTagCap}
-                        className="text-white data-[selected=true]:bg-white/10"
+                        className="text-popover-foreground data-[selected=true]:bg-accent-soft"
                         onSelect={() => {
                           onTagNamesChange(
                             addTagToDraftString(tagNames, tag.name)
@@ -199,7 +199,7 @@ export function OrbitReviewTagField({
           placeholder={
             atTagCap ? "Max 3 tags" : "New tag, press Enter"
           }
-          className="min-w-0 flex-1 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+          className="min-w-0 flex-1 border-hairline-soft bg-surface-1 text-foreground placeholder:text-muted-foreground/60"
         />
       </div>
     </div>
@@ -237,29 +237,29 @@ export function OrbitReviewCollectionField({
           }
           disabled={!included}
           placeholder={namePlaceholder}
-          className="min-w-0 flex-1 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+          className="min-w-0 flex-1 border-hairline-soft bg-surface-1 text-foreground placeholder:text-muted-foreground/60"
         />
         <Popover open={pickOpen} onOpenChange={setPickOpen}>
           <PopoverTrigger
             disabled={!included}
             className={cn(
               buttonVariants({ variant: "outline", size: "default" }),
-              "h-9 shrink-0 border-white/18 bg-white/[0.06] px-2.5 text-white hover:bg-white/10"
+              "h-9 shrink-0 border-hairline-soft bg-surface-2 px-2.5 text-foreground hover:bg-accent-soft"
             )}
           >
             Pick
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-80 border border-white/15 bg-slate-950 p-0 text-white shadow-2xl"
+            className="w-80 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
           >
-            <Command className="relative max-h-80 rounded-lg border-0 bg-slate-950 text-white">
+            <Command className="relative max-h-80 rounded-sm border-0 bg-popover text-popover-foreground">
               <CommandInput
                 placeholder="Search collections…"
-                className="text-white placeholder:text-white/35"
+                className="text-popover-foreground placeholder:text-muted-foreground/70"
               />
               <CommandList>
-                <CommandEmpty className="text-white/50">
+                <CommandEmpty className="text-muted-foreground">
                   No matching collections.
                 </CommandEmpty>
                 <CommandGroup heading="Your library">
@@ -267,7 +267,7 @@ export function OrbitReviewCollectionField({
                     <CommandItem
                       key={collection.id}
                       value={`${collection.name} ${collection.description ?? ""}`}
-                      className="text-white data-[selected=true]:bg-white/10"
+                      className="text-popover-foreground data-[selected=true]:bg-accent-soft"
                       onSelect={() => {
                         onCollectionNameChange(collection.name);
                         onCollectionDescriptionChange(
@@ -276,7 +276,7 @@ export function OrbitReviewCollectionField({
                         setPickOpen(false);
                       }}
                     >
-                      <Folder className="size-3.5 text-primary/80/90" />
+                      <Folder className="size-3.5 text-primary/80" />
                       {collection.name}
                     </CommandItem>
                   ))}
@@ -284,7 +284,7 @@ export function OrbitReviewCollectionField({
                 <CommandGroup>
                   <CommandItem
                     value="__clear__orbit_collection__"
-                    className="text-primary/80/90 data-[selected=true]:bg-white/10"
+                    className="text-primary data-[selected=true]:bg-accent-soft"
                     onSelect={() => {
                       onCollectionNameChange("");
                       onCollectionDescriptionChange("");
@@ -299,7 +299,7 @@ export function OrbitReviewCollectionField({
           </PopoverContent>
         </Popover>
       </div>
-      <p className="text-[10px] leading-snug text-white/45">
+      <p className="text-[10px] leading-snug text-muted-foreground">
         Pick an existing folder or type a new name in the field.
       </p>
       <Textarea
@@ -309,7 +309,7 @@ export function OrbitReviewCollectionField({
         }
         disabled={!included || !collectionName.trim()}
         placeholder="Optional description for new collection moves"
-        className="min-h-14 border-white/12 bg-white/[0.04] text-white placeholder:text-white/30"
+        className="min-h-14 border-hairline-soft bg-surface-1 text-foreground placeholder:text-muted-foreground/60"
       />
     </div>
   );
@@ -324,7 +324,7 @@ export function OrbitReviewDecisionControl({
 }) {
   return (
     <div
-      className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/10 p-1 sm:inline-grid sm:grid-cols-4"
+      className="grid grid-cols-2 gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 p-1 sm:inline-grid sm:grid-cols-4"
       role="radiogroup"
       aria-label="Review decision"
     >
@@ -339,8 +339,8 @@ export function OrbitReviewDecisionControl({
             className={cn(
               "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors",
               active
-                ? "bg-white text-slate-950 shadow-sm"
-                : "text-white/60 hover:bg-white/[0.08] hover:text-white"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
             )}
             onClick={() => onChange(option)}
           >
