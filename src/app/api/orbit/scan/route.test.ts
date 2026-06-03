@@ -251,4 +251,21 @@ describe("/api/orbit/scan", () => {
       });
     }
   );
+
+  it("rejects scan requests above the adaptive hard cap", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/orbit/scan", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "scan",
+          bookmarkIds: Array.from({ length: 37 }, (_, index) => `bookmark-${index}`),
+        }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(scanOrbitBookmarksWithXaiMock).not.toHaveBeenCalled();
+  });
 });

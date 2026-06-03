@@ -262,6 +262,23 @@ export interface OrbitScanOverview {
   collectionStrategy: string;
 }
 
+export type OrbitScanBatchProfileId = "quick" | "balanced" | "deep";
+export type OrbitScanBatchMode = "auto" | OrbitScanBatchProfileId;
+
+export interface OrbitScanBatchMetadata {
+  mode: OrbitScanBatchMode;
+  profile: OrbitScanBatchProfileId;
+  requestedCount: number;
+  candidatePoolCount: number;
+  sharedSignalCount: number;
+  sourceUnknownCount: number;
+  sourceUnknownRate: number;
+  selectedSourceUnknownCount: number;
+  selectedSourceUnknownRate: number;
+  usefulSignalCount: number;
+  selectionReason: string;
+}
+
 export interface OrbitScanPlan {
   overview: OrbitScanOverview;
   suggestions: OrbitBookmarkSuggestion[];
@@ -295,16 +312,36 @@ export interface OrbitCollectionRollup {
 }
 
 export interface OrbitScanResponsePayload {
+  scanRunId: string;
   model: string;
   scannedAt: string;
   privacy: {
     storeDisabled: boolean;
     zeroDataRetention: boolean | null;
   };
+  batch: OrbitScanBatchMetadata;
   plan: OrbitScanPlan;
   summary: OrbitScanSummary;
   tagRollups: OrbitTagRollup[];
   collectionRollups: OrbitCollectionRollup[];
+}
+
+export interface OrbitScanQualityPayload {
+  recommendedProfile: OrbitScanBatchProfileId;
+  profileReason: string;
+  successfulScanCount: number;
+  recentScanCount: number;
+  largeSuccessfulScanCount: number;
+  usefulSuggestionRate: number;
+  modelAbstainRate: number;
+  failureRate: number;
+  medianDurationMs: number;
+  reviewedSuggestionCount: number;
+  reviewUsefulRate: number | null;
+  deep: {
+    unlocked: boolean;
+    reason: string;
+  };
 }
 
 export type OrbitDecisionKind = "collection" | "tag";

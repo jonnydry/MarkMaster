@@ -94,14 +94,22 @@ import {
   type OrbitSortDirection,
   type OrbitView,
 } from "@/lib/orbit-navigation";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import {
+  ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+  ORBIT_SCAN_BATCH_PROFILES,
+  ORBIT_SCAN_CANDIDATE_POOL_SIZE,
+  type OrbitScanBatchMode,
+  type OrbitScanBatchProfileId,
+} from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 import type {
   BookmarkWithRelations,
   OrbitApplyResult,
+  OrbitScanBatchMetadata,
   OrbitDecisionEventPayload,
+  OrbitScanQualityPayload,
   OrbitScanPlan,
 } from "@/types";
 
@@ -111,10 +119,15 @@ type BookmarkResponse = {
   totalPages: number;
 };
 
+type OrbitScanCandidatesResponse = {
+  bookmarks: BookmarkWithRelations[];
+};
+
 type OrbitScanRequest = {
   targetIds: string[];
   scanningSelection: boolean;
   contextKey: string;
+  batch: OrbitScanBatchMetadata;
 };
 
 type OrbitReviewSession = {
@@ -162,12 +175,16 @@ function buildOrbitScanContextKey(args: {
   queryString: string;
   scanningSelection: boolean;
   scanTargetIds: string[];
+  batchMode: OrbitScanBatchMode;
+  batchProfile: OrbitScanBatchProfileId;
 }): string {
   const sortedTargets = [...args.scanTargetIds].sort().join("|");
   return [
     args.orbitView,
     String(args.page),
     args.queryString,
+    args.batchMode,
+    args.batchProfile,
     args.scanningSelection ? `sel:${sortedTargets}` : "queue",
   ].join("::");
 }
@@ -303,6 +320,71 @@ function buildNoOpApplyResult(bookmarkCount: number): OrbitApplyResult {
   };
 }
 
+function profileForCount(count: number): OrbitScanBatchProfileId {
+  if (count <= ORBIT_SCAN_BATCH_PROFILES.quick.size) return "quick";
+  if (count <= ORBIT_SCAN_BATCH_PROFILES.balanced.size) return "balanced";
+  return "deep";
+}
+
+function buildFallbackBatchMetadata(args: {
+  targetIds: string[];
+  mode: OrbitScanBatchMode;
+  profile: OrbitScanBatchProfileId;
+}): OrbitScanBatchMetadata {
+  return {
+    mode: args.mode,
+    profile: args.profile,
+    requestedCount: args.targetIds.length,
+    candidatePoolCount: args.targetIds.length,
+    sharedSignalCount: 0,
+    sourceUnknownCount: 0,
+    sourceUnknownRate: 0,
+    selectedSourceUnknownCount: 0,
+    selectedSourceUnknownRate: 0,
+    usefulSignalCount: 0,
+    selectionReason: "Scanned the provided bookmark IDs.",
+  };
+}
+
+function batchMetadataFromPlan(args: {
+  plan: ReturnType<typeof planOrbitScanBatch>;
+  mode: OrbitScanBatchMode;
+  profile: OrbitScanBatchProfileId;
+}): OrbitScanBatchMetadata {
+  return {
+    mode: args.mode,
+    profile: args.profile,
+    requestedCount: args.plan.bookmarkIds.length,
+    candidatePoolCount: args.plan.candidateCount,
+    sharedSignalCount: args.plan.sharedSignalCount,
+    sourceUnknownCount: args.plan.sourceUnknownCount,
+    sourceUnknownRate: args.plan.sourceUnknownRate,
+    selectedSourceUnknownCount: args.plan.selectedSourceUnknownCount,
+    selectedSourceUnknownRate: args.plan.selectedSourceUnknownRate,
+    usefulSignalCount: args.plan.usefulSignalCount,
+    selectionReason: args.plan.selectionReason,
+  };
+}
+
+function chooseAutoProfile(args: {
+  quality: OrbitScanQualityPayload | undefined;
+  sourceUnknownRate: number;
+}): OrbitScanBatchProfileId {
+  if (!args.quality || args.quality.successfulScanCount < 3) return "quick";
+  if (args.sourceUnknownRate > 0.35) return "quick";
+  return args.quality.recommendedProfile;
+}
+
+function countDecisionActions(events: OrbitDecisionEventPayload[]) {
+  return events.reduce(
+    (counts, event) => {
+      counts[event.action] += 1;
+      return counts;
+    },
+    { accepted: 0, edited: 0, kept: 0, rejected: 0 }
+  );
+}
+
 export default function OrbitPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -344,6 +426,8 @@ export default function OrbitPage() {
     () => new Set()
   );
   const [selectionMode, setSelectionMode] = useState(false);
+  const [scanBatchMode, setScanBatchMode] =
+    useState<OrbitScanBatchMode>("auto");
 
   // Simple click-outside + Esc for the floating menu (keeps things lightweight)
   useEffect(() => {
@@ -428,13 +512,77 @@ export default function OrbitPage() {
   const total = orbitData?.total ?? 0;
   const totalPages =
     orbitView === "all" ? Math.max(orbitData?.totalPages ?? 1, 1) : 1;
+  const scanCandidatesQueryString = useMemo(() => {
+    const params = new URLSearchParams({
+      page: orbitView === "recent" ? "1" : page.toString(),
+      pageSize: pageSize.toString(),
+      limit: ORBIT_SCAN_CANDIDATE_POOL_SIZE.toString(),
+      sortDirection: queueSortDirection,
+    });
+
+    if (deferredSearch) {
+      params.set("search", deferredSearch);
+    }
+
+    return params.toString();
+  }, [deferredSearch, orbitView, page, pageSize, queueSortDirection]);
+  const { data: scanCandidatesData } = useQuery<OrbitScanCandidatesResponse>({
+    queryKey: ["orbit", "scan-candidates", scanCandidatesQueryString],
+    queryFn: () =>
+      fetchJson(`/api/orbit/scan-candidates?${scanCandidatesQueryString}`),
+    placeholderData: keepPreviousData,
+  });
+  const { data: scanQuality } = useQuery<OrbitScanQualityPayload>({
+    queryKey: ["orbit", "scan-quality"],
+    queryFn: () => fetchJson("/api/orbit/scan-quality"),
+    staleTime: 60_000,
+  });
+  const scanCandidateBookmarks = scanCandidatesData
+    ? scanCandidatesData.bookmarks
+    : bookmarks;
+  const reviewBookmarks = useMemo(() => {
+    const byId = new Map(
+      scanCandidateBookmarks.map((bookmark) => [bookmark.id, bookmark])
+    );
+    for (const bookmark of bookmarks) {
+      byId.set(bookmark.id, bookmark);
+    }
+    return Array.from(byId.values());
+  }, [bookmarks, scanCandidateBookmarks]);
   const bookmarkById = useMemo(
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
     [bookmarks]
   );
+  const candidatePoolPlan = useMemo(
+    () =>
+      planOrbitScanBatch(
+        scanCandidateBookmarks,
+        Math.min(
+          ORBIT_SCAN_BATCH_PROFILES.deep.size,
+          Math.max(1, scanCandidateBookmarks.length)
+        )
+      ),
+    [scanCandidateBookmarks]
+  );
+  const autoScanBatchProfile = chooseAutoProfile({
+    quality: scanQuality,
+    sourceUnknownRate: candidatePoolPlan.sourceUnknownRate,
+  });
+  const deepLockedBySourceQuality = candidatePoolPlan.sourceUnknownRate > 0.35;
+  const deepUnlocked = Boolean(scanQuality?.deep.unlocked) && !deepLockedBySourceQuality;
+  const deepLockedReason = deepLockedBySourceQuality
+    ? "Current candidates have too much missing source context for Deep."
+    : (scanQuality?.deep.reason ?? "Needs scan history before Deep unlocks.");
+  const resolvedScanBatchMode: OrbitScanBatchMode =
+    scanBatchMode === "deep" && !deepUnlocked ? "auto" : scanBatchMode;
+  const scanBatchProfile: OrbitScanBatchProfileId =
+    resolvedScanBatchMode === "auto"
+      ? autoScanBatchProfile
+      : resolvedScanBatchMode;
+  const scanBatchLimit = ORBIT_SCAN_BATCH_PROFILES[scanBatchProfile].size;
   const defaultScanPlan = useMemo(
-    () => planOrbitScanBatch(bookmarks, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
-    [bookmarks]
+    () => planOrbitScanBatch(scanCandidateBookmarks, scanBatchLimit),
+    [scanCandidateBookmarks, scanBatchLimit]
   );
   const defaultScanTargetIds = defaultScanPlan.bookmarkIds;
   const selectedScanTargetIds = useMemo(() => {
@@ -444,19 +592,38 @@ export default function OrbitPage() {
     });
     return planOrbitScanBatch(
       selectedBookmarks,
-      ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN
+      scanBatchLimit
     ).bookmarkIds;
-  }, [bookmarkById, selectedBookmarkIds]);
+  }, [bookmarkById, scanBatchLimit, selectedBookmarkIds]);
+  const selectedScanPlan = useMemo(() => {
+    const selectedBookmarks = Array.from(selectedBookmarkIds).flatMap((bookmarkId) => {
+      const bookmark = bookmarkById.get(bookmarkId);
+      return bookmark ? [bookmark] : [];
+    });
+    return planOrbitScanBatch(selectedBookmarks, scanBatchLimit);
+  }, [bookmarkById, scanBatchLimit, selectedBookmarkIds]);
   const scanningSelection = selectionMode && selectedScanTargetIds.length > 0;
   const scanTargetIds = scanningSelection
     ? selectedScanTargetIds
     : defaultScanTargetIds;
+  const scanBatchMetadata = scanningSelection
+    ? batchMetadataFromPlan({
+        plan: selectedScanPlan,
+        mode: resolvedScanBatchMode,
+        profile: scanBatchProfile,
+      })
+    : batchMetadataFromPlan({
+        plan: defaultScanPlan,
+        mode: resolvedScanBatchMode,
+        profile: scanBatchProfile,
+      });
   const scanTargetCount = scanTargetIds.length;
   const queueBatchCount = defaultScanTargetIds.length;
   const queueIsLoading = isLoading && !orbitData;
   const hasSearchQuery = search.trim().length > 0;
   const hasSelectionOverflow =
-    selectedBookmarkIds.size > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN;
+    selectedBookmarkIds.size > scanBatchLimit;
+  const scanProfileLabel = ORBIT_SCAN_BATCH_PROFILES[scanBatchProfile].label;
   const queueOrderLabel =
     queueSortDirection === "asc" ? "oldest" : "newest";
   const scanHelperText = queueIsLoading
@@ -466,7 +633,7 @@ export default function OrbitPage() {
         ? `Grok will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
         : `Grok will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
       : queueBatchCount > 0
-        ? `Grok suggests tags and destinations for the ${queueBatchCount} ${queueOrderLabel} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"}. Review each suggestion or apply the whole pass at once.`
+        ? `${scanProfileLabel} scan selected ${queueBatchCount} ${queueOrderLabel} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"} from ${defaultScanPlan.candidateCount.toLocaleString()} candidates. Review each suggestion before applying.`
         : hasSearchQuery
           ? "No bookmarks match the current Orbit filter."
           : "Orbit is clear.";
@@ -501,23 +668,49 @@ export default function OrbitPage() {
         queryString,
         scanningSelection,
         scanTargetIds,
+        batchMode: resolvedScanBatchMode,
+        batchProfile: scanBatchProfile,
       }),
-    [orbitView, page, queryString, scanningSelection, scanTargetIds]
+    [
+      orbitView,
+      page,
+      queryString,
+      scanningSelection,
+      scanTargetIds,
+      resolvedScanBatchMode,
+      scanBatchProfile,
+    ]
   );
 
   const buildScanRequest = useCallback(
-    (targetIds: string[], scanSelection: boolean): OrbitScanRequest => ({
-      targetIds,
-      scanningSelection: scanSelection,
-      contextKey: buildOrbitScanContextKey({
-        orbitView,
-        page,
-        queryString,
+    (
+      targetIds: string[],
+      scanSelection: boolean,
+      batchMetadata?: OrbitScanBatchMetadata
+    ): OrbitScanRequest => {
+      const batch =
+        batchMetadata ??
+        buildFallbackBatchMetadata({
+          targetIds,
+          mode: resolvedScanBatchMode,
+          profile: profileForCount(targetIds.length),
+        });
+      return {
+        targetIds,
         scanningSelection: scanSelection,
-        scanTargetIds: targetIds,
-      }),
-    }),
-    [orbitView, page, queryString]
+        batch,
+        contextKey: buildOrbitScanContextKey({
+          orbitView,
+          page,
+          queryString,
+          scanningSelection: scanSelection,
+          scanTargetIds: targetIds,
+          batchMode: batch.mode,
+          batchProfile: batch.profile,
+        }),
+      };
+    },
+    [orbitView, page, queryString, resolvedScanBatchMode]
   );
 
   const staleScanPlan = Boolean(
@@ -757,7 +950,7 @@ export default function OrbitPage() {
           : "Grok is categorizing your queue — large batches can take a minute."
       );
       try {
-        const result = await scan.scanNow(request.targetIds);
+        const result = await scan.scanNow(request.targetIds, request.batch);
         if (result) {
           setScanContextAtLastRun(request.contextKey);
           const scopeLabel = request.scanningSelection ? "selected" : "Orbit";
@@ -777,8 +970,16 @@ export default function OrbitPage() {
   );
 
   const handleScan = useCallback(async () => {
-    await runOrbitScan(buildScanRequest(scanTargetIds, scanningSelection));
-  }, [buildScanRequest, runOrbitScan, scanTargetIds, scanningSelection]);
+    await runOrbitScan(
+      buildScanRequest(scanTargetIds, scanningSelection, scanBatchMetadata)
+    );
+  }, [
+    buildScanRequest,
+    runOrbitScan,
+    scanTargetIds,
+    scanningSelection,
+    scanBatchMetadata,
+  ]);
 
   const clearConsumedReviewUrlParams = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -875,8 +1076,25 @@ export default function OrbitPage() {
   ]);
 
   const handleRescanCurrentSelection = useCallback(async () => {
-    await runOrbitScan(buildScanRequest(selectedScanTargetIds, true));
-  }, [buildScanRequest, runOrbitScan, selectedScanTargetIds]);
+    await runOrbitScan(
+      buildScanRequest(
+        selectedScanTargetIds,
+        true,
+        batchMetadataFromPlan({
+          plan: selectedScanPlan,
+          mode: resolvedScanBatchMode,
+          profile: scanBatchProfile,
+        })
+      )
+    );
+  }, [
+    buildScanRequest,
+    runOrbitScan,
+    selectedScanTargetIds,
+    selectedScanPlan,
+    resolvedScanBatchMode,
+    scanBatchProfile,
+  ]);
 
   const handleReviewOpenChange = useCallback(
     (open: boolean) => {
@@ -951,6 +1169,13 @@ export default function OrbitPage() {
         if (hasMutations && !applied) return null;
 
         if (opts.decisionEvents.length > 0) {
+          const decisionCounts = countDecisionActions(opts.decisionEvents);
+          trackFlywheelEvent("orbit.review.applied", {
+            scanRunId: scan.plan?.scanRunId ?? null,
+            total: opts.decisionEvents.length,
+            ...decisionCounts,
+          });
+
           try {
             await sendJson("/api/orbit/decision-events", {
               method: "POST",
@@ -1258,6 +1483,11 @@ export default function OrbitPage() {
                 scanTargetCount={scanTargetIds.length}
                 hasScanPlan={!!scan.plan}
                 scanPlanSuggestionCount={scan.plan?.plan.suggestions.length ?? 0}
+                batchMode={resolvedScanBatchMode}
+                resolvedBatchProfile={scanBatchProfile}
+                deepUnlocked={deepUnlocked}
+                deepLockedReason={deepLockedReason}
+                onBatchModeChange={setScanBatchMode}
                 applyingBatch={scan.applyingBatch}
                 canApplyStrongMatches={canApplyStrongMatches}
                 mapHref={orbitMapHref}
@@ -1362,7 +1592,7 @@ export default function OrbitPage() {
                         )}
                       >
                         Grok will process the first{" "}
-                        {ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} selected.
+                        {scanBatchLimit} selected.
                       </span>
                     ) : null}
                   </div>
@@ -1684,7 +1914,7 @@ export default function OrbitPage() {
           open
           onOpenChange={handleReviewOpenChange}
           plan={scan.plan}
-          bookmarks={bookmarks}
+          bookmarks={reviewBookmarks}
           dismissedBookmarkIds={scan.dismissedBookmarkIds}
           existingTags={tags}
           existingCollections={collections}

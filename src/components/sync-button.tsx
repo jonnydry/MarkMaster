@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { fetchJson, sendJson, FetchJsonError } from "@/lib/fetch-json";
-import type { SyncRunSummary, SyncStatusResponse } from "@/types";
+import { sendJson, FetchJsonError } from "@/lib/fetch-json";
+import { useSyncStatus } from "@/hooks/use-sync-status";
+import type { SyncRunSummary } from "@/types";
 
 interface SyncButtonProps {
   lastSyncAt: Date | null;
@@ -16,6 +16,7 @@ interface SyncButtonProps {
   bookmarkCount?: number;
   detail?: "compact" | "full";
   layout?: "panel" | "icon";
+  onSyncStateChange?: (syncing: boolean) => void;
 }
 
 export function SyncButton({
@@ -24,19 +25,14 @@ export function SyncButton({
   bookmarkCount,
   detail = "compact",
   layout = "panel",
+  onSyncStateChange,
 }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<string>("");
 
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
-    useQuery<SyncStatusResponse>({
-      queryKey: ["sync-status"],
-      queryFn: () => fetchJson("/api/bookmarks/sync"),
-      refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
-      refetchIntervalInBackground: false,
-      refetchOnWindowFocus: true,
-    });
+    useSyncStatus();
 
   const currentRun = syncStatus?.currentRun;
   const latestRun = syncStatus?.recentRuns[0] ?? null;
@@ -69,6 +65,7 @@ export function SyncButton({
   const handleSync = async () => {
     if (isAnySyncRunning) return;
     setSyncing(true);
+    onSyncStateChange?.(true);
     try {
       const data = await sendJson<{
         newBookmarks: number;
@@ -120,6 +117,7 @@ export function SyncButton({
       toast.error("Failed to sync bookmarks");
     } finally {
       setSyncing(false);
+      onSyncStateChange?.(false);
     }
   };
 

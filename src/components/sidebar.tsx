@@ -43,6 +43,7 @@ export interface SidebarProps {
   lastSyncAt?: Date | null;
   totalBookmarks?: number;
   onSyncComplete?: () => void;
+  onSyncStateChange?: (syncing: boolean) => void;
 }
 
 const NAV_ITEMS = [
@@ -63,6 +64,7 @@ export function Sidebar({
   lastSyncAt,
   totalBookmarks,
   onSyncComplete,
+  onSyncStateChange,
 }: SidebarProps) {
   const t = useTypography();
   const { isOrbital } = useOrbitalTheme();
@@ -361,6 +363,7 @@ export function Sidebar({
               <SyncButton
                 lastSyncAt={lastSyncAt ?? null}
                 onSyncComplete={onSyncComplete}
+                onSyncStateChange={onSyncStateChange}
                 bookmarkCount={totalBookmarks}
               />
             </div>
@@ -376,6 +379,7 @@ export function Sidebar({
             <SyncButton
               lastSyncAt={lastSyncAt ?? null}
               onSyncComplete={onSyncComplete}
+              onSyncStateChange={onSyncStateChange}
               bookmarkCount={totalBookmarks}
               layout="icon"
             />

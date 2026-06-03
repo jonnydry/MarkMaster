@@ -146,6 +146,7 @@ export async function POST(req: NextRequest) {
         })),
         authorPriorHints,
         learningHints,
+        batch: parsed.data.batch,
       });
 
       return NextResponse.json(scan);

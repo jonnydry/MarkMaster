@@ -1,9 +1,13 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRESET_COLORS } from "@/lib/constants";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import {
+  ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+  ORBIT_SCAN_BATCH_PROFILES,
+} from "@/lib/orbit-config";
 import {
   extractOrbitBookmarkSignals,
   type OrbitLearningHint,
@@ -11,6 +15,7 @@ import {
 import { getTagColorSpectrum } from "@/lib/tag-colors";
 import type {
   OrbitApplyResult,
+  OrbitScanBatchMetadata,
   OrbitCollectionRollup,
   OrbitScanFailureCode,
   OrbitScanResponsePayload,
@@ -259,6 +264,26 @@ export const orbitScanPlanSchema = z.object({
     ),
 });
 
+const orbitScanBatchProfileSchema = z.enum(["quick", "balanced", "deep"]);
+
+export const orbitScanBatchMetadataSchema = z.object({
+  mode: z.enum(["auto", "quick", "balanced", "deep"]),
+  profile: orbitScanBatchProfileSchema,
+  requestedCount: z.number().int().min(1).max(ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
+  candidatePoolCount: z.number().int().min(1).max(100),
+  sharedSignalCount: z.number().min(0),
+  sourceUnknownCount: z.number().int().min(0).max(100),
+  sourceUnknownRate: z.number().min(0).max(1),
+  selectedSourceUnknownCount: z
+    .number()
+    .int()
+    .min(0)
+    .max(ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
+  selectedSourceUnknownRate: z.number().min(0).max(1),
+  usefulSignalCount: z.number().int().min(0),
+  selectionReason: z.string().trim().min(1).max(240),
+});
+
 export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("scan"),
@@ -269,6 +294,7 @@ export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
         ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
         `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`
       ),
+    batch: orbitScanBatchMetadataSchema.optional(),
   }),
   z.object({
     mode: z.literal("apply"),
@@ -1289,6 +1315,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   existingCollections: OrbitCollectionContext[];
   authorPriorHints?: OrbitAuthorPriorHint[];
   learningHints?: OrbitLearningHint[];
+  batch?: OrbitScanBatchMetadata;
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitGrokError(
@@ -1428,8 +1455,30 @@ export async function scanOrbitBookmarksWithXai(args: {
     existingTags: args.existingTags,
     existingCollections: args.existingCollections,
   });
+  const requestedCount = args.bookmarks.length;
+  const batch: OrbitScanBatchMetadata =
+    args.batch ??
+    {
+      mode: "balanced",
+      profile:
+        requestedCount <= ORBIT_SCAN_BATCH_PROFILES.quick.size
+          ? "quick"
+          : requestedCount <= ORBIT_SCAN_BATCH_PROFILES.balanced.size
+            ? "balanced"
+            : "deep",
+      requestedCount,
+      candidatePoolCount: requestedCount,
+      sharedSignalCount: 0,
+      sourceUnknownCount: 0,
+      sourceUnknownRate: 0,
+      selectedSourceUnknownCount: 0,
+      selectedSourceUnknownRate: 0,
+      usefulSignalCount: 0,
+      selectionReason: "Scanned the provided bookmark IDs.",
+    };
 
   return {
+    scanRunId: randomUUID(),
     model,
     scannedAt: new Date().toISOString(),
     privacy: {
@@ -1441,6 +1490,7 @@ export async function scanOrbitBookmarksWithXai(args: {
             ? false
             : null,
     },
+    batch,
     plan,
     summary: buildOrbitScanSummary(plan),
     tagRollups: buildOrbitTagRollups(plan),

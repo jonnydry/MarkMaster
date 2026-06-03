@@ -12,6 +12,7 @@
  *  - mode.quick / mode.deep (toggles + keyboard in review dialog)
  *  - digest.session_start (when a digest batch review session begins from URL intent)
  *  - quick.keep (Slice 3: lightweight outcome signal when a keep decision is recorded while Quick Pass is active)
+ *  - orbit.scan.completed / orbit.scan.failed / orbit.review.applied (adaptive Orbit batch quality)
  *
  * Stored via /api/flywheel (best-effort), aggregated in /api/analytics for the basic view.
  * Easy to extend in Slice 2/3 (source grouping, outcome derivation) while remaining zero-UX-impact.
@@ -27,7 +28,10 @@ export type FlywheelEventType =
   | "mode.quick"
   | "mode.deep"
   | "digest.session_start"
-  | "quick.keep";
+  | "quick.keep"
+  | "orbit.scan.completed"
+  | "orbit.scan.failed"
+  | "orbit.review.applied";
 
 export function trackFlywheelEvent(
   eventType: FlywheelEventType,

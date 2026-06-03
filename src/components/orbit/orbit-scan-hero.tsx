@@ -11,6 +11,7 @@ import {
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
+import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { useOrbitalTheme } from "@/components/providers";
 import {
   orbitControlRadius,
@@ -19,6 +20,11 @@ import {
   orbitLabelClass,
   orbitMetaSoft,
 } from "@/lib/orbit-route-chrome";
+import {
+  ORBIT_SCAN_BATCH_PROFILES,
+  type OrbitScanBatchMode,
+  type OrbitScanBatchProfileId,
+} from "@/lib/orbit-config";
 import { cn } from "@/lib/utils";
 
 export interface OrbitScanHeroProps {
@@ -28,24 +34,45 @@ export interface OrbitScanHeroProps {
   scanTargetCount: number;
   hasScanPlan: boolean;
   scanPlanSuggestionCount?: number;
+  batchMode: OrbitScanBatchMode;
+  resolvedBatchProfile: OrbitScanBatchProfileId;
+  deepUnlocked: boolean;
+  deepLockedReason: string;
   applyingBatch: boolean;
   canApplyStrongMatches: boolean;
   mapHref: string;
   scanError?: React.ReactNode;
+  onBatchModeChange: (mode: OrbitScanBatchMode) => void;
   onScan: () => void;
   onApplyStrongMatches: () => void;
   onReviewPass: () => void;
 }
 
+const BATCH_OPTIONS: Array<{
+  mode: OrbitScanBatchMode;
+  label: string;
+  title: string;
+}> = [
+  { mode: "auto", label: "Auto", title: "Adaptive batch size" },
+  {
+    mode: "quick",
+    label: `Quick ${ORBIT_SCAN_BATCH_PROFILES.quick.size}`,
+    title: "Fastest Grok pass",
+  },
+  {
+    mode: "balanced",
+    label: `Balanced ${ORBIT_SCAN_BATCH_PROFILES.balanced.size}`,
+    title: "Larger Grok pass when quality is reliable",
+  },
+  {
+    mode: "deep",
+    label: `Deep ${ORBIT_SCAN_BATCH_PROFILES.deep.size}`,
+    title: "Largest Grok pass",
+  },
+];
+
 export function OrbitScanProgressBar() {
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 top-0 h-1 overflow-hidden bg-primary/10"
-      aria-hidden="true"
-    >
-      <div className="orbit-scan-progress-bar h-full w-1/3 bg-gradient-to-r from-transparent via-primary to-transparent" />
-    </div>
-  );
+  return <ScrollingProgressBar />;
 }
 
 export function OrbitScanHero({
@@ -55,10 +82,15 @@ export function OrbitScanHero({
   scanTargetCount,
   hasScanPlan,
   scanPlanSuggestionCount = 0,
+  batchMode,
+  resolvedBatchProfile,
+  deepUnlocked,
+  deepLockedReason,
   applyingBatch,
   canApplyStrongMatches,
   mapHref,
   scanError,
+  onBatchModeChange,
   onScan,
   onApplyStrongMatches,
   onReviewPass,
@@ -86,6 +118,44 @@ export function OrbitScanHero({
   const statusLabel = hasScanPlan ? suggestionLabel : targetLabel;
   const primaryScanLabel =
     queueIsLoading || scanning ? "Categorizing queue..." : scanButtonLabel;
+  const batchSelector = (
+    <div
+      role="group"
+      aria-label="Grok batch size"
+      className={cn(
+        "inline-flex max-w-full overflow-x-auto rounded-sm border border-hairline-soft bg-surface-2/60 p-0.5",
+        orbitControlRadius(isOrbital)
+      )}
+    >
+      {BATCH_OPTIONS.map((option) => {
+        const active = batchMode === option.mode;
+        const disabled = option.mode === "deep" && !deepUnlocked;
+        const resolved =
+          option.mode === "auto" && resolvedBatchProfile !== "quick"
+            ? ` · ${ORBIT_SCAN_BATCH_PROFILES[resolvedBatchProfile].label}`
+            : "";
+        return (
+          <button
+            key={option.mode}
+            type="button"
+            aria-pressed={active}
+            disabled={disabled || scanning}
+            title={disabled ? deepLockedReason : `${option.title}${resolved}`}
+            onClick={() => onBatchModeChange(option.mode)}
+            className={cn(
+              "h-7 shrink-0 rounded-sm px-2 text-[10px] font-semibold transition-colors",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground",
+              disabled && "cursor-not-allowed opacity-45 hover:bg-transparent"
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   if (hasScanPlan) {
     return (
@@ -121,6 +191,7 @@ export function OrbitScanHero({
             >
               {suggestionLabel}
             </span>
+            {batchSelector}
           </div>
 
           <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
@@ -266,6 +337,8 @@ export function OrbitScanHero({
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:justify-end">
+          {batchSelector}
+
           {hasScanPlan ? (
             <Button
               type="button"

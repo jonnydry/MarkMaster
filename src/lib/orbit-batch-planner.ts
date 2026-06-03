@@ -25,6 +25,20 @@ const COMMON_WORDS = new Set([
 export interface OrbitBatchPlan {
   bookmarkIds: string[];
   sharedSignalCount: number;
+  candidateCount: number;
+  selectedCount: number;
+  sourceUnknownCount: number;
+  sourceUnknownRate: number;
+  selectedSourceUnknownCount: number;
+  selectedSourceUnknownRate: number;
+  usefulSignalCount: number;
+  selectionReason: string;
+}
+
+interface BookmarkSourceQuality {
+  sourceUnknown: boolean;
+  usefulSignalCount: number;
+  score: number;
 }
 
 function normalize(value: string) {
@@ -73,6 +87,68 @@ function topicTokensFromMetadata(bookmark: BookmarkWithRelations) {
   });
 }
 
+function textHasUsefulSignal(value: string | null | undefined) {
+  if (!value) return false;
+  const stripped = value
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/[^\p{L}\p{N}#+.-]+/gu, " ")
+    .trim();
+  if (stripped.length < 8) return false;
+  return /[\p{L}\p{N}]/u.test(stripped);
+}
+
+function xMediaAltTexts(bookmark: BookmarkWithRelations) {
+  const media = bookmark.xMetadata?.media;
+  const storedAltTexts =
+    bookmark.media?.flatMap((item) =>
+      typeof item.alt_text === "string" ? [item.alt_text] : []
+    ) ?? [];
+  if (!Array.isArray(media)) return storedAltTexts;
+
+  return storedAltTexts.concat(
+    media.flatMap((item) => {
+      const altText = item?.alt_text;
+      return typeof altText === "string" ? [altText] : [];
+    })
+  );
+}
+
+export function getOrbitBookmarkSourceQuality(
+  bookmark: BookmarkWithRelations
+): BookmarkSourceQuality {
+  let usefulSignalCount = 0;
+  if (textHasUsefulSignal(bookmark.tweetText)) usefulSignalCount += 1;
+  if (textHasUsefulSignal(bookmark.quotedTweet?.text)) usefulSignalCount += 1;
+
+  for (const note of bookmark.notes) {
+    if (textHasUsefulSignal(note.content)) usefulSignalCount += 1;
+  }
+
+  for (const url of bookmark.urls ?? []) {
+    if (textHasUsefulSignal(url.title)) usefulSignalCount += 1;
+    if (textHasUsefulSignal(url.description)) usefulSignalCount += 1;
+  }
+
+  for (const topic of topicTokensFromMetadata(bookmark)) {
+    if (textHasUsefulSignal(topic)) usefulSignalCount += 1;
+  }
+
+  for (const altText of xMediaAltTexts(bookmark)) {
+    if (textHasUsefulSignal(altText)) usefulSignalCount += 1;
+  }
+
+  const hasKnownAuthor =
+    normalize(bookmark.authorUsername) !== "" &&
+    normalize(bookmark.authorUsername) !== "unknown";
+  const sourceUnknown = !hasKnownAuthor || usefulSignalCount === 0;
+
+  return {
+    sourceUnknown,
+    usefulSignalCount,
+    score: (hasKnownAuthor ? 2 : 0) + Math.min(usefulSignalCount, 6),
+  };
+}
+
 function getBookmarkTokens(bookmark: BookmarkWithRelations) {
   const tokens = new Set<string>();
   addToken(tokens, bookmark.authorUsername, "author");
@@ -118,11 +194,51 @@ export function planOrbitScanBatch(
   bookmarks: BookmarkWithRelations[],
   limit: number
 ): OrbitBatchPlan {
-  if (bookmarks.length <= limit) {
+  const candidateCount = bookmarks.length;
+  const qualityById = new Map(
+    bookmarks.map((bookmark) => [bookmark.id, getOrbitBookmarkSourceQuality(bookmark)])
+  );
+  const sourceUnknownCount = bookmarks.filter(
+    (bookmark) => qualityById.get(bookmark.id)?.sourceUnknown
+  ).length;
+  const usefulSignalCount = bookmarks.reduce(
+    (total, bookmark) =>
+      total + (qualityById.get(bookmark.id)?.usefulSignalCount ?? 0),
+    0
+  );
+
+  const buildPlan = (
+    bookmarkIds: string[],
+    sharedSignalCount: number,
+    selectionReason: string
+  ): OrbitBatchPlan => {
+    const selectedSourceUnknownCount = bookmarkIds.filter(
+      (id) => qualityById.get(id)?.sourceUnknown
+    ).length;
     return {
-      bookmarkIds: bookmarks.map((bookmark) => bookmark.id),
-      sharedSignalCount: 0,
+      bookmarkIds,
+      sharedSignalCount,
+      candidateCount,
+      selectedCount: bookmarkIds.length,
+      sourceUnknownCount,
+      sourceUnknownRate:
+        candidateCount > 0 ? sourceUnknownCount / candidateCount : 0,
+      selectedSourceUnknownCount,
+      selectedSourceUnknownRate:
+        bookmarkIds.length > 0
+          ? selectedSourceUnknownCount / bookmarkIds.length
+          : 0,
+      usefulSignalCount,
+      selectionReason,
     };
+  };
+
+  if (bookmarks.length <= limit) {
+    return buildPlan(
+      bookmarks.map((bookmark) => bookmark.id),
+      0,
+      "All visible candidates fit this batch."
+    );
   }
 
   const tokenById = new Map(
@@ -137,16 +253,16 @@ export function planOrbitScanBatch(
       (total, candidate) =>
         total + overlapScore(aTokens, tokenById.get(candidate.id) ?? new Set()),
       0
-    );
+    ) + (qualityById.get(a.id)?.score ?? 0);
     const bScore = bookmarks.reduce(
       (total, candidate) =>
         total + overlapScore(bTokens, tokenById.get(candidate.id) ?? new Set()),
       0
-    );
+    ) + (qualityById.get(b.id)?.score ?? 0);
     return bScore - aScore || (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
   })[0];
 
-  if (!seed) return { bookmarkIds: [], sharedSignalCount: 0 };
+  if (!seed) return buildPlan([], 0, "No scan candidates available.");
 
   const selected = [seed.id];
   const selectedTokens = new Set(tokenById.get(seed.id) ?? []);
@@ -159,6 +275,8 @@ export function planOrbitScanBatch(
       const bScore = overlapScore(selectedTokens, tokenById.get(b.id) ?? new Set());
       return (
         bScore - aScore ||
+        (qualityById.get(b.id)?.score ?? 0) -
+          (qualityById.get(a.id)?.score ?? 0) ||
         (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0)
       );
     });
@@ -172,5 +290,11 @@ export function planOrbitScanBatch(
     for (const token of nextTokens) selectedTokens.add(token);
   }
 
-  return { bookmarkIds: selected, sharedSignalCount };
+  return buildPlan(
+    selected,
+    sharedSignalCount,
+    sharedSignalCount > 0
+      ? "Selected a coherent batch with shared topics, folders, authors, or domains."
+      : "Selected the strongest source-quality candidates in queue order."
+  );
 }

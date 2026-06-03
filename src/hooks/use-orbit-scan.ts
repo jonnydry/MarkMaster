@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { FetchJsonError, sendJson, type JsonValue } from "@/lib/fetch-json";
+import { trackFlywheelEvent } from "@/lib/flywheel";
 import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
@@ -15,6 +16,7 @@ import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
   OrbitApplyResult,
   OrbitBookmarkDecision,
+  OrbitScanBatchMetadata,
   OrbitScanConfidence,
   OrbitScanErrorPayload,
   OrbitScanFailureCode,
@@ -52,7 +54,10 @@ export interface OrbitScanState {
 }
 
 export interface OrbitScanHandle extends OrbitScanState {
-  scanNow: (bookmarkIds: string[]) => Promise<OrbitScanResponsePayload | null>;
+  scanNow: (
+    bookmarkIds: string[],
+    batch?: OrbitScanBatchMetadata
+  ) => Promise<OrbitScanResponsePayload | null>;
   applySuggestion: (
     bookmarkId: string,
     variant: "primary" | "alt"
@@ -196,7 +201,7 @@ export function useOrbitScan(): OrbitScanHandle {
   );
 
   const scanNow = useCallback(
-    async (bookmarkIds: string[]) => {
+    async (bookmarkIds: string[], batch?: OrbitScanBatchMetadata) => {
       const unique = Array.from(new Set(bookmarkIds));
       if (unique.length === 0) return null;
       if (unique.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
@@ -211,20 +216,75 @@ export function useOrbitScan(): OrbitScanHandle {
 
       setScanning(true);
       setError(null);
+      const startedAt = Date.now();
 
       try {
         const result = await sendJson<
           OrbitScanResponsePayload,
-          { mode: "scan"; bookmarkIds: string[] }
+          {
+            mode: "scan";
+            bookmarkIds: string[];
+            batch?: JsonValue;
+          }
         >("/api/orbit/scan", {
           method: "POST",
-          body: { mode: "scan", bookmarkIds: unique },
+          body: {
+            mode: "scan",
+            bookmarkIds: unique,
+            ...(batch
+              ? { batch: JSON.parse(JSON.stringify(batch)) as JsonValue }
+              : {}),
+          },
         });
         setPlan(result);
         setDismissed(new Set());
+        const durationMs = Date.now() - startedAt;
+        const suggestions = result.plan.suggestions;
+        const usefulSuggestions = suggestions.filter(
+          (suggestion) =>
+            suggestion.tags.length > 0 || suggestion.collection !== null
+        ).length;
+        const modelAbstains = suggestions.filter(
+          (suggestion) =>
+            suggestion.confidence === "low" &&
+            suggestion.tags.length === 0 &&
+            suggestion.collection === null
+        ).length;
+        trackFlywheelEvent("orbit.scan.completed", {
+          scanRunId: result.scanRunId,
+          durationMs,
+          requestedCount: unique.length,
+          candidatePoolCount: result.batch.candidatePoolCount,
+          profile: result.batch.profile,
+          mode: result.batch.mode,
+          usefulSuggestions,
+          highConfidence: suggestions.filter(
+            (suggestion) => suggestion.confidence === "high"
+          ).length,
+          mediumConfidence: suggestions.filter(
+            (suggestion) => suggestion.confidence === "medium"
+          ).length,
+          lowConfidence: suggestions.filter(
+            (suggestion) => suggestion.confidence === "low"
+          ).length,
+          modelAbstains,
+          sourceUnknowns: result.batch.selectedSourceUnknownCount,
+          safeAutoApplyCount: suggestions.filter(isSafeAutoApplySuggestion).length,
+        });
         return result;
       } catch (err) {
-        setError(buildOrbitScanFailure(err, "Could not scan Orbit with Grok"));
+        const failure = buildOrbitScanFailure(
+          err,
+          "Could not scan Orbit with Grok"
+        );
+        setError(failure);
+        trackFlywheelEvent("orbit.scan.failed", {
+          durationMs: Date.now() - startedAt,
+          requestedCount: unique.length,
+          profile: batch?.profile ?? null,
+          mode: batch?.mode ?? null,
+          code: failure.code,
+        });
         throw err;
       } finally {
         setScanning(false);

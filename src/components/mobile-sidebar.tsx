@@ -23,6 +23,7 @@ interface MobileSidebarProps {
   onTagToggle: (tagId: string) => void;
   onCreateCollection: () => void;
   onSyncComplete?: () => void;
+  onSyncStateChange?: (syncing: boolean) => void;
   lastSyncAt?: Date | null;
   totalBookmarks?: number;
 }

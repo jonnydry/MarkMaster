@@ -42,11 +42,13 @@ import { DashboardSkeleton } from "./dashboard-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
+import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { PaginationControls } from "@/components/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { SyncButton } from "@/components/sync-button";
 import { Bookmark } from "lucide-react";
 import { SelectionToolbar } from "./selection-toolbar";
+import { useSyncStatus } from "@/hooks/use-sync-status";
 
 import { orbital } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
@@ -192,6 +194,7 @@ function DashboardContent() {
   const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<string[]>([]);
   const [tagTargetIds, setTagTargetIds] = useState<string[]>([]);
   const [collectionTargetIds, setCollectionTargetIds] = useState<string[]>([]);
+  const [syncRequestLoading, setSyncRequestLoading] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { isOrbital } = useOrbitalTheme();
@@ -212,6 +215,7 @@ function DashboardContent() {
   const { data: tags = [] } = useTagsQuery();
 
   const { data: collections = [] } = useCollectionsQuery();
+  const { data: syncStatus } = useSyncStatus();
 
   // Shared performance highlights (raw / untouched only for the dashboard strip)
   const dislikedIds = getDislikedHighlightIds();
@@ -470,6 +474,10 @@ function DashboardContent() {
     void invalidateLibraryQueries(queryClient, { refetchType: "all" });
   }, [queryClient]);
 
+  const handleSyncStateChange = useCallback((syncing: boolean) => {
+    setSyncRequestLoading(syncing);
+  }, []);
+
   const handleCreateCollectionOpen = useCallback(() => {
     setCreateCollectionOpen(true);
   }, []);
@@ -543,6 +551,8 @@ function DashboardContent() {
       : MEDIA_FILTER_LABELS[filters.mediaFilter] || filters.mediaFilter;
   const primaryFilterCompactLabel =
     filters.mediaFilter === "all" ? "All" : primaryFilterLabel;
+  const syncProgressVisible =
+    syncRequestLoading || Boolean(syncStatus?.currentRun);
 
   const selectedTagEntries = useMemo(
     () =>
@@ -565,10 +575,16 @@ function DashboardContent() {
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
           totalBookmarks={total}
           onSyncComplete={handleSyncComplete}
+          onSyncStateChange={handleSyncStateChange}
         />
       </div>
 
-      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        aria-busy={syncProgressVisible}
+      >
+        {syncProgressVisible ? <ScrollingProgressBar className="z-50" /> : null}
+
         <div className="app-main-scroll h-full overflow-x-hidden scrollbar-thin">
           <PageHeader
             sticky
@@ -592,6 +608,7 @@ function DashboardContent() {
                       }
                       totalBookmarks={total}
                       onSyncComplete={handleSyncComplete}
+                      onSyncStateChange={handleSyncStateChange}
                     />
                   }
                   search={filters.search}
@@ -711,6 +728,7 @@ function DashboardContent() {
                       <SyncButton
                         lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
                         onSyncComplete={handleSyncComplete}
+                        onSyncStateChange={handleSyncStateChange}
                         detail="full"
                       />
                     </div>

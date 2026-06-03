@@ -74,4 +74,44 @@ describe("planOrbitScanBatch", () => {
     expect(new Set(plan.bookmarkIds)).toEqual(new Set(["ai-1", "ai-2"]));
     expect(plan.sharedSignalCount).toBeGreaterThan(0);
   });
+
+  it("reports source quality and deprioritizes weak unknown-source candidates", () => {
+    const candidates = [
+      bookmark("unknown", {
+        authorUsername: "unknown",
+        tweetText: "https://t.co/abc",
+      }),
+      bookmark("ai-1", {
+        tweetText: "New LLM benchmark paper with evaluation dataset",
+        urls: [
+          {
+            url: "https://arxiv.org/abs/1",
+            expanded_url: "https://arxiv.org/abs/1",
+            display_url: "arxiv.org/abs/1",
+            title: "LLM benchmark evaluation",
+          },
+        ],
+      }),
+      bookmark("ai-2", {
+        tweetText: "Model evaluation notes for AI systems",
+        urls: [
+          {
+            url: "https://arxiv.org/abs/2",
+            expanded_url: "https://arxiv.org/abs/2",
+            display_url: "arxiv.org/abs/2",
+            title: "AI evaluation",
+          },
+        ],
+      }),
+    ];
+
+    const plan = planOrbitScanBatch(candidates, 2);
+
+    expect(new Set(plan.bookmarkIds)).toEqual(new Set(["ai-1", "ai-2"]));
+    expect(plan.candidateCount).toBe(3);
+    expect(plan.sourceUnknownCount).toBe(1);
+    expect(plan.sourceUnknownRate).toBeCloseTo(1 / 3);
+    expect(plan.selectedSourceUnknownCount).toBe(0);
+    expect(plan.usefulSignalCount).toBeGreaterThan(1);
+  });
 });
