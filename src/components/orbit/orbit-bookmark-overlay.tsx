@@ -5,7 +5,6 @@ import Image from "next/image";
 import {
   ArchiveX,
   ArrowUpRight,
-  CheckCircle2,
   FolderInput,
   Link2,
   RotateCcw,
@@ -250,19 +249,15 @@ export function OrbitBookmarkOverlay({
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
-                      Orbit review
+                      Orbit
                     </span>
-                    <SuggestionBadge
-                      tone={
-                        suggestionDismissed
-                          ? "primary"
-                          : hasPrimarySuggestion
-                            ? "success"
-                            : "neutral"
-                      }
-                    >
-                      {suggestionStateLabel}
-                    </SuggestionBadge>
+                    {hasPrimarySuggestion || suggestionDismissed ? (
+                      <SuggestionBadge
+                        tone={suggestionDismissed ? "primary" : "success"}
+                      >
+                        {suggestionStateLabel}
+                      </SuggestionBadge>
+                    ) : null}
                   </div>
                 </div>
                 <Button
@@ -332,50 +327,48 @@ export function OrbitBookmarkOverlay({
                 </div>
               ) : null}
 
-              <div className="mt-5 rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
-                      <GrokMark className="size-3.5" />
-                      Grok suggestion
+              {hasPrimarySuggestion ? (
+                <div className="mt-5 rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                        <GrokMark className="size-3.5" />
+                        Grok suggestion
+                      </div>
+                      <div className="mt-2 text-sm font-semibold leading-6 text-foreground">
+                        {decision?.primary
+                          ? decision.primary.kind === "collection"
+                            ? `Add to ${decision.primary.label}`
+                            : `Tag as ${decision.primary.label}`
+                          : "No category move queued"}
+                      </div>
                     </div>
-                    <div className="mt-2 text-sm font-semibold leading-6 text-foreground">
-                      {decision?.primary
-                        ? decision.primary.kind === "collection"
-                          ? `Add to ${decision.primary.label}`
-                          : `Tag as ${decision.primary.label}`
-                        : "No category move queued"}
-                    </div>
+                    <OrbitLogoMark className="mt-0.5 size-8 text-primary opacity-85" />
                   </div>
-                  <OrbitLogoMark className="mt-0.5 size-8 text-primary opacity-85" />
-                </div>
 
-                {decision?.reasoning ? (
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    {decision.reasoning}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    Run a scan to see Grok suggestions for this bookmark.
-                  </p>
-                )}
+                  {decision?.reasoning ? (
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {decision.reasoning}
+                    </p>
+                  ) : null}
 
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {decision?.confidence ? (
-                    <SuggestionBadge
-                      tone={decision.confidence === "high" ? "success" : "primary"}
-                    >
-                      {decision.confidence} confidence
-                    </SuggestionBadge>
-                  ) : null}
-                  {decision?.primary ? (
-                    <SuggestionBadge tone="neutral">
-                      {decision.primary.reuseExisting ? "Existing" : "New"}{" "}
-                      {decision.primary.kind}
-                    </SuggestionBadge>
-                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {decision?.confidence ? (
+                      <SuggestionBadge
+                        tone={decision.confidence === "high" ? "success" : "primary"}
+                      >
+                        {decision.confidence} confidence
+                      </SuggestionBadge>
+                    ) : null}
+                    {decision?.primary ? (
+                      <SuggestionBadge tone="neutral">
+                        {decision.primary.reuseExisting ? "Existing" : "New"}{" "}
+                        {decision.primary.kind}
+                      </SuggestionBadge>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="mt-5">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -392,10 +385,10 @@ export function OrbitBookmarkOverlay({
                       }
                     />
                   ) : null}
-                  {onDecision ? (
+                  {suggestionDismissed && onDecision ? (
                     <OrbitOverlayToolButton
-                      icon={suggestionDismissed ? RotateCcw : CheckCircle2}
-                      label={suggestionDismissed ? "Restore suggestion" : "Keep in Orbit"}
+                      icon={RotateCcw}
+                      label="Restore suggestion"
                       onClick={() =>
                         closeAndRun(() => onDecision(bookmark.id, "dismiss"))
                       }
@@ -421,7 +414,7 @@ export function OrbitBookmarkOverlay({
                       }
                     />
                   ) : null}
-                  {showFullReview && onFullReview ? (
+                  {hasPrimarySuggestion && showFullReview && onFullReview ? (
                     <OrbitOverlayToolButton
                       icon={OrbitLogoMark}
                       label="Open review pass"
@@ -453,24 +446,22 @@ export function OrbitBookmarkOverlay({
                 </div>
               </div>
 
-              <div className="mt-5 border-t border-hairline-soft pt-4">
-                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  Suggested tags
+              {hasPrimarySuggestion && decision?.suggestedTags.length ? (
+                <div className="mt-5 border-t border-hairline-soft pt-4">
+                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    Suggested tags
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {decision.suggestedTags.slice(0, 5).map((tag) => (
+                      <TagPill
+                        key={`${tag.name}-${tag.color}`}
+                        name={tag.name}
+                        color={tag.color}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {decision?.suggestedTags.length ? (
-                    decision.suggestedTags
-                      .slice(0, 5)
-                      .map((tag) => (
-                        <TagPill key={`${tag.name}-${tag.color}`} name={tag.name} color={tag.color} />
-                      ))
-                  ) : (
-                    <span className="text-xs text-muted-foreground/70">
-                      No tag suggestions yet
-                    </span>
-                  )}
-                </div>
-              </div>
+              ) : null}
 
               <div className="mt-5 border-t border-hairline-soft pt-4">
                 <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">

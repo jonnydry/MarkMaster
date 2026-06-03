@@ -36,35 +36,30 @@ import { RetryButton } from "@/components/ui/retry-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { SearchBar } from "@/components/search-bar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 const OrbitReviewDialog = dynamic(
   () =>
     import("@/components/orbit/orbit-review-dialog").then((m) => m.OrbitReviewDialog),
   { ssr: false }
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
-import { OrbitQueueToolbar } from "@/components/orbit/orbit-queue-toolbar";
-import { OrbitScanHero } from "@/components/orbit/orbit-scan-hero";
+import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 
 // Clean-list + expanded overlay components (new Orbit model)
 import { OrbitList } from "@/components/orbit/orbit-list";
 import { OrbitContextualMenu } from "@/components/orbit/orbit-quick-actions";
 
-import { orbital } from "@/components/orbital";
+import { orbital, OrbitalRings } from "@/components/orbital";
 import { useOrbitalTheme } from "@/components/providers";
 import {
   clampMenuPosition,
   orbitBannerClass,
   orbitControlRadius,
-  orbitDataClass,
   orbitGhostButtonClass,
-  orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
   orbitSelectionBarClass,
@@ -156,6 +151,14 @@ const ORBIT_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { id: "previous", keys: ["K", "ArrowUp"], label: "Previous queue item" },
       { id: "search", keys: ["/"], label: "Search Orbit" },
       { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
+    ],
+  },
+  {
+    title: "Triage Active Item",
+    shortcuts: [
+      { id: "accept", keys: ["A"], label: "Accept Grok suggestion" },
+      { id: "skip", keys: ["S"], label: "Skip / keep in Orbit" },
+      { id: "edit", keys: ["E"], label: "Edit in review" },
     ],
   },
   {
@@ -619,6 +622,18 @@ export default function OrbitPage() {
       });
   const scanTargetCount = scanTargetIds.length;
   const queueBatchCount = defaultScanTargetIds.length;
+  const planSuggestionIds = useMemo(
+    () => scan.plan?.plan.suggestions.map((suggestion) => suggestion.bookmarkId) ?? [],
+    [scan.plan]
+  );
+  const passTotal = planSuggestionIds.length;
+  const triagedCount = useMemo(
+    () =>
+      planSuggestionIds.filter(
+        (id) => appliedBookmarkIds.has(id) || scan.dismissedBookmarkIds.has(id)
+      ).length,
+    [planSuggestionIds, appliedBookmarkIds, scan.dismissedBookmarkIds]
+  );
   const queueIsLoading = isLoading && !orbitData;
   const hasSearchQuery = search.trim().length > 0;
   const hasSelectionOverflow =
@@ -657,9 +672,6 @@ export default function OrbitPage() {
           : scanningSelection
             ? "Auto-categorize selection"
             : "Auto-categorize queue";
-  const showQueueTools =
-    isLoading || isError || total > 0 || hasSearchQuery;
-
   const currentScanContextKey = useMemo(
     () =>
       buildOrbitScanContextKey({
@@ -1253,6 +1265,31 @@ export default function OrbitPage() {
     }
   }, [scan]);
 
+  const handleAcceptSuggestion = useCallback(
+    async (id: string) => {
+      const decision = scan.getDecision(id);
+      if (!decision?.primary) {
+        handleOpenBookmarkReview(id);
+        return;
+      }
+      try {
+        const applied = await scan.applySuggestion(id, "primary");
+        if (applied) {
+          setAppliedBookmarkIds((current) => {
+            const next = new Set(current);
+            next.add(id);
+            return next;
+          });
+          toast.success(`Applied · ${formatAppliedToast(applied)}`);
+        }
+      } catch {
+        // Fall back to the review surface so the user can resolve it manually.
+        handleOpenBookmarkReview(id);
+      }
+    },
+    [scan, handleOpenBookmarkReview]
+  );
+
   const handleOrbitOverlayDecision = (id: string, kind: string) => {
     const decision = scan.getDecision(id);
     if (kind === "keep-tag" && decision?.primary) {
@@ -1387,6 +1424,15 @@ export default function OrbitPage() {
       review: () => {
         if (scan.plan) handleOpenReviewAll();
       },
+      accept: () => {
+        if (activeBookmark) void handleAcceptSuggestion(activeBookmark.id);
+      },
+      skip: () => {
+        if (activeBookmark) handleKeepInOrbit(activeBookmark.id);
+      },
+      edit: () => {
+        if (activeBookmark && scan.plan) handleOpenBookmarkReview(activeBookmark.id);
+      },
       tag: () => {
         if (activeBookmark) handleBookmarkAddTag(activeBookmark.id);
       },
@@ -1451,32 +1497,22 @@ export default function OrbitPage() {
             }
           >
             <OrbitHeaderLogoAccent />
-            <div
-              className={cn(
-                "mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-2 text-[10px]",
-                orbitHairlineBorder(isOrbital),
-                orbitMetaMuted(isOrbital)
-              )}
-            >
-              <span className={orbitDataClass(isOrbital)}>{total} unsorted</span>
-              <span className={orbitDataClass(isOrbital)}>Grok</span>
-              <KeyboardShortcutsHelpButton
-                open={keyboardShortcutsOpen}
-                onOpenChange={setKeyboardShortcutsOpen}
-                groups={ORBIT_SHORTCUT_GROUPS}
-                description="Orbit queue navigation and review actions."
-                className={cn(
-                  "relative z-10 size-7 border-primary/20 bg-surface-1/70 text-primary/80 hover:border-primary/35 hover:bg-primary/10 hover:text-primary",
-                  isOrbital && "shadow-[0_0_18px_rgba(37,99,235,0.08)]"
-                )}
-              />
-            </div>
-            <OrbitTriageHint className="mt-2" />
           </PageHeader>
 
           <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-4")}>
-            <section className={cn(bookmarkFeedColumnClassName, "pt-1")}>
-              <OrbitScanHero
+            <section className={cn(bookmarkFeedColumnClassName, "space-y-3 pt-1")}>
+              <OrbitCommandBar
+                ref={searchInputRef}
+                orbitView={orbitView}
+                total={total}
+                sortDirection={queueSortDirection}
+                onChangeView={handleOrbitViewChange}
+                onChangeSortDirection={handleQueueSortDirectionChange}
+                canSelect={total > 0}
+                selectionMode={selectionMode}
+                onToggleSelectionMode={toggleSelectionMode}
+                triagedCount={triagedCount}
+                passTotal={passTotal}
                 scanButtonLabel={scanButtonLabel}
                 queueIsLoading={queueIsLoading}
                 scanning={scan.scanning}
@@ -1487,13 +1523,20 @@ export default function OrbitPage() {
                 resolvedBatchProfile={scanBatchProfile}
                 deepUnlocked={deepUnlocked}
                 deepLockedReason={deepLockedReason}
-                onBatchModeChange={setScanBatchMode}
                 applyingBatch={scan.applyingBatch}
                 canApplyStrongMatches={canApplyStrongMatches}
                 mapHref={orbitMapHref}
+                onBatchModeChange={setScanBatchMode}
                 onScan={handleScan}
                 onApplyStrongMatches={handleApplyStrongMatches}
                 onReviewPass={handleOpenReviewAll}
+                search={search}
+                onSearchChange={handleSearchChange}
+                visibleStatusLabel={visibleStatusLabel}
+                isUpdating={(isFetching || isSearchPending) && !isLoading}
+                keyboardShortcutsOpen={keyboardShortcutsOpen}
+                onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
+                shortcutGroups={ORBIT_SHORTCUT_GROUPS}
                 scanError={
                   scan.error ? (
                     <OrbitScanFailureNotice
@@ -1511,30 +1554,10 @@ export default function OrbitPage() {
                 }
               />
 
-              <div
-                className={cn(
-                  "mt-3 rounded-sm border p-2",
-                  orbitHairlineBorder(isOrbital),
-                  isOrbital
-                    ? "glass-orbital"
-                    : "bg-surface-1/70 dark:bg-white/[0.035]"
-                )}
-              >
-                <OrbitQueueToolbar
-                  orbitView={orbitView}
-                  total={total}
-                  sortDirection={queueSortDirection}
-                  queueOrderLabel={queueOrderLabel}
-                  onChangeView={handleOrbitViewChange}
-                  onChangeSortDirection={handleQueueSortDirectionChange}
-                  selectionMode={selectionMode}
-                  canSelect={total > 0}
-                  onToggleSelectionMode={toggleSelectionMode}
-                />
-              </div>
+              <OrbitTriageHint />
 
               {scan.plan ? (
-                <OrbitScanOverviewStrip payload={scan.plan} className="mt-4" />
+                <OrbitScanOverviewStrip payload={scan.plan} />
               ) : null}
             </section>
 
@@ -1656,43 +1679,6 @@ export default function OrbitPage() {
                 </div>
               )}
 
-              {showQueueTools && (
-                <>
-                  <div
-                    className={cn(
-                      "overflow-hidden rounded-sm border",
-                      orbitHairlineBorder(isOrbital),
-                      isOrbital ? "glass-orbital" : "bg-surface-1/70 dark:bg-white/[0.035]"
-                    )}
-                  >
-                    <div className="relative w-full overflow-hidden border-b border-hairline-soft">
-                      <SearchBar
-                        ref={searchInputRef}
-                        glass
-                        value={search}
-                        onChange={handleSearchChange}
-                        placeholder="Search Orbit by author, text, or notes…"
-                        inputClassName="h-10 rounded-none"
-                      />
-                    </div>
-
-                    <div
-                      className={cn(
-                        "flex items-center justify-between gap-3 px-3 py-2 text-[11px]",
-                        orbitMetaMuted(isOrbital)
-                      )}
-                    >
-                      <span className="text-mono-data">{visibleStatusLabel}</span>
-                      {(isFetching || isSearchPending) && !isLoading && (
-                        <span className="flex shrink-0 items-center gap-1">
-                          <Loader2 className="size-3 animate-spin" /> Updating…
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
               {isError ? (
                 <ErrorState
                   layout="panel"
@@ -1715,7 +1701,20 @@ export default function OrbitPage() {
               ) : bookmarks.length === 0 ? (
                 <EmptyState
                   layout="inline"
-                  leading={<OrbitLogoMark className="mx-auto mb-4 size-8" />}
+                  leading={
+                    search.trim() ? (
+                      <OrbitLogoMark className="mx-auto mb-4 size-8" />
+                    ) : (
+                      <div className="relative mx-auto mb-3 flex h-24 w-40 items-center justify-center">
+                        <OrbitalRings
+                          className="absolute inset-0 m-auto opacity-70"
+                          size="sm"
+                          tone="cyan"
+                        />
+                        <OrbitLogoMark className="relative size-8 text-primary drop-shadow-[0_0_18px_rgba(37,99,235,0.35)]" />
+                      </div>
+                    )
+                  }
                   title={search.trim() ? "No matches in Orbit" : "Orbit is clear"}
                   description={
                     search.trim()
@@ -1783,14 +1782,24 @@ export default function OrbitPage() {
                           handleSelectionChange(id, !selectedBookmarkIds.has(id))
                         }
                         onSelect={(id) => {
-                          setActiveBookmarkId(id);
                           if (menuForId) {
                             setMenuForId(null);
                             setMenuPosition(null);
                           }
+                          // One review surface: rows with a Grok suggestion open
+                          // the focused review; the rest open the read-only peek.
+                          if (scan.getDecision(id)?.primary) {
+                            handleOpenBookmarkReview(id);
+                          } else {
+                            setActiveBookmarkId(id);
+                          }
                         }}
                         onQuickAction={(id, action, event) => {
-                          if (action === "keep") {
+                          if (action === "accept") {
+                            void handleAcceptSuggestion(id);
+                          } else if (action === "edit") {
+                            handleOpenBookmarkReview(id);
+                          } else if (action === "keep") {
                             const wasDismissed = scan.dismissedBookmarkIds.has(id);
                             handleKeepInOrbit(id);
                             if (!wasDismissed) setActiveBookmarkId(null);

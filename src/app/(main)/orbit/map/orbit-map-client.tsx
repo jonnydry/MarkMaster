@@ -577,7 +577,7 @@ export default function OrbitMapPage() {
               />
               <Link
                 href="/orbit"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
               >
                 <ArrowLeft className="size-4" />
                 Orbit queue
@@ -594,7 +594,7 @@ export default function OrbitMapPage() {
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
               isOrbital
                 ? "rounded-sm border border-hairline-soft bg-background"
-                : "rounded-[26px] border border-white/[0.055] bg-[#070b13]"
+                : "rounded-sm border border-white/[0.055] bg-[#070b13]"
             )}
           >
             {isLoading ? (

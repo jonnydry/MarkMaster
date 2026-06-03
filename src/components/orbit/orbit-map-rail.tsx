@@ -19,6 +19,13 @@ import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getOrbitCollectionActionState } from "@/lib/orbit-map-actions";
+import {
+  orbitGhostButtonClass,
+  orbitHairlineBorder,
+  orbitLabelClass,
+  orbitMetaMuted,
+  orbitMetaSoft,
+} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import type {
@@ -48,6 +55,14 @@ interface OrbitMapRailProps {
   variant?: "rail" | "overlay";
   className?: string;
   showLegend?: boolean;
+}
+
+/** Shared panel surface for both rail and overlay variants, theme-aware. */
+function panelClass(isOrbital: boolean, isOverlay: boolean) {
+  if (isOverlay) return "min-w-0";
+  return isOrbital
+    ? "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
+    : "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
 }
 
 function findNode(
@@ -133,24 +148,15 @@ export function OrbitMapRail({
       className={cn(
         isOverlay
           ? cn(
-              "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-[26px] p-4 shadow-none backdrop-blur-2xl [scrollbar-width:thin]",
-              isOrbital
-                ? cn(orbital.glass, "border-primary/25")
-                : "border border-white/[0.055] bg-white/[0.035]"
+              "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-sm border p-4 shadow-lg backdrop-blur-2xl [scrollbar-width:thin]",
+              orbitHairlineBorder(isOrbital),
+              isOrbital ? cn(orbital.glass, "border-primary/25") : "bg-surface-1/90"
             )
           : "flex w-full flex-col gap-3 lg:w-[300px] lg:shrink-0 xl:w-[320px]",
         className
       )}
     >
-      <section
-        className={cn(
-          isOverlay
-            ? "min-w-0"
-            : isOrbital
-              ? "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
-              : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
-        )}
-      >
+      <section className={panelClass(isOrbital, isOverlay)}>
         <SelectedClusterBody
           node={activeNode}
           stats={data.stats}
@@ -174,23 +180,18 @@ export function OrbitMapRail({
       {showLegend && (
         <section
           className={cn(
-            "text-sm text-white/70",
             isOverlay
-              ? "mt-4 border-t border-white/[0.055] pt-3"
-              : isOrbital
-                ? "rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
-                : "rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm backdrop-blur-sm"
+              ? cn("mt-4 border-t pt-3", orbitHairlineBorder(isOrbital))
+              : panelClass(isOrbital, false)
           )}
         >
-          <p className={cn(
-            "text-[11px] font-medium uppercase tracking-[0.18em]",
-            isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
-          )}>
+          <p className={cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital))}>
             Legend
           </p>
           <ul
             className={cn(
-              "mt-3 gap-2",
+              "mt-3 gap-2 text-sm",
+              orbitMetaMuted(isOrbital),
               isOverlay
                 ? "grid grid-cols-1 text-xs sm:grid-cols-2"
                 : "space-y-2"
@@ -201,22 +202,19 @@ export function OrbitMapRail({
               <span>Loose bookmark</span>
             </li>
             <li className="flex items-center gap-3">
-              <span className="inline-block size-2.5 rounded-full bg-slate-200" />
+              <span className="inline-block size-2.5 rounded-full bg-muted-foreground/60" />
               <span>Assigned bookmark</span>
             </li>
             <li className="flex items-center gap-3">
-              <span className="inline-block size-3 rounded-full bg-blue-400" />
+              <span className="inline-block size-3 rounded-full bg-primary/70" />
               <span>Tag or collection</span>
             </li>
             <li className="flex items-center gap-3">
-              <span className="h-px w-5 bg-slate-400/50" />
+              <span className="h-px w-5 bg-hairline-strong" />
               <span>Relationship</span>
             </li>
           </ul>
-          <p className={cn(
-            "mt-3 text-xs",
-            isOrbital ? cn(orbital.label, "text-primary/60 text-[10px]") : "text-white/50"
-          )}>
+          <p className={cn("mt-3 text-[10px]", orbitMetaMuted(isOrbital))}>
             Scroll to zoom · drag to pan · click to focus · Esc to clear
           </p>
         </section>
@@ -262,17 +260,14 @@ function SelectedClusterBody({
   isOverlay,
   isOrbital,
 }: SelectedClusterBodyProps) {
+  const kicker = cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital));
+  const bodyText = cn("text-sm", orbitMetaMuted(isOrbital));
+
   if (!node) {
     return (
       <div className="space-y-2">
-        <p className={cn(
-          "text-sm font-medium",
-          isOrbital ? cn(orbital.label, "text-primary/90") : "text-white"
-        )}>Select a node</p>
-        <p className={cn(
-          "text-sm",
-          isOrbital ? "text-primary/70" : "text-white/65"
-        )}>
+        <p className="text-sm font-medium text-foreground">Select a node</p>
+        <p className={bodyText}>
           Click a tag, collection, or bookmark on the graph to see details and
           move it into a home.
         </p>
@@ -284,31 +279,25 @@ function SelectedClusterBody({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-sm bg-primary/10 text-primary">
             <OrbitLogoMark className="size-4" />
           </span>
           <div>
-            <p className={cn(
-              "text-sm font-medium",
-              isOrbital ? cn(orbital.label, "text-primary/90") : "text-white"
-            )}>Orbit index</p>
-            <p className={cn(
-              "text-xs",
-              isOrbital ? "text-primary/70" : "text-white/60"
-            )}>Central anchor for loose bookmarks</p>
+            <p className="text-sm font-medium text-foreground">Orbit index</p>
+            <p className={cn("text-xs", orbitMetaMuted(isOrbital))}>
+              Central anchor for loose bookmarks
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <RailMetric
             label="Total"
             value={stats.totalBookmarks.toLocaleString()}
-            isOverlay={isOverlay}
             isOrbital={isOrbital}
           />
           <RailMetric
             label="Loose"
             value={stats.looseBookmarks.toLocaleString()}
-            isOverlay={isOverlay}
             isOrbital={isOrbital}
           />
         </div>
@@ -330,7 +319,7 @@ function SelectedClusterBody({
       <div className="space-y-3">
         <div className="flex items-start gap-3">
           <span
-            className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl"
+            className="mt-0.5 inline-flex size-8 items-center justify-center rounded-sm"
             style={{
               backgroundColor: `${node.color}22`,
               color: node.color,
@@ -339,28 +328,18 @@ function SelectedClusterBody({
             <TagIcon className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className={cn(
-              "text-[11px] uppercase tracking-[0.18em]",
-              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
-            )}>
-              Tag
-            </p>
-            <p className="truncate text-sm font-semibold text-white">
+            <p className={kicker}>Tag</p>
+            <p className="truncate text-sm font-semibold text-foreground">
               {node.name}
             </p>
           </div>
         </div>
-        <p className={cn(
-          "text-sm",
-          isOrbital ? "text-primary/70" : "text-white/65"
-        )}>
-          {pluralize(node.count, "bookmark")}
-        </p>
+        <p className={bodyText}>{pluralize(node.count, "bookmark")}</p>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="outline"
-            className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
+            className="h-9 gap-1.5 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
             onClick={onAssign}
             disabled={!selectedBookmarkId}
           >
@@ -370,20 +349,17 @@ function SelectedClusterBody({
           <Button
             size="sm"
             variant="outline"
-            className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+            className={cn("h-9 gap-1.5", orbitGhostButtonClass(isOrbital))}
             onClick={onAddTag}
             disabled={!selectedBookmarkId}
           >
             <TagIcon className="size-4" />
             Tag
           </Button>
-          <Link
+          <DashboardLink
             href={`/dashboard?tag=${encodeURIComponent(node.id)}`}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
-          >
-            <LayoutGrid className="size-3.5" />
-            Dashboard
-          </Link>
+            isOrbital={isOrbital}
+          />
         </div>
         {connected.length > 0 && (
           <ConnectedList
@@ -400,37 +376,26 @@ function SelectedClusterBody({
 
   if (node.kind === "collection") {
     const Icon = node.variant === "x_folder" ? FolderOpen : Folder;
-    const actionState = getOrbitCollectionActionState(
-      node,
-      selectedBookmarkId
-    );
+    const actionState = getOrbitCollectionActionState(node, selectedBookmarkId);
     const isCopying = copyingCollectionId === node.id;
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-sm bg-primary/10 text-primary">
             <Icon className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className={cn(
-              "text-[11px] uppercase tracking-[0.18em]",
-              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
-            )}>
+            <p className={kicker}>
               {node.variant === "x_folder" ? "X folder" : "Collection"}
             </p>
-            <p className="truncate text-sm font-semibold text-white">
+            <p className="truncate text-sm font-semibold text-foreground">
               {node.name}
             </p>
           </div>
         </div>
-        <p className={cn(
-          "text-sm",
-          isOrbital ? "text-primary/70" : "text-white/65"
-        )}>
-          {pluralize(node.count, "bookmark")}
-        </p>
+        <p className={bodyText}>{pluralize(node.count, "bookmark")}</p>
         {actionState.readOnlyReason && (
-          <p className="text-xs leading-5 text-white/55">
+          <p className={cn("text-xs leading-5", orbitMetaMuted(isOrbital))}>
             {actionState.readOnlyReason}
           </p>
         )}
@@ -439,7 +404,7 @@ function SelectedClusterBody({
             <Button
               size="sm"
               variant="outline"
-              className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
+              className="h-9 gap-1.5 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
               onClick={() => onCopyAsCollection(node.id)}
               disabled={isCopying}
             >
@@ -455,7 +420,7 @@ function SelectedClusterBody({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-9 gap-1.5 border-primary/25 bg-primary/15 text-primary-foreground hover:bg-primary/20"
+                className="h-9 gap-1.5 border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
                 onClick={onAssign}
                 disabled={!actionState.canAssign}
               >
@@ -465,7 +430,7 @@ function SelectedClusterBody({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+                className={cn("h-9 gap-1.5", orbitGhostButtonClass(isOrbital))}
                 onClick={onAddToCollection}
                 disabled={!actionState.canCollect}
               >
@@ -475,13 +440,10 @@ function SelectedClusterBody({
             </>
           )}
           {node.variant !== "x_folder" && (
-            <Link
+            <DashboardLink
               href={`/dashboard?collection=${encodeURIComponent(node.id)}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
-            >
-              <LayoutGrid className="size-3.5" />
-              Dashboard
-            </Link>
+              isOrbital={isOrbital}
+            />
           )}
         </div>
         {connected.length > 0 && (
@@ -507,30 +469,18 @@ function SelectedClusterBody({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary/80">
+          <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-sm bg-primary/10 text-primary/80">
             <GrokMark className="size-4" title="Grok" />
           </span>
           <div className="min-w-0">
-            <p className={cn(
-              "text-[11px] uppercase tracking-[0.18em]",
-              isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
-            )}>
-              Bookmark
-            </p>
-            <p className="truncate text-sm font-semibold text-white">
+            <p className={kicker}>Bookmark</p>
+            <p className="truncate text-sm font-semibold text-foreground">
               @{node.authorUsername}
             </p>
           </div>
         </div>
         {focusedBookmarkLoading && !focusedBookmark ? (
-          <p
-            className={cn(
-              "text-sm",
-              isOrbital ? "text-primary/80" : "text-white/70"
-            )}
-          >
-            Loading…
-          </p>
+          <p className={bodyText}>Loading…</p>
         ) : focusedBookmark ? (
           <BookmarkPostPreview
             tweetText={focusedBookmark.tweetText}
@@ -543,26 +493,19 @@ function SelectedClusterBody({
             bookmarkKey={focusedBookmark.id}
             variant="inline"
             textClassName={cn(
-              "text-sm line-clamp-5 whitespace-pre-wrap",
-              isOrbital ? "text-primary/80" : "text-white/70"
+              "line-clamp-5 whitespace-pre-wrap text-sm",
+              orbitMetaMuted(isOrbital)
             )}
             galleryClassName="!mt-2"
           />
         ) : (
-          <p
-            className={cn(
-              "text-sm",
-              isOrbital ? "text-primary/80" : "text-white/70"
-            )}
-          >
-            {node.title}
-          </p>
+          <p className={bodyText}>{node.title}</p>
         )}
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="outline"
-            className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+            className={cn("h-9 gap-1.5", orbitGhostButtonClass(isOrbital))}
             onClick={onAddTag}
             disabled={!hasExplicitSelection}
           >
@@ -572,7 +515,7 @@ function SelectedClusterBody({
           <Button
             size="sm"
             variant="outline"
-            className="h-9 gap-1.5 border-white/20 bg-white/5 text-white hover:bg-white/10"
+            className={cn("h-9 gap-1.5", orbitGhostButtonClass(isOrbital))}
             onClick={onAddToCollection}
             disabled={!hasExplicitSelection}
           >
@@ -582,7 +525,7 @@ function SelectedClusterBody({
           <Button
             size="sm"
             variant="ghost"
-            className="h-9 gap-1.5 text-white/70 hover:text-white"
+            className="h-9 gap-1.5 text-muted-foreground hover:text-foreground"
             onClick={() => onOpenBookmark(node.id)}
             disabled={!hasExplicitSelection}
           >
@@ -591,17 +534,13 @@ function SelectedClusterBody({
           </Button>
         </div>
         {isLoose && (
-          <p className={cn(
-            "text-xs",
-            isOrbital ? "text-primary/70" : "text-primary/80"
-          )}>Not yet tagged or collected</p>
+          <p className={cn("text-xs", orbitMetaSoft(isOrbital))}>
+            Not yet tagged or collected
+          </p>
         )}
         {tagConnections.length > 0 && (
           <div className="space-y-1.5">
-            <p className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.18em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
-            )}>
+            <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
               Tags
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -609,7 +548,7 @@ function SelectedClusterBody({
                 t.kind === "tag" ? (
                   <span
                     key={t.id}
-                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80"
+                    className="inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/60 px-2 py-1 text-xs text-foreground/85"
                   >
                     <span
                       className="inline-block size-2 rounded-full"
@@ -624,10 +563,7 @@ function SelectedClusterBody({
         )}
         {collectionConnections.length > 0 && (
           <div className="space-y-1.5">
-            <p className={cn(
-              "text-[10px] font-medium uppercase tracking-[0.18em]",
-              isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
-            )}>
+            <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
               Collections
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -635,7 +571,7 @@ function SelectedClusterBody({
                 c.kind === "collection" ? (
                   <span
                     key={c.id}
-                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80"
+                    className="inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/60 px-2 py-1 text-xs text-foreground/85"
                   >
                     <Folder className="size-3 text-primary" />
                     {c.name}
@@ -650,7 +586,8 @@ function SelectedClusterBody({
             type="button"
             className={cn(
               "text-xs underline-offset-2 hover:underline",
-              isOrbital ? "text-primary/70 hover:text-primary" : "text-white/55 hover:text-white"
+              orbitMetaSoft(isOrbital),
+              "hover:text-foreground"
             )}
             onClick={onClearSelection}
           >
@@ -666,6 +603,21 @@ function SelectedClusterBody({
   }
 
   return null;
+}
+
+function DashboardLink({ href, isOrbital }: { href: string; isOrbital: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors",
+        orbitGhostButtonClass(isOrbital)
+      )}
+    >
+      <LayoutGrid className="size-3.5" />
+      Dashboard
+    </Link>
+  );
 }
 
 function ConnectedList({
@@ -686,18 +638,14 @@ function ConnectedList({
 
   return (
     <div className="space-y-2 pt-1">
-      <p className={cn(
-        "text-[10px] font-medium uppercase tracking-[0.18em]",
-        isOrbital ? cn(orbital.label, "text-primary/60") : "text-white/50"
-      )}>
+      <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
         {title} · {bookmarks.length}
       </p>
       <ScrollArea
         className={cn(
-          "h-40 rounded-xl",
-          isOverlay
-            ? "bg-white/[0.025]"
-            : "border border-white/8 bg-white/[0.03]"
+          "h-40 rounded-sm border",
+          orbitHairlineBorder(isOrbital),
+          isOverlay ? "bg-surface-1/40" : "bg-surface-1/55"
         )}
       >
         <ul className="space-y-0.5 p-2">
@@ -707,17 +655,15 @@ function ConnectedList({
                 <button
                   type="button"
                   onClick={() => onOpenBookmark(b.id)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-white/75 transition-colors hover:bg-white/5 hover:text-white"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
                 >
                   <span
                     className={cn(
                       "inline-block size-1.5 shrink-0 rounded-full",
-                      b.affiliated ? "bg-slate-200" : "bg-primary"
+                      b.affiliated ? "bg-muted-foreground/60" : "bg-primary"
                     )}
                   />
-                  <span className="min-w-0 truncate">
-                    @{b.authorUsername}
-                  </span>
+                  <span className="min-w-0 truncate">@{b.authorUsername}</span>
                 </button>
               </li>
             ) : null
@@ -731,31 +677,18 @@ function ConnectedList({
 function RailMetric({
   label,
   value,
-  isOverlay,
   isOrbital,
 }: {
   label: string;
   value: string;
-  isOverlay: boolean;
   isOrbital: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl p-3",
-        isOverlay ? "bg-white/[0.025]" : "bg-white/[0.04]"
-      )}
-    >
-      <p className={cn(
-        "text-[10px] font-medium uppercase tracking-[0.2em]",
-        isOrbital ? cn(orbital.label, "text-primary/70") : "text-white/55"
-      )}>
+    <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-3">
+      <p className={cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital))}>
         {label}
       </p>
-      <p className={cn(
-        "mt-1 text-lg font-semibold tracking-tight",
-        isOrbital ? orbital.data : "text-white"
-      )}>
+      <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
         {value}
       </p>
     </div>

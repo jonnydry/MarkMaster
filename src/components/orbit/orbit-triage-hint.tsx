@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 
 import { useOrbitalTheme } from "@/components/providers";
 import {
@@ -35,17 +35,31 @@ export function OrbitTriageHint({ className }: { className?: string }) {
 
   if (dismissed) return null;
 
+  const strong = isOrbital
+    ? "font-medium text-foreground/90"
+    : "font-medium text-foreground/85 dark:text-white/85";
+
   return (
     <div
       className={cn(
-        "relative mt-3 rounded-sm border px-3 py-2.5 text-xs leading-relaxed",
+        "flex items-center gap-2 rounded-sm border px-3 py-2 text-[11px] leading-relaxed",
         orbitHairlineBorder(isOrbital),
         isOrbital
-          ? "border-primary/15 bg-primary/5 text-muted-foreground"
-          : "border-hairline-soft bg-surface-2/50 text-muted-foreground dark:border-white/10 dark:bg-white/[0.03] dark:text-white/65",
+          ? "border-primary/15 bg-primary/5"
+          : "border-hairline-soft bg-surface-2/50 dark:border-white/10 dark:bg-white/[0.03]",
+        orbitMetaMuted(isOrbital),
         className
       )}
     >
+      <Sparkles className="size-3.5 shrink-0 text-primary/70" aria-hidden />
+      <p className="min-w-0 flex-1">
+        <span className={strong}>Scan</span> with Grok, then{" "}
+        <span className={strong}>Accept</span> ·{" "}
+        <span className={strong}>Skip</span> ·{" "}
+        <span className={strong}>Edit</span> each row inline — or open the{" "}
+        <span className={strong}>Review pass</span> for the whole batch.{" "}
+        <span className="hidden sm:inline">Press ? for shortcuts.</span>
+      </p>
       <button
         type="button"
         onClick={() => {
@@ -53,7 +67,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
           window.dispatchEvent(new Event(TRIAGE_HINT_CHANGE_EVENT));
         }}
         className={cn(
-          "absolute right-1.5 top-1.5 rounded p-0.5",
+          "shrink-0 rounded p-0.5",
           isOrbital
             ? "text-primary/50 hover:text-primary"
             : "text-muted-foreground hover:text-foreground dark:text-white/40 dark:hover:text-white/70"
@@ -62,29 +76,6 @@ export function OrbitTriageHint({ className }: { className?: string }) {
       >
         <X className="size-3.5" />
       </button>
-      <p className={cn("pr-5 font-medium", orbitMetaMuted(isOrbital))}>
-        How triage works
-      </p>
-      <ul className={cn("mt-1.5 list-inside list-disc space-y-0.5 pr-4", orbitMetaMuted(isOrbital))}>
-        <li>
-          <strong className={isOrbital ? "text-foreground/90" : "text-foreground/80 dark:text-white/80"}>
-            Scan
-          </strong>{" "}
-          — Grok suggests tags and collections for the queue
-        </li>
-        <li>
-          <strong className={isOrbital ? "text-foreground/90" : "text-foreground/80 dark:text-white/80"}>
-            Row click
-          </strong>{" "}
-          — quick review in the expanded overlay
-        </li>
-        <li>
-          <strong className={isOrbital ? "text-foreground/90" : "text-foreground/80 dark:text-white/80"}>
-            Review pass
-          </strong>{" "}
-          — batch review after a scan (when available)
-        </li>
-      </ul>
     </div>
   );
 }

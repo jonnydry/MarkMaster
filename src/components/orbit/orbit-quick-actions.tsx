@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  Check,
   CircleSlash2,
   ExternalLink,
   Link2,
   RotateCcw,
+  SlidersHorizontal,
   Tag,
   X,
 } from "lucide-react";
@@ -61,25 +63,57 @@ export function OrbitActionPill({
   bookmarkId,
   onAction,
   suggestionDismissed = false,
+  hasSuggestion = false,
 }: Omit<OrbitQuickActionProps, "onClose"> & {
   suggestionDismissed?: boolean;
+  /** When true, a Grok suggestion is queued — surface inbox-zero Accept/Edit. */
+  hasSuggestion?: boolean;
 }) {
   const skipLabel = suggestionDismissed
     ? "Restore suggestion"
-    : "Keep in Orbit";
+    : hasSuggestion
+      ? "Skip suggestion"
+      : "Keep in Orbit";
 
-  const actions = [
-    {
-      key: "keep",
-      label: skipLabel,
-      icon: suggestionDismissed ? (
-        <RotateCcw className="size-3.5 text-primary" />
-      ) : (
-        <CircleSlash2 className="size-3.5 text-primary" />
-      ),
-    },
-    { key: "tag", label: "Add tag", icon: <Tag className="size-3.5 text-bronze" /> },
-  ];
+  const actions: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    tone?: "accept";
+  }> = [];
+
+  // Inbox-zero affordances appear only while an un-actioned suggestion exists.
+  if (hasSuggestion && !suggestionDismissed) {
+    actions.push({
+      key: "accept",
+      label: "Accept suggestion",
+      icon: <Check className="size-3.5" />,
+      tone: "accept",
+    });
+    actions.push({
+      key: "edit",
+      label: "Edit in review",
+      icon: <SlidersHorizontal className="size-3.5 text-primary" />,
+    });
+  }
+
+  actions.push({
+    key: "keep",
+    label: skipLabel,
+    icon: suggestionDismissed ? (
+      <RotateCcw className="size-3.5 text-primary" />
+    ) : (
+      <CircleSlash2 className="size-3.5 text-primary" />
+    ),
+  });
+
+  if (!hasSuggestion || suggestionDismissed) {
+    actions.push({
+      key: "tag",
+      label: "Add tag",
+      icon: <Tag className="size-3.5 text-bronze" />,
+    });
+  }
 
   return (
     <OrbitalActionPill className="orbital-action-pill">
@@ -95,6 +129,8 @@ export function OrbitActionPill({
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-sm transition-all",
             "hover:bg-primary/10 active:bg-primary/15",
+            action.tone === "accept" &&
+              "text-emerald-600 hover:bg-emerald-500/15 active:bg-emerald-500/20 dark:text-emerald-300",
             action.key === "keep" &&
               (suggestionDismissed
                 ? "bg-primary/15 text-primary"

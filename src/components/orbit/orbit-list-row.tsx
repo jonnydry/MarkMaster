@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { Check, MoreHorizontal } from "lucide-react";
+import { Check, FolderInput, MoreHorizontal, Tag as TagIcon } from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -9,8 +9,8 @@ import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
 import { useOrbitalTheme } from "@/components/providers";
 import {
-  formatOrbitRowStatusChip,
   getOrbitRowQueueStatus,
+  getOrbitRowSuggestion,
   type OrbitRowQueueStatus,
 } from "@/lib/orbit-row-status";
 import {
@@ -78,7 +78,14 @@ export const OrbitListRow = memo(function OrbitListRow({
     appliedBookmarkIds: appliedBookmarkIds ?? new Set(),
     decision,
   });
-  const statusChip = formatOrbitRowStatusChip(decision);
+  const suggestion = getOrbitRowSuggestion(decision);
+  const showSuggestion = queueStatus === "hasSuggestion" && Boolean(suggestion);
+  const confidenceDotClass =
+    suggestion?.confidence === "high"
+      ? "bg-emerald-500"
+      : suggestion?.confidence === "medium"
+        ? "bg-amber-500"
+        : "bg-muted-foreground/50";
 
   const handleRowClick = () => {
     if (selectionMode) {
@@ -222,16 +229,44 @@ export const OrbitListRow = memo(function OrbitListRow({
 
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            {statusChip ? (
+            {showSuggestion && suggestion ? (
               <span
                 className={cn(
-                  "inline-flex rounded-sm border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                  "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-[11px]",
                   isOrbital
-                    ? "border-primary/25 bg-primary/10 text-primary"
-                    : "border-sky-400/25 bg-sky-400/10 text-sky-700 dark:text-sky-200"
+                    ? "border-primary/25 bg-primary/[0.07] text-foreground/90"
+                    : "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
                 )}
+                title={`Grok suggests: ${
+                  suggestion.kind === "collection" ? "add to" : "tag as"
+                } ${suggestion.label} · ${suggestion.confidence} confidence`}
               >
-                {statusChip}
+                <span
+                  className={cn("size-1.5 shrink-0 rounded-full", confidenceDotClass)}
+                  aria-hidden
+                />
+                {suggestion.kind === "collection" ? (
+                  <FolderInput className="size-3 shrink-0 text-primary/70" aria-hidden />
+                ) : (
+                  <TagIcon
+                    className="size-3 shrink-0"
+                    style={suggestion.color ? { color: suggestion.color } : undefined}
+                    aria-hidden
+                  />
+                )}
+                <span className="min-w-0 max-w-[12rem] truncate font-medium">
+                  {suggestion.label}
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-wide",
+                    suggestion.reuseExisting
+                      ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
+                      : "border-primary/25 bg-primary/10 text-primary/80"
+                  )}
+                >
+                  {suggestion.reuseExisting ? "Lib" : "New"}
+                </span>
               </span>
             ) : null}
             {queueStatus === "applied" ? (
@@ -258,6 +293,7 @@ export const OrbitListRow = memo(function OrbitListRow({
             <OrbitActionPill
               bookmarkId={bookmark.id}
               suggestionDismissed={queueStatus === "dismissed"}
+              hasSuggestion={showSuggestion}
               onAction={onQuickAction}
             />
             <button
