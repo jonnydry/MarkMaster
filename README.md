@@ -72,8 +72,17 @@ server; `npm run env:check` reports whether optional `XAI_API_KEY` is set.
 ### 3. Set up the database
 
 ```bash
-npx prisma migrate dev --name init
+npm run db:migrate
 ```
+
+`npm run dev` checks that migrations are current before starting the app. If it
+reports pending migrations, run `npm run db:migrate` and start dev again.
+For frontend-only work when you intentionally want to skip the database check,
+use `npm run dev:unchecked`.
+
+When creating new schema changes against a local development database, use
+`npx prisma migrate dev --name <change-name>` to generate the migration, then
+commit the new folder under `prisma/migrations`.
 
 ### 4. Configure your X Developer App
 
@@ -90,6 +99,12 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to start.
+
+Deployment builds should apply migrations explicitly before building:
+
+```bash
+npm run deploy:build
+```
 
 ## Project Structure
 
