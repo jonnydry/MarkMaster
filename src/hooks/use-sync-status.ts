@@ -11,8 +11,10 @@ export function useSyncStatus() {
   return useQuery<SyncStatusResponse>({
     queryKey: syncStatusQueryKey,
     queryFn: () => fetchJson("/api/bookmarks/sync"),
+    staleTime: 30_000,
     refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 }

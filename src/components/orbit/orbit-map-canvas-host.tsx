@@ -2,8 +2,8 @@
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import type { OrbitGraphPayload } from '@/types';
-import { OrbitMapCanvas as LegacyOrbitMapCanvas } from './orbit-map-canvas';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
+import { OrbitMapUnsupportedState } from './orbit-map-unsupported-state';
 import { loadOrbitMapPositions } from '@/lib/orbit-map-layout-storage';
 
 // Import protocol types (including shared UI types)
@@ -49,6 +49,34 @@ export interface OrbitMapCanvasHandle {
 
 // Re-export shared types so pages can import them from this component (for backward compatibility)
 export type { OrbitMapSelection, OrbitMapFocus, GraphFilter } from '@/lib/orbit-worker-protocol';
+
+function getOrbitMapGraphKey(graph: OrbitGraphPayload) {
+  const stats = graph.stats;
+  return [
+    graph.scope ?? 'library',
+    graph.generatedAt,
+    graph.nodeCap,
+    graph.nodes.length,
+    graph.edges.length,
+    stats.totalBookmarks,
+    stats.affiliatedBookmarks,
+    stats.looseBookmarks,
+    stats.renderedBookmarks,
+    stats.truncatedBookmarks,
+    stats.tagCount,
+    stats.userCollectionCount,
+    stats.xFolderCount,
+  ].join(':');
+}
+
+function getOrbitMapDebugPerfEnabled() {
+  if (process.env.NODE_ENV === 'production') return false;
+  try {
+    return window.localStorage.getItem('orbit-map-debug-perf') === '1';
+  } catch {
+    return false;
+  }
+}
 
 const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostProps>(
   function OrbitMapCanvasHost(rawProps, ref) {
@@ -145,6 +173,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             width: canvas.clientWidth,
             height: canvas.clientHeight,
             dpr: window.devicePixelRatio || 1,
+            debugPerf: getOrbitMapDebugPerfEnabled(),
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -166,7 +195,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
                   };
                   workerRef.current?.postMessage(graphMessage);
-                  lastGraphKey.current = `${propsRef.current.graph.nodes.length}-${propsRef.current.graph.edges.length}`;
+                  lastGraphKey.current = getOrbitMapGraphKey(propsRef.current.graph);
 
                   // Then send the current filter
                   const filterMessage = {
@@ -306,7 +335,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     useEffect(() => {
       if (!workerRef.current || useFallback || !graph) return;
 
-      const graphKey = `${graph.nodes.length}-${graph.edges.length}`;
+      const graphKey = getOrbitMapGraphKey(graph);
 
       const graphChanged = lastGraphKey.current !== graphKey;
 
@@ -398,9 +427,42 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         workerRef.current?.postMessage(msg);
       };
 
+      let pendingPointerMove: WorkerMessage | null = null;
+      let pointerMoveFrame: number | null = null;
+      let pendingWheel:
+        | { deltaY: number; x: number; y: number; ctrlKey?: boolean }
+        | null = null;
+      let wheelFrame: number | null = null;
+
+      const flushPointerMove = () => {
+        pointerMoveFrame = null;
+        if (!pendingPointerMove) return;
+        send(pendingPointerMove);
+        pendingPointerMove = null;
+      };
+
+      const flushWheel = () => {
+        wheelFrame = null;
+        if (!pendingWheel) return;
+        send({
+          type: WorkerMessageType.WHEEL,
+          protocolVersion: 1,
+          deltaY: pendingWheel.deltaY,
+          x: pendingWheel.x,
+          y: pendingWheel.y,
+          ctrlKey: pendingWheel.ctrlKey,
+        });
+        pendingWheel = null;
+      };
+
       const handlePointerDown = (e: PointerEvent) => {
         if (e.button !== 0) return;
         e.preventDefault();
+        if (pointerMoveFrame !== null) {
+          window.cancelAnimationFrame(pointerMoveFrame);
+          pointerMoveFrame = null;
+          pendingPointerMove = null;
+        }
         const { x, y } = canvasPoint(e.clientX, e.clientY);
         canvas.setPointerCapture(e.pointerId);
         send({
@@ -414,13 +476,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
       const handlePointerMove = (e: PointerEvent) => {
         const { x, y } = canvasPoint(e.clientX, e.clientY);
-        send({
+        pendingPointerMove = {
           type: WorkerMessageType.POINTER_MOVE,
           protocolVersion: 1,
           x,
           y,
           buttons: e.buttons,
-        });
+        };
+        if (pointerMoveFrame === null) {
+          pointerMoveFrame = window.requestAnimationFrame(flushPointerMove);
+        }
       };
 
       const handlePointerUp = (e: PointerEvent) => {
@@ -440,6 +505,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       };
 
       const handlePointerLeave = () => {
+        if (pointerMoveFrame !== null) {
+          window.cancelAnimationFrame(pointerMoveFrame);
+          pointerMoveFrame = null;
+          pendingPointerMove = null;
+        }
         send({
           type: WorkerMessageType.POINTER_LEAVE,
           protocolVersion: 1,
@@ -449,14 +519,15 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       const handleWheel = (e: WheelEvent) => {
         e.preventDefault();
         const { x, y } = canvasPoint(e.clientX, e.clientY);
-        send({
-          type: WorkerMessageType.WHEEL,
-          protocolVersion: 1,
-          deltaY: e.deltaY,
+        pendingWheel = {
+          deltaY: (pendingWheel?.deltaY ?? 0) + e.deltaY,
           x,
           y,
           ctrlKey: e.ctrlKey,
-        });
+        };
+        if (wheelFrame === null) {
+          wheelFrame = window.requestAnimationFrame(flushWheel);
+        }
       };
 
       const handleDoubleClick = (e: MouseEvent) => {
@@ -528,6 +599,12 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 
       return () => {
+        if (pointerMoveFrame !== null) {
+          window.cancelAnimationFrame(pointerMoveFrame);
+        }
+        if (wheelFrame !== null) {
+          window.cancelAnimationFrame(wheelFrame);
+        }
         canvas.removeEventListener('pointerdown', handlePointerDown);
         window.removeEventListener('pointermove', handlePointerMove);
         window.removeEventListener('pointerup', handlePointerUp);
@@ -654,20 +731,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       getLatestPositions: () => ({ ...latestPositionsRef.current }),
     }), []);
 
-    // If we need to fall back, render the original legacy component
+    // If we need to fall back, render a small unsupported-browser state.
     if (useFallback) {
-      return (
-        <LegacyOrbitMapCanvas
-          ref={ref}
-          data={props.graph!}
-          selection={props.selection ?? null}
-          focus={props.focus}
-          onSelectionChange={props.onSelectionChange ?? (() => {})}
-          onHoverChange={props.onHoverChange}
-          onOpenBookmark={props.onOpenBookmark}
-          className={props.className}
-        />
-      );
+      return <OrbitMapUnsupportedState />;
     }
 
     return (

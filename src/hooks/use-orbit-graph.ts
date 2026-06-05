@@ -15,8 +15,9 @@ export function useOrbitGraphQuery(scope: OrbitGraphScope = "library") {
     queryKey: orbitGraphQueryKey(scope),
     queryFn: () => fetchJson(`/api/orbit/graph?scope=${scope}`),
     placeholderData: keepPreviousData,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 }

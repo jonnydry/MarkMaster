@@ -55,49 +55,51 @@ export async function GET(req: NextRequest) {
     ...(scope === "orbit" ? orbitQueueWhere : {}),
   };
 
-  const [tagsRaw, collectionsRaw, totalBookmarks, bookmarksRaw] =
-    await Promise.all([
-      prisma.tag.findMany({
-        where: { userId: user.id },
+  // Keep these reads sequential. The graph endpoint is loaded alongside tags,
+  // collections, and sync status; fanning out here can exhaust the local Prisma
+  // pool during dev reloads and make the map briefly fail with P2024.
+  const tagsRaw = await prisma.tag.findMany({
+    where: { userId: user.id },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      _count: { select: { bookmarks: true } },
+    },
+    orderBy: { name: "asc" },
+  });
+  const collectionsRaw = await prisma.collection.findMany({
+    where: { userId: user.id },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      _count: { select: { items: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  const totalBookmarks = await prisma.bookmark.count({
+    where: { userId: user.id },
+  });
+  const bookmarksRaw = await prisma.bookmark.findMany({
+    where: bookmarkWhere,
+    select: {
+      id: true,
+      tweetText: true,
+      authorUsername: true,
+      authorDisplayName: true,
+      bookmarkedAt: true,
+      tags: { select: { tagId: true } },
+      collectionItems: {
         select: {
-          id: true,
-          name: true,
-          color: true,
-          _count: { select: { bookmarks: true } },
+          collectionId: true,
+          collection: { select: { type: true } },
         },
-        orderBy: { name: "asc" },
-      }),
-      prisma.collection.findMany({
-        where: { userId: user.id },
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          _count: { select: { items: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.bookmark.count({ where: { userId: user.id } }),
-      prisma.bookmark.findMany({
-        where: bookmarkWhere,
-        select: {
-          id: true,
-          tweetText: true,
-          authorUsername: true,
-          authorDisplayName: true,
-          bookmarkedAt: true,
-          tags: { select: { tagId: true } },
-          collectionItems: {
-            select: {
-              collectionId: true,
-              collection: { select: { type: true } },
-            },
-          },
-        },
-        orderBy: { bookmarkedAt: "desc" },
-        take: nodeCap,
-      }),
-    ]);
+      },
+    },
+    orderBy: { bookmarkedAt: "desc" },
+    take: nodeCap,
+  });
 
   const nodes: OrbitGraphNode[] = [];
   const edges: OrbitGraphEdge[] = [];

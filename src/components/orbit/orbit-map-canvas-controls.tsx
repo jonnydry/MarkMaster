@@ -67,8 +67,8 @@ export function OrbitMapCanvasControls({
 
       <div
         className={cn(
-          "pointer-events-none absolute bottom-4 right-4 flex flex-col gap-1.5",
-          zoomControlsClassName
+          "pointer-events-none absolute flex flex-col gap-1.5",
+          zoomControlsClassName ?? "bottom-4 right-4"
         )}
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}

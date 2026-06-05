@@ -1,0 +1,41 @@
+import type { OrbitGraphNode } from "@/types";
+
+export const ORBIT_MAP_SEARCH_RESULT_LIMIT = 8;
+
+function getSearchText(node: OrbitGraphNode) {
+  switch (node.kind) {
+    case "tag":
+    case "collection":
+      return node.name.toLowerCase();
+    case "bookmark":
+      return `${node.authorUsername} ${node.title}`.toLowerCase();
+    default:
+      return "";
+  }
+}
+
+function getKindRank(node: OrbitGraphNode) {
+  if (node.kind === "tag") return 0;
+  if (node.kind === "collection") return 1;
+  if (node.kind === "bookmark") return 2;
+  return 3;
+}
+
+function getMatchRank(node: OrbitGraphNode, query: string) {
+  const text = getSearchText(node);
+  const exactBonus = text === query ? -20 : 0;
+  const startBonus = text.startsWith(query) ? -10 : 0;
+  return getKindRank(node) + exactBonus + startBonus;
+}
+
+export function rankOrbitMapSearchResults(
+  nodes: OrbitGraphNode[],
+  rawQuery: string
+) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return [];
+
+  return nodes
+    .filter((node) => getSearchText(node).includes(query))
+    .sort((a, b) => getMatchRank(a, query) - getMatchRank(b, query));
+}

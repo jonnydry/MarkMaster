@@ -21,18 +21,23 @@ export function OrbitMapHoverCard({
   containerHeight,
 }: OrbitMapHoverCardProps) {
   const { isOrbital } = useOrbitalTheme();
+  const maxLeft = Math.max(8, containerWidth - 272);
+  const maxTop = Math.max(8, containerHeight - 140);
+  const preferredLeft = x + 14;
+  const sideAwareLeft = preferredLeft > maxLeft ? x - 278 : preferredLeft;
 
   return (
     <div
+      data-orbit-hover-card
       className={cn(
-        "pointer-events-none absolute z-20 w-64 p-3 shadow-none backdrop-blur-xl",
+        "pointer-events-none absolute z-20 w-64 p-3 opacity-95 shadow-none backdrop-blur-xl transition-[opacity,transform] duration-150 ease-out will-change-transform",
         isOrbital
           ? "rounded-sm border border-hairline-soft bg-surface-1/90"
           : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
       )}
       style={{
-        left: Math.min(Math.max(x + 14, 8), containerWidth - 264),
-        top: Math.min(Math.max(y + 14, 8), containerHeight - 120),
+        left: Math.min(Math.max(sideAwareLeft, 8), maxLeft),
+        top: Math.min(Math.max(y + 14, 8), maxTop),
       }}
     >
       <div className="flex items-center gap-2">

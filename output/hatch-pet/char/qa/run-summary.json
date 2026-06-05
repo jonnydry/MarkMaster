@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "run_dir": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char",
+  "spritesheet": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char/final/spritesheet.webp",
+  "validation": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char/final/validation.json",
+  "contact_sheet": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char/qa/contact-sheet.png",
+  "review": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char/qa/review.json",
+  "videos": "/Users/jonnydrybanski/Cursor Projects/MarkMaster/output/hatch-pet/char/qa/videos",
+  "package": "/Users/jonnydrybanski/.codex/pets/char"
+}

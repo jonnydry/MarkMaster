@@ -26,23 +26,6 @@ const syncRunSelect = {
 
 type SyncRunSnapshot = Prisma.SyncRunGetPayload<{ select: typeof syncRunSelect }>;
 
-async function expireStaleSyncRuns(userId: string) {
-  await prisma.syncRun.updateMany({
-    where: {
-      userId,
-      status: "RUNNING",
-      startedAt: {
-        lt: new Date(Date.now() - STALE_SYNC_WINDOW_MS),
-      },
-    },
-    data: {
-      status: "FAILED",
-      completedAt: new Date(),
-      errorMessage: "Sync did not finish.",
-    },
-  });
-}
-
 function syncCooldownResponse(
   retryUntil: Date,
   latestRun: SyncRunSnapshot
@@ -68,21 +51,39 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await expireStaleSyncRuns(user.id);
+  let currentRun: SyncRunSnapshot | null = await prisma.syncRun.findFirst({
+    where: { userId: user.id, status: "RUNNING" },
+    orderBy: { startedAt: "desc" },
+    select: syncRunSelect,
+  });
 
-  const [currentRun, recentRuns] = await Promise.all([
-    prisma.syncRun.findFirst({
-      where: { userId: user.id, status: "RUNNING" },
-      orderBy: { startedAt: "desc" },
-      select: syncRunSelect,
-    }),
-    prisma.syncRun.findMany({
-      where: { userId: user.id, status: { not: "RUNNING" } },
-      orderBy: { startedAt: "desc" },
-      take: 5,
-      select: syncRunSelect,
-    }),
-  ]);
+  if (
+    currentRun &&
+    currentRun.startedAt < new Date(Date.now() - STALE_SYNC_WINDOW_MS)
+  ) {
+    await prisma.syncRun.updateMany({
+      where: {
+        userId: user.id,
+        status: "RUNNING",
+        startedAt: {
+          lt: new Date(Date.now() - STALE_SYNC_WINDOW_MS),
+        },
+      },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        errorMessage: "Sync did not finish.",
+      },
+    });
+    currentRun = null;
+  }
+
+  const recentRuns = await prisma.syncRun.findMany({
+    where: { userId: user.id, status: { not: "RUNNING" } },
+    orderBy: { startedAt: "desc" },
+    take: 5,
+    select: syncRunSelect,
+  });
 
   return NextResponse.json({ currentRun, recentRuns });
 }

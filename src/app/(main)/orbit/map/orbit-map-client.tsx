@@ -16,9 +16,7 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  Folder,
   Loader2,
-  Search,
 } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
@@ -47,8 +45,13 @@ import {
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
+import { rankOrbitMapSearchResults } from "@/lib/orbit-map-search";
+import { OrbitMapCommandSurface } from "@/components/orbit/orbit-map-command-surface";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
+import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
+import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
+import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
 import { saveOrbitMapPositions } from "@/lib/orbit-map-layout-storage";
 import type { OrbitGraphNode, OrbitGraphScope } from "@/types";
 
@@ -160,8 +163,6 @@ export default function OrbitMapPage() {
   }, [focusBookmarkIdParam, selectIdParam, selectKindParam]);
   const graphScope: OrbitGraphScope =
     scopeParam === "orbit" ? "orbit" : "library";
-  const [hoverSelection, setHoverSelection] =
-    useState<OrbitMapSelection | null>(null);
   const [hoverCard, setHoverCard] = useState<{
     node: BookmarkGraphNode;
     x: number;
@@ -169,6 +170,13 @@ export default function OrbitMapPage() {
   } | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [stageSize, setStageSize] = useState({ width: 960, height: 640 });
+  const hoverIntentTimerRef = useRef<number | null>(null);
+  const hoverClearTimerRef = useRef<number | null>(null);
+  const layoutSaveTimerRef = useRef<number | null>(null);
+  const pendingLayoutPositionsRef = useRef<Record<
+    string,
+    { x: number; y: number }
+  > | null>(null);
 
   const handleSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
@@ -230,29 +238,60 @@ export default function OrbitMapPage() {
     return () => observer.disconnect();
   }, []);
 
+  const clearHoverTimers = useCallback(() => {
+    if (hoverIntentTimerRef.current !== null) {
+      window.clearTimeout(hoverIntentTimerRef.current);
+      hoverIntentTimerRef.current = null;
+    }
+    if (hoverClearTimerRef.current !== null) {
+      window.clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => clearHoverTimers();
+  }, [clearHoverTimers]);
+
+  useEffect(() => {
+    return () => {
+      if (layoutSaveTimerRef.current !== null) {
+        window.clearTimeout(layoutSaveTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleHoverChange = useCallback(
     (
       next: OrbitMapSelection | null,
       position?: { x: number; y: number }
     ) => {
-      setHoverSelection(next);
+      clearHoverTimers();
+
       if (next?.kind === "bookmark" && position && graph) {
         const node = graph.nodes.find(
           (n) => n.kind === "bookmark" && n.id === next.id
         );
         if (node?.kind === "bookmark") {
-          setHoverCard({ node, x: position.x, y: position.y });
+          hoverIntentTimerRef.current = window.setTimeout(() => {
+            setHoverCard({ node, x: position.x, y: position.y });
+            hoverIntentTimerRef.current = null;
+          }, 140);
           return;
         }
       }
-      setHoverCard(null);
+
+      hoverClearTimerRef.current = window.setTimeout(() => {
+        setHoverCard(null);
+        hoverClearTimerRef.current = null;
+      }, 140);
     },
-    [graph]
+    [clearHoverTimers, graph]
   );
 
   const dbUser = session?.dbUser;
 
-  const activeSelection = selection ?? hoverSelection;
+  const activeSelection = selection;
   const activeSelectionNode = useMemo(() => {
     if (!graph || !activeSelection) return null;
     return graph.nodes.find((node) => node.id === activeSelection.id) ?? null;
@@ -317,22 +356,7 @@ export default function OrbitMapPage() {
   }, [focusAnchorIdParam, focusBookmarkIdParam, graph]);
 
   const searchResults = useMemo(() => {
-    if (!graph || !searchDeferred) return [];
-    return graph.nodes.filter((node) => {
-      switch (node.kind) {
-        case "tag":
-          return node.name.toLowerCase().includes(searchDeferred);
-        case "collection":
-          return node.name.toLowerCase().includes(searchDeferred);
-        case "bookmark":
-          return (
-            node.authorUsername.toLowerCase().includes(searchDeferred) ||
-            node.title.toLowerCase().includes(searchDeferred)
-          );
-        default:
-          return false;
-      }
-    });
+    return graph ? rankOrbitMapSearchResults(graph.nodes, searchDeferred) : [];
   }, [graph, searchDeferred]);
 
   useEffect(() => {
@@ -464,15 +488,24 @@ export default function OrbitMapPage() {
 
   const handleLayoutUpdated = useCallback(
     (positions: Record<string, { x: number; y: number }>) => {
-      saveOrbitMapPositions(positions, graphScope);
+      pendingLayoutPositionsRef.current = positions;
+      if (layoutSaveTimerRef.current !== null) return;
+
+      layoutSaveTimerRef.current = window.setTimeout(() => {
+        layoutSaveTimerRef.current = null;
+        if (pendingLayoutPositionsRef.current) {
+          saveOrbitMapPositions(pendingLayoutPositionsRef.current, graphScope);
+          pendingLayoutPositionsRef.current = null;
+        }
+      }, 500);
     },
     [graphScope]
   );
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
+      clearHoverTimers();
       setHoverCard(null);
-      setHoverSelection(null);
 
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (next === "orbit") {
@@ -491,7 +524,7 @@ export default function OrbitMapPage() {
         scroll: false,
       });
     },
-    [router, searchParams]
+    [clearHoverTimers, router, searchParams]
   );
 
   const headerDescription = useMemo(() => {
@@ -573,35 +606,47 @@ export default function OrbitMapPage() {
                 open={keyboardShortcutsOpen}
                 onOpenChange={setKeyboardShortcutsOpen}
                 groups={ORBIT_MAP_SHORTCUT_GROUPS}
-                description="Orbit graph search, scope, and assignment shortcuts."
+                description="Orbit graph search, view, and assignment shortcuts."
+              />
+              <OrbitMapLegendButton />
+              <OrbitMapScopeMenu
+                graphScope={graphScope}
+                isLoading={isLoading}
+                onScopeChange={handleScopeChange}
               />
               <Link
                 href="/orbit"
+                aria-label="Back to Orbit queue"
                 className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
               >
                 <ArrowLeft className="size-4" />
-                Orbit queue
+                <span className="hidden sm:inline">Orbit queue</span>
               </Link>
               {dbUser ? <UserNavDynamic user={dbUser} /> : null}
             </div>
           }
         />
 
-        <div className={cn("flex min-h-0 min-w-0 flex-1", appContentInsetClassName)}>
+        <div
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 gap-3",
+            appContentInsetClassName
+          )}
+        >
           <div
             ref={stageRef}
             className={cn(
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
               isOrbital
-                ? "rounded-sm border border-hairline-soft bg-background"
-                : "rounded-sm border border-white/[0.055] bg-[#070b13]"
+                ? "rounded-sm border border-hairline-soft bg-background dark:bg-black"
+                : "rounded-sm border border-white/[0.055] bg-background dark:bg-black"
             )}
           >
             {isLoading ? (
               <div
                 className={cn(
                   "flex h-full w-full items-center justify-center",
-                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
                 )}
               >
                 <div className="flex items-center gap-2 text-sm text-white/60">
@@ -613,7 +658,7 @@ export default function OrbitMapPage() {
               <div
                 className={cn(
                   "flex h-full w-full items-center justify-center p-6",
-                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
                 )}
               >
                 <ErrorState
@@ -631,7 +676,7 @@ export default function OrbitMapPage() {
               <div
                 className={cn(
                   "flex h-full w-full flex-col items-center justify-center p-8",
-                  isOrbital ? "bg-background" : "bg-[#0b0f1a]"
+                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
                 )}
               >
                 <EmptyState
@@ -666,8 +711,8 @@ export default function OrbitMapPage() {
                 layoutScope={graphScope}
                 focus={focus}
                 className="h-full w-full"
-                filterControlsClassName="top-[7.25rem] lg:top-[7.25rem]"
-                zoomControlsClassName="bottom-[12.5rem] right-3 sm:bottom-[11rem] lg:bottom-4 lg:right-4"
+                filterControlsClassName="left-4 top-[4.5rem]"
+                zoomControlsClassName="bottom-[calc(30dvh+1.25rem)] right-4 lg:bottom-4"
               />
             ) : null}
 
@@ -681,196 +726,33 @@ export default function OrbitMapPage() {
               />
             ) : null}
 
-            <div className="pointer-events-none absolute inset-x-3 top-3 z-30 lg:inset-x-auto lg:left-4 lg:w-[min(520px,calc(100%-404px))] xl:w-[min(560px,calc(100%-420px))]">
-              <div className="pointer-events-auto space-y-2 rounded-2xl border border-white/[0.055] bg-white/[0.035] p-2 shadow-none backdrop-blur-xl">
-                <div
-                  className="flex gap-1 rounded-full bg-white/[0.04] p-0.5"
-                  role="group"
-                  aria-label="Graph data scope"
-                >
-                  {(
-                    [
-                      { key: "library" as const, label: "Full library" },
-                      { key: "orbit" as const, label: "Orbit queue" },
-                    ] as const
-                  ).map(({ key, label }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-pressed={graphScope === key}
-                      onClick={() => handleScopeChange(key)}
-                      disabled={isLoading}
-                      className={cn(
-                        "flex-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50",
-                        graphScope === key
-                          ? "bg-white/[0.14] text-white"
-                          : "text-white/50 hover:text-white/80"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="relative rounded-full px-1">
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                    <Search className="size-4 text-white/40" />
-                  </div>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Find tags, collections, or bookmarks…"
-                    disabled={!graph}
-                    className="h-9 w-full rounded-full border-0 bg-transparent pl-9 pr-10 text-sm text-white outline-none placeholder:text-white/35 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                  {isFetching && !isLoading && (
-                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                      <Loader2 className="size-3.5 animate-spin text-white/55" />
-                    </div>
-                  )}
-                </div>
-
-                {searchDeferred && searchResults.length > 0 && (
-                  <div
-                    className={cn(
-                      "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 overflow-auto shadow-none backdrop-blur-xl",
-                      isOrbital
-                        ? "rounded-sm border border-hairline-soft bg-surface-1/90"
-                        : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
-                    )}
-                  >
-                    <ul className="py-1">
-                      {searchResults.slice(0, 20).map((node) => {
-                        const identity: OrbitMapSelection =
-                          node.kind === "core"
-                            ? { kind: "core", id: node.id }
-                            : node.kind === "tag"
-                              ? { kind: "tag", id: node.id }
-                              : node.kind === "collection"
-                                ? { kind: "collection", id: node.id }
-                                : { kind: "bookmark", id: node.id };
-                        return (
-                          <li key={node.id}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSelectionChange(identity);
-                                canvasRef.current?.focusOn(identity);
-                                setSearch("");
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 transition-colors hover:bg-white/5 hover:text-white"
-                            >
-                              {node.kind === "tag" && (
-                                <>
-                                  <span
-                                    className="inline-block size-2 rounded-full"
-                                    style={{ backgroundColor: node.color }}
-                                  />
-                                  <span className="truncate">{node.name}</span>
-                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                    Tag
-                                  </span>
-                                </>
-                              )}
-                              {node.kind === "collection" && (
-                                <>
-                                  <Folder className="size-3.5 text-sky-300" />
-                                  <span className="truncate">{node.name}</span>
-                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                    {node.variant === "x_folder"
-                                      ? "X folder"
-                                      : "Collection"}
-                                  </span>
-                                </>
-                              )}
-                              {node.kind === "bookmark" && (
-                                <>
-                                  <span
-                                    className={cn(
-                                      "inline-block size-1.5 rounded-full",
-                                      node.affiliated
-                                        ? "bg-slate-200"
-                                        : "bg-sky-300"
-                                    )}
-                                  />
-                                  <span className="truncate">
-                                    @{node.authorUsername}
-                                  </span>
-                                  <span className="ml-auto text-[10px] uppercase tracking-wider text-white/40">
-                                    Bookmark
-                                  </span>
-                                </>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
-                {searchDeferred && searchResults.length === 0 && (
-                  <div
-                    className={cn(
-                      "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 p-3 text-sm text-white/50 shadow-none backdrop-blur-xl",
-                      isOrbital
-                        ? "rounded-sm border border-hairline-soft bg-surface-1/90"
-                        : "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
-                    )}
-                  >
-                    No results for “{searchDeferred}”
-                  </div>
-                )}
-                </div>
-              </div>
-            </div>
+            <OrbitMapCommandSurface
+              isFetching={isFetching}
+              hasGraph={Boolean(graph)}
+              search={search}
+              searchQuery={searchDeferred}
+              searchResults={searchResults}
+              searchInputRef={searchInputRef}
+              onSearchChange={setSearch}
+              onResultSelect={(identity) => {
+                handleSelectionChange(identity);
+                canvasRef.current?.focusOn(identity);
+              }}
+            />
 
             {stats && (
-              <div className="pointer-events-none absolute bottom-5 left-5 z-20 hidden max-w-[calc(100%-6rem)] items-center gap-3 text-white/60 lg:flex">
-                <MapMetric label="Loose" value={stats.looseBookmarks} />
-                <span className="h-6 w-px bg-white/[0.08]" />
-                <MapMetric label="Tags" value={stats.tagCount} />
-                <span className="h-6 w-px bg-white/[0.08]" />
-                <MapMetric
-                  label="Collections"
-                  value={stats.userCollectionCount + stats.xFolderCount}
-                />
-                {truncatedCount > 0 && (
-                  <>
-                    <span className="h-6 w-px bg-white/[0.08]" />
-                    <MapMetric label="Hidden" value={truncatedCount} />
-                  </>
-                )}
-              </div>
+              <OrbitMapStatsStrip
+                stats={stats}
+                truncatedCount={truncatedCount}
+              />
             )}
 
             {graph && (
               <>
-                <div className="pointer-events-none absolute right-3 top-3 z-30 hidden lg:block">
-                  <OrbitMapRail
-                    data={graph}
-                    selection={selection}
-                    hoverSelection={hoverSelection}
-                    selectedBookmarkId={selectedBookmarkId}
-                    focusedBookmark={focusedBookmark}
-                    focusedBookmarkLoading={focusedBookmarkLoading}
-                    onAssign={handleAssign}
-                    onAddTag={openTagDialog}
-                    onAddToCollection={openCollectionDialog}
-                    onCopyAsCollection={handleCopyAsCollection}
-                    onOpenBookmark={handleOpenBookmark}
-                    onClearSelection={() => handleSelectionChange(null)}
-                    copyingCollectionId={copyingCollectionId}
-                    variant="overlay"
-                  />
-                </div>
-
                 <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
                   <OrbitMapRail
                     data={graph}
                     selection={selection}
-                    hoverSelection={hoverSelection}
                     selectedBookmarkId={selectedBookmarkId}
                     focusedBookmark={focusedBookmark}
                     focusedBookmarkLoading={focusedBookmarkLoading}
@@ -883,12 +765,30 @@ export default function OrbitMapPage() {
                     copyingCollectionId={copyingCollectionId}
                     variant="overlay"
                     className="max-h-[30dvh] w-full"
-                    showLegend={false}
                   />
                 </div>
               </>
             )}
           </div>
+
+          {graph && (
+            <OrbitMapRail
+              data={graph}
+              selection={selection}
+              selectedBookmarkId={selectedBookmarkId}
+              focusedBookmark={focusedBookmark}
+              focusedBookmarkLoading={focusedBookmarkLoading}
+              onAssign={handleAssign}
+              onAddTag={openTagDialog}
+              onAddToCollection={openCollectionDialog}
+              onCopyAsCollection={handleCopyAsCollection}
+              onOpenBookmark={handleOpenBookmark}
+              onClearSelection={() => handleSelectionChange(null)}
+              copyingCollectionId={copyingCollectionId}
+              variant="rail"
+              className="hidden h-full overflow-y-auto lg:flex lg:w-[300px] xl:w-[320px]"
+            />
+          )}
         </div>
       </div>
 
@@ -929,19 +829,6 @@ export default function OrbitMapPage() {
         onOpenChange={setCreateCollectionOpen}
         onCreateCollection={createCollection}
       />
-    </div>
-  );
-}
-
-function MapMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/35">
-        {label}
-      </p>
-      <p className="text-sm font-semibold tabular-nums text-white/75">
-        {value.toLocaleString()}
-      </p>
     </div>
   );
 }

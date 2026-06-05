@@ -53,6 +53,30 @@ import {
   forceCenter,
   type Simulation,
 } from 'd3-force';
+import {
+  clampOrbitMapZoom,
+  constrainOrbitMapCameraState,
+  getOrbitMapFitZoom,
+  getOrbitMapGraphBounds,
+  type OrbitMapGraphBounds,
+} from './orbit-map-camera';
+import {
+  getSeededOrbitMapPosition,
+  isFiniteOrbitMapPosition,
+} from './orbit-map-layout';
+import { findClosestOrbitMapNode } from './orbit-map-hit-test';
+import { createOrbitMapPerfLogger } from './orbit-map-perf';
+import {
+  getOrbitMapNodeRadius,
+  getOrbitMapNodeVisualStyle,
+  getOrbitMapLabelText,
+  shouldShowOrbitMapLabel,
+} from './orbit-map-rendering';
+import {
+  easeOrbitMapOutCubic,
+  getOrbitMapAnimationProgress,
+  shouldContinueOrbitMapLoop,
+} from './orbit-map-animation';
 
 /**
  * Internal simulation node type used by d3-force and the renderer.
@@ -79,30 +103,6 @@ interface SimulationLink {
   source: string | SimulationNode;
   target: string | SimulationNode;
   kind: string;
-}
-
-/**
- * Deterministic position based on node ID.
- * Used when no persisted positions are available.
- * This gives stable but spread-out initial layouts across refreshes.
- */
-function seededPosition(id: string): { x: number; y: number } {
-  // FNV-1a 32-bit hash
-  let hash = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    hash ^= id.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  // Convert hash into two pseudo-random values in [0, 1)
-  const x = ((hash >>> 0) % 100000) / 100000;
-  const y = (((hash >>> 16) ^ (hash >>> 0)) % 100000) / 100000;
-
-  // Map to a reasonable world space
-  return {
-    x: (x - 0.5) * 900,   // -450 .. +450
-    y: (y - 0.5) * 700,   // -350 .. +350
-  };
 }
 
 /**
@@ -147,6 +147,8 @@ let isInitialized = false;
 // Current graph data and filter (stored in worker)
 let currentGraph: OrbitGraphPayload | null = null;
 let currentFilter: GraphFilter = 'all';
+let currentInitialPositions = new Map<string, { x: number; y: number }>();
+let perf = createOrbitMapPerfLogger(false);
 
 // Cursor state for CURSOR_CHANGED messages
 let isPointerDown = false;
@@ -169,6 +171,7 @@ let linksContainer: Container | null = null;
 let nodesContainer: Container | null = null;
 let labelsContainer: Container | null = null;
 let effectsContainer: Container | null = null; // For temporary effects like pulses and animations
+let linkGraphics: Graphics | null = null;
 
 // Label management for LOD
 const labelMap = new Map<string, Text | BitmapText>(); // nodeId -> Text or BitmapText object
@@ -192,31 +195,18 @@ let currentSelection: OrbitMapSelection | null = null;
 const adjacency = new Map<string, Set<string>>();
 
 // Label visibility thresholds (based on zoom level)
-const LABEL_ZOOM_THRESHOLD = 0.6;           // Below this, only show important labels (tags, collections, core)
-const LABEL_ZOOM_BOOKMARK_THRESHOLD = 1.8;  // Below this, hide bookmark labels to avoid clutter
-
-/**
- * Checks if a world-space position is visible in the current camera view.
- * Adds some margin so labels don't pop in/out at the edges.
- */
-function isNodeInView(worldX: number, worldY: number, margin = 150): boolean {
-  if (!app) return true;
-
-  const { width, height } = app.renderer;
-
-  // Convert screen edges to world space
-  const left   = (-camera.x) / camera.zoom;
-  const right  = (width - camera.x) / camera.zoom;
-  const top    = (-camera.y) / camera.zoom;
-  const bottom = (height - camera.y) / camera.zoom;
-
-  return (
-    worldX >= left - margin &&
-    worldX <= right + margin &&
-    worldY >= top - margin &&
-    worldY <= bottom + margin
-  );
-}
+const LABEL_ZOOM_THRESHOLD = 0.95;          // Below this, hide text labels and let the graph read as structure.
+const LABEL_BASE_FONT_SIZE = 18;
+const LABEL_MIN_WORLD_SCALE = 0.16;
+const LABEL_MAX_WORLD_SCALE = 2.35;
+const GRAPH_BACKGROUND_COLOR = 0x000000;
+const MIN_CAMERA_ZOOM = 0.12;
+const MAX_CAMERA_ZOOM = 1.85;
+const CAMERA_FRAME_PADDING = 72;
+const CAMERA_NODE_PADDING = 18;
+const MAX_FIT_ZOOM = 1.75;
+const WHEEL_DELTA_CAP = 90;
+const WHEEL_ZOOM_SENSITIVITY = 0.00055;
 
 // === Animation System (runs in worker) ===
 interface Animation {
@@ -346,6 +336,10 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
       sendLayoutUpdate(false);
       break;
 
+    case WorkerMessageType.DESTROY:
+      handleDestroy();
+      break;
+
     default:
       console.warn('[OrbitWorker] Unhandled message type:', msg.type);
   }
@@ -358,6 +352,11 @@ function handleInit(msg: InitMessage) {
   }
 
   try {
+    perf = createOrbitMapPerfLogger(Boolean(msg.debugPerf));
+    const initStartedAt =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
+    perf.mark('worker:init:start');
+
     // Create Pixi Application with the transferred OffscreenCanvas
     app = new Application();
 
@@ -368,17 +367,22 @@ function handleInit(msg: InitMessage) {
       height: msg.height,
       resolution: msg.dpr,
       antialias: true,
-      backgroundColor: 0x0b0f1a,    // Dark background matching the app theme
+      backgroundColor: GRAPH_BACKGROUND_COLOR,
       autoDensity: true,
     }).then(() => {
       isInitialized = true;
+      const initMs = Math.round(
+        (typeof performance !== 'undefined' ? performance.now() : Date.now()) -
+          initStartedAt
+      );
+      perf.mark('worker:init:ready', { initMs });
 
       // Install a BitmapFont once for fast, high-quality labels (major performance win vs regular Text)
       BitmapFont.install({
         name: 'OrbitLabel',
         style: {
-          fontFamily: 'var(--font-sans), system-ui, sans-serif',
-          fontSize: 12,
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontSize: LABEL_BASE_FONT_SIZE,
           fill: 0xe2e8f0,
         },
         // Charset constants live on BitmapFontManager in Pixi v8 (BitmapFont has no static ASCII).
@@ -391,7 +395,6 @@ function handleInit(msg: InitMessage) {
       // Notify main thread (width/height can be 0 if not critical at this stage)
       postToMain({ type: MainMessageType.READY, protocolVersion: 1, width: 0, height: 0 });
 
-      console.log('[OrbitWorker] Initialized successfully with OffscreenCanvas + BitmapFont');
     }).catch((err) => {
       postToMain({
         type: MainMessageType.ERROR,
@@ -401,7 +404,7 @@ function handleInit(msg: InitMessage) {
     });
   } catch (err) {
     postToMain({
-      type: 'ERROR',
+      type: MainMessageType.ERROR,
       protocolVersion: 1,
       message: 'Worker initialization failed: ' + String(err),
     });
@@ -412,10 +415,19 @@ function handleResize(msg: ResizeMessage) {
   if (!app || !isInitialized) return;
 
   app.renderer.resize(msg.width, msg.height);
+  constrainCamera();
+  applyCameraTransform();
+  app.renderer.render(app.stage);
 }
 
 function handleSetGraph(msg: SetGraphMessage) {
   currentGraph = msg.graph;
+  currentInitialPositions = new Map(
+    Object.entries(msg.initialPositions ?? {}).filter(
+      (entry): entry is [string, { x: number; y: number }] =>
+        isFiniteOrbitMapPosition(entry[1])
+    )
+  );
 
   // Build adjacency map for neighbor highlighting
   buildAdjacencyMap();
@@ -447,8 +459,24 @@ function addEdge(a: string, b: string) {
 }
 
 function handleSetFilter(msg: SetFilterMessage) {
-  currentFilter = msg.filter as GraphFilter;
+  const nextFilter = msg.filter as GraphFilter;
+  if (currentFilter === nextFilter) return;
+  currentFilter = nextFilter;
   rebuildScene();
+}
+
+function handleDestroy() {
+  if (simulation) {
+    simulation.stop();
+    simulation = null;
+  }
+  activeAnimations.length = 0;
+  labelMap.clear();
+  nodeGraphicsMap.clear();
+  adjacency.clear();
+  app?.destroy();
+  app = null;
+  isInitialized = false;
 }
 
 /**
@@ -457,6 +485,8 @@ function handleSetFilter(msg: SetFilterMessage) {
  */
 function rebuildScene() {
   if (!app || !currentGraph) return;
+  const graphStartedAt =
+    typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   // Stop previous simulation
   if (simulation) {
@@ -467,6 +497,15 @@ function rebuildScene() {
   // Clear scene
   if (linksContainer) linksContainer.removeChildren();
   if (nodesContainer) nodesContainer.removeChildren();
+  if (labelsContainer) {
+    for (const label of labelMap.values()) {
+      label.destroy();
+    }
+    labelMap.clear();
+    labelsContainer.removeChildren();
+  }
+  if (effectsContainer) effectsContainer.removeChildren();
+  linkGraphics = null;
   nodeGraphicsMap.clear();
 
   if (!linksContainer) {
@@ -487,6 +526,10 @@ function rebuildScene() {
   }
 
   const { nodes, edges } = currentGraph;
+  perf.mark('graph:set', {
+    nodes: nodes.length,
+    edges: edges.length,
+  });
 
   // Visibility filter (runs on raw graph nodes before we enrich them into SimulationNodes)
   const isNodeVisible = (node: OrbitGraphNode): boolean => {
@@ -509,16 +552,25 @@ function rebuildScene() {
       id: node.id,
       kind: node.kind,
       node,
-      radius: node.kind === 'bookmark' ? 6 : node.kind === 'tag' ? 10 : 8,
+      radius: getOrbitMapNodeRadius(node),
     };
 
     // Use persisted positions if available (from server or previous layout)
+    const initialPosition = currentInitialPositions.get(node.id);
     const simNode = node as OrbitGraphNode & { x?: number; y?: number };
-    if (typeof simNode.x === 'number' && typeof simNode.y === 'number') {
+    if (initialPosition) {
+      datum.x = initialPosition.x;
+      datum.y = initialPosition.y;
+    } else if (
+      typeof simNode.x === 'number' &&
+      Number.isFinite(simNode.x) &&
+      typeof simNode.y === 'number' &&
+      Number.isFinite(simNode.y)
+    ) {
       datum.x = simNode.x;
       datum.y = simNode.y;
     } else {
-      const pos = seededPosition(node.id);
+      const pos = getSeededOrbitMapPosition(node.id);
       datum.x = pos.x;
       datum.y = pos.y;
     }
@@ -591,6 +643,15 @@ function rebuildScene() {
   autoFitCamera(app.renderer.width, app.renderer.height);
   renderSceneFromSimulation();
   applyCameraTransform();
+  const firstRenderMs = Math.round(
+    (typeof performance !== 'undefined' ? performance.now() : Date.now()) -
+      graphStartedAt
+  );
+  perf.mark('graph:first-render', {
+    firstRenderMs,
+    visibleNodes: nodeData.length,
+    visibleEdges: linkData.length,
+  });
 
   // Start the simulation loop inside the worker
   startSimulationLoop();
@@ -604,139 +665,87 @@ function renderSceneFromSimulation() {
   nodesContainer.removeChildren();
   nodeGraphicsMap.clear();
 
-  const linkGraphics = new Graphics();
-  linkGraphics.alpha = 0.28;
+  const focusContext = getFocusContext();
 
-  linkData.forEach((link) => {
-    const source = nodeData.find((n) => n.id === link.source);
-    const target = nodeData.find((n) => n.id === link.target);
-    if (source && target) {
-      linkGraphics.moveTo(source.x ?? 0, source.y ?? 0);
-      linkGraphics.lineTo(target.x ?? 0, target.y ?? 0);
-    }
-  });
-  linkGraphics.stroke({ width: 1.2, color: 0x475569 });
+  linkGraphics = new Graphics();
+  linkGraphics.alpha = 1;
   linksContainer.addChild(linkGraphics);
-
-  // Determine active node for neighbor highlighting (prefer selection over hover)
-  const activeId = currentSelection?.id || currentHover?.id || null;
-  const neighborIds = activeId ? (adjacency.get(activeId) || new Set()) : new Set();
+  drawLinks(focusContext);
 
   nodeData.forEach((datum) => {
-    // View-frustum culling for nodes (big win on large graphs when zoomed in)
-    if (!isNodeInView(datum.x ?? 0, datum.y ?? 0)) {
-      return;
-    }
-
     const g = new Graphics();
     const node = datum.node;
 
-    let color = 0x60a5fa;
-    switch (node.kind) {
-      case 'core': color = 0xfacc15; break;
-      case 'tag': color = parseInt(node.color.replace('#', ''), 16) || 0x22c55e; break;
-      case 'collection': color = node.variant === 'x_folder' ? 0xa78bfa : 0xf472b6; break;
-      case 'bookmark': color = node.recent ? 0x38bdf8 : 0x64748b; break;
-      case 'overflow': color = 0xf97316; break;
-    }
+    const visualStyle = getOrbitMapNodeVisualStyle(node);
 
     // === Neighbor Dimming Logic ===
-    const isActive = datum.id === activeId;
-    const isNeighbor = neighborIds.has(datum.id);
+    const isActive = datum.id === focusContext.activeId;
+    const isNeighbor = focusContext.neighborIds.has(datum.id);
+    const isAssignedBookmark = node.kind === 'bookmark' && node.affiliated;
 
     let alpha = 1.0;
     let strokeAlpha = 0.6;
 
-    if (activeId) {
+    if (focusContext.activeId) {
       if (isActive) {
         alpha = 1.0;
-        strokeAlpha = 0.9;
+        strokeAlpha = 0.96;
       } else if (isNeighbor) {
-        alpha = 0.9;
-        strokeAlpha = 0.7;
+        alpha = focusContext.hasSelection ? 0.94 : 0.78;
+        strokeAlpha = focusContext.hasSelection ? 0.82 : 0.6;
       } else {
-        // Non-neighbor → strongly dim
-        alpha = 0.12;
-        strokeAlpha = 0.15;
+        if (focusContext.hasSelection) {
+          alpha = visualStyle.isHub ? 0.34 : isAssignedBookmark ? 0.18 : 0.24;
+          strokeAlpha = visualStyle.isHub ? 0.24 : 0.2;
+        } else {
+          alpha = visualStyle.isHub ? 0.26 : isAssignedBookmark ? 0.16 : 0.22;
+          strokeAlpha = visualStyle.isHub ? 0.2 : 0.16;
+        }
       }
+    } else if (camera.zoom < 0.26 && node.kind === 'bookmark') {
+      alpha = node.affiliated ? 0.5 : 0.7;
+      strokeAlpha = 0.24;
     }
 
-    g.circle(datum.x ?? 0, datum.y ?? 0, datum.radius);
-    g.fill({ color, alpha });
-    g.stroke({ width: 1, color: 0xffffff, alpha: strokeAlpha });
-
-    // Stronger ring for active node
-    if (isActive) {
-      const ring = new Graphics();
-      const ringColor = currentSelection ? 0xfacc15 : 0x38bdf8;
-      ring.circle(datum.x ?? 0, datum.y ?? 0, datum.radius + 6);
-      ring.stroke({ width: 2.5, color: ringColor, alpha: 0.95 });
-      nodesContainer!.addChild(ring);
-    }
-
-    // === Animation Effects (Pulse + Assign Flight) ===
-    // These are drawn every frame from the effects container
-    if (effectsContainer) {
-      effectsContainer.removeChildren();
-
-      activeAnimations.forEach((anim) => {
-        if (anim.type === 'pulse') {
-          const datum = nodeData.find((d) => d.id === anim.nodeId);
-          if (!datum) return;
-
-          const elapsed = Date.now() - anim.startTime;
-          const progress = Math.min(elapsed / anim.duration, 1);
-
-          // Multiple expanding rings with nice easing and falloff
-          for (let i = 0; i < 5; i++) {
-            const ringProgress = Math.max(0, (progress * 1.7) - (i * 0.18));
-            if (ringProgress <= 0) continue;
-
-            const pulseRadius = datum.radius + (ringProgress * 48);
-            const pulseAlpha = (1 - ringProgress) * (0.8 - i * 0.11);
-
-            const pulse = new Graphics();
-            pulse.circle(datum.x ?? 0, datum.y ?? 0, pulseRadius);
-            pulse.stroke({ width: 3, color: 0x38bdf8, alpha: pulseAlpha });
-            effectsContainer!.addChild(pulse);
-          }
-
-          // Subtle breathing scale on the node itself during the pulse
-          const g = nodeGraphicsMap.get(anim.nodeId);
-          if (g) {
-            const breath = 1 + Math.sin(progress * Math.PI * 3.5) * 0.09 * (1 - progress);
-            g.scale.set(breath);
-          }
-        }
-
-        if (
-          anim.type === 'assign' &&
-          anim.fromX !== undefined && anim.fromY !== undefined &&
-          anim.targetX !== undefined && anim.targetY !== undefined
-        ) {
-          const datum = nodeData.find((d) => d.id === anim.nodeId);
-          if (!datum) return;
-
-          // Elegant flight path line
-          const flight = new Graphics();
-          flight.moveTo(anim.fromX, anim.fromY);
-          flight.lineTo(anim.targetX, anim.targetY);
-          flight.stroke({ width: 2.2, color: 0x64748b, alpha: 0.28 });
-          effectsContainer!.addChild(flight);
-
-          // More visible faded ghost at the original position
-          const ghost = new Graphics();
-          ghost.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
-          ghost.fill({ color: 0x64748b, alpha: 0.14 });
-          ghost.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
-          effectsContainer!.addChild(ghost);
-        }
+    if (visualStyle.isHub) {
+      g.circle(0, 0, datum.radius + 1.5);
+      g.fill({ color: visualStyle.color, alpha: alpha * 0.16 });
+      g.stroke({
+        width: visualStyle.strokeWidth,
+        color: visualStyle.strokeColor,
+        alpha: Math.max(strokeAlpha, 0.42) * alpha,
+      });
+      g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
+      g.fill({ color: visualStyle.color, alpha });
+      g.stroke({ width: 1, color: 0xffffff, alpha: strokeAlpha * 0.72 });
+    } else {
+      g.circle(0, 0, datum.radius);
+      g.fill({ color: visualStyle.color, alpha });
+      g.stroke({
+        width: visualStyle.strokeWidth,
+        color: visualStyle.strokeColor,
+        alpha: strokeAlpha,
       });
     }
 
+    // Stronger ring for active node
+    if (isActive) {
+      const ringColor = currentSelection ? 0xfacc15 : 0x38bdf8;
+      g.circle(0, 0, datum.radius + 10);
+      g.stroke({ width: 5, color: ringColor, alpha: 0.2 });
+      g.circle(0, 0, datum.radius + 6);
+      g.stroke({ width: 2.4, color: ringColor, alpha: 0.98 });
+    } else if (isNeighbor && focusContext.hasSelection && visualStyle.isHub) {
+      g.circle(0, 0, datum.radius + 5);
+      g.stroke({ width: 1.6, color: 0x60a5fa, alpha: 0.58 });
+    }
+
+    g.position.set(datum.x ?? 0, datum.y ?? 0);
     nodesContainer!.addChild(g);
     nodeGraphicsMap.set(datum.id, g);
   });
+
+  renderEffects();
 
   // === Label Rendering with Level of Detail (LOD) ===
   if (!labelsContainer) {
@@ -744,14 +753,7 @@ function renderSceneFromSimulation() {
     app!.stage.addChild(labelsContainer);
   }
 
-  const showAllLabels = camera.zoom >= LABEL_ZOOM_BOOKMARK_THRESHOLD;
-  const showImportantLabels = camera.zoom >= LABEL_ZOOM_THRESHOLD;
-
-  const activeIds = new Set<string>();
-  if (currentHover) activeIds.add(currentHover.id);
-  if (currentSelection) activeIds.add(currentSelection.id);
-
-  // First, remove labels for nodes that no longer qualify (LOD + culling)
+  // First, remove labels for nodes that no longer qualify for the current LOD.
   for (const [nodeId, label] of labelMap) {
     const datum = nodeData.find((d) => d.id === nodeId);
     const node = datum?.node;
@@ -759,14 +761,7 @@ function renderSceneFromSimulation() {
     let shouldKeep = false;
 
     if (node && datum) {
-      const isActive = activeIds.has(nodeId);
-      const inView = isNodeInView(datum.x ?? 0, datum.y ?? 0);
-
-      if (node.kind === 'core' || node.kind === 'tag' || node.kind === 'collection') {
-        shouldKeep = (showImportantLabels || isActive) && inView;
-      } else if (node.kind === 'bookmark') {
-        shouldKeep = (showAllLabels || isActive) && inView;
-      }
+      shouldKeep = shouldRenderLabel(datum, focusContext);
     }
 
     if (!shouldKeep) {
@@ -781,22 +776,14 @@ function renderSceneFromSimulation() {
     const node = datum.node;
     const nodeId = datum.id;
 
-    const isActive = activeIds.has(nodeId);
-    const inView = isNodeInView(datum.x ?? 0, datum.y ?? 0);
+    const isActive = datum.id === focusContext.activeId;
+    const isNeighbor = focusContext.neighborIds.has(nodeId);
 
-    let shouldShowLabel = false;
-
-    if (node.kind === 'core' || node.kind === 'tag' || node.kind === 'collection') {
-      shouldShowLabel = (showImportantLabels || isActive) && inView;
-    } else if (node.kind === 'bookmark') {
-      shouldShowLabel = (showAllLabels || isActive) && inView;
+    if (!shouldRenderLabel(datum, focusContext)) {
+      return;
     }
 
-    if (!shouldShowLabel) return;
-
-    const labelText = node.kind === 'bookmark'
-      ? (node.title || node.authorUsername || 'Bookmark')
-      : (node.kind === 'tag' || node.kind === 'collection' ? node.name : 'Node');
+    const labelText = getOrbitMapLabelText(node);
 
     let label = labelMap.get(nodeId);
 
@@ -819,28 +806,178 @@ function renderSceneFromSimulation() {
       if (label.text !== labelText) {
         label.text = labelText;
       }
-      label.style.fill = isActive ? 0xffffff : 0xe2e8f0;
-      label.style.fontWeight = isActive ? '600' : '400';
     }
 
-    // Position label above the node, accounting for camera
-    const labelY = (datum.y ?? 0) - (datum.radius + 8);
-    label.x = datum.x ?? 0;
-    label.y = labelY;
+    label.style.fill = isActive ? 0xf8fafc : isNeighbor ? 0xcbd5e1 : 0xe2e8f0;
+    label.style.fontWeight = isActive ? '600' : '400';
 
-    // Keep label size relatively stable on screen (counter camera zoom)
-    const desiredScreenSize = node.kind === 'bookmark' ? 11 : 12;
-    const labelScale = Math.max(0.6, Math.min(2.2, desiredScreenSize / camera.zoom));
-    label.scale.set(labelScale);
-
-    // Fade labels slightly when zoomed out
-    label.alpha = camera.zoom < 0.9 ? 0.75 : 1.0;
+    positionLabel(label, datum, focusContext);
   });
 
   if (app) {
     applyCameraTransform();
     app.renderer.render(app.stage);
   }
+}
+
+function resolveLinkNode(endpoint: string | SimulationNode): SimulationNode | undefined {
+  return typeof endpoint === 'string'
+    ? nodeData.find((node) => node.id === endpoint)
+    : endpoint;
+}
+
+function getFocusContext() {
+  const activeId = currentSelection?.id || currentHover?.id || null;
+  return {
+    activeId,
+    hasSelection: Boolean(currentSelection),
+    neighborIds: activeId ? adjacency.get(activeId) || new Set<string>() : new Set<string>(),
+  };
+}
+
+function shouldRenderLabel(
+  datum: SimulationNode,
+  focusContext: ReturnType<typeof getFocusContext>
+) {
+  const isActive = datum.id === focusContext.activeId;
+  const isNeighbor = focusContext.neighborIds.has(datum.id);
+
+  return shouldShowOrbitMapLabel(
+    datum.node.kind,
+    camera.zoom,
+    LABEL_ZOOM_THRESHOLD,
+    {
+      isActive,
+      isSelectedNeighbor: focusContext.hasSelection && isNeighbor,
+    }
+  );
+}
+
+function drawLinks(focusContext = getFocusContext()) {
+  if (!linkGraphics) return;
+
+  linkGraphics.clear();
+  linkData.forEach((link) => {
+    const source = resolveLinkNode(link.source);
+    const target = resolveLinkNode(link.target);
+    if (!source || !target) return;
+
+    const touchesActive =
+      Boolean(focusContext.activeId) &&
+      (source.id === focusContext.activeId || target.id === focusContext.activeId);
+    const linkAlpha = !focusContext.activeId
+      ? 0.16
+      : touchesActive
+        ? focusContext.hasSelection
+          ? 0.86
+          : 0.42
+        : focusContext.hasSelection
+          ? 0.075
+          : 0.085;
+    const linkWidth = touchesActive
+      ? focusContext.hasSelection
+        ? 2.05
+        : 1.35
+      : 0.85;
+    const linkColor = touchesActive ? 0xcbd5e1 : 0x334155;
+
+    linkGraphics!.moveTo(source.x ?? 0, source.y ?? 0);
+    linkGraphics!.lineTo(target.x ?? 0, target.y ?? 0);
+    linkGraphics!.stroke({ width: linkWidth, color: linkColor, alpha: linkAlpha });
+  });
+}
+
+function positionLabel(
+  label: Text | BitmapText,
+  datum: SimulationNode,
+  focusContext = getFocusContext()
+) {
+  const isActive = datum.id === focusContext.activeId;
+  const isNeighbor = focusContext.neighborIds.has(datum.id);
+
+  label.x = datum.x ?? 0;
+  label.y = (datum.y ?? 0) - (datum.radius + (isActive ? 9 : 7));
+
+  // Keep labels relatively stable on screen while their container follows camera zoom.
+  const desiredScreenSize = isActive ? 9.2 : isNeighbor ? 8.4 : 8;
+  const labelScale = Math.max(
+    LABEL_MIN_WORLD_SCALE,
+    Math.min(
+      LABEL_MAX_WORLD_SCALE,
+      desiredScreenSize / (LABEL_BASE_FONT_SIZE * Math.max(camera.zoom, 0.01))
+    )
+  );
+  label.scale.set(labelScale);
+  label.alpha = isActive ? 0.88 : isNeighbor ? 0.72 : camera.zoom < 1.15 ? 0.5 : 0.74;
+}
+
+function updateLabelPositions() {
+  for (const [nodeId, label] of labelMap) {
+    const datum = nodeData.find((node) => node.id === nodeId);
+    if (datum) {
+      positionLabel(label, datum);
+    }
+  }
+}
+
+function renderEffects() {
+  if (!effectsContainer) return;
+
+  effectsContainer.removeChildren();
+
+  activeAnimations.forEach((anim) => {
+    if (anim.type === 'pulse') {
+      const datum = nodeData.find((d) => d.id === anim.nodeId);
+      if (!datum) return;
+
+      const progress = getOrbitMapAnimationProgress(anim);
+
+      // Multiple expanding rings with nice easing and falloff.
+      for (let i = 0; i < 5; i++) {
+        const ringProgress = Math.max(0, (progress * 1.7) - (i * 0.18));
+        if (ringProgress <= 0) continue;
+
+        const pulseRadius = datum.radius + (ringProgress * 48);
+        const pulseAlpha = (1 - ringProgress) * (0.8 - i * 0.11);
+
+        const pulse = new Graphics();
+        pulse.circle(datum.x ?? 0, datum.y ?? 0, pulseRadius);
+        pulse.stroke({ width: 3, color: 0x38bdf8, alpha: pulseAlpha });
+        effectsContainer!.addChild(pulse);
+      }
+
+      // Subtle breathing scale on the node itself during the pulse.
+      const g = nodeGraphicsMap.get(anim.nodeId);
+      if (g) {
+        const breath =
+          1 + Math.sin(progress * Math.PI * 3.5) * 0.09 * (1 - progress);
+        g.scale.set(breath);
+      }
+    }
+
+    if (
+      anim.type === 'assign' &&
+      anim.fromX !== undefined && anim.fromY !== undefined &&
+      anim.targetX !== undefined && anim.targetY !== undefined
+    ) {
+      const datum = nodeData.find((d) => d.id === anim.nodeId);
+      if (!datum) return;
+
+      // Elegant flight path line.
+      const flight = new Graphics();
+      flight.moveTo(anim.fromX, anim.fromY);
+      flight.lineTo(anim.targetX, anim.targetY);
+      flight.stroke({ width: 2.2, color: 0x64748b, alpha: 0.28 });
+      effectsContainer!.addChild(flight);
+
+      // More visible faded ghost at the original position.
+      const ghost = new Graphics();
+      ghost.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
+      ghost.fill({ color: 0x64748b, alpha: 0.14 });
+      ghost.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
+      effectsContainer!.addChild(ghost);
+    }
+  });
 }
 
 /** Runs the simulation inside the worker */
@@ -850,22 +987,26 @@ function startSimulationLoop() {
 
   let layoutUpdateTickCounter = 0;
   const LAYOUT_UPDATE_INTERVAL = 35; // send layout every ~35 ticks while running
+  const simulationStartedAt =
+    typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   const tick = () => {
     activeSimulation.tick();
 
     // Update animations (assign flights, pulses, etc.)
     updateAnimations();
+    drawLinks();
 
     // Update Pixi positions from simulation data
     nodeData.forEach((datum) => {
       const g = nodeGraphicsMap.get(datum.id);
       if (g) {
-        g.x = datum.x ?? 0;
-        g.y = datum.y ?? 0;
+        g.position.set(datum.x ?? 0, datum.y ?? 0);
         g.scale.set(datum.scale || 1);
       }
     });
+    updateLabelPositions();
+    renderEffects();
 
     if (app) {
       applyCameraTransform();
@@ -881,14 +1022,25 @@ function startSimulationLoop() {
       layoutUpdateTickCounter = 0;
     }
 
-    const stillAnimating = activeSimulation.alpha() > 0.008 || activeAnimations.length > 0;
+    const stillAnimating = shouldContinueOrbitMapLoop(
+      activeSimulation.alpha(),
+      activeAnimations.length
+    );
 
     if (stillAnimating) {
       requestAnimationFrame(tick);
     } else {
-      console.log('[OrbitWorker] Simulation cooled down');
       // Send one final stabilized layout update
       sendLayoutUpdate(true);
+      const settledMs = Math.round(
+        (typeof performance !== 'undefined' ? performance.now() : Date.now()) -
+          simulationStartedAt
+      );
+      perf.mark('simulation:settled', {
+        settledMs,
+        nodes: nodeData.length,
+        edges: linkData.length,
+      });
     }
   };
 
@@ -904,13 +1056,13 @@ function handleCameraMessage(msg: CameraControlMessage) {
   if (!app) return;
 
   let cameraChanged = false;
+  let sceneNeedsRefresh = false;
 
   switch (msg.type) {
     case WorkerMessageType.PAN: {
-      const dx = msg.dx / camera.zoom;
-      const dy = msg.dy / camera.zoom;
-      camera.x += dx;
-      camera.y += dy;
+      camera.x += msg.dx;
+      camera.y += msg.dy;
+      constrainCamera();
       cameraChanged = true;
 
       // User is actively panning (from pointer drag or other controls like buttons)
@@ -929,29 +1081,39 @@ function handleCameraMessage(msg: CameraControlMessage) {
       const worldX = (screenX - camera.x) / camera.zoom;
       const worldY = (screenY - camera.y) / camera.zoom;
 
-      const newZoom = Math.max(0.1, Math.min(8, camera.zoom * factor));
+      const newZoom = clampZoom(camera.zoom * factor);
 
       camera.x = screenX - worldX * newZoom;
       camera.y = screenY - worldY * newZoom;
       camera.zoom = newZoom;
+      constrainCamera();
       cameraChanged = true;
+      sceneNeedsRefresh = true;
       break;
     }
 
     case WorkerMessageType.SET_CAMERA: {
       if (msg.camera) {
+        const previousZoom = camera.zoom;
         camera.x = msg.camera.x ?? camera.x;
         camera.y = msg.camera.y ?? camera.y;
-        camera.zoom = msg.camera.zoom ?? camera.zoom;
+        camera.zoom =
+          msg.camera.zoom !== undefined ? clampZoom(msg.camera.zoom) : camera.zoom;
+        constrainCamera();
         cameraChanged = true;
+        sceneNeedsRefresh = previousZoom !== camera.zoom;
       }
       break;
     }
   }
 
   if (cameraChanged) {
-    applyCameraTransform();
-    app.renderer.render(app.stage);
+    if (sceneNeedsRefresh) {
+      renderSceneFromSimulation();
+    } else {
+      applyCameraTransform();
+      app.renderer.render(app.stage);
+    }
 
     // Notify main thread about camera change (for minimap, URL sync, etc.)
     postToMain({
@@ -974,38 +1136,19 @@ function handleSetSelection(msg: SetSelectionMessage) {
 function handleResetView() {
   if (!app || nodeData.length === 0) return;
 
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
+  const bounds = getGraphBounds();
+  if (!bounds) return;
 
-  for (const datum of nodeData) {
-    if (typeof datum.x !== "number" || typeof datum.y !== "number") continue;
-    const pad = datum.radius + 8;
-    minX = Math.min(minX, datum.x - pad);
-    maxX = Math.max(maxX, datum.x + pad);
-    minY = Math.min(minY, datum.y - pad);
-    maxY = Math.max(maxY, datum.y + pad);
-  }
-
-  if (!Number.isFinite(minX)) return;
-
-  const padding = 72;
-  const worldWidth = maxX - minX + padding * 2;
-  const worldHeight = maxY - minY + padding * 2;
-  const zoomX = app.renderer.width / worldWidth;
-  const zoomY = app.renderer.height / worldHeight;
-  const nextZoom = Math.max(0.12, Math.min(2.4, Math.min(zoomX, zoomY) * 0.92));
-
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
+  const nextZoom = getFitZoom(bounds);
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cy = (bounds.minY + bounds.maxY) / 2;
 
   camera.zoom = nextZoom;
   camera.x = app.renderer.width / 2 - cx * nextZoom;
   camera.y = app.renderer.height / 2 - cy * nextZoom;
+  constrainCamera();
 
-  applyCameraTransform();
-  app.renderer.render(app.stage);
+  renderSceneFromSimulation();
 
   postToMain({
     type: MainMessageType.CAMERA_CHANGED,
@@ -1017,20 +1160,24 @@ function handleResetView() {
 function handleWheel(msg: WheelMessage) {
   if (!app) return;
 
-  const factor = msg.deltaY < 0 ? 1.12 : 0.9;
+  const normalizedDelta = Math.max(
+    -WHEEL_DELTA_CAP,
+    Math.min(WHEEL_DELTA_CAP, msg.deltaY)
+  );
+  const factor = Math.exp(-normalizedDelta * WHEEL_ZOOM_SENSITIVITY);
   const screenX = msg.x;
   const screenY = msg.y;
 
   const worldX = (screenX - camera.x) / camera.zoom;
   const worldY = (screenY - camera.y) / camera.zoom;
-  const newZoom = Math.max(0.1, Math.min(8, camera.zoom * factor));
+  const newZoom = clampZoom(camera.zoom * factor);
 
   camera.x = screenX - worldX * newZoom;
   camera.y = screenY - worldY * newZoom;
   camera.zoom = newZoom;
+  constrainCamera();
 
-  applyCameraTransform();
-  app.renderer.render(app.stage);
+  renderSceneFromSimulation();
 
   postToMain({
     type: MainMessageType.CAMERA_CHANGED,
@@ -1045,18 +1192,11 @@ function handleDoubleClick(msg: DoubleClickMessage) {
   const worldX = (msg.x - camera.x) / camera.zoom;
   const worldY = (msg.y - camera.y) / camera.zoom;
 
-  let closest: SimulationNode | null = null;
-  let minDist = Infinity;
-
-  for (const datum of nodeData) {
-    const dx = (datum.x ?? 0) - worldX;
-    const dy = (datum.y ?? 0) - worldY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < minDist && dist <= datum.radius + 10) {
-      minDist = dist;
-      closest = datum;
-    }
-  }
+  const closest = findClosestOrbitMapNode(
+    nodeData,
+    { x: worldX, y: worldY },
+    10
+  );
 
   if (closest?.node.kind === "bookmark") {
     postToMain({
@@ -1094,20 +1234,11 @@ function handlePointerEvent(msg: PointerEventMessage) {
   const worldX = (x - camera.x) / camera.zoom;
   const worldY = (y - camera.y) / camera.zoom;
 
-  // Find closest node within interaction radius
-  let closest: SimulationNode | null = null;
-  let minDist = Infinity;
-
-  for (const datum of nodeData) {
-    const dx = (datum.x ?? 0) - worldX;
-    const dy = (datum.y ?? 0) - worldY;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < minDist && dist <= datum.radius + 10) {
-      minDist = dist;
-      closest = datum;
-    }
-  }
+  const closest = findClosestOrbitMapNode(
+    nodeData,
+    { x: worldX, y: worldY },
+    10
+  );
 
   const newHover = closest ? { id: closest.id, kind: closest.node.kind } : null;
 
@@ -1118,6 +1249,7 @@ function handlePointerEvent(msg: PointerEventMessage) {
       panDragLast = { x, y };
       camera.x += dx;
       camera.y += dy;
+      constrainCamera();
       applyCameraTransform();
       app.renderer.render(app.stage);
       postCursorChange("grabbing");
@@ -1267,22 +1399,27 @@ function handleFocusOn(msg: FocusOnMessage) {
   const currentZoom = camera.zoom || 1;
 
   // Calculate target camera position to center the node
-  const targetCameraX = (currentApp.renderer.width / 2) - (target.x * currentZoom);
-  const targetCameraY = (currentApp.renderer.height / 2) - (target.y * currentZoom);
+  const targetCamera = constrainCameraState({
+    x: (currentApp.renderer.width / 2) - (target.x * currentZoom),
+    y: (currentApp.renderer.height / 2) - (target.y * currentZoom),
+    zoom: currentZoom,
+  });
 
   const startX = camera.x;
   const startY = camera.y;
   const startTime = Date.now();
   const duration = 350; // ms
 
-  // Smoothly animate the camera toward the target using easeOutCubic
+  // Smoothly animate the camera toward the target.
   const animateCamera = () => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+    const eased = easeOrbitMapOutCubic(progress);
 
-    camera.x = startX + (targetCameraX - startX) * eased;
-    camera.y = startY + (targetCameraY - startY) * eased;
+    camera.x = startX + (targetCamera.x - startX) * eased;
+    camera.y = startY + (targetCamera.y - startY) * eased;
+    camera.zoom = targetCamera.zoom;
+    constrainCamera();
 
     applyCameraTransform();
     currentApp.renderer.render(currentApp.stage);
@@ -1291,8 +1428,10 @@ function handleFocusOn(msg: FocusOnMessage) {
       requestAnimationFrame(animateCamera);
     } else {
       // Snap to final position
-      camera.x = targetCameraX;
-      camera.y = targetCameraY;
+      camera.x = targetCamera.x;
+      camera.y = targetCamera.y;
+      camera.zoom = targetCamera.zoom;
+      constrainCamera();
       applyCameraTransform();
       currentApp.renderer.render(currentApp.stage);
 
@@ -1359,8 +1498,7 @@ function updateAnimations() {
       return;
     }
 
-    const elapsed = now - anim.startTime;
-    const progress = Math.min(elapsed / anim.duration, 1);
+    const progress = getOrbitMapAnimationProgress(anim, now);
 
     if (
       anim.type === "assign" &&
@@ -1368,7 +1506,7 @@ function updateAnimations() {
       anim.targetX !== undefined && anim.targetY !== undefined
     ) {
       // Ease the visual position of the node along the flight path
-      const t = easeOutCubic(progress);
+      const t = easeOrbitMapOutCubic(progress);
       datum.x = anim.fromX + (anim.targetX - anim.fromX) * t;
       datum.y = anim.fromY + (anim.targetY - anim.fromY) * t;
 
@@ -1437,10 +1575,6 @@ function updateAnimations() {
   }
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 self.onmessage = handleMessage;
 
 /* ============================================================
@@ -1448,18 +1582,58 @@ self.onmessage = handleMessage;
    ============================================================ */
 
 function applyCameraTransform() {
-  if (!linksContainer || !nodesContainer) return;
-
   // We apply camera to the containers so everything moves together
   const tx = camera.x;
   const ty = camera.y;
   const scale = camera.zoom;
 
-  linksContainer.position.set(tx, ty);
-  linksContainer.scale.set(scale);
+  for (const container of [
+    linksContainer,
+    nodesContainer,
+    labelsContainer,
+    effectsContainer,
+  ]) {
+    if (!container) continue;
+    container.position.set(tx, ty);
+    container.scale.set(scale);
+  }
+}
 
-  nodesContainer.position.set(tx, ty);
-  nodesContainer.scale.set(scale);
+function getCameraConfig() {
+  return {
+    minZoom: MIN_CAMERA_ZOOM,
+    maxZoom: MAX_CAMERA_ZOOM,
+    maxFitZoom: MAX_FIT_ZOOM,
+    framePadding: CAMERA_FRAME_PADDING,
+    nodePadding: CAMERA_NODE_PADDING,
+    viewportWidth: app?.renderer.width ?? 0,
+    viewportHeight: app?.renderer.height ?? 0,
+  };
+}
+
+function getGraphBounds(): OrbitMapGraphBounds | null {
+  return getOrbitMapGraphBounds(nodeData, CAMERA_NODE_PADDING);
+}
+
+function getFitZoom(bounds: OrbitMapGraphBounds): number {
+  if (!app) return MIN_CAMERA_ZOOM;
+  return getOrbitMapFitZoom(bounds, getCameraConfig());
+}
+
+function clampZoom(nextZoom: number): number {
+  return clampOrbitMapZoom(nextZoom, getGraphBounds(), getCameraConfig());
+}
+
+function constrainCamera() {
+  camera = constrainCameraState(camera);
+}
+
+function constrainCameraState(nextCamera: typeof camera): typeof camera {
+  return constrainOrbitMapCameraState(
+    nextCamera,
+    getGraphBounds(),
+    getCameraConfig()
+  );
 }
 
 function autoFitCamera(width: number, height: number, preservePrevious = false) {
@@ -1473,38 +1647,13 @@ function autoFitCamera(width: number, height: number, preservePrevious = false) 
     return;
   }
 
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
+  const bounds = getGraphBounds();
+  if (!bounds) return;
 
-  nodeData.forEach((d) => {
-    if (typeof d.x === 'number' && typeof d.y === 'number') {
-      minX = Math.min(minX, d.x);
-      maxX = Math.max(maxX, d.x);
-      minY = Math.min(minY, d.y);
-      maxY = Math.max(maxY, d.y);
-    }
-  });
-
-  const graphWidth = maxX - minX || 1;
-  const graphHeight = maxY - minY || 1;
-
-  // Dynamic padding based on graph size
-  const padding = Math.min(80, Math.max(30, Math.min(width, height) * 0.08));
-
-  const scaleX = (width - padding * 2) / graphWidth;
-  const scaleY = (height - padding * 2) / graphHeight;
-
-  // More conservative max zoom for large graphs
-  const maxZoom = graphWidth < 400 && graphHeight < 400 ? 4.0 : 2.8;
-  const newZoom = Math.min(scaleX, scaleY, maxZoom);
-
-  camera.zoom = Math.max(newZoom, 0.12);
-
-  // Center the graph
-  camera.x = (width / 2) - ((minX + maxX) / 2) * camera.zoom;
-  camera.y = (height / 2) - ((minY + maxY) / 2) * camera.zoom;
+  camera.zoom = getFitZoom(bounds);
+  camera.x = (width / 2) - ((bounds.minX + bounds.maxX) / 2) * camera.zoom;
+  camera.y = (height / 2) - ((bounds.minY + bounds.maxY) / 2) * camera.zoom;
+  constrainCamera();
 }
 
 /* ============================================================ */
-
-console.log('[OrbitWorker] Worker script loaded');

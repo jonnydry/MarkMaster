@@ -23,7 +23,7 @@
  *   self.onmessage = (e) => { const msg = e.data as WorkerMessage; ... }
  *   self.postMessage(reply as MainMessage, transferList);
  *
- * @see src/components/orbit/orbit-map-canvas.tsx (current main-thread implementation to be migrated)
+ * @see src/components/orbit/orbit-map-canvas-host.tsx
  * @see types/index.ts for OrbitGraph* types
  */
 
@@ -177,6 +177,8 @@ export interface InitMessage {
   dpr: number;
   /** Optional camera to restore (e.g. from a saved view) */
   initialCamera?: CameraState;
+  /** Development-only internal timing logs; ignored by production builds. */
+  debugPerf?: boolean;
 }
 
 export interface SetGraphMessage {
@@ -282,7 +284,7 @@ export interface DoubleClickMessage {
 export interface PanMessage {
   type: typeof WorkerMessageType.PAN;
   protocolVersion: number;
-  /** Delta in CSS pixels (will be divided by current zoom inside worker) */
+  /** Delta in canvas CSS pixels. Camera pan is screen-space, so the worker applies it directly. */
   dx: number;
   dy: number;
 }
@@ -343,6 +345,11 @@ export interface RequestLayoutMessage {
   protocolVersion: number;
 }
 
+export interface DestroyMessage {
+  type: typeof WorkerMessageType.DESTROY;
+  protocolVersion: number;
+}
+
 export interface FocusPulseMessage {
   type: typeof WorkerMessageType.FOCUS_PULSE;
   protocolVersion: number;
@@ -373,6 +380,7 @@ export type WorkerMessage =
   | ResetViewMessage
   | AnimateAssignMessage
   | RequestLayoutMessage
+  | DestroyMessage
   | FocusPulseMessage;
 
 // Grouped unions for handler typing

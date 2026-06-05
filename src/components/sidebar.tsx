@@ -7,6 +7,7 @@ import {
   BarChart3,
   Bookmark,
   FolderOpen,
+  Network,
   Settings,
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
@@ -49,6 +50,7 @@ export interface SidebarProps {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
   { href: "/orbit", icon: OrbitLogoMark, label: "Orbit" },
+  { href: "/orbit/map", icon: Network, label: "Graph" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },
