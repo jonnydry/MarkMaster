@@ -62,6 +62,17 @@ import type {
   OrbitMapSelection,
 } from "@/components/orbit/orbit-map-canvas-host";
 
+type OrbitMapGraphIndexes = {
+  nodesById: Map<string, OrbitGraphNode>;
+  bookmarksById: Map<string, BookmarkGraphNode>;
+  bookmarkCount: number;
+};
+
+type PendingLayoutSave = {
+  scope: OrbitGraphScope;
+  positions: Record<string, { x: number; y: number }>;
+};
+
 const OrbitMapCanvas = dynamic(
   () =>
     import("@/components/orbit/orbit-map-canvas-host").then((m) => m.default),
@@ -173,10 +184,7 @@ export default function OrbitMapPage() {
   const hoverIntentTimerRef = useRef<number | null>(null);
   const hoverClearTimerRef = useRef<number | null>(null);
   const layoutSaveTimerRef = useRef<number | null>(null);
-  const pendingLayoutPositionsRef = useRef<Record<
-    string,
-    { x: number; y: number }
-  > | null>(null);
+  const pendingLayoutSaveRef = useRef<PendingLayoutSave | null>(null);
 
   const handleSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
@@ -223,15 +231,36 @@ export default function OrbitMapPage() {
     isFetching,
   } = useOrbitGraphQuery(graphScope);
 
+  const graphIndexes = useMemo<OrbitMapGraphIndexes | null>(() => {
+    if (!graph) return null;
+    const nodesById = new Map<string, OrbitGraphNode>();
+    const bookmarksById = new Map<string, BookmarkGraphNode>();
+    let bookmarkCount = 0;
+
+    for (const node of graph.nodes) {
+      nodesById.set(node.id, node);
+      if (node.kind === "bookmark") {
+        bookmarksById.set(node.id, node);
+        bookmarkCount += 1;
+      }
+    }
+
+    return { nodesById, bookmarksById, bookmarkCount };
+  }, [graph]);
+
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setStageSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
+      const nextWidth = Math.round(entry.contentRect.width);
+      const nextHeight = Math.round(entry.contentRect.height);
+      setStageSize((current) => {
+        if (current.width === nextWidth && current.height === nextHeight) {
+          return current;
+        }
+        return { width: nextWidth, height: nextHeight };
       });
     });
     observer.observe(stage);
@@ -253,13 +282,21 @@ export default function OrbitMapPage() {
     return () => clearHoverTimers();
   }, [clearHoverTimers]);
 
-  useEffect(() => {
-    return () => {
-      if (layoutSaveTimerRef.current !== null) {
-        window.clearTimeout(layoutSaveTimerRef.current);
-      }
-    };
+  const flushPendingLayoutSave = useCallback(() => {
+    if (layoutSaveTimerRef.current !== null) {
+      window.clearTimeout(layoutSaveTimerRef.current);
+      layoutSaveTimerRef.current = null;
+    }
+
+    const pending = pendingLayoutSaveRef.current;
+    if (!pending) return;
+    saveOrbitMapPositions(pending.positions, pending.scope);
+    pendingLayoutSaveRef.current = null;
   }, []);
+
+  useEffect(() => {
+    return () => flushPendingLayoutSave();
+  }, [flushPendingLayoutSave]);
 
   const handleHoverChange = useCallback(
     (
@@ -268,11 +305,9 @@ export default function OrbitMapPage() {
     ) => {
       clearHoverTimers();
 
-      if (next?.kind === "bookmark" && position && graph) {
-        const node = graph.nodes.find(
-          (n) => n.kind === "bookmark" && n.id === next.id
-        );
-        if (node?.kind === "bookmark") {
+      if (next?.kind === "bookmark" && position && graphIndexes) {
+        const node = graphIndexes.bookmarksById.get(next.id);
+        if (node) {
           hoverIntentTimerRef.current = window.setTimeout(() => {
             setHoverCard({ node, x: position.x, y: position.y });
             hoverIntentTimerRef.current = null;
@@ -286,16 +321,22 @@ export default function OrbitMapPage() {
         hoverClearTimerRef.current = null;
       }, 140);
     },
-    [clearHoverTimers, graph]
+    [clearHoverTimers, graphIndexes]
   );
 
   const dbUser = session?.dbUser;
+  const lastSyncAtValue = dbUser?.lastSyncAt;
+  const lastSyncAt = useMemo(
+    () => (lastSyncAtValue ? new Date(lastSyncAtValue) : null),
+    [lastSyncAtValue]
+  );
 
   const activeSelection = selection;
   const activeSelectionNode = useMemo(() => {
-    if (!graph || !activeSelection) return null;
-    return graph.nodes.find((node) => node.id === activeSelection.id) ?? null;
-  }, [activeSelection, graph]);
+    if (!graphIndexes || !activeSelection) return null;
+    const node = graphIndexes.nodesById.get(activeSelection.id) ?? null;
+    return node?.kind === activeSelection.kind ? node : null;
+  }, [activeSelection, graphIndexes]);
 
   const selectedBookmarkId = useMemo(() => {
     if (selection?.kind === "bookmark") return selection.id;
@@ -337,34 +378,30 @@ export default function OrbitMapPage() {
 
   const focus: OrbitMapFocus | null = useMemo(() => {
     if (!focusBookmarkIdParam || !focusAnchorIdParam) return null;
-    if (!graph) return null;
-    const bookmarkExists = graph.nodes.some(
-      (node) => node.kind === "bookmark" && node.id === focusBookmarkIdParam
-    );
-    const anchorExists = graph.nodes.some(
-      (node) =>
-        (node.kind === "tag" ||
-          node.kind === "collection" ||
-          node.kind === "core") &&
-        node.id === focusAnchorIdParam
-    );
-    if (!bookmarkExists || !anchorExists) return null;
+    if (!graphIndexes) return null;
+    const bookmark = graphIndexes.bookmarksById.get(focusBookmarkIdParam);
+    const anchor = graphIndexes.nodesById.get(focusAnchorIdParam);
+    if (!bookmark || !anchor) return null;
+    if (
+      anchor.kind !== "tag" &&
+      anchor.kind !== "collection" &&
+      anchor.kind !== "core"
+    ) {
+      return null;
+    }
     return {
       bookmarkId: focusBookmarkIdParam,
       predictedAnchorId: focusAnchorIdParam,
     };
-  }, [focusAnchorIdParam, focusBookmarkIdParam, graph]);
+  }, [focusAnchorIdParam, focusBookmarkIdParam, graphIndexes]);
 
   const searchResults = useMemo(() => {
     return graph ? rankOrbitMapSearchResults(graph.nodes, searchDeferred) : [];
   }, [graph, searchDeferred]);
 
   useEffect(() => {
-    if (!focusBookmarkIdParam || !graph) return;
-    const bookmarkExists = graph.nodes.some(
-      (node) => node.kind === "bookmark" && node.id === focusBookmarkIdParam
-    );
-    if (!bookmarkExists) return;
+    if (!focusBookmarkIdParam || !graphIndexes) return;
+    if (!graphIndexes.bookmarksById.has(focusBookmarkIdParam)) return;
     const handle = window.setTimeout(() => {
       canvasRef.current?.focusOn({
         kind: "bookmark",
@@ -372,7 +409,7 @@ export default function OrbitMapPage() {
       });
     }, 60);
     return () => window.clearTimeout(handle);
-  }, [focusBookmarkIdParam, graph]);
+  }, [focusBookmarkIdParam, graphIndexes]);
 
   const goToTagOnDashboard = useCallback(
     (tagId: string) => {
@@ -474,12 +511,12 @@ export default function OrbitMapPage() {
 
   const stats = graph?.stats;
   const truncatedCount = stats?.truncatedBookmarks ?? 0;
+  const renderedBookmarkCount = graphIndexes?.bookmarkCount ?? 0;
   const graphIsEmpty =
-    Boolean(graph) &&
+    Boolean(graph && graphIndexes) &&
     (graphScope === "orbit"
       ? stats?.looseBookmarks === 0
-      : stats?.totalBookmarks === 0 ||
-        graph!.nodes.filter((node) => node.kind === "bookmark").length === 0);
+      : stats?.totalBookmarks === 0 || renderedBookmarkCount === 0);
 
   const handleSyncComplete = useCallback(() => {
     void invalidateLibraryQueries(queryClient);
@@ -488,22 +525,17 @@ export default function OrbitMapPage() {
 
   const handleLayoutUpdated = useCallback(
     (positions: Record<string, { x: number; y: number }>) => {
-      pendingLayoutPositionsRef.current = positions;
+      pendingLayoutSaveRef.current = { positions, scope: graphScope };
       if (layoutSaveTimerRef.current !== null) return;
 
-      layoutSaveTimerRef.current = window.setTimeout(() => {
-        layoutSaveTimerRef.current = null;
-        if (pendingLayoutPositionsRef.current) {
-          saveOrbitMapPositions(pendingLayoutPositionsRef.current, graphScope);
-          pendingLayoutPositionsRef.current = null;
-        }
-      }, 500);
+      layoutSaveTimerRef.current = window.setTimeout(flushPendingLayoutSave, 500);
     },
-    [graphScope]
+    [flushPendingLayoutSave, graphScope]
   );
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
+      flushPendingLayoutSave();
       clearHoverTimers();
       setHoverCard(null);
 
@@ -524,7 +556,19 @@ export default function OrbitMapPage() {
         scroll: false,
       });
     },
-    [clearHoverTimers, router, searchParams]
+    [clearHoverTimers, flushPendingLayoutSave, router, searchParams]
+  );
+
+  const handleClearSelection = useCallback(() => {
+    handleSelectionChange(null);
+  }, [handleSelectionChange]);
+
+  const handleSearchResultSelect = useCallback(
+    (identity: OrbitMapSelection) => {
+      handleSelectionChange(identity);
+      canvasRef.current?.focusOn(identity);
+    },
+    [handleSelectionChange]
   );
 
   const headerDescription = useMemo(() => {
@@ -557,7 +601,7 @@ export default function OrbitMapPage() {
       },
       tag: () => openTagDialog(),
       collection: () => openCollectionDialog(),
-      clear: () => handleSelectionChange(null),
+      clear: () => handleClearSelection(),
       shortcuts: () => setKeyboardShortcutsOpen(true),
     },
   });
@@ -571,7 +615,7 @@ export default function OrbitMapPage() {
           selectedTags={[]}
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+          lastSyncAt={lastSyncAt}
           onSyncComplete={handleSyncComplete}
         />
       </div>
@@ -593,9 +637,7 @@ export default function OrbitMapPage() {
                 selectedTags={[]}
                 onTagToggle={goToTagOnDashboard}
                 onCreateCollection={handleCreateCollectionOpen}
-                lastSyncAt={
-                  dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
-                }
+                lastSyncAt={lastSyncAt}
                 onSyncComplete={handleSyncComplete}
               />
             </div>
@@ -734,10 +776,7 @@ export default function OrbitMapPage() {
               searchResults={searchResults}
               searchInputRef={searchInputRef}
               onSearchChange={setSearch}
-              onResultSelect={(identity) => {
-                handleSelectionChange(identity);
-                canvasRef.current?.focusOn(identity);
-              }}
+              onResultSelect={handleSearchResultSelect}
             />
 
             {stats && (
@@ -761,7 +800,7 @@ export default function OrbitMapPage() {
                     onAddToCollection={openCollectionDialog}
                     onCopyAsCollection={handleCopyAsCollection}
                     onOpenBookmark={handleOpenBookmark}
-                    onClearSelection={() => handleSelectionChange(null)}
+                    onClearSelection={handleClearSelection}
                     copyingCollectionId={copyingCollectionId}
                     variant="overlay"
                     className="max-h-[30dvh] w-full"
@@ -783,10 +822,10 @@ export default function OrbitMapPage() {
               onAddToCollection={openCollectionDialog}
               onCopyAsCollection={handleCopyAsCollection}
               onOpenBookmark={handleOpenBookmark}
-              onClearSelection={() => handleSelectionChange(null)}
+              onClearSelection={handleClearSelection}
               copyingCollectionId={copyingCollectionId}
               variant="rail"
-              className="hidden h-full overflow-y-auto lg:flex lg:w-[300px] xl:w-[320px]"
+              className="hidden h-full min-h-0 overflow-y-auto lg:flex lg:w-[300px] xl:w-[320px]"
             />
           )}
         </div>

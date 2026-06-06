@@ -61,10 +61,10 @@ interface OrbitMapRailProps {
 
 /** Shared panel surface for both rail and overlay variants, theme-aware. */
 function panelClass(isOrbital: boolean, isOverlay: boolean) {
-  if (isOverlay) return "min-w-0 overflow-hidden";
+  if (isOverlay) return "min-w-0 shrink-0";
   return isOrbital
-    ? "min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
-    : "min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
+    ? "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
+    : "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
 }
 
 function pluralize(count: number, singular: string, plural?: string) {
@@ -116,7 +116,7 @@ export function OrbitMapRail({
               orbitHairlineBorder(isOrbital),
               isOrbital ? cn(orbital.glass, "border-primary/25") : "bg-surface-1/90"
             )
-          : "flex min-w-0 w-full flex-col gap-3 overflow-x-hidden lg:w-[300px] lg:shrink-0 xl:w-[320px]",
+          : "flex min-w-0 w-full flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin] lg:w-[300px] lg:shrink-0 xl:w-[320px]",
         className
       )}
     >
@@ -455,7 +455,7 @@ function SelectedClusterBody({
         </div>
 
         {tagConnections.length > 0 || collectionConnections.length > 0 ? (
-          <div className="min-w-0 space-y-2 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/35 p-3">
+          <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/35 p-3">
             <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
               Relationships
             </p>
@@ -502,7 +502,7 @@ function SelectedClusterBody({
         {focusedBookmarkLoading && !focusedBookmark ? (
           <p className={bodyText}>Loading…</p>
         ) : focusedBookmark ? (
-          <div className="min-w-0 space-y-2 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/25 p-3">
+          <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/25 p-3">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
               <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
                 Evidence
@@ -529,7 +529,7 @@ function SelectedClusterBody({
                 "min-w-0 break-words line-clamp-4 whitespace-pre-wrap text-sm leading-5",
                 orbitMetaMuted(isOrbital)
               )}
-              galleryClassName="!mt-2 min-w-0 max-h-56 w-full overflow-hidden border-hairline-soft/70"
+              galleryClassName="!mt-2 min-w-0 w-full border-hairline-soft/70"
             />
           </div>
         ) : (

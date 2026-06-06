@@ -194,6 +194,15 @@ let currentSelection: OrbitMapSelection | null = null;
 // Adjacency map for efficient neighbor highlighting
 const adjacency = new Map<string, Set<string>>();
 
+function isSameOrbitMapHover(
+  a: { id: string; kind: string } | null,
+  b: { id: string; kind: string } | null
+) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.id === b.id && a.kind === b.kind;
+}
+
 // Label visibility thresholds (based on zoom level)
 const LABEL_ZOOM_THRESHOLD = 0.95;          // Below this, hide text labels and let the graph read as structure.
 const LABEL_BASE_FONT_SIZE = 18;
@@ -543,8 +552,13 @@ function rebuildScene() {
     return true;
   };
 
-  const visibleNodes = nodes.filter(isNodeVisible);
-  const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
+  const visibleNodes: OrbitGraphNode[] = [];
+  const visibleNodeIds = new Set<string>();
+  for (const node of nodes) {
+    if (!isNodeVisible(node)) continue;
+    visibleNodes.push(node);
+    visibleNodeIds.add(node.id);
+  }
 
   // Prepare nodes for d3-force using our internal SimulationNode type
   nodeData = visibleNodes.map((node) => {
@@ -578,9 +592,11 @@ function rebuildScene() {
   });
 
   // Build links using a helper for clarity
-  linkData = edges
-    .map((edge) => edgeToLink(edge, visibleNodeIds))
-    .filter((link): link is SimulationLink => link !== null);
+  linkData = [];
+  for (const edge of edges) {
+    const link = edgeToLink(edge, visibleNodeIds);
+    if (link) linkData.push(link);
+  }
 
   // Create and configure d3-force simulation (this is the heavy work now off the main thread)
   simulation = forceSimulation(nodeData)
@@ -1256,7 +1272,7 @@ function handlePointerEvent(msg: PointerEventMessage) {
       return;
     }
 
-    if (JSON.stringify(newHover) !== JSON.stringify(currentHover)) {
+    if (!isSameOrbitMapHover(newHover, currentHover)) {
       currentHover = newHover;
       renderSceneFromSimulation();
 

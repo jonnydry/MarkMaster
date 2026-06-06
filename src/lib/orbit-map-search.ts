@@ -21,8 +21,7 @@ function getKindRank(node: OrbitGraphNode) {
   return 3;
 }
 
-function getMatchRank(node: OrbitGraphNode, query: string) {
-  const text = getSearchText(node);
+function getMatchRank(node: OrbitGraphNode, text: string, query: string) {
   const exactBonus = text === query ? -20 : 0;
   const startBonus = text.startsWith(query) ? -10 : 0;
   return getKindRank(node) + exactBonus + startBonus;
@@ -35,7 +34,16 @@ export function rankOrbitMapSearchResults(
   const query = rawQuery.trim().toLowerCase();
   if (!query) return [];
 
-  return nodes
-    .filter((node) => getSearchText(node).includes(query))
-    .sort((a, b) => getMatchRank(a, query) - getMatchRank(b, query));
+  const matches: Array<{ index: number; node: OrbitGraphNode; rank: number }> = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const text = getSearchText(node);
+    if (!text.includes(query)) continue;
+    matches.push({ index, node, rank: getMatchRank(node, text, query) });
+  }
+
+  return matches
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((match) => match.node);
 }

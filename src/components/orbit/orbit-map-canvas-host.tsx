@@ -78,6 +78,15 @@ function getOrbitMapDebugPerfEnabled() {
   }
 }
 
+function isCanvasTransferReuseError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('transferControlToOffscreen') ||
+    message.includes('Cannot transfer control') ||
+    (error instanceof DOMException && error.name === 'InvalidStateError')
+  );
+}
+
 const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostProps>(
   function OrbitMapCanvasHost(rawProps, ref) {
     // Support legacy `data` prop for backward compatibility during migration
@@ -91,6 +100,8 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     propsRef.current = props;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
+    const canvasTransferRetryRef = useRef(0);
+    const [canvasInstance, setCanvasInstance] = useState(0);
     const [useFallback, setUseFallback] = useState(false);
     const [workerGeneration, setWorkerGeneration] = useState(0);
     const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
@@ -177,6 +188,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           };
 
           worker.postMessage(initMessage, [offscreen]);
+          canvasTransferRetryRef.current = 0;
           setWorkerGeneration((generation) => generation + 1);
 
           // Listen for messages from worker
@@ -308,6 +320,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           };
         } catch (err) {
           pendingWorker?.terminate();
+          if (isCanvasTransferReuseError(err) && canvasTransferRetryRef.current < 1) {
+            canvasTransferRetryRef.current += 1;
+            setCanvasInstance((instance) => instance + 1);
+            return;
+          }
           console.error('[OrbitMapHost] Failed to create worker:', err);
           setUseFallback(true);
         }
@@ -327,7 +344,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           workerRef.current = null;
         }
       };
-    }, []);
+    }, [canvasInstance]);
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");
@@ -744,6 +761,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
       >
         <canvas
+          key={canvasInstance}
           ref={canvasRef}
           style={{
             width: '100%',
