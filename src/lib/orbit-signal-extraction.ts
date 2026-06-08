@@ -1,10 +1,18 @@
 import "server-only";
 
+import { getContentTypeHints } from "@/lib/auto-tag";
+import { getDomainHints } from "@/lib/orbit-domain-hints";
+import {
+  getOrbitBookmarkPrimaryText,
+  textHasUsefulSignal,
+} from "@/lib/orbit-primary-text";
+
 const MAX_SIGNAL_TEXT = 500;
 const MAX_LINKS = 3;
 const MAX_TOPICS = 8;
 const MAX_ALT_TEXTS = 4;
 const MAX_VOCAB_MATCHES = 8;
+const MAX_AUTHOR_BIO = 200;
 
 type JsonObject = Record<string, unknown>;
 
@@ -40,6 +48,12 @@ export interface OrbitLearningHint {
   reasons: string[];
 }
 
+export interface OrbitNeighborHint {
+  tags: string[];
+  collections: string[];
+  reasons: string[];
+}
+
 export interface OrbitExtractedSignals {
   primaryText: string;
   noteText: string | null;
@@ -49,6 +63,13 @@ export interface OrbitExtractedSignals {
     title: string | null;
     description: string | null;
   }>;
+  articleContext: { title?: string; previewText?: string } | null;
+  threadContext: {
+    isThread: boolean;
+    isReply: boolean;
+    conversationId?: string;
+  };
+  authorContext: { bio?: string } | null;
   xTopics: Array<{
     domain: string | null;
     entity: string;
@@ -59,6 +80,8 @@ export interface OrbitExtractedSignals {
     altTexts: string[];
   };
   sourceFolders: string[];
+  contentTypeHints: string[];
+  domainHints: string[];
   existingVocabularyMatches: {
     tags: string[];
     collections: string[];
@@ -70,11 +93,17 @@ export interface OrbitExtractedSignals {
     avoidCollections: string[];
     reasons: string[];
   } | null;
+  neighborHints: OrbitNeighborHint | null;
   dataQuality: {
     hasFullText: boolean;
+    hasNoteText: boolean;
+    hasQuotedText: boolean;
     hasUrlMetadata: boolean;
     hasXTopics: boolean;
     hasMediaAltText: boolean;
+    hasArticle: boolean;
+    hasThreadContext: boolean;
+    hasAuthorBio: boolean;
   };
 }
 
@@ -111,9 +140,15 @@ function getTweetMetadata(bookmark: OrbitSignalBookmark): JsonObject | null {
   return getNestedObject(bookmark.xMetadata, "tweet");
 }
 
-function getNoteTweetText(bookmark: OrbitSignalBookmark): string | null {
+function getAuthorMetadata(bookmark: OrbitSignalBookmark): JsonObject | null {
+  return getNestedObject(bookmark.xMetadata, "author");
+}
+
+function getNoteTweetUrls(bookmark: OrbitSignalBookmark): unknown[] {
   const noteTweet = getNestedObject(getTweetMetadata(bookmark), "note_tweet");
-  return getString(noteTweet?.text);
+  const entities = getNestedObject(noteTweet, "entities");
+  const urls = entities?.urls;
+  return Array.isArray(urls) ? urls : [];
 }
 
 function getQuotedText(input: unknown): string | null {
@@ -143,19 +178,80 @@ function domainFromUrl(value: unknown): string | null {
   }
 }
 
-function getUrlContext(input: unknown): OrbitExtractedSignals["linkContext"] {
-  if (!Array.isArray(input)) return [];
+function urlContextKey(item: JsonObject) {
+  const expandedUrl = getString(item.expanded_url) ?? getString(item.url);
+  const displayUrl = getString(item.display_url);
+  return normalizeKey(expandedUrl ?? displayUrl ?? "");
+}
 
-  return input.slice(0, MAX_LINKS).flatMap((item) => {
-    if (!isObject(item)) return [];
-    const expandedUrl = getString(item.expanded_url) ?? getString(item.url);
-    const title = truncate(getString(item.title), 160) || null;
-    const description = truncate(getString(item.description), 220) || null;
-    const domain = domainFromUrl(expandedUrl ?? getString(item.display_url));
+function getUrlContext(inputs: unknown[]): OrbitExtractedSignals["linkContext"] {
+  const deduped = new Map<string, OrbitExtractedSignals["linkContext"][number]>();
 
-    if (!domain && !title && !description) return [];
-    return [{ domain, title, description }];
-  });
+  for (const input of inputs) {
+    if (!Array.isArray(input)) continue;
+
+    for (const item of input) {
+      if (!isObject(item)) continue;
+      const key = urlContextKey(item);
+      if (!key) continue;
+
+      const expandedUrl = getString(item.expanded_url) ?? getString(item.url);
+      const title = truncate(getString(item.title), 160) || null;
+      const description = truncate(getString(item.description), 220) || null;
+      const domain = domainFromUrl(expandedUrl ?? getString(item.display_url));
+
+      if (!domain && !title && !description) continue;
+      if (!deduped.has(key)) {
+        deduped.set(key, { domain, title, description });
+      }
+    }
+  }
+
+  return Array.from(deduped.values()).slice(0, MAX_LINKS);
+}
+
+function getArticleContext(bookmark: OrbitSignalBookmark) {
+  const article = getNestedObject(getTweetMetadata(bookmark), "article");
+  if (!article) return null;
+
+  const title = truncate(getString(article.title), 160) || undefined;
+  const previewText =
+    truncate(
+      getString(article.preview_text) ??
+        getString(article.previewText) ??
+        getString(article.description),
+      300
+    ) || undefined;
+
+  if (!title && !previewText) return null;
+  return { title, previewText };
+}
+
+function getThreadContext(bookmark: OrbitSignalBookmark, tweetId?: string) {
+  const tweet = getTweetMetadata(bookmark);
+  const conversationId = getString(tweet?.conversation_id) ?? undefined;
+  const referenced = Array.isArray(tweet?.referenced_tweets)
+    ? tweet.referenced_tweets
+    : [];
+  const isReply = referenced.some(
+    (item) => isObject(item) && getString(item.type) === "replied_to"
+  );
+  const isThread =
+    isReply ||
+    Boolean(conversationId && tweetId && conversationId !== tweetId) ||
+    /🧵|\bthread\b/i.test(bookmark.tweetText) ||
+    /\b1\/\d+\b/.test(bookmark.tweetText);
+
+  return {
+    isThread,
+    isReply,
+    ...(conversationId ? { conversationId } : {}),
+  };
+}
+
+function getAuthorContext(bookmark: OrbitSignalBookmark) {
+  const bio = truncate(getString(getAuthorMetadata(bookmark)?.description), MAX_AUTHOR_BIO);
+  return bio ? { bio } : null;
 }
 
 function getContextAnnotations(bookmark: OrbitSignalBookmark) {
@@ -251,17 +347,36 @@ function cleanLearningHint(hint?: OrbitLearningHint | null) {
     : null;
 }
 
+function cleanNeighborHint(hint?: OrbitNeighborHint | null): OrbitNeighborHint | null {
+  if (!hint) return null;
+
+  const cleaned = {
+    tags: hint.tags.slice(0, 5),
+    collections: hint.collections.slice(0, 4),
+    reasons: hint.reasons.slice(0, 4),
+  };
+
+  return cleaned.tags.length || cleaned.collections.length ? cleaned : null;
+}
+
 export function extractOrbitBookmarkSignals(args: {
   bookmark: OrbitSignalBookmark;
   existingTags: OrbitSignalVocabularyItem[];
   existingCollections: OrbitSignalVocabularyItem[];
   learningHint?: OrbitLearningHint | null;
+  neighborHint?: OrbitNeighborHint | null;
+  tweetId?: string;
 }): OrbitExtractedSignals {
-  const noteTweetText = getNoteTweetText(args.bookmark);
-  const primaryText = truncate(noteTweetText ?? args.bookmark.tweetText);
+  const primaryText = truncate(getOrbitBookmarkPrimaryText(args.bookmark));
   const noteText = truncate(args.bookmark.notes[0]?.content, 300) || null;
   const quotedText = truncate(getQuotedText(args.bookmark.quotedTweet), 300) || null;
-  const linkContext = getUrlContext(args.bookmark.urls);
+  const linkContext = getUrlContext([
+    args.bookmark.urls,
+    getNoteTweetUrls(args.bookmark),
+  ]);
+  const articleContext = getArticleContext(args.bookmark);
+  const threadContext = getThreadContext(args.bookmark, args.tweetId);
+  const authorContext = getAuthorContext(args.bookmark);
   const xTopics = getContextAnnotations(args.bookmark);
   const altTexts = getMediaAltTexts(args.bookmark);
   const sourceFolders = Array.from(
@@ -272,30 +387,58 @@ export function extractOrbitBookmarkSignals(args: {
       return map;
     }, new Map<string, string>()).values()
   );
+  const contentTypeHints = getContentTypeHints(
+    primaryText,
+    Array.isArray(args.bookmark.media) ? args.bookmark.media : null,
+    Array.isArray(args.bookmark.urls) ? args.bookmark.urls : null
+  );
+  const domainHints = getDomainHints(linkContext.map((link) => link.domain));
 
   const vocabularyHaystack = [
     primaryText,
     noteText,
     quotedText,
+    articleContext?.title,
+    articleContext?.previewText,
+    authorContext?.bio,
     ...linkContext.flatMap((link) => [link.domain, link.title, link.description]),
     ...xTopics.flatMap((topic) => [topic.domain, topic.entity, topic.description]),
     ...altTexts,
     ...sourceFolders,
+    ...contentTypeHints,
+    ...domainHints,
   ]
     .filter(Boolean)
     .join(" ");
+
+  const dataQuality = {
+    hasFullText: textHasUsefulSignal(primaryText),
+    hasNoteText: textHasUsefulSignal(noteText),
+    hasQuotedText: textHasUsefulSignal(quotedText),
+    hasUrlMetadata: linkContext.some((link) => link.title || link.description),
+    hasXTopics: xTopics.length > 0,
+    hasMediaAltText: altTexts.length > 0,
+    hasArticle: Boolean(articleContext),
+    hasThreadContext: threadContext.isThread || threadContext.isReply,
+    hasAuthorBio: Boolean(authorContext?.bio),
+  };
 
   return {
     primaryText,
     noteText,
     quotedText,
     linkContext,
+    articleContext,
+    threadContext,
+    authorContext,
     xTopics,
     visualContext: {
       mediaTypes: getMediaTypes(args.bookmark.media),
       altTexts,
     },
     sourceFolders,
+    contentTypeHints,
+    domainHints,
     existingVocabularyMatches: {
       tags: getVocabularyMatches(args.existingTags, vocabularyHaystack),
       collections: getVocabularyMatches(
@@ -304,11 +447,7 @@ export function extractOrbitBookmarkSignals(args: {
       ),
     },
     localLearning: cleanLearningHint(args.learningHint),
-    dataQuality: {
-      hasFullText: Boolean(noteTweetText),
-      hasUrlMetadata: linkContext.some((link) => link.title || link.description),
-      hasXTopics: xTopics.length > 0,
-      hasMediaAltText: altTexts.length > 0,
-    },
+    neighborHints: cleanNeighborHint(args.neighborHint),
+    dataQuality,
   };
 }

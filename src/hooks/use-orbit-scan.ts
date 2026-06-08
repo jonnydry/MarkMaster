@@ -170,6 +170,74 @@ function buildOrbitScanRecovery(code: OrbitScanFailureCode):
   };
 }
 
+export function buildOrbitScanCompletedFlywheelPayload(args: {
+  result: OrbitScanResponsePayload;
+  requestedBookmarkIds: string[];
+  durationMs: number;
+}) {
+  const suggestions = args.result.plan.suggestions;
+  const usefulSuggestions = suggestions.filter(
+    (suggestion) =>
+      suggestion.tags.length > 0 || suggestion.collection !== null
+  ).length;
+  const modelAbstains = suggestions.filter(
+    (suggestion) =>
+      suggestion.confidence === "low" &&
+      suggestion.tags.length === 0 &&
+      suggestion.collection === null
+  ).length;
+  const reusedExistingTags = suggestions.reduce(
+    (total, suggestion) =>
+      total + suggestion.tags.filter((tag) => tag.reuseExisting).length,
+    0
+  );
+  const newTags = suggestions.reduce(
+    (total, suggestion) =>
+      total + suggestion.tags.filter((tag) => !tag.reuseExisting).length,
+    0
+  );
+  const reusedExistingCollections = suggestions.filter(
+    (suggestion) => suggestion.collection?.reuseExisting
+  ).length;
+  const newCollections = suggestions.filter(
+    (suggestion) => suggestion.collection && !suggestion.collection.reuseExisting
+  ).length;
+
+  return {
+    scanRunId: args.result.scanRunId,
+    durationMs: args.durationMs,
+    requestedCount: args.requestedBookmarkIds.length,
+    candidatePoolCount: args.result.batch.candidatePoolCount,
+    profile: args.result.batch.profile,
+    mode: args.result.batch.mode,
+    usefulSuggestions,
+    highConfidence: suggestions.filter(
+      (suggestion) => suggestion.confidence === "high"
+    ).length,
+    mediumConfidence: suggestions.filter(
+      (suggestion) => suggestion.confidence === "medium"
+    ).length,
+    lowConfidence: suggestions.filter(
+      (suggestion) => suggestion.confidence === "low"
+    ).length,
+    modelAbstains,
+    sourceUnknowns: args.result.batch.selectedSourceUnknownCount,
+    safeAutoApplyCount: suggestions.filter(isSafeAutoApplySuggestion).length,
+    signalQuality: {
+      richCount: args.result.batch.signalQuality?.richCount ?? 0,
+      sparseCount: args.result.batch.signalQuality?.sparseCount ?? 0,
+      enrichment: args.result.batch.enrichment ?? null,
+    },
+    suggestionOutcomes: {
+      reusedExistingTags,
+      newTags,
+      reusedExistingCollections,
+      newCollections,
+      abstained: modelAbstains,
+    },
+  };
+}
+
 export function buildOrbitScanFailure(
   err: unknown,
   fallbackMessage: string
@@ -259,38 +327,14 @@ export function useOrbitScan(): OrbitScanHandle {
         setPlan(result);
         setDismissed(new Set());
         const durationMs = Date.now() - startedAt;
-        const suggestions = result.plan.suggestions;
-        const usefulSuggestions = suggestions.filter(
-          (suggestion) =>
-            suggestion.tags.length > 0 || suggestion.collection !== null
-        ).length;
-        const modelAbstains = suggestions.filter(
-          (suggestion) =>
-            suggestion.confidence === "low" &&
-            suggestion.tags.length === 0 &&
-            suggestion.collection === null
-        ).length;
-        trackFlywheelEvent("orbit.scan.completed", {
-          scanRunId: result.scanRunId,
-          durationMs,
-          requestedCount: unique.length,
-          candidatePoolCount: result.batch.candidatePoolCount,
-          profile: result.batch.profile,
-          mode: result.batch.mode,
-          usefulSuggestions,
-          highConfidence: suggestions.filter(
-            (suggestion) => suggestion.confidence === "high"
-          ).length,
-          mediumConfidence: suggestions.filter(
-            (suggestion) => suggestion.confidence === "medium"
-          ).length,
-          lowConfidence: suggestions.filter(
-            (suggestion) => suggestion.confidence === "low"
-          ).length,
-          modelAbstains,
-          sourceUnknowns: result.batch.selectedSourceUnknownCount,
-          safeAutoApplyCount: suggestions.filter(isSafeAutoApplySuggestion).length,
-        });
+        trackFlywheelEvent(
+          "orbit.scan.completed",
+          buildOrbitScanCompletedFlywheelPayload({
+            result,
+            requestedBookmarkIds: unique,
+            durationMs,
+          })
+        );
         return result;
       } catch (err) {
         const failure = buildOrbitScanFailure(

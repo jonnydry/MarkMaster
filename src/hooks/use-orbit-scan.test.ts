@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FetchJsonError } from "@/lib/fetch-json";
 import {
+  buildOrbitScanCompletedFlywheelPayload,
   buildOrbitScanFailure,
   removeSuggestionsFromScanPlan,
 } from "@/hooks/use-orbit-scan";
@@ -48,6 +49,108 @@ describe("buildOrbitScanFailure", () => {
       retryAfterSeconds: payload.retryAfterSeconds,
     });
     expect(failure.recoveryHref).toBe(payload.recoveryHref);
+  });
+});
+
+describe("buildOrbitScanCompletedFlywheelPayload", () => {
+  it("includes server signalQuality and suggestion outcome counts", () => {
+    const payload = buildOrbitScanCompletedFlywheelPayload({
+      requestedBookmarkIds: ["b1", "b2"],
+      durationMs: 1200,
+      result: {
+        scanRunId: "run-1",
+        model: "grok",
+        scannedAt: "2026-06-08T00:00:00.000Z",
+        privacy: { storeDisabled: true, zeroDataRetention: null },
+        batch: {
+          mode: "balanced",
+          profile: "balanced",
+          requestedCount: 2,
+          candidatePoolCount: 2,
+          sharedSignalCount: 0,
+          sourceUnknownCount: 0,
+          sourceUnknownRate: 0,
+          selectedSourceUnknownCount: 0,
+          selectedSourceUnknownRate: 0,
+          usefulSignalCount: 2,
+          selectionReason: "test",
+          signalQuality: { richCount: 1, sparseCount: 1 },
+          enrichment: { attempted: 1, refreshed: 1, skipped: 1 },
+        },
+        plan: {
+          overview: {
+            summary: "Summary",
+            taggingStrategy: "Tags",
+            collectionStrategy: "Collections",
+          },
+          suggestions: [
+            {
+              bookmarkId: "b1",
+              confidence: "high",
+              reasoning: "Clear topic",
+              tags: [
+                {
+                  name: "AI",
+                  color: "#1d9bf0",
+                  reason: "Topic",
+                  reuseExisting: true,
+                },
+                {
+                  name: "Paper",
+                  color: "#a855f7",
+                  reason: "Format",
+                  reuseExisting: false,
+                },
+              ],
+              collection: {
+                name: "AI Papers",
+                description: "Research",
+                reason: "Fit",
+                reuseExisting: true,
+              },
+            },
+            {
+              bookmarkId: "b2",
+              confidence: "low",
+              reasoning: "No topic",
+              tags: [],
+              collection: null,
+            },
+          ],
+        },
+        summary: {
+          bookmarkCount: 2,
+          bookmarksWithTags: 1,
+          bookmarksWithCollections: 1,
+          tagAssignments: 2,
+          uniqueTags: 2,
+          collectionBuckets: 1,
+          reusedExistingTags: 1,
+          reusedExistingCollections: 1,
+          newCollectionBuckets: 0,
+        },
+        tagRollups: [],
+        collectionRollups: [],
+      },
+    });
+
+    expect(payload).toMatchObject({
+      requestedCount: 2,
+      usefulSuggestions: 1,
+      modelAbstains: 1,
+      signalQuality: {
+        richCount: 1,
+        sparseCount: 1,
+        enrichment: { attempted: 1, refreshed: 1, skipped: 1 },
+      },
+      suggestionOutcomes: {
+        reusedExistingTags: 1,
+        newTags: 1,
+        reusedExistingCollections: 1,
+        newCollections: 0,
+        abstained: 1,
+      },
+    });
   });
 });
 

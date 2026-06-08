@@ -19,6 +19,8 @@ type ScanMetrics = {
   durationMs: number;
   usefulSuggestions: number;
   modelAbstains: number;
+  richSignalCount?: number;
+  sparseSignalCount?: number;
 };
 
 const QUICK_PROFILE = ORBIT_SCAN_BATCH_PROFILES.quick.id;
@@ -37,12 +39,23 @@ function numberFromPayload(payload: unknown, key: string) {
 }
 
 function scanMetricsFromEvent(event: OrbitScanQualityEvent): ScanMetrics {
+  const payload = isRecord(event.payload) ? event.payload : {};
+  const signalQuality = isRecord(payload.signalQuality) ? payload.signalQuality : null;
+
   return {
     eventType: event.eventType,
     requestedCount: numberFromPayload(event.payload, "requestedCount"),
     durationMs: numberFromPayload(event.payload, "durationMs"),
     usefulSuggestions: numberFromPayload(event.payload, "usefulSuggestions"),
     modelAbstains: numberFromPayload(event.payload, "modelAbstains"),
+    richSignalCount:
+      signalQuality && typeof signalQuality.richCount === "number"
+        ? Math.max(0, signalQuality.richCount)
+        : undefined,
+    sparseSignalCount:
+      signalQuality && typeof signalQuality.sparseCount === "number"
+        ? Math.max(0, signalQuality.sparseCount)
+        : undefined,
   };
 }
 
@@ -190,6 +203,32 @@ export function evaluateOrbitScanQuality(args: {
   });
   const deepUnlocked = deepReason === "Deep batches are available.";
 
+  const richScans = successful.filter(
+    (event) => (event.richSignalCount ?? 0) > (event.sparseSignalCount ?? 0)
+  );
+  const sparseScans = successful.filter(
+    (event) => (event.sparseSignalCount ?? 0) > (event.richSignalCount ?? 0)
+  );
+  const qualityBySignalTier =
+    richScans.length > 0 || sparseScans.length > 0
+      ? {
+          rich: {
+            scans: richScans.length,
+            usefulSuggestionRate: rate(
+              richScans.reduce((total, event) => total + event.usefulSuggestions, 0),
+              richScans.reduce((total, event) => total + event.requestedCount, 0)
+            ),
+          },
+          sparse: {
+            scans: sparseScans.length,
+            usefulSuggestionRate: rate(
+              sparseScans.reduce((total, event) => total + event.usefulSuggestions, 0),
+              sparseScans.reduce((total, event) => total + event.requestedCount, 0)
+            ),
+          },
+        }
+      : undefined;
+
   return {
     recommendedProfile,
     profileReason,
@@ -202,6 +241,7 @@ export function evaluateOrbitScanQuality(args: {
     medianDurationMs: recentRates.medianDurationMs,
     reviewedSuggestionCount,
     reviewUsefulRate,
+    ...(qualityBySignalTier ? { qualityBySignalTier } : {}),
     deep: {
       unlocked: deepUnlocked,
       reason: deepReason,

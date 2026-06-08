@@ -169,4 +169,71 @@ describe("orbit decision events", () => {
       },
     ]);
   });
+
+  it("derives hints from xTopic entities and content type keys", async () => {
+    mocks.prisma.orbitDecisionEvent.findMany.mockResolvedValue([
+      {
+        action: "accepted",
+        originalSuggestion: null,
+        reviewedSuggestion: {
+          bookmarkId: "old-1",
+          tags: [{ name: "Paper" }],
+          collection: null,
+        },
+        bookmark: {
+          authorUsername: "researcher",
+          tweetText: "🧵",
+          media: null,
+          urls: [{ expanded_url: "https://example.com" }],
+          xMetadata: {
+            tweet: {
+              note_tweet: {
+                text: "Thread about benchmark evaluation papers with a link below.",
+              },
+              context_annotations: [
+                {
+                  entity: { name: "Artificial Intelligence" },
+                },
+              ],
+            },
+          },
+          collectionItems: [],
+        },
+      },
+    ]);
+
+    const hints = await getOrbitLearningHintsForScan({
+      userId: "user-1",
+      bookmarks: [
+        {
+          id: "bookmark-1",
+          authorUsername: "other",
+          tweetText: "🧵",
+          media: null,
+          urls: [{ expanded_url: "https://example.com/docs" }],
+          xMetadata: {
+            tweet: {
+              note_tweet: {
+                text: "Thread about benchmark evaluation papers with a link below.",
+              },
+              context_annotations: [
+                {
+                  entity: { name: "Artificial Intelligence" },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(hints[0]?.matchingTags).toEqual(["Paper"]);
+    expect(hints[0]?.reasons).toEqual(
+      expect.arrayContaining([
+        "same X topic: Artificial Intelligence",
+        "same content type: Thread",
+        "same content type: Article",
+      ])
+    );
+  });
 });

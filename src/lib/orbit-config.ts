@@ -25,3 +25,6 @@ export const ORBIT_SCAN_CANDIDATE_POOL_SIZE = 100;
 /** Upper bound for bookmarks sent to xAI per Orbit scan (prompt size + API limits). */
 export const ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN =
   ORBIT_SCAN_BATCH_PROFILES.deep.size;
+
+/** Pre-scan X re-enrichment before Grok (disable with ORBIT_SCAN_ENRICHMENT=false). */
+export const ORBIT_SCAN_ENRICHMENT = process.env.ORBIT_SCAN_ENRICHMENT !== "false";

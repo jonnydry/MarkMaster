@@ -505,6 +505,13 @@ export async function fetchBookmarksByFolder(
   return { bookmarks: details.bookmarks, rateLimit: details.rateLimit };
 }
 
+export async function refreshBookmarkDataByTweetIds(
+  userId: string,
+  tweetIds: string[]
+): Promise<{ bookmarks: BookmarkData[]; rateLimit: RateLimitInfo }> {
+  return fetchPostsByIds(userId, tweetIds);
+}
+
 async function fetchPostsByIds(
   userId: string,
   tweetIds: string[]

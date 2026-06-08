@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { planOrbitScanBatch } from "./orbit-batch-planner";
+import {
+  getOrbitBookmarkSourceQuality,
+  planOrbitScanBatch,
+} from "./orbit-batch-planner";
 import type { BookmarkWithRelations } from "@/types";
 
 function bookmark(
@@ -113,5 +116,23 @@ describe("planOrbitScanBatch", () => {
     expect(plan.sourceUnknownRate).toBeCloseTo(1 / 3);
     expect(plan.selectedSourceUnknownCount).toBe(0);
     expect(plan.usefulSignalCount).toBeGreaterThan(1);
+  });
+
+  it("counts note_tweet primary text as a useful signal", () => {
+    const quality = getOrbitBookmarkSourceQuality(
+      bookmark("sparse", {
+        tweetText: "👀",
+        xMetadata: {
+          tweet: {
+            note_tweet: {
+              text: "Detailed benchmark evaluation systems for transformer models.",
+            },
+          },
+        },
+      })
+    );
+
+    expect(quality.usefulSignalCount).toBeGreaterThan(0);
+    expect(quality.sourceUnknown).toBe(false);
   });
 });

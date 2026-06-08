@@ -632,8 +632,15 @@ describe("buildOrbitPromptPayload", () => {
       existingCollections: [],
     });
 
+    expect(payload.signalPriority[0]).toContain("signals.primaryText");
     expect(payload.signalPriority).toEqual(
       expect.arrayContaining([expect.stringContaining("priorDecisions")])
+    );
+    expect(payload.topicExtractionRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("domainHints")])
+    );
+    expect(payload.abstentionTriggers).toEqual(
+      expect.arrayContaining([expect.stringContaining("signals.dataQuality")])
     );
     expect(payload.batchConsistencyRules).toEqual(
       expect.arrayContaining([expect.stringContaining("same tag spellings")])
@@ -720,6 +727,9 @@ describe("buildOrbitPromptPayload", () => {
     expect(payload.signalPriority).toEqual(
       expect.arrayContaining([expect.stringContaining("signals.localLearning")])
     );
+    expect(payload.bookmarks[0].tweetText).toContain(
+      "Full note tweet about AI benchmark evaluation systems."
+    );
     expect(payload.bookmarks[0].signals).toMatchObject({
       primaryText: "Full note tweet about AI benchmark evaluation systems.",
       xTopics: [
@@ -732,6 +742,7 @@ describe("buildOrbitPromptPayload", () => {
       visualContext: {
         altTexts: ["Chart comparing AI benchmark scores"],
       },
+      domainHints: ["Paper"],
       existingVocabularyMatches: {
         tags: ["AI"],
         collections: ["AI Papers"],
@@ -742,7 +753,99 @@ describe("buildOrbitPromptPayload", () => {
         avoidTags: ["Article"],
         reasons: ["same link domain: arxiv.org"],
       },
+      dataQuality: {
+        hasFullText: true,
+        hasNoteText: false,
+        hasQuotedText: false,
+        hasXTopics: true,
+        hasMediaAltText: true,
+      },
     });
+  });
+
+  it("includes neighbor hints and relevance-ranked vocabulary", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "AI benchmark paper on arxiv.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: [
+            {
+              expanded_url: "https://arxiv.org/abs/2501.00001",
+              display_url: "arxiv.org/abs/2501.00001",
+            },
+          ],
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: [
+        { name: "Gardening", color: "#22c55e", bookmarkCount: 100 },
+        { name: "AI", color: "#1d9bf0", bookmarkCount: 5 },
+      ],
+      existingCollections: [
+        { name: "Garden Ideas", description: null, bookmarkCount: 20 },
+        { name: "AI Papers", description: "Research", bookmarkCount: 4 },
+      ],
+      neighborHints: [
+        {
+          bookmarkId: "b1",
+          hint: {
+            tags: ["Paper"],
+            collections: ["AI Papers"],
+            reasons: ["same author"],
+          },
+        },
+      ],
+    });
+
+    expect(payload.existingTags[0]?.name).toBe("AI");
+    expect(payload.existingCollections[0]?.name).toBe("AI Papers");
+    expect(payload.bookmarks[0].signals.neighborHints).toMatchObject({
+      tags: ["Paper"],
+      collections: ["AI Papers"],
+    });
+  });
+
+  it("promotes vocabulary matches into prompt existingTags even when low-count", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "Niche quantum computing benchmark paper.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: Array.from({ length: 90 }, (_, index) => ({
+        name: `Tag ${index}`,
+        color: PRESET_COLORS[index % PRESET_COLORS.length],
+        bookmarkCount: index,
+      })).concat([{ name: "Quantum", color: "#a855f7", bookmarkCount: 1 }]),
+      existingCollections: [],
+    });
+
+    expect(payload.existingTags.map((tag) => tag.name)).toContain("Quantum");
+    expect(payload.bookmarks[0].signals.existingVocabularyMatches.tags).toContain(
+      "Quantum"
+    );
   });
 
   it("includes author prior hints on matching bookmarks", () => {
@@ -785,7 +888,7 @@ describe("buildOrbitPromptPayload", () => {
     });
   });
 
-  it("trims existing tags and collections to prompt limits by usage", () => {
+  it("limits existing tags and collections to prompt caps by relevance", () => {
     const payload = buildOrbitPromptPayload({
       bookmarks: [
         {

@@ -3,6 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 
+import { getContentTypeHints } from "@/lib/auto-tag";
+import { getOrbitBookmarkPrimaryText } from "@/lib/orbit-primary-text";
 import { prisma } from "./prisma";
 import type {
   OrbitBookmarkSuggestion,
@@ -18,7 +20,10 @@ const NEGATIVE_ACTIONS = new Set(["kept", "rejected"]);
 type BookmarkForLearning = {
   id: string;
   authorUsername: string;
+  tweetText?: string;
+  media?: unknown;
   urls: unknown;
+  xMetadata?: unknown;
   xFolderHints?: Array<{ name: string }>;
 };
 
@@ -122,6 +127,42 @@ function domainKeysFromUrls(input: unknown) {
   return Array.from(seen);
 }
 
+function xTopicEntitiesFromMetadata(xMetadata: unknown) {
+  if (!isObject(xMetadata)) return [];
+  const tweet = xMetadata.tweet;
+  if (!isObject(tweet)) return [];
+  const annotations = tweet.context_annotations;
+  if (!Array.isArray(annotations)) return [];
+
+  const seen = new Set<string>();
+  return annotations.flatMap((annotation) => {
+    if (!isObject(annotation)) return [];
+    const entity = isObject(annotation.entity) ? annotation.entity : null;
+    const entityName = getString(entity?.name);
+    if (!entityName) return [];
+    const key = normalizeKey(entityName);
+    if (!key || seen.has(key)) return [];
+    seen.add(key);
+    return [entityName];
+  });
+}
+
+function contentTypeKeysFromBookmark(bookmark: BookmarkForLearning) {
+  const hints = getContentTypeHints(
+    getOrbitBookmarkPrimaryText({
+      tweetText: bookmark.tweetText ?? "",
+      xMetadata: bookmark.xMetadata,
+    }),
+    Array.isArray(bookmark.media) ? bookmark.media : null,
+    Array.isArray(bookmark.urls) ? bookmark.urls : null
+  );
+
+  return hints.map((hint) => ({
+    key: `contentType:${normalizeKey(hint)}`,
+    reason: `same content type: ${hint}`,
+  }));
+}
+
 function keysForBookmark(bookmark: BookmarkForLearning) {
   const keys: Array<{ key: string; reason: string }> = [];
   const author = normalizeKey(bookmark.authorUsername);
@@ -142,6 +183,15 @@ function keysForBookmark(bookmark: BookmarkForLearning) {
   for (const domain of domainKeysFromUrls(bookmark.urls)) {
     keys.push({ key: `domain:${domain}`, reason: `same link domain: ${domain}` });
   }
+
+  for (const entity of xTopicEntitiesFromMetadata(bookmark.xMetadata)) {
+    keys.push({
+      key: `xTopic:${normalizeKey(entity)}`,
+      reason: `same X topic: ${entity}`,
+    });
+  }
+
+  keys.push(...contentTypeKeysFromBookmark(bookmark));
 
   return keys;
 }
@@ -238,7 +288,10 @@ export async function getOrbitLearningHintsForScan(args: {
       bookmark: {
         select: {
           authorUsername: true,
+          tweetText: true,
+          media: true,
           urls: true,
+          xMetadata: true,
           collectionItems: {
             where: { collection: { type: "x_folder" } },
             select: {
@@ -255,7 +308,10 @@ export async function getOrbitLearningHintsForScan(args: {
     const eventKeys = keysForBookmark({
       id: "",
       authorUsername: event.bookmark.authorUsername,
+      tweetText: event.bookmark.tweetText,
+      media: event.bookmark.media,
       urls: event.bookmark.urls,
+      xMetadata: event.bookmark.xMetadata,
       xFolderHints: event.bookmark.collectionItems.map((item) => ({
         name: item.collection.name,
       })),

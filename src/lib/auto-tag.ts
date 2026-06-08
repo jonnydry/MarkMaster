@@ -44,3 +44,12 @@ export function suggestTags(
     ({ name, color }) => ({ name, color })
   );
 }
+
+/** Content-type labels derived from tweet text, media, and URLs (for Orbit signals). */
+export function getContentTypeHints(
+  tweetText: string,
+  media: unknown[] | null,
+  urls: unknown[] | null
+): string[] {
+  return suggestTags(tweetText, media, urls).map((tag) => tag.name);
+}

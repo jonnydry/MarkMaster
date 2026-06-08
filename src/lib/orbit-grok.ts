@@ -12,7 +12,12 @@ import {
 import {
   extractOrbitBookmarkSignals,
   type OrbitLearningHint,
+  type OrbitNeighborHint,
 } from "@/lib/orbit-signal-extraction";
+import {
+  rankCollectionsForOrbitPrompt,
+  rankTagsForOrbitPrompt,
+} from "@/lib/orbit-vocab-ranking";
 import { getTagColorSpectrum } from "@/lib/tag-colors";
 import type {
   OrbitApplyResult,
@@ -283,6 +288,23 @@ export const orbitScanBatchMetadataSchema = z.object({
   selectedSourceUnknownRate: z.number().min(0).max(1),
   usefulSignalCount: z.number().int().min(0),
   selectionReason: z.string().trim().min(1).max(240),
+  enrichment: z
+    .object({
+      attempted: z.number().int().min(0),
+      refreshed: z.number().int().min(0),
+      skipped: z.number().int().min(0),
+      failed: z.number().int().min(0).optional(),
+      reason: z
+        .enum(["rate_limited", "auth_error", "none_needed", "error"])
+        .optional(),
+    })
+    .optional(),
+  signalQuality: z
+    .object({
+      richCount: z.number().int().min(0),
+      sparseCount: z.number().int().min(0),
+    })
+    .optional(),
 });
 
 export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
@@ -664,15 +686,61 @@ function asXFolderHints(input: OrbitBookmarkForScan["xFolderHints"]) {
   return Array.from(deduped.values()).slice(0, MAX_X_FOLDER_HINTS_PER_BOOKMARK);
 }
 
+function promoteMatchedVocabulary<T extends { name: string }>(args: {
+  ranked: T[];
+  allItems: T[];
+  matchedNames: string[];
+  maxCount: number;
+}) {
+  const rankedKeys = new Set(args.ranked.map((item) => normalizeKey(item.name)));
+  const allByKey = new Map(
+    args.allItems.map((item) => [normalizeKey(item.name), item])
+  );
+  const promoted = [...args.ranked];
+
+  for (const name of args.matchedNames) {
+    const key = normalizeKey(name);
+    if (!key || rankedKeys.has(key)) continue;
+
+    const item = allByKey.get(key);
+    if (!item) continue;
+
+    if (promoted.length < args.maxCount) {
+      promoted.push(item);
+    } else {
+      promoted[promoted.length - 1] = item;
+    }
+    rankedKeys.add(key);
+  }
+
+  return promoted.slice(0, args.maxCount);
+}
+
 function buildBookmarkPayload(args: {
   bookmark: OrbitBookmarkForScan;
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
   authorPriorHint?: OrbitAuthorPriorHint;
   learningHint?: OrbitLearningHint;
+  neighborHint?: OrbitNeighborHint;
 }) {
-  const { bookmark, authorPriorHint, existingTags, existingCollections, learningHint } =
-    args;
+  const {
+    bookmark,
+    authorPriorHint,
+    existingTags,
+    existingCollections,
+    learningHint,
+    neighborHint,
+  } = args;
+
+  const signals = extractOrbitBookmarkSignals({
+    bookmark,
+    existingTags,
+    existingCollections,
+    learningHint,
+    neighborHint,
+    tweetId: bookmark.tweetId,
+  });
 
   return {
     id: bookmark.id,
@@ -683,19 +751,14 @@ function buildBookmarkPayload(args: {
     },
     savedAt: new Date(bookmark.bookmarkedAt).toISOString(),
     tweetCreatedAt: new Date(bookmark.tweetCreatedAt).toISOString(),
-    tweetText: truncateText(bookmark.tweetText, MAX_TEXT_LENGTH),
+    tweetText: truncateText(signals.primaryText, MAX_TEXT_LENGTH),
     note: truncateText(bookmark.notes[0]?.content, MAX_NOTE_LENGTH) || null,
     mediaTypes: asMediaTypes(bookmark.media),
     urls: asUrls(bookmark.urls),
     quotedTweet: asQuotedTweet(bookmark.quotedTweet),
     sourceFolders: asXFolderHints(bookmark.xFolderHints),
     metrics: asPublicMetrics(bookmark.publicMetrics),
-    signals: extractOrbitBookmarkSignals({
-      bookmark,
-      existingTags,
-      existingCollections,
-      learningHint,
-    }),
+    signals,
     ...(authorPriorHint
       ? {
           priorDecisions: {
@@ -714,6 +777,7 @@ export function buildOrbitPromptPayload(args: {
   existingCollections: OrbitCollectionContext[];
   authorPriorHints?: OrbitAuthorPriorHint[];
   learningHints?: OrbitLearningHint[];
+  neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
 }) {
   const palette = getTagColorSpectrum(
     Math.min(
@@ -734,26 +798,88 @@ export function buildOrbitPromptPayload(args: {
   const learningHintByBookmarkId = new Map(
     (args.learningHints ?? []).map((hint) => [hint.bookmarkId, hint])
   );
+  const neighborHintByBookmarkId = new Map(
+    (args.neighborHints ?? []).map((entry) => [entry.bookmarkId, entry.hint])
+  );
 
-  const promptTags = trimTagsForOrbitPrompt(args.existingTags);
-  const promptCollections = trimCollectionsForOrbitPrompt(args.existingCollections);
+  const promptTags = rankTagsForOrbitPrompt(
+    args.existingTags,
+    args.bookmarks,
+    args.authorPriorHints,
+    MAX_PROMPT_EXISTING_TAGS
+  );
+  const promptCollections = rankCollectionsForOrbitPrompt(
+    args.existingCollections,
+    args.bookmarks,
+    args.authorPriorHints,
+    MAX_PROMPT_EXISTING_COLLECTIONS
+  );
+
+  const bookmarkPayloads = args.bookmarks.map((bookmark) =>
+    buildBookmarkPayload({
+      bookmark,
+      existingTags: args.existingTags,
+      existingCollections: args.existingCollections,
+      authorPriorHint: authorHintByUsername.get(
+        normalizeKey(bookmark.authorUsername)
+      ),
+      learningHint: learningHintByBookmarkId.get(bookmark.id),
+      neighborHint: neighborHintByBookmarkId.get(bookmark.id),
+    })
+  );
+
+  const finalTags = promoteMatchedVocabulary({
+    ranked: promptTags,
+    allItems: args.existingTags,
+    matchedNames: bookmarkPayloads.flatMap(
+      (payload) => payload.signals.existingVocabularyMatches.tags
+    ),
+    maxCount: MAX_PROMPT_EXISTING_TAGS,
+  });
+  const finalCollections = promoteMatchedVocabulary({
+    ranked: promptCollections,
+    allItems: args.existingCollections,
+    matchedNames: bookmarkPayloads.flatMap(
+      (payload) => payload.signals.existingVocabularyMatches.collections
+    ),
+    maxCount: MAX_PROMPT_EXISTING_COLLECTIONS,
+  });
 
   return {
     goal:
       "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
 
     signalPriority: [
-      "Start with bookmarks[].signals: xTopics, existingVocabularyMatches, sourceFolders, linkContext, visualContext.altTexts, and localLearning are deterministic hints extracted before the model call.",
-      "Read tweetText first, then quotedTweet.text, then note, then urls[].title and urls[].description.",
+      "Start with bookmarks[].signals: read signals.primaryText first — it is the best available tweet text (note_tweet when present).",
+      "Use signals.xTopics, signals.articleContext, signals.linkContext, signals.domainHints, and signals.contentTypeHints as strong structured context.",
+      "Use signals.existingVocabularyMatches, signals.neighborHints, signals.localLearning, and signals.sourceFolders as deterministic preference hints.",
+      "Use signals.authorContext.bio and signals.threadContext when tweet text is sparse.",
+      "Read quotedTweet.text, note, and urls[].title/description after signals.primaryText.",
       "When a bookmark includes priorDecisions, treat frequentTags/frequentCollections as strong hints for that author — but never override explicit tweet/quote/note topic.",
       "When signals.localLearning appears, treat matchingTags/matchingCollections as strong local preference signals and avoidTags/avoidCollections as negative examples.",
+      "When signals.neighborHints appears, treat its tags/collections as soft recall hints from similar tagged bookmarks (same author or domain).",
       "Use signals.existingVocabularyMatches as preferred candidates when they fit the content; do not copy them if the bookmark topic does not support them.",
       "Use signals.xTopics and signals.visualContext.altTexts as strong context when tweet text is sparse.",
       "Use sourceFolders as weak-but-useful context because they are synced X folder names for that bookmark.",
-      "Use author.username, mediaTypes, and metrics only as weak secondary signals.",
       "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
       "Sparse titles, bare URLs, previews, engagement copy, and boilerplate excerpts are weak signals. Do not tag from metadata noise alone.",
       "When title and excerpt disagree, prefer the explicit tweet/quoted text and choose the narrower topic, or return low confidence if no topic is clear.",
+      "Use author.username and mediaTypes only as weak secondary signals.",
+      "Use metrics only as the weakest signal — never tag from engagement counts alone.",
+    ],
+
+    topicExtractionRules: [
+      "Prefer the narrowest specific topic supported by signals.primaryText, articleContext, linkContext, and xTopics.",
+      "Use domainHints and contentTypeHints to choose format labels (Paper, Code, Video) only when the content clearly matches.",
+      "When threadContext.isThread is true, Thread may be used as a content-type tag if the post is clearly a thread — not as a default.",
+      "Do not invent topics from author bio alone; use authorContext only to disambiguate sparse posts.",
+    ],
+
+    abstentionTriggers: [
+      "All signals.dataQuality flags are false — return low confidence with empty tags and null collection.",
+      "Only emoji, bare URLs, or engagement copy with no url title/description — abstain.",
+      "Conflicting topics with no clear winner — abstain rather than guess.",
+      "Only generic domainHints/contentTypeHints without a specific topic — prefer abstention.",
     ],
 
     batchConsistencyRules: [
@@ -789,7 +915,7 @@ export function buildOrbitPromptPayload(args: {
     confidenceRubric: {
       high: "Content explicitly signals a specific topic; an obvious reusable tag applies.",
       medium: "Topic is inferable but not explicit; tags are reasonable defaults.",
-      low: "Content is weakly inferable or ambiguous. Return empty tags and null collection unless one specific topic is clearly supported.",
+      low: "Content is weakly inferable or ambiguous. Return empty tags and null collection unless one specific topic is clearly supported. When all signals.dataQuality flags are false, confidence must be low.",
     },
 
     outputContract: [
@@ -801,14 +927,14 @@ export function buildOrbitPromptPayload(args: {
 
     palette,
 
-    existingTags: promptTags.map((tag) => ({
+    existingTags: finalTags.map((tag) => ({
       name: tag.name,
       color: tag.color,
       ...(typeof tag.bookmarkCount === "number"
         ? { bookmarkCount: tag.bookmarkCount }
         : {}),
     })),
-    existingCollections: promptCollections.map((collection) => ({
+    existingCollections: finalCollections.map((collection) => ({
       name: collection.name,
       description: collection.description,
       ...(typeof collection.bookmarkCount === "number"
@@ -891,17 +1017,7 @@ export function buildOrbitPromptPayload(args: {
       },
     ],
 
-    bookmarks: args.bookmarks.map((bookmark) =>
-      buildBookmarkPayload({
-        bookmark,
-        existingTags: args.existingTags,
-        existingCollections: args.existingCollections,
-        authorPriorHint: authorHintByUsername.get(
-          normalizeKey(bookmark.authorUsername)
-        ),
-        learningHint: learningHintByBookmarkId.get(bookmark.id),
-      })
-    ),
+    bookmarks: bookmarkPayloads,
   };
 }
 
@@ -1316,6 +1432,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   existingCollections: OrbitCollectionContext[];
   authorPriorHints?: OrbitAuthorPriorHint[];
   learningHints?: OrbitLearningHint[];
+  neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batch?: OrbitScanBatchMetadata;
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {

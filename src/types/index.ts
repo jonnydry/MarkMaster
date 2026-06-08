@@ -277,6 +277,17 @@ export interface OrbitScanBatchMetadata {
   selectedSourceUnknownRate: number;
   usefulSignalCount: number;
   selectionReason: string;
+  enrichment?: {
+    attempted: number;
+    refreshed: number;
+    skipped: number;
+    failed?: number;
+    reason?: "rate_limited" | "auth_error" | "none_needed" | "error";
+  };
+  signalQuality?: {
+    richCount: number;
+    sparseCount: number;
+  };
 }
 
 export interface OrbitScanPlan {
@@ -338,6 +349,10 @@ export interface OrbitScanQualityPayload {
   medianDurationMs: number;
   reviewedSuggestionCount: number;
   reviewUsefulRate: number | null;
+  qualityBySignalTier?: {
+    rich: { scans: number; usefulSuggestionRate: number };
+    sparse: { scans: number; usefulSuggestionRate: number };
+  };
   deep: {
     unlocked: boolean;
     reason: string;

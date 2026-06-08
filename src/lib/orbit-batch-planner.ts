@@ -1,3 +1,8 @@
+import {
+  getOrbitArticlePreviewText,
+  getOrbitBookmarkPrimaryText,
+  textHasUsefulSignal,
+} from "@/lib/orbit-primary-text";
 import type { BookmarkWithRelations } from "@/types";
 
 const COMMON_WORDS = new Set([
@@ -87,16 +92,6 @@ function topicTokensFromMetadata(bookmark: BookmarkWithRelations) {
   });
 }
 
-function textHasUsefulSignal(value: string | null | undefined) {
-  if (!value) return false;
-  const stripped = value
-    .replace(/https?:\/\/\S+/gi, " ")
-    .replace(/[^\p{L}\p{N}#+.-]+/gu, " ")
-    .trim();
-  if (stripped.length < 8) return false;
-  return /[\p{L}\p{N}]/u.test(stripped);
-}
-
 function xMediaAltTexts(bookmark: BookmarkWithRelations) {
   const media = bookmark.xMetadata?.media;
   const storedAltTexts =
@@ -117,7 +112,10 @@ export function getOrbitBookmarkSourceQuality(
   bookmark: BookmarkWithRelations
 ): BookmarkSourceQuality {
   let usefulSignalCount = 0;
-  if (textHasUsefulSignal(bookmark.tweetText)) usefulSignalCount += 1;
+  if (textHasUsefulSignal(getOrbitBookmarkPrimaryText(bookmark))) usefulSignalCount += 1;
+  if (textHasUsefulSignal(getOrbitArticlePreviewText(bookmark.xMetadata))) {
+    usefulSignalCount += 1;
+  }
   if (textHasUsefulSignal(bookmark.quotedTweet?.text)) usefulSignalCount += 1;
 
   for (const note of bookmark.notes) {
@@ -152,7 +150,7 @@ export function getOrbitBookmarkSourceQuality(
 function getBookmarkTokens(bookmark: BookmarkWithRelations) {
   const tokens = new Set<string>();
   addToken(tokens, bookmark.authorUsername, "author");
-  addTextTokens(tokens, bookmark.tweetText);
+  addTextTokens(tokens, getOrbitBookmarkPrimaryText(bookmark));
 
   for (const item of bookmark.collectionItems) {
     addTextTokens(tokens, item.collection.name);

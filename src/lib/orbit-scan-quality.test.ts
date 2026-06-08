@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { evaluateOrbitScanQuality } from "./orbit-scan-quality";
 
-function completed(payload: Record<string, number | string>) {
+function completed(payload: Record<string, unknown>) {
   return { eventType: "orbit.scan.completed", payload };
 }
 
-function failed(payload: Record<string, number | string>) {
+function failed(payload: Record<string, unknown>) {
   return { eventType: "orbit.scan.failed", payload };
 }
 
@@ -73,6 +73,60 @@ describe("evaluateOrbitScanQuality", () => {
 
     expect(quality.deep.unlocked).toBe(true);
     expect(quality.deep.reason).toBe("Deep batches are available.");
+  });
+
+  it("aggregates quality by signal tier when scan events include signalQuality", () => {
+    const quality = evaluateOrbitScanQuality({
+      scanEvents: [
+        completed({
+          requestedCount: 10,
+          durationMs: 20_000,
+          usefulSuggestions: 8,
+          modelAbstains: 1,
+          signalQuality: { richCount: 10, sparseCount: 0 },
+        }),
+        completed({
+          requestedCount: 8,
+          durationMs: 18_000,
+          usefulSuggestions: 2,
+          modelAbstains: 5,
+          signalQuality: { richCount: 0, sparseCount: 8 },
+        }),
+      ],
+    });
+
+    expect(quality.qualityBySignalTier).toMatchObject({
+      rich: {
+        scans: 1,
+        usefulSuggestionRate: 0.8,
+      },
+      sparse: {
+        scans: 1,
+        usefulSuggestionRate: 0.25,
+      },
+    });
+    expect(quality.qualityBySignalTier?.rich.usefulSuggestionRate).toBeGreaterThan(
+      quality.qualityBySignalTier?.sparse.usefulSuggestionRate ?? 0
+    );
+  });
+
+  it("classifies mixed batches exclusively by dominant signal tier", () => {
+    const quality = evaluateOrbitScanQuality({
+      scanEvents: [
+        completed({
+          requestedCount: 10,
+          durationMs: 20_000,
+          usefulSuggestions: 7,
+          modelAbstains: 2,
+          signalQuality: { richCount: 6, sparseCount: 4 },
+        }),
+      ],
+    });
+
+    expect(quality.qualityBySignalTier).toMatchObject({
+      rich: { scans: 1, usefulSuggestionRate: 0.7 },
+      sparse: { scans: 0, usefulSuggestionRate: 0 },
+    });
   });
 
   it("keeps Deep locked when failures or abstains are too high", () => {
