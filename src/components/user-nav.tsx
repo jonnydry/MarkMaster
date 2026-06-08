@@ -1,19 +1,21 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Moon, Sun, LogOut, Download, User, Type } from "lucide-react";
+import { Moon, Sun, LogOut, Download, User, Type, Palette } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { useTheme, useOrbitalTheme, useFontMode } from "@/components/providers";
+import { useTheme, useColorTheme, useFontMode } from "@/components/providers";
+import { COLOR_THEMES } from "@/lib/color-themes";
 import { cn } from "@/lib/utils";
-import { orbital } from "@/components/orbital";
 import type { DbUser } from "@/lib/auth";
 
 interface UserNavProps {
@@ -23,7 +25,7 @@ interface UserNavProps {
 export function UserNav({ user }: UserNavProps) {
   const { theme, toggleTheme } = useTheme();
   const { fontMode, toggleFontMode } = useFontMode();
-  const { isOrbital, toggleOrbital } = useOrbitalTheme();
+  const { colorTheme, setColorTheme } = useColorTheme();
 
   return (
     <DropdownMenu>
@@ -70,14 +72,36 @@ export function UserNav({ user }: UserNavProps) {
           <Type className="w-4 h-4 mr-2" />
           {fontMode === "mono" ? "Default Typography" : "Monospace UI"}
           {fontMode === "mono" && (
-            <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>
+            <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
+              ON
+            </span>
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={toggleOrbital}>
-          <OrbitLogoMark className={cn("w-4 h-4 mr-2", isOrbital && orbital.icon)} />
-          {isOrbital ? "Disable Orbit Theme" : "Enable Orbit Theme"}
-          {isOrbital && <span className={cn(orbital.label, "ml-auto text-[9px]")}>ON</span>}
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Palette className="w-4 h-4 mr-2" />
+            Accent Color
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {COLOR_THEMES.map((option) => (
+              <DropdownMenuItem
+                key={option.id}
+                onClick={() => setColorTheme(option.id)}
+              >
+                <span
+                  className="mr-2 h-3 w-3 rounded-full border border-hairline-soft"
+                  style={{ backgroundColor: option.swatch }}
+                />
+                {option.name}
+                {colorTheme === option.id && (
+                  <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
+                    ON
+                  </span>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuItem
           onClick={() => window.open("/api/export?format=json")}
         >

@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewedOrbitPlan,
   createOrbitReviewDraft,
+  getDraftAppliedImpact,
+  getGrokProposedImpact,
+  summarizeReviewBatchImpact,
   type OrbitReviewSuggestionDraft,
 } from "@/lib/orbit-review";
 import type { CollectionWithCount, OrbitScanPlan, TagWithCount } from "@/types";
@@ -88,6 +91,63 @@ describe("createOrbitReviewDraft", () => {
         collectionDescription: "",
       },
     ]);
+  });
+});
+
+describe("review impact helpers", () => {
+  it("summarizes unique tags and collections across applyable drafts", () => {
+    const drafts: OrbitReviewSuggestionDraft[] = [
+      {
+        bookmarkId: "b1",
+        included: true,
+        decision: "tags_collection",
+        tagNames: "AI, Tools",
+        collectionName: "AI Research",
+        collectionDescription: "",
+      },
+      {
+        bookmarkId: "b2",
+        included: true,
+        decision: "tags",
+        tagNames: "AI, Design",
+        collectionName: "",
+        collectionDescription: "",
+      },
+      {
+        bookmarkId: "b3",
+        included: false,
+        decision: "keep",
+        tagNames: "",
+        collectionName: "",
+        collectionDescription: "",
+      },
+    ];
+
+    expect(summarizeReviewBatchImpact(drafts)).toEqual({
+      tagNames: ["AI", "Tools", "Design"],
+      collectionNames: ["AI Research"],
+    });
+  });
+
+  it("derives per-draft and grok proposed impact", () => {
+    const draft: OrbitReviewSuggestionDraft = {
+      bookmarkId: "b1",
+      included: true,
+      decision: "tags",
+      tagNames: "Research, AI",
+      collectionName: "Ignored",
+      collectionDescription: "",
+    };
+
+    expect(getDraftAppliedImpact(draft)).toEqual({
+      tagNames: ["Research", "AI"],
+      collectionName: null,
+    });
+
+    expect(getGrokProposedImpact(sourcePlan.suggestions[0])).toEqual({
+      tagNames: ["AI", "Tools"],
+      collectionName: "AI Research",
+    });
   });
 });
 

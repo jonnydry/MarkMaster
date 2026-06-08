@@ -3,13 +3,11 @@
 import { Info } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useOrbitalTheme } from "@/components/providers";
 import {
   orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
-  orbitMetaSoft,
-} from "@/lib/orbit-route-chrome";
+  orbitMetaSoft} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
 interface OrbitMapLegendButtonProps {
@@ -17,7 +15,6 @@ interface OrbitMapLegendButtonProps {
 }
 
 export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
-  const { isOrbital } = useOrbitalTheme();
 
   return (
     <Popover>
@@ -25,7 +22,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
         aria-label="Graph legend"
         className={cn(
           "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-          orbitHairlineBorder(isOrbital),
+          orbitHairlineBorder(),
           className
         )}
       >
@@ -34,10 +31,10 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 gap-3 p-3">
         <div>
-          <p className={cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital))}>
+          <p className={cn(orbitLabelClass(), orbitMetaSoft())}>
             Legend
           </p>
-          <ul className={cn("mt-3 space-y-3 text-sm", orbitMetaMuted(isOrbital))}>
+          <ul className={cn("mt-3 space-y-3 text-sm", orbitMetaMuted())}>
             <li className="flex items-center gap-3">
               <span
                 className="inline-block size-3 rounded-full border border-[#bfdbfe]/80 bg-[#2f6fed] shadow-[0_0_0_3px_rgba(47,111,237,0.12)]"
@@ -70,7 +67,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
             </li>
           </ul>
         </div>
-        <p className={cn("border-t border-hairline-soft pt-2 text-[10px]", orbitMetaMuted(isOrbital))}>
+        <p className={cn("border-t border-hairline-soft pt-2 text-[10px]", orbitMetaMuted())}>
           Scroll to zoom · drag to pan · click to focus · Esc to clear
         </p>
       </PopoverContent>

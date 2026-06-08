@@ -10,8 +10,7 @@ import {
   FolderOpen,
   LayoutGrid,
   Loader2,
-  Tag as TagIcon,
-} from "lucide-react";
+  Tag as TagIcon} from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
@@ -20,27 +19,22 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   buildOrbitMapConnectionIndex,
-  getConnectedOrbitMapNodes,
-} from "@/lib/orbit-map-connections";
+  getConnectedOrbitMapNodes} from "@/lib/orbit-map-connections";
 import { getOrbitCollectionActionState } from "@/lib/orbit-map-actions";
 import {
   orbitGhostButtonClass,
   orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
-  orbitMetaSoft,
-} from "@/lib/orbit-route-chrome";
+  orbitMetaSoft} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import type {
   BookmarkWithRelations,
   OrbitGraphNode,
-  OrbitGraphPayload,
-} from "@/types";
+  OrbitGraphPayload} from "@/types";
 
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 
 interface OrbitMapRailProps {
   data: OrbitGraphPayload;
@@ -60,11 +54,9 @@ interface OrbitMapRailProps {
 }
 
 /** Shared panel surface for both rail and overlay variants, theme-aware. */
-function panelClass(isOrbital: boolean, isOverlay: boolean) {
+function panelClass( isOverlay: boolean) {
   if (isOverlay) return "min-w-0 shrink-0";
-  return isOrbital
-    ? "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm"
-    : "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
+  return "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
 }
 
 function pluralize(count: number, singular: string, plural?: string) {
@@ -85,8 +77,7 @@ export function OrbitMapRail({
   onClearSelection,
   copyingCollectionId,
   variant = "rail",
-  className,
-}: OrbitMapRailProps) {
+  className}: OrbitMapRailProps) {
   const nodeById = useMemo(
     () => new Map(data.nodes.map((node) => [node.id, node])),
     [data.nodes]
@@ -105,7 +96,6 @@ export function OrbitMapRail({
     );
   }, [activeNode, connectedNodeIdsById, nodeById]);
   const isOverlay = variant === "overlay";
-  const { isOrbital } = useOrbitalTheme();
 
   return (
     <aside
@@ -113,14 +103,14 @@ export function OrbitMapRail({
         isOverlay
           ? cn(
               "pointer-events-auto flex max-h-[min(68dvh,620px)] w-[min(352px,calc(100vw-2rem))] min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 shadow-lg backdrop-blur-2xl [scrollbar-width:thin]",
-              orbitHairlineBorder(isOrbital),
-              isOrbital ? cn(orbital.glass, "border-primary/25") : "bg-surface-1/90"
+              orbitHairlineBorder(),
+              "bg-surface-1/90"
             )
           : "flex min-w-0 w-full flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin] lg:w-[300px] lg:shrink-0 xl:w-[320px]",
         className
       )}
     >
-      <section className={panelClass(isOrbital, isOverlay)}>
+      <section className={panelClass(isOverlay)}>
         <SelectedClusterBody
           node={activeNode}
           stats={data.stats}
@@ -137,7 +127,7 @@ export function OrbitMapRail({
           onClearSelection={onClearSelection}
           copyingCollectionId={copyingCollectionId}
           isOverlay={isOverlay}
-          isOrbital={isOrbital}
+          
         />
       </section>
     </aside>
@@ -160,7 +150,7 @@ interface SelectedClusterBodyProps {
   onClearSelection: () => void;
   copyingCollectionId?: string | null;
   isOverlay: boolean;
-  isOrbital: boolean;
+  
 }
 
 function SelectedClusterBody({
@@ -178,11 +168,9 @@ function SelectedClusterBody({
   onOpenBookmark,
   onClearSelection,
   copyingCollectionId,
-  isOverlay,
-  isOrbital,
-}: SelectedClusterBodyProps) {
-  const kicker = cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital));
-  const bodyText = cn("min-w-0 break-words text-sm", orbitMetaMuted(isOrbital));
+  isOverlay}: SelectedClusterBodyProps) {
+  const kicker = cn(orbitLabelClass(), orbitMetaSoft());
+  const bodyText = cn("min-w-0 break-words text-sm", orbitMetaMuted());
 
   if (!node) {
     return (
@@ -205,7 +193,7 @@ function SelectedClusterBody({
           </span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">Orbit index</p>
-            <p className={cn("text-xs", orbitMetaMuted(isOrbital))}>
+            <p className={cn("text-xs", orbitMetaMuted())}>
               Central anchor for loose bookmarks
             </p>
           </div>
@@ -214,12 +202,12 @@ function SelectedClusterBody({
           <RailMetric
             label="Total"
             value={stats.totalBookmarks.toLocaleString()}
-            isOrbital={isOrbital}
+            
           />
           <RailMetric
             label="Loose"
             value={stats.looseBookmarks.toLocaleString()}
-            isOrbital={isOrbital}
+            
           />
         </div>
         {connected.length > 0 && (
@@ -228,7 +216,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            isOrbital={isOrbital}
+            
           />
         )}
       </div>
@@ -243,8 +231,7 @@ function SelectedClusterBody({
             className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-sm"
             style={{
               backgroundColor: `${node.color}22`,
-              color: node.color,
-            }}
+              color: node.color}}
           >
             <TagIcon className="size-4" />
           </span>
@@ -272,7 +259,7 @@ function SelectedClusterBody({
             variant="outline"
             className={cn(
               "h-9 min-w-0 justify-center gap-1.5 px-2",
-              orbitGhostButtonClass(isOrbital)
+              orbitGhostButtonClass()
             )}
             onClick={onAddTag}
             disabled={!selectedBookmarkId}
@@ -282,7 +269,7 @@ function SelectedClusterBody({
           </Button>
           <DashboardLink
             href={`/dashboard?tag=${encodeURIComponent(node.id)}`}
-            isOrbital={isOrbital}
+            
           />
         </div>
         {connected.length > 0 && (
@@ -291,7 +278,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            isOrbital={isOrbital}
+            
           />
         )}
       </div>
@@ -319,7 +306,7 @@ function SelectedClusterBody({
         </div>
         <p className={bodyText}>{pluralize(node.count, "bookmark")}</p>
         {actionState.readOnlyReason && (
-          <p className={cn("text-xs leading-5", orbitMetaMuted(isOrbital))}>
+          <p className={cn("text-xs leading-5", orbitMetaMuted())}>
             {actionState.readOnlyReason}
           </p>
         )}
@@ -356,7 +343,7 @@ function SelectedClusterBody({
                 variant="outline"
                 className={cn(
                   "h-9 min-w-0 justify-center gap-1.5 px-2",
-                  orbitGhostButtonClass(isOrbital)
+                  orbitGhostButtonClass()
                 )}
                 onClick={onAddToCollection}
                 disabled={!actionState.canCollect}
@@ -369,7 +356,7 @@ function SelectedClusterBody({
           {node.variant !== "x_folder" && (
             <DashboardLink
               href={`/dashboard?collection=${encodeURIComponent(node.id)}`}
-              isOrbital={isOrbital}
+              
             />
           )}
         </div>
@@ -379,7 +366,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            isOrbital={isOrbital}
+            
           />
         )}
       </div>
@@ -412,7 +399,7 @@ function SelectedClusterBody({
           isLoose={isLoose}
           tagCount={tagConnections.length}
           collectionCount={collectionConnections.length}
-          isOrbital={isOrbital}
+          
         />
 
         <div className="grid min-w-0 grid-cols-2 gap-2 min-[420px]:grid-cols-3">
@@ -421,7 +408,7 @@ function SelectedClusterBody({
             variant="outline"
             className={cn(
               "h-9 min-w-0 justify-center gap-1.5 px-2",
-              orbitGhostButtonClass(isOrbital)
+              orbitGhostButtonClass()
             )}
             onClick={onAddTag}
             disabled={!hasExplicitSelection}
@@ -434,7 +421,7 @@ function SelectedClusterBody({
             variant="outline"
             className={cn(
               "h-9 min-w-0 justify-center gap-1.5 px-2",
-              orbitGhostButtonClass(isOrbital)
+              orbitGhostButtonClass()
             )}
             onClick={onAddToCollection}
             disabled={!hasExplicitSelection}
@@ -456,7 +443,7 @@ function SelectedClusterBody({
 
         {tagConnections.length > 0 || collectionConnections.length > 0 ? (
           <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/35 p-3">
-            <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
+            <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
               Relationships
             </p>
             {tagConnections.length > 0 && (
@@ -494,7 +481,7 @@ function SelectedClusterBody({
             )}
           </div>
         ) : (
-          <p className={cn("text-xs", orbitMetaSoft(isOrbital))}>
+          <p className={cn("text-xs", orbitMetaSoft())}>
             Not yet tagged or collected
           </p>
         )}
@@ -504,11 +491,11 @@ function SelectedClusterBody({
         ) : focusedBookmark ? (
           <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/25 p-3">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
+              <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
                 Evidence
               </p>
               {hasMedia && (
-                <span className={cn("text-[10px]", orbitMetaSoft(isOrbital))}>
+                <span className={cn("text-[10px]", orbitMetaSoft())}>
                   Media attached
                 </span>
               )}
@@ -519,15 +506,14 @@ function SelectedClusterBody({
               media={focusedBookmark.media}
               tweetLink={{
                 authorUsername: focusedBookmark.authorUsername,
-                tweetId: focusedBookmark.tweetId,
-              }}
+                tweetId: focusedBookmark.tweetId}}
               bookmarkKey={focusedBookmark.id}
               variant="inline"
               priorityMedia={!isOverlay}
               className="min-w-0"
               textClassName={cn(
                 "min-w-0 break-words line-clamp-4 whitespace-pre-wrap text-sm leading-5",
-                orbitMetaMuted(isOrbital)
+                orbitMetaMuted()
               )}
               galleryClassName="!mt-2 min-w-0 w-full border-hairline-soft/70"
             />
@@ -540,7 +526,7 @@ function SelectedClusterBody({
             type="button"
             className={cn(
               "text-xs underline-offset-2 hover:underline",
-              orbitMetaSoft(isOrbital),
+              orbitMetaSoft(),
               "hover:text-foreground"
             )}
             onClick={onClearSelection}
@@ -559,13 +545,13 @@ function SelectedClusterBody({
   return null;
 }
 
-function DashboardLink({ href, isOrbital }: { href: string; isOrbital: boolean }) {
+function DashboardLink({ href}: { href: string;  }) {
   return (
     <Link
       href={href}
       className={cn(
         "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors",
-        orbitGhostButtonClass(isOrbital)
+        orbitGhostButtonClass()
       )}
     >
       <LayoutGrid className="size-3.5 shrink-0" />
@@ -577,19 +563,17 @@ function DashboardLink({ href, isOrbital }: { href: string; isOrbital: boolean }
 function BookmarkInspectorStatus({
   isLoose,
   tagCount,
-  collectionCount,
-  isOrbital,
-}: {
+  collectionCount}: {
   isLoose: boolean;
   tagCount: number;
   collectionCount: number;
-  isOrbital: boolean;
+  
 }) {
   const cardClass =
     "min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/45 px-2 py-2";
   const labelClass = cn(
-    orbitLabelClass(isOrbital),
-    orbitMetaSoft(isOrbital),
+    orbitLabelClass(),
+    orbitMetaSoft(),
     "truncate tracking-[0.14em]"
   );
 
@@ -621,27 +605,25 @@ function ConnectedList({
   title,
   nodes,
   onOpenBookmark,
-  isOverlay,
-  isOrbital,
-}: {
+  isOverlay}: {
   title: string;
   nodes: OrbitGraphNode[];
   onOpenBookmark: (bookmarkId: string) => void;
   isOverlay: boolean;
-  isOrbital: boolean;
+  
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
   if (bookmarks.length === 0) return null;
 
   return (
     <div className="min-w-0 space-y-2 pt-1">
-      <p className={cn(orbitLabelClass(isOrbital), orbitMetaMuted(isOrbital))}>
+      <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
         {title} · {bookmarks.length}
       </p>
       <ScrollArea
         className={cn(
           "h-40 min-w-0 rounded-sm border",
-          orbitHairlineBorder(isOrbital),
+          orbitHairlineBorder(),
           isOverlay ? "bg-surface-1/40" : "bg-surface-1/55"
         )}
       >
@@ -673,16 +655,14 @@ function ConnectedList({
 
 function RailMetric({
   label,
-  value,
-  isOrbital,
-}: {
+  value}: {
   label: string;
   value: string;
-  isOrbital: boolean;
+  
 }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/55 p-3">
-      <p className={cn(orbitLabelClass(isOrbital), orbitMetaSoft(isOrbital), "truncate")}>
+      <p className={cn(orbitLabelClass(), orbitMetaSoft(), "truncate")}>
         {label}
       </p>
       <p className="mt-1 truncate text-lg font-semibold tracking-tight text-foreground">

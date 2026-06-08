@@ -26,29 +26,8 @@ export const bookmarkCollectionRowSyncedClassName = bookmarkFeedColumnClassName;
 export const bookmarkCollectionCardCellClassName =
   "min-w-0 flex-1 max-w-[600px]";
 
-/**
- * Inspector-aware helpers for two-column mission-control layout (dashboard/library + orbit).
- * Only affects layout when `data-theme="orbital"` (via parent conditional), no-op otherwise.
- * Mirrors the proven Orbit two-column pattern.
- */
-
-/** Left column wrapper class when right inspector is shown (constrains feed on lg+). */
-export const bookmarkFeedLeftInspectorClassName = "min-w-0 flex-1 lg:max-w-[640px]";
-
-/**
- * Right inspector column wrapper (sticky card container).
- * Use with `hidden lg:block lg:w-[380px] lg:shrink-0`
- */
-export const bookmarkFeedRightInspectorWrapperClassName = "hidden lg:block lg:w-[380px] lg:shrink-0";
-
-/** Returns the list root className, suppressing centering mx-auto when two-col inspector active. */
-export function getBookmarkListContainerClassName(
-  inspectorActive: boolean,
-  viewMode: ViewMode = "feed"
-): string {
+/** Returns the list root className for feed/list view modes. */
+export function getBookmarkListContainerClassName(viewMode: ViewMode = "feed"): string {
   if (viewMode === "grid") return "";
-  if (inspectorActive) {
-    return "w-full"; // width + constraints come from flex parent + left class above
-  }
   return bookmarkFeedColumnClassName;
 }

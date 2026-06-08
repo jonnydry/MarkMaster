@@ -10,7 +10,7 @@ import React from "react";
 
 export type OrbitalTone = "cyan" | "bronze" | "emerald";
 
-/** Visual tokens for orbital-themed surfaces (typography tiers scoped via .theme-orbital in CSS). */
+/** Shared surface primitives for elevated panels and auth chrome. */
 export const orbital = {
   glass: "glass-orbital rounded-sm",
   label: orbitalTypography.label,

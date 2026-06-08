@@ -3,7 +3,6 @@
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
-import { useOrbitalTheme } from "@/components/providers";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { OrbitListRow } from "./orbit-list-row";
 
@@ -22,12 +21,12 @@ interface OrbitListProps {
   appliedBookmarkIds?: Set<string>;
 }
 
-function OrbitListRowSkeleton({ isOrbital }: { isOrbital: boolean }) {
+function OrbitListRowSkeleton() {
   return (
     <div
       className={cn(
         "flex items-stretch gap-3 border-b px-5 py-2.5",
-        orbitHairlineBorder(isOrbital)
+        orbitHairlineBorder()
       )}
     >
       <div className="mt-1 h-10 w-[3px] shrink-0 rounded-full skeleton-shimmer" />
@@ -62,13 +61,12 @@ export function OrbitList({
   dismissedBookmarkIds,
   appliedBookmarkIds,
 }: OrbitListProps) {
-  const { isOrbital } = useOrbitalTheme();
 
   if (isLoading) {
     return (
       <div className={cn("flex flex-col", className)} role="status" aria-label="Loading Orbit">
         {Array.from({ length: 6 }).map((_, index) => (
-          <OrbitListRowSkeleton key={index} isOrbital={isOrbital} />
+          <OrbitListRowSkeleton key={index} />
         ))}
       </div>
     );

@@ -4,23 +4,15 @@ import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital } from "@/components/orbital";
 import { useTypography } from "@/hooks/use-typography";
 import {
   addDislikedHighlightId,
   addLikedHighlightId,
   getHighlightFeedback,
   removeDislikedHighlightId,
-  removeLikedHighlightId,
-} from "@/lib/highlight-feedback";
+  removeLikedHighlightId} from "@/lib/highlight-feedback";
+import { formatCompactCount } from "@/lib/format-metrics";
 import type { BookmarkWithRelations } from "@/types";
-
-function formatCompactMetric(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toLocaleString();
-}
 
 export function getHighlightLabel(bookmark: BookmarkWithRelations) {
   const firstTag = bookmark.tags[0]?.tag.name;
@@ -34,9 +26,9 @@ export function getHighlightLabel(bookmark: BookmarkWithRelations) {
 function getHighlightMetric(bookmark: BookmarkWithRelations) {
   const metrics = bookmark.publicMetrics;
   if (!metrics) return `@${bookmark.authorUsername}`;
-  if (metrics.like_count > 0) return `${formatCompactMetric(metrics.like_count)} likes`;
-  if (metrics.retweet_count > 0) return `${formatCompactMetric(metrics.retweet_count)} reposts`;
-  if (metrics.reply_count > 0) return `${formatCompactMetric(metrics.reply_count)} replies`;
+  if (metrics.like_count > 0) return `${formatCompactCount(metrics.like_count)} likes`;
+  if (metrics.retweet_count > 0) return `${formatCompactCount(metrics.retweet_count)} reposts`;
+  if (metrics.reply_count > 0) return `${formatCompactCount(metrics.reply_count)} replies`;
   return `@${bookmark.authorUsername}`;
 }
 
@@ -63,9 +55,7 @@ export function HighlightCard({
   onFocusForTriage,
   onOrbitReview,
   layout = "default",
-  className,
-}: HighlightCardProps) {
-  const { isOrbital } = useOrbitalTheme();
+  className}: HighlightCardProps) {
   const t = useTypography();
   const [, setFeedbackTick] = useState(0);
   const label = getHighlightLabel(bookmark);
@@ -187,9 +177,7 @@ export function HighlightCard({
             <span
               className={cn(
                 "rounded px-1.5 py-px text-[9px]",
-                isOrbital
-                  ? orbital.badge("bronze")
-                  : "border border-amber-400/20 bg-amber-400/10 text-[9px] uppercase tracking-wider text-amber-200"
+                "border border-amber-400/20 bg-amber-400/10 text-[9px] uppercase tracking-wider text-amber-200"
               )}
               title={
                 itemLabel.includes("Resurfaced")

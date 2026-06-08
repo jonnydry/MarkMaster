@@ -3,11 +3,9 @@
 import { useSyncExternalStore } from "react";
 import { Sparkles, X } from "lucide-react";
 
-import { useOrbitalTheme } from "@/components/providers";
 import {
   dismissOrbitTriageHint,
-  isOrbitTriageHintDismissed,
-} from "@/lib/orbit-triage-hint";
+  isOrbitTriageHintDismissed} from "@/lib/orbit-triage-hint";
 import { orbitHairlineBorder, orbitMetaMuted } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +24,6 @@ function subscribeToTriageHint(callback: () => void) {
 }
 
 export function OrbitTriageHint({ className }: { className?: string }) {
-  const { isOrbital } = useOrbitalTheme();
   const dismissed = useSyncExternalStore(
     subscribeToTriageHint,
     isOrbitTriageHintDismissed,
@@ -35,19 +32,15 @@ export function OrbitTriageHint({ className }: { className?: string }) {
 
   if (dismissed) return null;
 
-  const strong = isOrbital
-    ? "font-medium text-foreground/90"
-    : "font-medium text-foreground/85 dark:text-white/85";
+  const strong = "font-medium text-foreground/85 dark:text-white/85";
 
   return (
     <div
       className={cn(
         "flex items-center gap-2 rounded-sm border px-3 py-2 text-[11px] leading-relaxed",
-        orbitHairlineBorder(isOrbital),
-        isOrbital
-          ? "border-primary/15 bg-primary/5"
-          : "border-hairline-soft bg-surface-2/50 dark:border-white/10 dark:bg-white/[0.03]",
-        orbitMetaMuted(isOrbital),
+        orbitHairlineBorder(),
+        "border-hairline-soft bg-surface-2/50 dark:border-white/10 dark:bg-white/[0.03]",
+        orbitMetaMuted(),
         className
       )}
     >
@@ -68,9 +61,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
         }}
         className={cn(
           "shrink-0 rounded p-0.5",
-          isOrbital
-            ? "text-primary/50 hover:text-primary"
-            : "text-muted-foreground hover:text-foreground dark:text-white/40 dark:hover:text-white/70"
+          "text-muted-foreground hover:text-foreground dark:text-white/40 dark:hover:text-white/70"
         )}
         aria-label="Dismiss triage tips"
       >

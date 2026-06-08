@@ -49,6 +49,8 @@
   --color-note: var(--note);
   --color-emerald: var(--emerald);
   --color-success: var(--success);
+  --color-bronze: var(--bronze);
+  --color-bronze-muted: var(--bronze-muted);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -60,15 +62,10 @@
   --animate-fade-in-up: fade-in-up 0.45s ease-out both;
   --animate-slide-in: slide-in 0.3s ease-out both;
   --animate-scale-in: scale-in 0.2s ease-out both;
-  /* Orbital theme color extensions (vars populated only under data-theme="orbital" / .theme-orbital) */
-  --color-orbital-glow: var(--orbital-glow);
-  --color-orbital-glow-strong: var(--orbital-glow-strong);
-  --color-bronze: var(--bronze);
-  --color-bronze-muted: var(--bronze-muted);
-  --color-ring-bronze: var(--ring-bronze);
 }
 
 :root {
+  color-scheme: light;
   --background: #f8faff;
   --foreground: #0b0f19;
   --card: #ffffff;
@@ -125,9 +122,15 @@
   --z-overlay: 30;
   --z-modal: 50;
   --success: #22c55e;
+  --markmaster-logo-hue: 0deg;
+  --markmaster-logo-saturate: 1;
+  --markmaster-logo-brightness: 1;
+  --bronze: #c9aa6c;
+  --bronze-muted: #a88a4e;
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0f0f0f;
   --foreground: #f0ebe3;
   --card: #161616;
@@ -176,177 +179,234 @@
   --page-shell-ambient: rgba(37, 99, 235, 0.09);
   --page-shell-highlight: rgba(255, 255, 255, 0.035);
   --success: #4ade80;
+  --markmaster-logo-hue: 0deg;
+  --markmaster-logo-saturate: 1.05;
+  --markmaster-logo-brightness: 1.04;
 }
 
-/* === ORBITAL THEME (opt-in layered theme, does not affect default :root or .dark colors) ===
-   Activate via data-theme="orbital" or class="theme-orbital" on html or ancestor container.
-   Color mode (html.dark vs not) selects void-dark vs Polar Observatory light palettes.
-   Per Master-Unification-Plan: default production palette (blue #2563eb etc) remains 100% untouched.
+/* === Accent color themes (opt-in via data-color-theme on html) ===
+   Surfaces inherit from :root / .dark; only primary accent tokens change.
+   "horizon" (default blue) needs no attribute — omit data-color-theme.
 */
 
-/* Orbital dark — deep cosmic void */
-:root.dark[data-theme="orbital"],
-html.theme-orbital.dark {
-  --background: #0A0A0A;
-  --foreground: #EDE8E0;
-  --card: #111111;
-  --card-foreground: #EDE8E0;
-  --popover: #0F0F0F;
-  --popover-foreground: #EDE8E0;
-
-  --primary: #5CE1C7;
-  --primary-foreground: #0A0A0A;
-  --orbital-glow: #5CE1C7;
-  --orbital-glow-strong: #7CF4D9;
-
-  --accent: #C9AA6C;
-  --accent-foreground: #0A0A0A;
-  --bronze: #C9AA6C;
-  --bronze-muted: #A88A4E;
-
-  --accent-glow: rgba(92, 225, 199, 0.18);
-  --accent-glow-strong: rgba(92, 225, 199, 0.28);
-  --ring: #5CE1C7;
-  --ring-bronze: #C9AA6C;
-
-  --surface-1: #0F0F0F;
-  --surface-2: #131313;
-  --surface-3: #171717;
-  --surface-elevated: #1C1C1C;
-
-  --hairline-soft: rgba(255, 255, 255, 0.055);
-  --hairline-strong: rgba(255, 255, 255, 0.095);
-  --border: #1F1F1F;
-  --input: #151515;
-
-  --secondary: #151515;
-  --secondary-foreground: #C8C0B4;
-  --muted: #151515;
-  --muted-foreground: #7A7570;
-
-  --sidebar: #0C0C0C;
-  --sidebar-foreground: #C8C0B4;
-  --sidebar-primary: #5CE1C7;
-  --sidebar-primary-foreground: #0A0A0A;
-  --sidebar-accent: rgba(92, 225, 199, 0.10);
-  --sidebar-accent-foreground: #7CF4D9;
-  --sidebar-border: #1F1F1F;
-  --sidebar-ring: #5CE1C7;
-
-  --accent-soft: rgba(92, 225, 199, 0.09);
-  --menu-selection-bg: rgba(92, 225, 199, 0.07);
-  --menu-selection-ring: rgba(92, 225, 199, 0.22);
-  --menu-selection-glow: rgba(92, 225, 199, 0.15);
-
-  --page-shell-depth-top: #0C0C0C;
-  --page-shell-depth-bottom: #0A0A0A;
-  --page-shell-ambient: rgba(92, 225, 199, 0.06);
-  --page-shell-highlight: rgba(255, 255, 255, 0.028);
-
-  --success: #34D3A3;
-  --warning: #C9AA6C;
-  --emerald: #34D3A3;
-  --note: #A5B4C8;
-
-  --chart-1: #5CE1C7;
-  --chart-2: #7CF4D9;
-  --chart-3: #C9AA6C;
-  --chart-4: #A88A4E;
-  --chart-5: #7CF4D9;
-
-  --destructive: #ef4444;
-
-  /* Mode-aware effect tokens (consumed by glass, grain, logo utilities) */
-  --orbital-shadow-deep: rgba(0, 0, 0, 0.55);
-  --orbital-shadow-soft: rgba(0, 0, 0, 0.5);
-  --orbital-shadow-menu: rgba(0, 0, 0, 0.6);
-  --orbital-grain-dot: rgba(255, 255, 255, 0.04);
-  --orbital-grain-dot-faint: rgba(255, 255, 255, 0.018);
-  --orbital-grain-blend: screen;
-  --markmaster-logo-filter: hue-rotate(148deg) saturate(1.4) brightness(1.06);
-  --markmaster-logo-glow: drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 45%, transparent));
+:root[data-color-theme="aurora"] {
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --ring: #0d9488;
+  --sidebar-primary: #0d9488;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(13, 148, 136, 0.1);
+  --sidebar-accent-foreground: #0f766e;
+  --sidebar-ring: #0d9488;
+  --accent-soft: rgba(13, 148, 136, 0.1);
+  --menu-selection-bg: rgba(13, 148, 136, 0.08);
+  --menu-selection-ring: rgba(13, 148, 136, 0.22);
+  --menu-selection-glow: rgba(13, 148, 136, 0.14);
+  --page-shell-ambient: rgba(13, 148, 136, 0.08);
+  --chart-1: #0d9488;
+  --chart-2: #14b8a6;
+  --emerald: #0d9488;
+  --markmaster-logo-hue: -52deg;
+  --markmaster-logo-saturate: 1.15;
+  --markmaster-logo-brightness: 1.02;
 }
 
-/* Orbital light — Polar Observatory (daylight mission control) */
-:root:not(.dark)[data-theme="orbital"],
-html.theme-orbital:not(.dark) {
-  --background: #EEF4F2;
-  --foreground: #132320;
-  --card: #F8FBFA;
-  --card-foreground: #132320;
-  --popover: #FFFFFF;
-  --popover-foreground: #132320;
+.dark[data-color-theme="aurora"] {
+  --primary: #2dd4bf;
+  --primary-foreground: #042f2e;
+  --ring: #2dd4bf;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #042f2e;
+  --sidebar-accent: rgba(45, 212, 191, 0.12);
+  --sidebar-accent-foreground: #5eead4;
+  --sidebar-ring: #2dd4bf;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --menu-selection-bg: rgba(45, 212, 191, 0.08);
+  --menu-selection-ring: rgba(45, 212, 191, 0.24);
+  --menu-selection-glow: rgba(45, 212, 191, 0.18);
+  --page-shell-ambient: rgba(45, 212, 191, 0.09);
+  --chart-1: #2dd4bf;
+  --chart-2: #5eead4;
+  --emerald: #2dd4bf;
+  --markmaster-logo-hue: -48deg;
+  --markmaster-logo-saturate: 1.28;
+  --markmaster-logo-brightness: 1.08;
+}
 
-  --primary: #0EA58A;
-  --primary-foreground: #FFFFFF;
-  --orbital-glow: #14B8A6;
-  --orbital-glow-strong: #2DD4BF;
+:root[data-color-theme="ember"] {
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
+  --ring: #ea580c;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(234, 88, 12, 0.1);
+  --sidebar-accent-foreground: #c2410c;
+  --sidebar-ring: #ea580c;
+  --accent-soft: rgba(234, 88, 12, 0.1);
+  --menu-selection-bg: rgba(234, 88, 12, 0.08);
+  --menu-selection-ring: rgba(234, 88, 12, 0.22);
+  --menu-selection-glow: rgba(234, 88, 12, 0.14);
+  --page-shell-ambient: rgba(234, 88, 12, 0.08);
+  --chart-1: #ea580c;
+  --chart-2: #f97316;
+  --emerald: #ea580c;
+  --markmaster-logo-hue: -194deg;
+  --markmaster-logo-saturate: 1.22;
+  --markmaster-logo-brightness: 1.03;
+}
 
-  --accent: #9A7840;
-  --accent-foreground: #FFFFFF;
-  --bronze: #9A7840;
-  --bronze-muted: #7A6233;
+.dark[data-color-theme="ember"] {
+  --primary: #fb923c;
+  --primary-foreground: #431407;
+  --ring: #fb923c;
+  --sidebar-primary: #fb923c;
+  --sidebar-primary-foreground: #431407;
+  --sidebar-accent: rgba(251, 146, 60, 0.12);
+  --sidebar-accent-foreground: #fdba74;
+  --sidebar-ring: #fb923c;
+  --accent-soft: rgba(251, 146, 60, 0.12);
+  --menu-selection-bg: rgba(251, 146, 60, 0.08);
+  --menu-selection-ring: rgba(251, 146, 60, 0.24);
+  --menu-selection-glow: rgba(251, 146, 60, 0.18);
+  --page-shell-ambient: rgba(251, 146, 60, 0.09);
+  --chart-1: #fb923c;
+  --chart-2: #fdba74;
+  --emerald: #fb923c;
+  --markmaster-logo-hue: -188deg;
+  --markmaster-logo-saturate: 1.32;
+  --markmaster-logo-brightness: 1.08;
+}
 
-  --accent-glow: rgba(14, 165, 138, 0.12);
-  --accent-glow-strong: rgba(14, 165, 138, 0.22);
-  --ring: #0EA58A;
-  --ring-bronze: #9A7840;
+:root[data-color-theme="nebula"] {
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --ring: #7c3aed;
+  --sidebar-primary: #7c3aed;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(124, 58, 237, 0.1);
+  --sidebar-accent-foreground: #6d28d9;
+  --sidebar-ring: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.1);
+  --menu-selection-bg: rgba(124, 58, 237, 0.08);
+  --menu-selection-ring: rgba(124, 58, 237, 0.22);
+  --menu-selection-glow: rgba(124, 58, 237, 0.14);
+  --page-shell-ambient: rgba(124, 58, 237, 0.08);
+  --chart-1: #7c3aed;
+  --chart-2: #8b5cf6;
+  --emerald: #7c3aed;
+  --markmaster-logo-hue: 38deg;
+  --markmaster-logo-saturate: 1.18;
+  --markmaster-logo-brightness: 1.02;
+}
 
-  --surface-1: #F8FBFA;
-  --surface-2: #E8F0ED;
-  --surface-3: #DCE8E4;
-  --surface-elevated: #FFFFFF;
+.dark[data-color-theme="nebula"] {
+  --primary: #a78bfa;
+  --primary-foreground: #2e1065;
+  --ring: #a78bfa;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #2e1065;
+  --sidebar-accent: rgba(167, 139, 250, 0.12);
+  --sidebar-accent-foreground: #c4b5fd;
+  --sidebar-ring: #a78bfa;
+  --accent-soft: rgba(167, 139, 250, 0.12);
+  --menu-selection-bg: rgba(167, 139, 250, 0.08);
+  --menu-selection-ring: rgba(167, 139, 250, 0.24);
+  --menu-selection-glow: rgba(167, 139, 250, 0.18);
+  --page-shell-ambient: rgba(167, 139, 250, 0.09);
+  --chart-1: #a78bfa;
+  --chart-2: #c4b5fd;
+  --emerald: #a78bfa;
+  --markmaster-logo-hue: 42deg;
+  --markmaster-logo-saturate: 1.28;
+  --markmaster-logo-brightness: 1.08;
+}
 
-  --hairline-soft: rgba(19, 35, 32, 0.08);
-  --hairline-strong: rgba(19, 35, 32, 0.14);
-  --border: #C5D8D2;
-  --input: #E8F0ED;
+:root[data-color-theme="canopy"] {
+  --primary: #16a34a;
+  --primary-foreground: #ffffff;
+  --ring: #16a34a;
+  --sidebar-primary: #16a34a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(22, 163, 74, 0.1);
+  --sidebar-accent-foreground: #15803d;
+  --sidebar-ring: #16a34a;
+  --accent-soft: rgba(22, 163, 74, 0.1);
+  --menu-selection-bg: rgba(22, 163, 74, 0.08);
+  --menu-selection-ring: rgba(22, 163, 74, 0.22);
+  --menu-selection-glow: rgba(22, 163, 74, 0.14);
+  --page-shell-ambient: rgba(22, 163, 74, 0.08);
+  --chart-1: #16a34a;
+  --chart-2: #22c55e;
+  --emerald: #16a34a;
+  --markmaster-logo-hue: -79deg;
+  --markmaster-logo-saturate: 1.16;
+  --markmaster-logo-brightness: 1.02;
+}
 
-  --secondary: #E8F0ED;
-  --secondary-foreground: #2A4038;
-  --muted: #E8F0ED;
-  --muted-foreground: #5A6F69;
+.dark[data-color-theme="canopy"] {
+  --primary: #4ade80;
+  --primary-foreground: #052e16;
+  --ring: #4ade80;
+  --sidebar-primary: #4ade80;
+  --sidebar-primary-foreground: #052e16;
+  --sidebar-accent: rgba(74, 222, 128, 0.12);
+  --sidebar-accent-foreground: #86efac;
+  --sidebar-ring: #4ade80;
+  --accent-soft: rgba(74, 222, 128, 0.12);
+  --menu-selection-bg: rgba(74, 222, 128, 0.08);
+  --menu-selection-ring: rgba(74, 222, 128, 0.24);
+  --menu-selection-glow: rgba(74, 222, 128, 0.18);
+  --page-shell-ambient: rgba(74, 222, 128, 0.09);
+  --chart-1: #4ade80;
+  --chart-2: #86efac;
+  --emerald: #4ade80;
+  --markmaster-logo-hue: -74deg;
+  --markmaster-logo-saturate: 1.26;
+  --markmaster-logo-brightness: 1.08;
+}
 
-  --sidebar: #E8F2EF;
-  --sidebar-foreground: #132320;
-  --sidebar-primary: #0EA58A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgba(14, 165, 138, 0.10);
-  --sidebar-accent-foreground: #0D9488;
-  --sidebar-border: #C5D8D2;
-  --sidebar-ring: #0EA58A;
+:root[data-color-theme="pulse"] {
+  --primary: #db2777;
+  --primary-foreground: #ffffff;
+  --ring: #db2777;
+  --sidebar-primary: #db2777;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(219, 39, 119, 0.1);
+  --sidebar-accent-foreground: #be185d;
+  --sidebar-ring: #db2777;
+  --accent-soft: rgba(219, 39, 119, 0.1);
+  --menu-selection-bg: rgba(219, 39, 119, 0.08);
+  --menu-selection-ring: rgba(219, 39, 119, 0.22);
+  --menu-selection-glow: rgba(219, 39, 119, 0.14);
+  --page-shell-ambient: rgba(219, 39, 119, 0.08);
+  --chart-1: #db2777;
+  --chart-2: #ec4899;
+  --emerald: #db2777;
+  --markmaster-logo-hue: 108deg;
+  --markmaster-logo-saturate: 1.2;
+  --markmaster-logo-brightness: 1.03;
+}
 
-  --accent-soft: rgba(14, 165, 138, 0.09);
-  --menu-selection-bg: rgba(14, 165, 138, 0.08);
-  --menu-selection-ring: rgba(14, 165, 138, 0.22);
-  --menu-selection-glow: rgba(14, 165, 138, 0.14);
-
-  --page-shell-depth-top: #F4FAF8;
-  --page-shell-depth-bottom: #E5EFEB;
-  --page-shell-ambient: rgba(14, 165, 138, 0.08);
-  --page-shell-highlight: rgba(255, 255, 255, 0.85);
-
-  --success: #0D9488;
-  --warning: #9A7840;
-  --emerald: #0D9488;
-  --note: #4A635C;
-
-  --chart-1: #0EA58A;
-  --chart-2: #2DD4BF;
-  --chart-3: #9A7840;
-  --chart-4: #7A6233;
-  --chart-5: #14B8A6;
-
-  --destructive: #ef4444;
-
-  --orbital-shadow-deep: rgba(14, 165, 138, 0.14);
-  --orbital-shadow-soft: rgba(14, 165, 138, 0.10);
-  --orbital-shadow-menu: rgba(14, 165, 138, 0.12);
-  --orbital-grain-dot: rgba(19, 35, 32, 0.06);
-  --orbital-grain-dot-faint: rgba(19, 35, 32, 0.03);
-  --orbital-grain-blend: multiply;
-  --markmaster-logo-filter: hue-rotate(142deg) saturate(1.3) brightness(0.97);
-  --markmaster-logo-glow: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 35%, transparent));
+.dark[data-color-theme="pulse"] {
+  --primary: #f472b6;
+  --primary-foreground: #500724;
+  --ring: #f472b6;
+  --sidebar-primary: #f472b6;
+  --sidebar-primary-foreground: #500724;
+  --sidebar-accent: rgba(244, 114, 182, 0.12);
+  --sidebar-accent-foreground: #f9a8d4;
+  --sidebar-ring: #f472b6;
+  --accent-soft: rgba(244, 114, 182, 0.12);
+  --menu-selection-bg: rgba(244, 114, 182, 0.08);
+  --menu-selection-ring: rgba(244, 114, 182, 0.24);
+  --menu-selection-glow: rgba(244, 114, 182, 0.18);
+  --page-shell-ambient: rgba(244, 114, 182, 0.09);
+  --chart-1: #f472b6;
+  --chart-2: #f9a8d4;
+  --emerald: #f472b6;
+  --markmaster-logo-hue: 112deg;
+  --markmaster-logo-saturate: 1.3;
+  --markmaster-logo-brightness: 1.08;
 }
 
 /* Global Monospace Mode — full 3-tier suite (JetBrains body/data, IBM Plex labels) */
@@ -424,7 +484,7 @@ html.theme-orbital:not(.dark) {
   }
 }
 
-/* Orbital theme motion language (only styled/animated under .theme-orbital) */
+/* Orbital ring motion keyframes (used by branded assets) */
 @keyframes ring-rotate-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -468,6 +528,12 @@ html.theme-orbital:not(.dark) {
 }
 
 @layer utilities {
+  /* OS-native scrollbars — no custom thumb/track painting */
+  .scrollbar-native {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
   .scrollbar-thin {
     scrollbar-width: thin;
   }
@@ -484,8 +550,8 @@ html.theme-orbital:not(.dark) {
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: oklch(0.4 0 0);
   }
-  html.theme-orbital:not(.dark) .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.72 0.04 170);
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.45 0 0);
   }
   .app-shell-bg {
     background-color: var(--background);
@@ -662,20 +728,6 @@ html.theme-orbital:not(.dark) {
   .stagger-4 { animation-delay: 200ms; }
   .stagger-5 { animation-delay: 250ms; }
   .stagger-6 { animation-delay: 300ms; }
-  .card-lift {
-    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 220ms ease-out;
-  }
-  .card-lift:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: var(--hairline-strong);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .card-lift { transition: none; }
-    .card-lift:hover { transform: none; }
-  }
   .skeleton-shimmer {
     position: relative;
     background-color: var(--muted);
@@ -721,9 +773,8 @@ html.theme-orbital:not(.dark) {
     }
   }
 
-  /* 3-tier Monospace-Native Typography — active under mono toggle or Orbit theme */
-  [data-font-mode="mono"] .text-mono-display,
-  .theme-orbital .text-mono-display {
+  /* 3-tier Monospace-Native Typography — active under mono toggle */
+  [data-font-mode="mono"] .text-mono-display {
     font-family: var(--font-jetbrains-mono);
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -731,9 +782,7 @@ html.theme-orbital:not(.dark) {
   }
 
   [data-font-mode="mono"] .text-mono-ui,
-  [data-font-mode="mono"] .text-mono-label,
-  .theme-orbital .text-mono-ui,
-  .theme-orbital .text-mono-label {
+  [data-font-mode="mono"] .text-mono-label {
     font-family: var(--font-ibm-plex-mono);
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -742,8 +791,7 @@ html.theme-orbital:not(.dark) {
     font-size: 0.625rem;
   }
 
-  [data-font-mode="mono"] .text-mono-data,
-  .theme-orbital .text-mono-data {
+  [data-font-mode="mono"] .text-mono-data {
     font-family: var(--font-jetbrains-mono);
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
@@ -751,9 +799,7 @@ html.theme-orbital:not(.dark) {
 
   /* Tier 1 — display headings */
   [data-font-mode="mono"] .text-heading-display,
-  [data-font-mode="mono"] h1.heading-font,
-  .theme-orbital .text-heading-display,
-  .theme-orbital h1.heading-font {
+  [data-font-mode="mono"] h1.heading-font {
     font-family: var(--font-jetbrains-mono);
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -765,12 +811,7 @@ html.theme-orbital:not(.dark) {
   [data-font-mode="mono"] [data-slot="label"],
   [data-font-mode="mono"] .app-chrome-label,
   [data-font-mode="mono"] h2.heading-font,
-  [data-font-mode="mono"] [data-slot="dialog-title"],
-  .theme-orbital label,
-  .theme-orbital [data-slot="label"],
-  .theme-orbital .app-chrome-label,
-  .theme-orbital h2.heading-font,
-  .theme-orbital [data-slot="dialog-title"] {
+  [data-font-mode="mono"] [data-slot="dialog-title"] {
     font-family: var(--font-ibm-plex-mono);
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -778,20 +819,17 @@ html.theme-orbital:not(.dark) {
     font-variant-numeric: tabular-nums;
   }
 
-  [data-font-mode="mono"] .app-chrome-label,
-  .theme-orbital .app-chrome-label {
+  [data-font-mode="mono"] .app-chrome-label {
     letter-spacing: 0.14em;
     font-size: 0.625rem;
   }
 
-  [data-font-mode="mono"] h2.heading-font,
-  .theme-orbital h2.heading-font {
+  [data-font-mode="mono"] h2.heading-font {
     font-size: 0.6875rem;
   }
 
   /* Tier 3 — tabular data */
-  [data-font-mode="mono"] .tabular-nums,
-  .theme-orbital .tabular-nums {
+  [data-font-mode="mono"] .tabular-nums {
     font-family: var(--font-jetbrains-mono);
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
@@ -801,104 +839,80 @@ html.theme-orbital:not(.dark) {
     font-family: var(--font-heading), var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   }
 
-  .theme-orbital [data-settings-page] .rounded-2xl {
-    border-radius: 0.125rem;
+  /* MarkMaster rocket logo — tint to match active accent theme */
+  .markmaster-logo {
+    filter:
+      hue-rotate(var(--markmaster-logo-hue, 0deg))
+      saturate(var(--markmaster-logo-saturate, 1))
+      brightness(var(--markmaster-logo-brightness, 1))
+      drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 42%, transparent));
+    transition: filter 220ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .markmaster-logo {
+      transition: none;
+    }
   }
 
-  /* Orbital theme glassmorphism + grain (scoped, only effective under .theme-orbital) */
-  .theme-orbital .glass-orbital {
+  .glass-orbital {
     background: color-mix(in srgb, var(--surface-1) 72%, transparent);
     border: 1px solid var(--hairline-soft);
     backdrop-filter: blur(20px);
     box-shadow:
       inset 0 1px 0 var(--page-shell-highlight),
-      0 8px 32px -8px var(--orbital-shadow-deep),
-      0 0 0 1px var(--accent-glow);
-  }
-  .theme-orbital .glass-orbital[data-glow="cyan"] {
-    box-shadow:
-      inset 0 1px 0 var(--page-shell-highlight),
-      0 8px 32px -8px var(--orbital-shadow-deep),
-      0 0 0 1px var(--accent-glow),
-      0 0 28px -8px var(--accent-glow-strong);
-  }
-  .theme-orbital .orbital-slide-in-shadow {
-    box-shadow:
-      inset 0 1px 0 var(--page-shell-highlight),
-      -14px 0 40px -16px var(--orbital-shadow-deep),
-      0 0 0 1px var(--accent-glow);
-  }
-  .theme-orbital .grain {
-    position: relative;
-    overflow: hidden;
-  }
-  .theme-orbital .grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      radial-gradient(var(--orbital-grain-dot) 0.6px, transparent 0.6px),
-      radial-gradient(var(--orbital-grain-dot-faint) 0.6px, transparent 0.6px);
-    background-size: 3px 3px, 4.5px 4.5px;
-    background-position: 0 0, 1.5px 1.5px;
-    opacity: 0.7;
-    mix-blend-mode: var(--orbital-grain-blend);
-    z-index: 1;
+      0 8px 32px -8px color-mix(in srgb, var(--foreground) 8%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
   }
 
-  /* MarkMaster rocket logo — shift blue asset to orbital teal when Orbit theme is on */
-  html.theme-orbital .markmaster-logo {
-    filter: var(--markmaster-logo-filter) var(--markmaster-logo-glow);
-  }
-
-  /* === Orbit redesign surface primitives (menu, action pill, slide-in) === */
-  .theme-orbital .orbital-menu {
+  .orbital-slide-in-shadow {
     box-shadow:
       inset 0 1px 0 var(--page-shell-highlight),
-      0 10px 30px -10px var(--orbital-shadow-menu),
-      0 0 0 1px var(--accent-glow);
+      -14px 0 40px -16px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
   }
 
-  .theme-orbital .orbital-action-pill {
+  .orbital-menu {
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 10px 30px -10px color-mix(in srgb, var(--foreground) 12%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  .orbital-action-pill {
     transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
-  .theme-orbital .orbital-action-pill:hover {
+  .orbital-action-pill:hover {
     transform: translateY(-0.5px);
-    box-shadow: 0 4px 14px -2px var(--orbital-shadow-soft), 0 0 0 1px var(--accent-glow);
+    box-shadow:
+      0 4px 14px -2px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
   }
 
-  /* Slide-in panel specific depth */
-  .theme-orbital .orbital-slide-in {
-    /* The cyan left border + main glass treatment comes from the primitive classes */
-  }
-
-  /* Orbital ring + nucleus animations (GPU, reduced-motion safe; only animate under theme) */
-  .theme-orbital .orbital-ring-slow {
+  .orbital-ring-slow {
     animation: ring-rotate-slow 68s linear infinite;
     transform-origin: center;
     transform-box: fill-box;
   }
-  .theme-orbital .orbital-ring-medium {
+  .orbital-ring-medium {
     animation: ring-rotate-medium 47s linear infinite;
     transform-origin: center;
     transform-box: fill-box;
   }
-  .theme-orbital .orbital-ring-fast {
+  .orbital-ring-fast {
     animation: ring-rotate-fast 31s linear infinite;
     transform-origin: center;
     transform-box: fill-box;
   }
-  .theme-orbital .orbital-nucleus {
+  .orbital-nucleus {
     animation: nucleus-breath 5.8s ease-in-out infinite;
     transform-origin: center;
     transform-box: fill-box;
   }
   @media (prefers-reduced-motion: reduce) {
-    .theme-orbital .orbital-ring-slow,
-    .theme-orbital .orbital-ring-medium,
-    .theme-orbital .orbital-ring-fast,
-    .theme-orbital .orbital-nucleus {
+    .orbital-ring-slow,
+    .orbital-ring-medium,
+    .orbital-ring-fast,
+    .orbital-nucleus {
       animation: none;
     }
   }

@@ -1,77 +1,32 @@
 "use client";
 
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { useOrbitalTheme } from "@/components/providers";
 import { orbitShellClass } from "@/lib/orbit-route-chrome";
 import { appContentInsetClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
-import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { fetchJson } from "@/lib/fetch-json";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
-import type { BookmarkWithRelations } from "@/types";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
-import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
-import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import {
-  useSurfaceKeyboardShortcuts,
-  type KeyboardShortcutGroup,
-} from "@/hooks/use-keyboard-shortcuts";
-import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
-import { rankOrbitMapSearchResults } from "@/lib/orbit-map-search";
+  ORBIT_MAP_SHORTCUT_GROUPS,
+  useOrbitMapPage,
+} from "@/hooks/use-orbit-map-page";
 import { OrbitMapCommandSurface } from "@/components/orbit/orbit-map-command-surface";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
 import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
 import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
-import { saveOrbitMapPositions } from "@/lib/orbit-map-layout-storage";
-import type { OrbitGraphNode, OrbitGraphScope } from "@/types";
-
-type BookmarkGraphNode = Extract<OrbitGraphNode, { kind: "bookmark" }>;
-import type {
-  OrbitMapCanvasHandle,
-  OrbitMapFocus,
-  OrbitMapSelection,
-} from "@/components/orbit/orbit-map-canvas-host";
-
-type OrbitMapGraphIndexes = {
-  nodesById: Map<string, OrbitGraphNode>;
-  bookmarksById: Map<string, BookmarkGraphNode>;
-  bookmarkCount: number;
-};
-
-type PendingLayoutSave = {
-  scope: OrbitGraphScope;
-  positions: Record<string, { x: number; y: number }>;
-};
 
 const OrbitMapCanvas = dynamic(
   () =>
@@ -110,504 +65,78 @@ const CreateCollectionDialog = dynamic(
   { ssr: false }
 );
 
-const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> = new Set([
-  "tag",
-  "collection",
-  "bookmark",
-  "core",
-  "overflow",
-]);
-
-const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
-  {
-    title: "Graph Navigation",
-    shortcuts: [
-      { id: "search", keys: ["/"], label: "Search graph" },
-      { id: "scope-library", keys: ["L"], label: "Full library scope" },
-      { id: "scope-orbit", keys: ["Q"], label: "Orbit queue scope" },
-      { id: "back", keys: ["B"], label: "Back to Orbit queue" },
-      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
-    ],
-  },
-  {
-    title: "Selected Bookmark",
-    shortcuts: [
-      { id: "assign", keys: ["A"], label: "Assign selected tag or collection" },
-      { id: "tag", keys: ["T"], label: "Add tag" },
-      { id: "collection", keys: ["C"], label: "Add to collection" },
-      { id: "clear", keys: ["X"], label: "Clear graph selection" },
-    ],
-  },
-];
-
 export default function OrbitMapPage() {
-  const { isOrbital } = useOrbitalTheme();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
-  const focusBookmarkIdParam = searchParams?.get("focus") ?? null;
-  const focusAnchorIdParam = searchParams?.get("anchor") ?? null;
-  const assignmentBookmarkIdParam = searchParams?.get("bookmark") ?? null;
-  const scopeParam = searchParams?.get("scope");
-  const { data: session } = useSession();
-  const actions = useBookmarkActions();
-  const { createCollection, createCollectionQuick } = useCreateCollection();
-
-  const { data: tags = [] } = useTagsQuery();
-  const { data: collections = [] } = useCollectionsQuery();
-
-  const selectIdParam = searchParams?.get("select") ?? null;
-  const selectKindParam = searchParams?.get("kind") ?? null;
-
-  const selection = useMemo<OrbitMapSelection | null>(() => {
-    if (
-      selectIdParam &&
-      selectKindParam &&
-      MAP_SELECTION_KINDS.has(selectKindParam as OrbitMapSelection["kind"])
-    ) {
-      return { kind: selectKindParam as OrbitMapSelection["kind"], id: selectIdParam };
-    }
-    if (focusBookmarkIdParam) {
-      return { kind: "bookmark", id: focusBookmarkIdParam };
-    }
-    return null;
-  }, [focusBookmarkIdParam, selectIdParam, selectKindParam]);
-  const graphScope: OrbitGraphScope =
-    scopeParam === "orbit" ? "orbit" : "library";
-  const [hoverCard, setHoverCard] = useState<{
-    node: BookmarkGraphNode;
-    x: number;
-    y: number;
-  } | null>(null);
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const [stageSize, setStageSize] = useState({ width: 960, height: 640 });
-  const hoverIntentTimerRef = useRef<number | null>(null);
-  const hoverClearTimerRef = useRef<number | null>(null);
-  const layoutSaveTimerRef = useRef<number | null>(null);
-  const pendingLayoutSaveRef = useRef<PendingLayoutSave | null>(null);
-
-  const handleSelectionChange = useCallback(
-    (next: OrbitMapSelection | null) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
-      if (next) {
-        params.set("select", next.id);
-        params.set("kind", next.kind);
-        if (next.kind === "bookmark") {
-          params.set("bookmark", next.id);
-        }
-      } else {
-        params.delete("select");
-        params.delete("kind");
-        params.delete("bookmark");
-        params.delete("focus");
-        params.delete("anchor");
-      }
-      const query = params.toString();
-      router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
-        scroll: false,
-      });
-    },
-    [router, searchParams]
-  );
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
-  const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
-  const [pendingBookmarkIds, setPendingBookmarkIds] = useState<string[]>([]);
-  const [copyingCollectionId, setCopyingCollectionId] = useState<string | null>(
-    null
-  );
-  const [search, setSearch] = useState("");
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const searchDeferred = useDeferredValue(search.trim().toLowerCase());
-  const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
+  const page = useOrbitMapPage();
   const {
-    data: graph,
+    dbUser,
+    tags,
+    collections,
+    graph,
+    graphScope,
+    selection,
+    focus,
     isLoading,
     isError,
     error,
     refetch,
     isFetching,
-  } = useOrbitGraphQuery(graphScope);
+    graphIsEmpty,
+    stats,
+    truncatedCount,
+    search,
+    setSearch,
+    searchDeferred,
+    searchResults,
+    searchInputRef,
+    keyboardShortcutsOpen,
+    setKeyboardShortcutsOpen,
+    headerDescription,
+    lastSyncAt,
+    stageRef,
+    stageSize,
+    hoverCard,
+    canvasRef,
+    copyingCollectionId,
+    selectedBookmarkId,
+    focusedBookmark,
+    focusedBookmarkLoading,
+    actions,
+    createCollection,
+    createCollectionQuick,
+    dialogs,
+    goToTagOnDashboard,
+    handleCreateCollectionOpen,
+    handleSyncComplete,
+    handleSelectionChange,
+    handleScopeChange,
+    handleLayoutUpdated,
+    handleHoverChange,
+    handleOpenBookmark,
+    handleAssign,
+    openTagDialog,
+    openCollectionDialog,
+    handleCopyAsCollection,
+    handleClearSelection,
+    handleSearchResultSelect,
+  } = page;
 
-  const graphIndexes = useMemo<OrbitMapGraphIndexes | null>(() => {
-    if (!graph) return null;
-    const nodesById = new Map<string, OrbitGraphNode>();
-    const bookmarksById = new Map<string, BookmarkGraphNode>();
-    let bookmarkCount = 0;
-
-    for (const node of graph.nodes) {
-      nodesById.set(node.id, node);
-      if (node.kind === "bookmark") {
-        bookmarksById.set(node.id, node);
-        bookmarkCount += 1;
-      }
-    }
-
-    return { nodesById, bookmarksById, bookmarkCount };
-  }, [graph]);
-
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const nextWidth = Math.round(entry.contentRect.width);
-      const nextHeight = Math.round(entry.contentRect.height);
-      setStageSize((current) => {
-        if (current.width === nextWidth && current.height === nextHeight) {
-          return current;
-        }
-        return { width: nextWidth, height: nextHeight };
-      });
-    });
-    observer.observe(stage);
-    return () => observer.disconnect();
-  }, []);
-
-  const clearHoverTimers = useCallback(() => {
-    if (hoverIntentTimerRef.current !== null) {
-      window.clearTimeout(hoverIntentTimerRef.current);
-      hoverIntentTimerRef.current = null;
-    }
-    if (hoverClearTimerRef.current !== null) {
-      window.clearTimeout(hoverClearTimerRef.current);
-      hoverClearTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => clearHoverTimers();
-  }, [clearHoverTimers]);
-
-  const flushPendingLayoutSave = useCallback(() => {
-    if (layoutSaveTimerRef.current !== null) {
-      window.clearTimeout(layoutSaveTimerRef.current);
-      layoutSaveTimerRef.current = null;
-    }
-
-    const pending = pendingLayoutSaveRef.current;
-    if (!pending) return;
-    saveOrbitMapPositions(pending.positions, pending.scope);
-    pendingLayoutSaveRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    return () => flushPendingLayoutSave();
-  }, [flushPendingLayoutSave]);
-
-  const handleHoverChange = useCallback(
-    (
-      next: OrbitMapSelection | null,
-      position?: { x: number; y: number }
-    ) => {
-      clearHoverTimers();
-
-      if (next?.kind === "bookmark" && position && graphIndexes) {
-        const node = graphIndexes.bookmarksById.get(next.id);
-        if (node) {
-          hoverIntentTimerRef.current = window.setTimeout(() => {
-            setHoverCard({ node, x: position.x, y: position.y });
-            hoverIntentTimerRef.current = null;
-          }, 140);
-          return;
-        }
-      }
-
-      hoverClearTimerRef.current = window.setTimeout(() => {
-        setHoverCard(null);
-        hoverClearTimerRef.current = null;
-      }, 140);
-    },
-    [clearHoverTimers, graphIndexes]
-  );
-
-  const dbUser = session?.dbUser;
-  const lastSyncAtValue = dbUser?.lastSyncAt;
-  const lastSyncAt = useMemo(
-    () => (lastSyncAtValue ? new Date(lastSyncAtValue) : null),
-    [lastSyncAtValue]
-  );
-
-  const activeSelection = selection;
-  const activeSelectionNode = useMemo(() => {
-    if (!graphIndexes || !activeSelection) return null;
-    const node = graphIndexes.nodesById.get(activeSelection.id) ?? null;
-    return node?.kind === activeSelection.kind ? node : null;
-  }, [activeSelection, graphIndexes]);
-
-  const selectedBookmarkId = useMemo(() => {
-    if (selection?.kind === "bookmark") return selection.id;
-    return assignmentBookmarkIdParam ?? focusBookmarkIdParam;
-  }, [assignmentBookmarkIdParam, focusBookmarkIdParam, selection]);
-
-  const { data: focusedBookmarkData, isLoading: focusedBookmarkLoading } = useQuery({
-    queryKey: ["bookmarks", "orbit-map-focus", selectedBookmarkId],
-    queryFn: () =>
-      fetchJson<{ bookmarks: BookmarkWithRelations[] }>(
-        `/api/bookmarks?bookmarkId=${encodeURIComponent(selectedBookmarkId!)}&limit=1`
-      ),
-    enabled: Boolean(selectedBookmarkId),
-    placeholderData: keepPreviousData,
-  });
-  const focusedBookmark = focusedBookmarkData?.bookmarks?.[0] ?? null;
-
-  const dialogBookmarkTags = useMemo(() => {
-    if (
-      pendingBookmarkIds.length !== 1 ||
-      !focusedBookmark ||
-      focusedBookmark.id !== pendingBookmarkIds[0]
-    ) {
-      return [];
-    }
-    return focusedBookmark.tags.map((entry) => entry.tag.id);
-  }, [focusedBookmark, pendingBookmarkIds]);
-
-  const dialogBookmarkCollections = useMemo(() => {
-    if (
-      pendingBookmarkIds.length !== 1 ||
-      !focusedBookmark ||
-      focusedBookmark.id !== pendingBookmarkIds[0]
-    ) {
-      return [];
-    }
-    return focusedBookmark.collectionItems.map((entry) => entry.collection.id);
-  }, [focusedBookmark, pendingBookmarkIds]);
-
-  const focus: OrbitMapFocus | null = useMemo(() => {
-    if (!focusBookmarkIdParam || !focusAnchorIdParam) return null;
-    if (!graphIndexes) return null;
-    const bookmark = graphIndexes.bookmarksById.get(focusBookmarkIdParam);
-    const anchor = graphIndexes.nodesById.get(focusAnchorIdParam);
-    if (!bookmark || !anchor) return null;
-    if (
-      anchor.kind !== "tag" &&
-      anchor.kind !== "collection" &&
-      anchor.kind !== "core"
-    ) {
-      return null;
-    }
-    return {
-      bookmarkId: focusBookmarkIdParam,
-      predictedAnchorId: focusAnchorIdParam,
-    };
-  }, [focusAnchorIdParam, focusBookmarkIdParam, graphIndexes]);
-
-  const searchResults = useMemo(() => {
-    return graph ? rankOrbitMapSearchResults(graph.nodes, searchDeferred) : [];
-  }, [graph, searchDeferred]);
-
-  useEffect(() => {
-    if (!focusBookmarkIdParam || !graphIndexes) return;
-    if (!graphIndexes.bookmarksById.has(focusBookmarkIdParam)) return;
-    const handle = window.setTimeout(() => {
-      canvasRef.current?.focusOn({
-        kind: "bookmark",
-        id: focusBookmarkIdParam,
-      });
-    }, 60);
-    return () => window.clearTimeout(handle);
-  }, [focusBookmarkIdParam, graphIndexes]);
-
-  const goToTagOnDashboard = useCallback(
-    (tagId: string) => {
-      router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
-    },
-    [router]
-  );
-
-  const handleCreateCollectionOpen = useCallback(() => {
-    setCreateCollectionOpen(true);
-  }, []);
-
-  const handleOpenBookmark = useCallback(
-    (bookmarkId: string) => {
-      router.push(`/dashboard?bookmark=${encodeURIComponent(bookmarkId)}`);
-    },
-    [router]
-  );
-
-  const handleAssign = useCallback(async () => {
-    if (!activeSelectionNode || !selectedBookmarkId) return;
-    if (
-      activeSelectionNode.kind !== "tag" &&
-      activeSelectionNode.kind !== "collection"
-    ) {
-      return;
-    }
-
-    if (activeSelectionNode.kind === "tag") {
-      await canvasRef.current?.animateAssign(
-        selectedBookmarkId,
-        activeSelectionNode.id
-      );
-      await actions.handleAddTag(
-        selectedBookmarkId,
-        activeSelectionNode.name,
-        activeSelectionNode.color
-      );
-      await refetch();
-      return;
-    }
-
-    if (activeSelectionNode.variant === "x_folder") return;
-
-    await canvasRef.current?.animateAssign(
-      selectedBookmarkId,
-      activeSelectionNode.id
-    );
-    await actions.handleAddToCollection(
-      selectedBookmarkId,
-      activeSelectionNode.id
-    );
-    await refetch();
-  }, [actions, activeSelectionNode, refetch, selectedBookmarkId]);
-
-  const openTagDialog = useCallback(() => {
-    if (selectedBookmarkId) {
-      setPendingBookmarkIds([selectedBookmarkId]);
-      setTagDialogOpen(true);
-    }
-  }, [selectedBookmarkId]);
-
-  const openCollectionDialog = useCallback(() => {
-    if (selectedBookmarkId) {
-      setPendingBookmarkIds([selectedBookmarkId]);
-      setCollectionDialogOpen(true);
-    }
-  }, [selectedBookmarkId]);
-
-  const handleCopyAsCollection = useCallback(
-    async (collectionId: string) => {
-      setCopyingCollectionId(collectionId);
-      try {
-        const copied = await copyCollectionAsUserCollection(
-          collectionId,
-          queryClient
-        );
-        await refetch();
-
-        const nextSelection: OrbitMapSelection = {
-          kind: "collection",
-          id: copied.id,
-        };
-        handleSelectionChange(nextSelection);
-        window.setTimeout(() => {
-          canvasRef.current?.focusOn(nextSelection);
-        }, 60);
-        toast.success("Copied as a new collection");
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Could not copy as collection"
-        );
-      } finally {
-        setCopyingCollectionId(null);
-      }
-    },
-    [handleSelectionChange, queryClient, refetch]
-  );
-
-  const stats = graph?.stats;
-  const truncatedCount = stats?.truncatedBookmarks ?? 0;
-  const renderedBookmarkCount = graphIndexes?.bookmarkCount ?? 0;
-  const graphIsEmpty =
-    Boolean(graph && graphIndexes) &&
-    (graphScope === "orbit"
-      ? stats?.looseBookmarks === 0
-      : stats?.totalBookmarks === 0 || renderedBookmarkCount === 0);
-
-  const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient);
-    void refetch();
-  }, [queryClient, refetch]);
-
-  const handleLayoutUpdated = useCallback(
-    (positions: Record<string, { x: number; y: number }>) => {
-      pendingLayoutSaveRef.current = { positions, scope: graphScope };
-      if (layoutSaveTimerRef.current !== null) return;
-
-      layoutSaveTimerRef.current = window.setTimeout(flushPendingLayoutSave, 500);
-    },
-    [flushPendingLayoutSave, graphScope]
-  );
-
-  const handleScopeChange = useCallback(
-    (next: OrbitGraphScope) => {
-      flushPendingLayoutSave();
-      clearHoverTimers();
-      setHoverCard(null);
-
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
-      if (next === "orbit") {
-        params.set("scope", "orbit");
-      } else {
-        params.delete("scope");
-      }
-      params.delete("select");
-      params.delete("kind");
-      params.delete("bookmark");
-      params.delete("focus");
-      params.delete("anchor");
-
-      const query = params.toString();
-      router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
-        scroll: false,
-      });
-    },
-    [clearHoverTimers, flushPendingLayoutSave, router, searchParams]
-  );
-
-  const handleClearSelection = useCallback(() => {
-    handleSelectionChange(null);
-  }, [handleSelectionChange]);
-
-  const handleSearchResultSelect = useCallback(
-    (identity: OrbitMapSelection) => {
-      handleSelectionChange(identity);
-      canvasRef.current?.focusOn(identity);
-    },
-    [handleSelectionChange]
-  );
-
-  const headerDescription = useMemo(() => {
-    if (!stats) return "Visualise how tags, collections, and bookmarks connect.";
-    const scopeLabel =
-      graphScope === "orbit" ? "Orbit queue map" : "Full library map";
-    const bookmarkCount =
-      graphScope === "orbit"
-        ? stats.looseBookmarks.toLocaleString()
-        : stats.totalBookmarks.toLocaleString();
-    const bookmarkLabel = graphScope === "orbit" ? "in queue" : "bookmarks";
-    return `${scopeLabel} · ${bookmarkCount} ${bookmarkLabel} · ${stats.tagCount} tags · ${
-      stats.userCollectionCount + stats.xFolderCount
-    } collections${
-      truncatedCount > 0 ? ` · ${truncatedCount.toLocaleString()} hidden` : ""
-    }`;
-  }, [graphScope, stats, truncatedCount]);
-
-  useSurfaceKeyboardShortcuts({
-    shortcutGroups: ORBIT_MAP_SHORTCUT_GROUPS,
-    actions: {
-      search: () => searchInputRef.current?.focus(),
-      "scope-library": () => handleScopeChange("library"),
-      "scope-orbit": () => handleScopeChange("orbit"),
-      back: () => router.push("/orbit"),
-      assign: () => {
-        if (activeSelectionNode && selectedBookmarkId) {
-          void handleAssign();
-        }
-      },
-      tag: () => openTagDialog(),
-      collection: () => openCollectionDialog(),
-      clear: () => handleClearSelection(),
-      shortcuts: () => setKeyboardShortcutsOpen(true),
-    },
-  });
+  const railProps = {
+    data: graph!,
+    selection,
+    selectedBookmarkId,
+    focusedBookmark,
+    focusedBookmarkLoading,
+    onAssign: handleAssign,
+    onAddTag: openTagDialog,
+    onAddToCollection: openCollectionDialog,
+    onCopyAsCollection: handleCopyAsCollection,
+    onOpenBookmark: handleOpenBookmark,
+    onClearSelection: handleClearSelection,
+    copyingCollectionId,
+  };
 
   return (
-    <div className={orbitShellClass(isOrbital)}>
+    <div className={orbitShellClass()}>
       <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
@@ -679,16 +208,14 @@ export default function OrbitMapPage() {
             ref={stageRef}
             className={cn(
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
-              isOrbital
-                ? "rounded-sm border border-hairline-soft bg-background dark:bg-black"
-                : "rounded-sm border border-white/[0.055] bg-background dark:bg-black"
+              "rounded-sm border border-white/[0.055] bg-background dark:bg-black"
             )}
           >
             {isLoading ? (
               <div
                 className={cn(
                   "flex h-full w-full items-center justify-center",
-                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
+                  "bg-background dark:bg-black"
                 )}
               >
                 <div className="flex items-center gap-2 text-sm text-white/60">
@@ -700,7 +227,7 @@ export default function OrbitMapPage() {
               <div
                 className={cn(
                   "flex h-full w-full items-center justify-center p-6",
-                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
+                  "bg-background dark:bg-black"
                 )}
               >
                 <ErrorState
@@ -718,7 +245,7 @@ export default function OrbitMapPage() {
               <div
                 className={cn(
                   "flex h-full w-full flex-col items-center justify-center p-8",
-                  isOrbital ? "bg-background dark:bg-black" : "bg-background dark:bg-black"
+                  "bg-background dark:bg-black"
                 )}
               >
                 <EmptyState
@@ -787,43 +314,19 @@ export default function OrbitMapPage() {
             )}
 
             {graph && (
-              <>
-                <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
-                  <OrbitMapRail
-                    data={graph}
-                    selection={selection}
-                    selectedBookmarkId={selectedBookmarkId}
-                    focusedBookmark={focusedBookmark}
-                    focusedBookmarkLoading={focusedBookmarkLoading}
-                    onAssign={handleAssign}
-                    onAddTag={openTagDialog}
-                    onAddToCollection={openCollectionDialog}
-                    onCopyAsCollection={handleCopyAsCollection}
-                    onOpenBookmark={handleOpenBookmark}
-                    onClearSelection={handleClearSelection}
-                    copyingCollectionId={copyingCollectionId}
-                    variant="overlay"
-                    className="max-h-[30dvh] w-full"
-                  />
-                </div>
-              </>
+              <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
+                <OrbitMapRail
+                  {...railProps}
+                  variant="overlay"
+                  className="max-h-[30dvh] w-full"
+                />
+              </div>
             )}
           </div>
 
           {graph && (
             <OrbitMapRail
-              data={graph}
-              selection={selection}
-              selectedBookmarkId={selectedBookmarkId}
-              focusedBookmark={focusedBookmark}
-              focusedBookmarkLoading={focusedBookmarkLoading}
-              onAssign={handleAssign}
-              onAddTag={openTagDialog}
-              onAddToCollection={openCollectionDialog}
-              onCopyAsCollection={handleCopyAsCollection}
-              onOpenBookmark={handleOpenBookmark}
-              onClearSelection={handleClearSelection}
-              copyingCollectionId={copyingCollectionId}
+              {...railProps}
               variant="rail"
               className="hidden h-full min-h-0 overflow-y-auto lg:flex lg:w-[300px] xl:w-[320px]"
             />
@@ -832,40 +335,28 @@ export default function OrbitMapPage() {
       </div>
 
       <AddTagDialog
-        open={tagDialogOpen}
-        onOpenChange={(open) => {
-          setTagDialogOpen(open);
-          if (!open) {
-            setPendingBookmarkIds([]);
-            void refetch();
-          }
-        }}
-        bookmarkIds={pendingBookmarkIds}
+        open={dialogs.tagDialogOpen}
+        onOpenChange={dialogs.setTagDialogOpen}
+        bookmarkIds={dialogs.tagTargetIds}
         existingTags={tags}
         onAddTag={actions.handleAddTag}
         onRemoveTag={actions.handleRemoveTag}
-        bookmarkTags={dialogBookmarkTags}
+        bookmarkTags={dialogs.dialogTagIds}
       />
 
       <AddToCollectionDialog
-        open={collectionDialogOpen}
-        onOpenChange={(open) => {
-          setCollectionDialogOpen(open);
-          if (!open) {
-            setPendingBookmarkIds([]);
-            void refetch();
-          }
-        }}
-        bookmarkIds={pendingBookmarkIds}
+        open={dialogs.collectionDialogOpen}
+        onOpenChange={dialogs.setCollectionDialogOpen}
+        bookmarkIds={dialogs.collectionTargetIds}
         collections={collections}
-        bookmarkCollections={dialogBookmarkCollections}
+        bookmarkCollections={dialogs.dialogCollectionIds}
         onAddToCollection={actions.handleAddToCollection}
         onCreateCollection={createCollectionQuick}
       />
 
       <CreateCollectionDialog
-        open={createCollectionOpen}
-        onOpenChange={setCreateCollectionOpen}
+        open={dialogs.createCollectionOpen}
+        onOpenChange={dialogs.setCreateCollectionOpen}
         onCreateCollection={createCollection}
       />
     </div>

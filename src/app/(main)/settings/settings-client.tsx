@@ -1,24 +1,18 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
-import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  AlertTriangle,
   Braces,
   Download,
   Sun,
   Moon,
-  Tag,
   LogOut,
   BrainCircuit,
   KeyRound,
-  Loader2,
-  Palette,
-  Search,
   ShieldCheck,
   Table2,
   type LucideIcon,
@@ -26,31 +20,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { Input } from "@/components/ui/input";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
-import { useTheme, useFontMode, useOrbitalTheme } from "@/components/providers";
-import { OrbitalBadge } from "@/components/orbital";
+import { useTheme, useFontMode, useColorTheme } from "@/components/providers";
+import { ColorThemePicker } from "@/components/color-theme-picker";
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import { useCollectionsQuery } from "@/hooks/use-library-data";
+import { useSettingsTags } from "@/hooks/use-settings-tags";
 import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
-import {
-  invalidateLibraryQueries,
-  invalidateTagsQuery,
-} from "@/lib/query-invalidation";
-import { assignBalancedTagColors } from "@/lib/tag-colors";
+import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { TagRow } from "./tag-row";
-import { TagEditRow } from "./tag-edit-row";
+import {
+  OrbitGrokStatusPanel,
+  parseOrbitIssue,
+  useOrbitStatusQuery,
+} from "./settings-orbit-status-panel";
+import { SettingsTagsSection } from "./settings-tags-section";
 import {
   OrbitReadyBadge,
   SETTINGS_SECTIONS,
@@ -60,7 +52,6 @@ import {
   SettingsSection,
   SettingsSegment,
 } from "./settings-primitives";
-import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -98,23 +89,17 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { fontMode, setFontMode } = useFontMode();
-  const { isOrbital, toggleOrbital } = useOrbitalTheme();
+  const { colorTheme, setColorTheme } = useColorTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-  const [tagSearch, setTagSearch] = useState("");
   const tagSearchRef = useRef<HTMLInputElement>(null);
   const orbitIssue = parseOrbitIssue(searchParams.get("orbitIssue"));
   const dbUser = session?.dbUser;
   const lastSyncAt = dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null;
 
-  const {
-    data: tags = [],
-    isLoading: tagsLoading,
-    isError: tagsError,
-    error: tagsErrorValue,
-    refetch: refetchTags,
-  } = useTagsQuery();
+  const tagsState = useSettingsTags();
+  const { tags, tagsError, tagsErrorValue, refetchTags } = tagsState;
 
   const {
     data: collections = [],
@@ -123,102 +108,7 @@ export default function SettingsPage() {
     refetch: refetchCollections,
   } = useCollectionsQuery();
 
-  const [editingTag, setEditingTag] = useState<string | null>(null);
-  const [editTagName, setEditTagName] = useState("");
-  const [editTagColor, setEditTagColor] = useState("");
-  const [balancingTagColors, setBalancingTagColors] = useState(false);
-  const balancedTags = useMemo(() => assignBalancedTagColors(tags), [tags]);
-  const balancedTagColorUpdates = useMemo(
-    () =>
-      balancedTags.filter((tag, index) => tag.color !== tags[index]?.color),
-    [balancedTags, tags]
-  );
-  const orbitStatusQuery = useQuery({
-    queryKey: ["orbit", "xai-status", orbitIssue],
-    queryFn: () =>
-      fetchJson<OrbitXaiStatusPayload>(buildOrbitStatusUrl(orbitIssue)),
-    staleTime: 30_000,
-  });
-
-  const filteredTags = useMemo(() => {
-    const query = tagSearch.trim().toLowerCase();
-    if (!query) return tags;
-    return tags.filter((tag) => tag.name.toLowerCase().includes(query));
-  }, [tagSearch, tags]);
-
-  const handleDeleteTag = useCallback(async (tagId: string) => {
-    if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
-    try {
-      await sendJson("/api/tags", {
-        method: "DELETE",
-        body: { tagId },
-      });
-      await invalidateTagsQuery(queryClient);
-      toast.success("Tag deleted");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not delete tag"
-      );
-    }
-  }, [queryClient]);
-
-  const handleUpdateTag = useCallback(async (tagId: string, name: string, color: string) => {
-    try {
-      await sendJson("/api/tags", {
-        method: "PATCH",
-        body: { tagId, name, color },
-      });
-      await invalidateTagsQuery(queryClient);
-      setEditingTag(null);
-      toast.success("Tag updated");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not update tag"
-      );
-    }
-  }, [queryClient]);
-
-  const handleStartEdit = useCallback((tag: { id: string; name: string; color: string }) => {
-    setEditingTag(tag.id);
-    setEditTagName(tag.name);
-    setEditTagColor(tag.color);
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingTag(null);
-  }, []);
-
-  const handleBalanceTagColors = useCallback(async () => {
-    if (balancedTagColorUpdates.length === 0) {
-      toast.message("Tag colors already look balanced");
-      return;
-    }
-
-    setBalancingTagColors(true);
-    try {
-      await Promise.all(
-        balancedTagColorUpdates.map((tag) =>
-          sendJson("/api/tags", {
-            method: "PATCH",
-            body: { tagId: tag.id, color: tag.color },
-          })
-        )
-      );
-      await invalidateTagsQuery(queryClient);
-      setEditingTag(null);
-      toast.success(
-        `Balanced ${balancedTagColorUpdates.length} tag color${
-          balancedTagColorUpdates.length === 1 ? "" : "s"
-        }`
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not balance tag colors"
-      );
-    } finally {
-      setBalancingTagColors(false);
-    }
-  }, [balancedTagColorUpdates, queryClient]);
+  const orbitStatusQuery = useOrbitStatusQuery(orbitIssue);
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
@@ -400,24 +290,20 @@ export default function SettingsPage() {
                   >
                     <div className="rounded-sm border border-hairline-soft bg-surface-2/40 px-4">
                       <SettingsRow label="Color mode" divider={false}>
-                        <div className="flex flex-col items-end gap-1.5">
-                          <SettingsSegment
-                            ariaLabel="Color mode"
-                            value={theme}
-                            options={[
-                              { value: "dark" as const, label: "Dark" },
-                              { value: "light" as const, label: "Light" },
-                            ]}
-                            onChange={setTheme}
-                          />
-                          {isOrbital ? (
-                            <p className="max-w-[16rem] text-right text-[10px] text-muted-foreground/70">
-                              Light uses the Polar Observatory palette when Orbit theme is on.
-                            </p>
-                          ) : null}
-                        </div>
+                        <SettingsSegment
+                          ariaLabel="Color mode"
+                          value={theme}
+                          options={[
+                            { value: "dark" as const, label: "Dark" },
+                            { value: "light" as const, label: "Light" },
+                          ]}
+                          onChange={setTheme}
+                        />
                       </SettingsRow>
-                      <SettingsRow label="Typography">
+                      <SettingsRow label="Accent color">
+                        <ColorThemePicker value={colorTheme} onChange={setColorTheme} />
+                      </SettingsRow>
+                      <SettingsRow label="Typography" divider={false}>
                         <SettingsSegment
                           ariaLabel="Typography"
                           value={fontMode}
@@ -427,19 +313,6 @@ export default function SettingsPage() {
                           ]}
                           onChange={setFontMode}
                         />
-                      </SettingsRow>
-                      <SettingsRow label="Orbit theme" divider={false}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {isOrbital ? <OrbitalBadge tone="cyan">Active</OrbitalBadge> : null}
-                          <Button
-                            variant={isOrbital ? "default" : "outline"}
-                            size="sm"
-                            onClick={toggleOrbital}
-                            className="border-hairline-soft"
-                          >
-                            {isOrbital ? "Disable" : "Enable"}
-                          </Button>
-                        </div>
                       </SettingsRow>
                     </div>
                   </SettingsSection>
@@ -487,93 +360,7 @@ export default function SettingsPage() {
                     </SettingsRow>
                   </SettingsSection>
 
-                  <SettingsSection
-                    id="tags"
-                    icon={Tag}
-                    title="Tags"
-                    description="Rename, recolor, or balance tags across your library."
-                    action={
-                      tags.length > 1 ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 border-hairline-soft"
-                          onClick={handleBalanceTagColors}
-                          disabled={
-                            balancingTagColors || balancedTagColorUpdates.length === 0
-                          }
-                        >
-                          {balancingTagColors ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <Palette className="size-3.5" />
-                          )}
-                          Balance colors
-                        </Button>
-                      ) : null
-                    }
-                  >
-                    {tags.length > 0 ? (
-                      <div className="relative mb-3">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          ref={tagSearchRef}
-                          value={tagSearch}
-                          onChange={(e) => setTagSearch(e.target.value)}
-                          placeholder="Search tags…"
-                          className="h-9 border-hairline-soft bg-surface-2 pl-9"
-                          aria-label="Search tags"
-                        />
-                      </div>
-                    ) : null}
-
-                    {tagsLoading ? (
-                      <TagListSkeleton />
-                    ) : tags.length === 0 ? (
-                      <div className="rounded-sm border border-dashed border-hairline-soft px-4 py-10 text-center">
-                        <Tag className="mx-auto mb-2 size-7 text-muted-foreground/40" />
-                        <p className="text-sm font-medium">No tags yet</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Tags appear here as you organize bookmarks on the dashboard.
-                        </p>
-                      </div>
-                    ) : filteredTags.length === 0 ? (
-                      <div className="rounded-sm border border-hairline-soft px-4 py-6 text-center text-sm text-muted-foreground">
-                        No tags match &ldquo;{tagSearch.trim()}&rdquo;
-                      </div>
-                    ) : (
-                      <div className="max-h-[min(28rem,50vh)] overflow-y-auto rounded-sm border border-hairline-soft bg-surface-2/50">
-                        {filteredTags.map((tag, index) =>
-                          editingTag === tag.id ? (
-                            <TagEditRow
-                              key={tag.id}
-                              tag={tag}
-                              index={index}
-                              initialName={editTagName}
-                              initialColor={editTagColor}
-                              onSave={handleUpdateTag}
-                              onCancel={handleCancelEdit}
-                            />
-                          ) : (
-                            <TagRow
-                              key={tag.id}
-                              tag={tag}
-                              index={index}
-                              onStartEdit={handleStartEdit}
-                              onDelete={handleDeleteTag}
-                            />
-                          )
-                        )}
-                      </div>
-                    )}
-
-                    {!tagsLoading && tags.length > 0 ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {filteredTags.length.toLocaleString()} of {tags.length.toLocaleString()} tags
-                        {tagSearch.trim() ? " shown" : ""}
-                      </p>
-                    ) : null}
-                  </SettingsSection>
+                  <SettingsTagsSection {...tagsState} tagSearchRef={tagSearchRef} />
                 </div>
               </div>
             </div>
@@ -610,150 +397,5 @@ function ExportLink({
       <Icon className="size-4 text-primary" aria-hidden />
       Download {title}
     </a>
-  );
-}
-
-function TagListSkeleton() {
-  return (
-    <div className="space-y-0 rounded-sm border border-hairline-soft">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "flex items-center gap-3 px-4 py-3",
-            i > 0 && "border-t border-hairline-soft"
-          )}
-        >
-          <div className="size-3.5 rounded-full skeleton-shimmer" />
-          <div className="h-3 w-24 flex-1 rounded skeleton-shimmer" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function parseOrbitIssue(value: string | null): OrbitScanFailureCode | null {
-  return value === "xai_auth" || value === "xai_model" ? value : null;
-}
-
-function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
-  if (!issue) return "/api/orbit/status";
-  const params = new URLSearchParams({ lastFailure: issue });
-  return `/api/orbit/status?${params.toString()}`;
-}
-
-function OrbitGrokStatusPanel({
-  status,
-  loading,
-  error,
-  onRetry,
-}: {
-  status: OrbitXaiStatusPayload | undefined;
-  loading: boolean;
-  error: Error | null;
-  onRetry: () => void;
-}) {
-  if (loading) {
-    return (
-      <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-10 rounded skeleton-shimmer" />
-        ))}
-      </dl>
-    );
-  }
-
-  if (error || !status) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">
-          {error?.message ?? "Orbit status could not be checked."}
-        </p>
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  const privacyLabel = status.privacy.storeDisabled
-    ? "Response storage off"
-    : "Response storage on";
-  const zeroDataRetentionLabel =
-    status.privacy.zeroDataRetention === true
-      ? "Zero retention"
-      : status.privacy.zeroDataRetention === false
-        ? "Retention active"
-        : "Retention unknown";
-
-  return (
-    <div className="space-y-3">
-      {status.issues.length > 0 ? (
-        <div className="rounded-sm border border-amber-500/25 bg-amber-500/10 px-3 py-2.5">
-          <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" />
-            <div className="space-y-2">
-              {status.issues.map((issue) => (
-                <div key={issue.code}>
-                  <p className="text-sm font-medium text-foreground">{issue.title}</p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {issue.message}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        <OrbitStatusRow
-          label="Model"
-          value={`${status.model}${status.modelSource === "environment" ? " · env" : ""}`}
-        />
-        <OrbitStatusRow
-          label="Privacy"
-          value={`${privacyLabel} · ${zeroDataRetentionLabel}`}
-        />
-        <OrbitStatusRow
-          label="xAI key"
-          value={status.apiKeyConfigured ? "Configured" : "Missing"}
-          highlight={!status.apiKeyConfigured}
-        />
-        <OrbitStatusRow
-          label="Endpoint"
-          value={`${status.baseUrl}${status.baseUrlSource === "environment" ? " · env" : ""}`}
-        />
-      </dl>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          Refresh
-        </Button>
-        <Link
-          href="/orbit"
-          className="inline-flex h-8 items-center rounded-sm px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Open Orbit queue
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function OrbitStatusRow({
-  label,
-  value,
-  highlight = false,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={cn(highlight && "text-amber-700 dark:text-amber-200")}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
-    </div>
   );
 }

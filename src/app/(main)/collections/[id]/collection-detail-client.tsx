@@ -1,618 +1,145 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  ArrowLeft,
-  Globe,
-  Lock,
-  ChevronUp,
-  ChevronDown,
-  Copy,
-  ExternalLink,
-  Layers,
-  FolderOpen,
-  Share2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BookmarkCard } from "@/components/bookmark-card";
-import { toast } from "sonner";
-import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
-import { copyTextToClipboard } from "@/lib/clipboard";
-import {
-  bookmarkCollectionCardCellClassName,
-  bookmarkCollectionRowSyncedClassName,
-  bookmarkCollectionRowWithReorderClassName,
-  bookmarkFeedMaxWidthClassName,
-} from "@/lib/bookmark-feed-layout";
-import { invalidateCollectionQueries } from "@/lib/query-invalidation";
+
 import { PageHeader } from "@/components/page-header";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import {
-  scrollDataElementIntoView,
-  useSurfaceKeyboardShortcuts,
-  type KeyboardShortcutGroup,
-} from "@/hooks/use-keyboard-shortcuts";
-import { cn } from "@/lib/utils";
-import type { BookmarkWithRelations } from "@/types";
-import type { ShareContent } from "@/lib/share-content";
+  COLLECTION_DETAIL_SHORTCUT_GROUPS,
+  useCollectionDetailPage,
+} from "@/hooks/use-collection-detail-page";
+import {
+  CollectionDetailBookmarkList,
+  CollectionDetailDescription,
+  CollectionDetailErrorState,
+  CollectionDetailLoadingState,
+} from "./collection-detail-bookmark-list";
+import {
+  CollectionDetailBackButton,
+  CollectionDetailHeaderActions,
+  CollectionDetailTitle,
+} from "./collection-detail-header";
 
 const ShareDialog = dynamic(
   () => import("@/components/share-dialog").then((m) => m.ShareDialog),
   { ssr: false }
 );
 
-const COLLECTION_DETAIL_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
-  {
-    title: "Bookmarks",
-    shortcuts: [
-      { id: "next", keys: ["J"], label: "Next bookmark" },
-      { id: "previous", keys: ["K"], label: "Previous bookmark" },
-      { id: "open", keys: ["O"], label: "Open selected bookmark" },
-      { id: "shortcuts", keys: ["?"], label: "Keyboard shortcuts" },
-    ],
-  },
-  {
-    title: "Collection",
-    shortcuts: [
-      { id: "back", keys: ["B"], label: "Back to collections" },
-      { id: "edit-name", keys: ["E"], label: "Edit collection name" },
-    ],
-  },
-];
-
-type CollectionItemRow = {
-  id: string;
-  sortOrder: number;
-  bookmark: BookmarkWithRelations;
-};
-
-type CollectionDetail = {
-  id: string;
-  name: string;
-  description: string | null;
-  type: string;
-  isPublic: boolean;
-  shareSlug: string | null;
-  externalSource: string | null;
-  externalSourceId: string | null;
-  items: CollectionItemRow[];
-};
-
 export default function CollectionDetailClient({
   collectionId,
 }: {
   collectionId: string;
 }) {
-  const id = collectionId;
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [editingName, setEditingName] = useState(false);
-  const [name, setName] = useState("");
-  const [reordering, setReordering] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [shareContent, setShareContent] = useState<ShareContent | null>(null);
-  const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
-  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-
+  const page = useCollectionDetailPage(collectionId);
   const {
-    data: collection,
+    collection,
     isPending,
     isError,
-    error,
     refetch,
-  } = useQuery({
-    queryKey: ["collection", id],
-    queryFn: async () => {
-      try {
-        return await fetchJson<CollectionDetail>(`/api/collections/${id}`);
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("404")) {
-          throw new Error("NOT_FOUND");
-        }
-        throw new Error("LOAD_FAILED");
-      }
-    },
-  });
-
-  const sortedItems = useMemo(
-    () =>
-      collection ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder) : [],
-    [collection]
-  );
-  const sortedBookmarkIds = useMemo(
-    () => sortedItems.map((item) => item.bookmark.id),
-    [sortedItems]
-  );
-  const aboveFoldMediaBookmarkId = useMemo(() => {
-    const row = sortedItems.find((item) => {
-      const m = item.bookmark.media?.[0];
-      return Boolean(m?.url || m?.preview_image_url);
-    });
-    return row?.bookmark.id ?? null;
-  }, [sortedItems]);
-  const isSyncedFromX = collection?.type === "x_folder";
-  const isUserCollection = collection?.type === "user_collection";
-
-  const selectBookmarkByOffset = useCallback(
-    (offset: -1 | 1) => {
-      if (sortedBookmarkIds.length === 0) return;
-      const currentIndex = activeBookmarkId
-        ? sortedBookmarkIds.indexOf(activeBookmarkId)
-        : -1;
-      const nextIndex =
-        currentIndex === -1
-          ? 0
-          : Math.max(0, Math.min(sortedBookmarkIds.length - 1, currentIndex + offset));
-      const nextId = sortedBookmarkIds[nextIndex];
-      if (!nextId) return;
-      setActiveBookmarkId(nextId);
-      requestAnimationFrame(() =>
-        scrollDataElementIntoView("data-dashboard-bookmark-id", nextId)
-      );
-    },
-    [activeBookmarkId, sortedBookmarkIds]
-  );
-
-  const cancelEditingName = () => {
-    if (!collection) return;
-    setName(collection.name);
-    setEditingName(false);
-  };
-
-  const handleCopyAsCollection = async () => {
-    if (!collection) return;
-    try {
-      await copyCollectionAsUserCollection(id, queryClient);
-      toast.success("Copied as a new collection");
-      router.push("/collections");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not copy as collection"
-      );
-    }
-  };
-
-  const handleTogglePublic = async () => {
-    if (!collection) return;
-    try {
-      const updated = await sendJson<{ isPublic?: boolean }>(`/api/collections/${id}`, {
-        method: "PATCH",
-        body: { isPublic: !collection.isPublic },
-      });
-      await invalidateCollectionQueries(queryClient, id);
-      if (updated.isPublic) {
-        toast.success("Collection is now public");
-      } else {
-        toast.success("Collection is now private");
-      }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not update visibility"
-      );
-    }
-  };
-
-  const handleCopyShareLink = async () => {
-    if (!collection?.shareSlug) return;
-    const url = `${window.location.origin}/share/${collection.shareSlug}`;
-    const copied = await copyTextToClipboard(url);
-    if (copied) {
-      toast.success("Share link copied!");
-    } else {
-      toast.error("Could not copy link to clipboard");
-    }
-  };
-
-  const handleRemoveItem = async (bookmarkId: string) => {
-    try {
-      await sendJson(`/api/collections/${id}/items`, {
-        method: "DELETE",
-        body: { bookmarkId },
-      });
-      await invalidateCollectionQueries(queryClient, id);
-      toast.success("Removed from collection");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not remove bookmark"
-      );
-    }
-  };
-
-  const handleShareOnX = async () => {
-    if (!collection) return;
-    try {
-      const content = await fetchJson<ShareContent>(
-        `/api/collections/${id}/publish`,
-        { method: "POST" }
-      );
-      setShareContent(content);
-      setShareOpen(true);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not generate share content"
-      );
-    }
-  };
-
-  useSurfaceKeyboardShortcuts({
-    shortcutGroups: COLLECTION_DETAIL_SHORTCUT_GROUPS,
-    actions: {
-      next: () => selectBookmarkByOffset(1),
-      previous: () => selectBookmarkByOffset(-1),
-      open: () => {
-        const targetId =
-          activeBookmarkId && sortedBookmarkIds.includes(activeBookmarkId)
-            ? activeBookmarkId
-            : sortedBookmarkIds[0];
-        if (targetId) router.push(`/dashboard?bookmark=${encodeURIComponent(targetId)}`);
-      },
-      back: () => router.push("/collections"),
-      "edit-name": () => {
-        if (!collection || !isUserCollection) return;
-        setName(collection.name ?? "");
-        setEditingName(true);
-      },
-      shortcuts: () => setKeyboardShortcutsOpen(true),
-    },
-  });
-
-  const handleUpdateName = async () => {
-    if (!collection) return;
-
-    if (!name.trim()) {
-      cancelEditingName();
-      return;
-    }
-
-    try {
-      await sendJson(`/api/collections/${id}`, {
-        method: "PATCH",
-        body: { name: name.trim() },
-      });
-      await invalidateCollectionQueries(queryClient, id);
-      setEditingName(false);
-      toast.success("Name updated");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not update name"
-      );
-    }
-  };
-
-  const moveItem = async (fromIndex: number, direction: -1 | 1) => {
-    if (!collection || reordering) return;
-    const toIndex = fromIndex + direction;
-    if (toIndex < 0 || toIndex >= sortedItems.length) return;
-
-    setReordering(true);
-    try {
-      const next = [...sortedItems];
-      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-      const payload = next.map((it, i) => ({
-        bookmarkId: it.bookmark.id,
-        sortOrder: i,
-      }));
-
-      await sendJson(`/api/collections/${id}/items`, {
-        method: "PATCH",
-        body: { items: payload },
-      });
-      await invalidateCollectionQueries(queryClient, id);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not reorder items"
-      );
-    } finally {
-      setReordering(false);
-    }
-  };
+    isNotFound,
+    sortedItems,
+    aboveFoldMediaBookmarkId,
+    isSyncedFromX,
+    isUserCollection,
+    itemCountLabel,
+    editingName,
+    name,
+    setName,
+    reordering,
+    shareOpen,
+    setShareOpen,
+    shareContent,
+    activeBookmarkId,
+    setActiveBookmarkId,
+    keyboardShortcutsOpen,
+    setKeyboardShortcutsOpen,
+    cancelEditingName,
+    startEditingName,
+    handleCopyAsCollection,
+    handleTogglePublic,
+    handleCopyShareLink,
+    handleRemoveItem,
+    handleShareOnX,
+    handleUpdateName,
+    moveItem,
+    goToCollections,
+    goToDashboard,
+  } = page;
 
   if (isPending) {
-    return (
-      <div className="app-shell-bg app-viewport flex items-center justify-center">
-        <div className="max-w-4xl mx-auto w-full px-6 space-y-4">
-          <div className="h-8 w-48 rounded skeleton-shimmer" />
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-sm border border-hairline-soft bg-surface-1 px-4 py-4"
-              >
-                <div className="flex gap-3">
-                  <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-24 rounded skeleton-shimmer" />
-                    <div className="h-3 w-full rounded skeleton-shimmer" />
-                    <div className="h-3 w-4/5 rounded skeleton-shimmer" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <CollectionDetailLoadingState />;
   }
 
   if (isError || !collection) {
-    const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
     return (
-      <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
-        <div className="rounded-sm border border-hairline-soft bg-surface-1 p-6 text-center max-w-md">
-          <p className="text-sm font-medium text-foreground">
-            {isNotFound
-              ? "Collection not found"
-              : "Collection could not be loaded"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {isNotFound
-              ? "This collection does not exist or has been deleted."
-              : "It may have been deleted or you may not have access."}
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => refetch()}>
-              Retry
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => router.push("/collections")}>
-              Back to collections
-            </Button>
-          </div>
-        </div>
-      </div>
+      <CollectionDetailErrorState
+        isNotFound={isNotFound}
+        onRetry={() => refetch()}
+        onBack={goToCollections}
+      />
     );
   }
 
   return (
     <div className="app-shell-bg app-viewport flex flex-col overflow-x-hidden">
       <div className="app-main-scroll scrollbar-thin">
-          <PageHeader
-            sticky
-            titleClassName="text-2xl sm:text-3xl"
-            title={
-              editingName ? (
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onBlur={handleUpdateName}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleUpdateName();
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelEditingName();
-                    }
-                  }}
-                  className="w-full border-b border-primary bg-transparent pb-1 text-2xl font-bold tracking-tight heading-font outline-none sm:text-3xl"
-                />
-              ) : (
-                <span className="flex min-w-0 items-center gap-2.5">
-                  {isSyncedFromX ? (
-                    <FolderOpen className="w-6 h-6 text-muted-foreground shrink-0" aria-hidden />
-                  ) : (
-                    <Layers className="w-6 h-6 text-primary shrink-0" aria-hidden />
-                  )}
-                  {isSyncedFromX ? (
-                    collection.name
-                  ) : (
-                    <button
-                      type="button"
-                      className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                      onClick={() => {
-                        setName(collection.name ?? "");
-                        setEditingName(true);
-                      }}
-                      aria-label={`Edit collection name ${collection.name}`}
-                    >
-                      {collection.name}
-                    </button>
-                  )}
-                </span>
-              )
-            }
-            description={`${sortedItems.length} bookmark${sortedItems.length !== 1 ? "s" : ""}`}
-            leading={
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-10 shrink-0 border-hairline-soft bg-transparent"
-                onClick={() => router.push("/collections")}
-              >
-                <ArrowLeft className="size-4" />
-              </Button>
-            }
-            actions={
-              <>
-                {isSyncedFromX && (
-                  <>
-                    <Badge variant="outline" className="gap-1.5 border-primary/25 bg-accent-soft text-primary">
-                      Synced from X
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
-                      onClick={handleCopyAsCollection}
-                    >
-                      <Copy className="size-4" />
-                      Copy as Collection
-                    </Button>
-                  </>
-                )}
-                {isUserCollection && (
-                  <Badge variant="outline" className="gap-1.5 border-hairline-soft bg-surface-2/80">
-                    {collection.isPublic ? (
-                      <Globe className="w-3 h-3 text-success" />
-                    ) : (
-                      <Lock className="w-3 h-3" />
-                    )}
-                    {collection.isPublic ? "Public" : "Private"}
-                  </Badge>
-                )}
-                {isUserCollection && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 border-hairline-soft bg-transparent px-3 text-sm"
-                      onClick={handleTogglePublic}
-                    >
-                      {collection.isPublic ? "Make Private" : "Make Public"}
-                    </Button>
-                    {collection.isPublic && collection.shareSlug && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
-                          onClick={handleCopyShareLink}
-                        >
-                          <Copy className="size-4" />
-                          Copy Link
-                        </Button>
-                        <a
-                          href={`/share/${collection.shareSlug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-accent-soft"
-                          aria-label="Open public collection page"
-                          title="Open public collection page"
-                        >
-                          <ExternalLink className="size-4" />
-                        </a>
-                      </>
-                    )}
-                    {sortedItems.length > 0 && collection.isPublic && collection.shareSlug && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="h-9 gap-1.5 px-3 text-sm"
-                        onClick={handleShareOnX}
-                      >
-                        <Share2 className="size-4" />
-                        Share on X
-                      </Button>
-                    )}
-                  </>
-                )}
-                <KeyboardShortcutsHelpButton
-                  open={keyboardShortcutsOpen}
-                  onOpenChange={setKeyboardShortcutsOpen}
-                  groups={COLLECTION_DETAIL_SHORTCUT_GROUPS}
-                  description="Collection bookmark navigation and collection actions."
-                />
-              </>
-            }
+        <PageHeader
+          sticky
+          titleClassName="text-2xl sm:text-3xl"
+          title={
+            <CollectionDetailTitle
+              collection={collection}
+              editingName={editingName}
+              name={name}
+              isSyncedFromX={isSyncedFromX}
+              isUserCollection={isUserCollection}
+              onNameChange={setName}
+              onUpdateName={handleUpdateName}
+              onCancelEditingName={cancelEditingName}
+              onStartEditingName={startEditingName}
+            />
+          }
+          description={itemCountLabel}
+          leading={<CollectionDetailBackButton onBack={goToCollections} />}
+          actions={
+            <>
+              <CollectionDetailHeaderActions
+                collection={collection}
+                sortedItemCount={sortedItems.length}
+                isSyncedFromX={isSyncedFromX}
+                isUserCollection={isUserCollection}
+                onCopyAsCollection={handleCopyAsCollection}
+                onTogglePublic={handleTogglePublic}
+                onCopyShareLink={handleCopyShareLink}
+                onShareOnX={handleShareOnX}
+              />
+              <KeyboardShortcutsHelpButton
+                open={keyboardShortcutsOpen}
+                onOpenChange={setKeyboardShortcutsOpen}
+                groups={COLLECTION_DETAIL_SHORTCUT_GROUPS}
+                description="Collection bookmark navigation and collection actions."
+              />
+            </>
+          }
+        />
+
+        <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-5">
+          {collection.description ? (
+            <CollectionDetailDescription description={collection.description} />
+          ) : null}
+
+          <CollectionDetailBookmarkList
+            sortedItems={sortedItems}
+            isSyncedFromX={isSyncedFromX}
+            aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+            activeBookmarkId={activeBookmarkId}
+            reordering={reordering}
+            onSelectBookmark={setActiveBookmarkId}
+            onRemoveItem={handleRemoveItem}
+            onMoveItem={moveItem}
+            onGoToDashboard={goToDashboard}
           />
-
-      <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-5">
-        {collection.description && (
-          <div className="border-b border-hairline-soft py-4">
-            <p
-              className={cn(
-                "mx-auto text-sm leading-6 text-muted-foreground",
-                bookmarkFeedMaxWidthClassName
-              )}
-            >
-              {collection.description}
-            </p>
-          </div>
-        )}
-
-        {sortedItems.length === 0 ? (
-          <div className="py-20 text-center">
-            <div className="mx-auto max-w-md rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-8">
-            {isSyncedFromX ? (
-              <FolderOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
-            ) : (
-              <Layers className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
-            )}
-            <p className="text-muted-foreground">
-              No bookmarks in this collection yet.
-              <br />
-              Add bookmarks from the dashboard.
-            </p>
-            {!isSyncedFromX && (
-              <div className="mt-4 flex justify-center">
-                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
-                  Go to dashboard
-                </Button>
-              </div>
-            )}
-            </div>
-          </div>
-        ) : (
-          <div>
-            {sortedItems.map((item, index) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "group flex gap-2 sm:gap-3",
-                  isSyncedFromX
-                    ? bookmarkCollectionRowSyncedClassName
-                    : bookmarkCollectionRowWithReorderClassName
-                )}
-              >
-                {!isSyncedFromX && (
-                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 sm:px-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                      disabled={reordering || index === 0}
-                      onClick={() => moveItem(index, -1)}
-                      aria-label="Move bookmark up"
-                    >
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                      disabled={reordering || index === sortedItems.length - 1}
-                      onClick={() => moveItem(index, 1)}
-                      aria-label="Move bookmark down"
-                    >
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                  </div>
-                )}
-                <div
-                  className={
-                    isSyncedFromX ? "min-w-0 flex-1" : bookmarkCollectionCardCellClassName
-                  }
-                >
-                  <BookmarkCard
-                    bookmark={item.bookmark}
-                    viewMode="feed"
-                    priorityMedia={item.bookmark.id === aboveFoldMediaBookmarkId}
-                    selected={activeBookmarkId === item.bookmark.id}
-                    onSelect={setActiveBookmarkId}
-                    onDelete={
-                      isSyncedFromX
-                        ? undefined
-                        : () => handleRemoveItem(item.bookmark.id)
-                    }
-                    deleteLabel={
-                      isSyncedFromX ? undefined : "Remove from collection"
-                    }
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
+        </main>
       </div>
 
       <ShareDialog

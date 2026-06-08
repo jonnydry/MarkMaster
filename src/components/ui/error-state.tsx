@@ -2,8 +2,6 @@
 
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme } from "@/components/providers";
-import { useTypography } from "@/hooks/use-typography";
 
 export type ErrorStateLayout = "page" | "panel" | "inline" | "stage";
 
@@ -31,8 +29,6 @@ export function ErrorState({
   layout = "page",
   className,
 }: ErrorStateProps) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
   const isStage = layout === "stage";
   const showIcon = layout === "page";
 
@@ -43,30 +39,18 @@ export function ErrorState({
         ? "font-medium"
         : "text-lg font-semibold",
     isStage && "text-lg font-medium text-white",
-    !isStage && layout !== "inline" && layout !== "panel" &&
-      (isOrbital ? t.display : "heading-font text-foreground")
+    !isStage && layout !== "inline" && layout !== "panel" && "heading-font text-foreground"
   );
 
   const descriptionClass = cn(
     layout === "panel" ? "mt-1 text-xs text-muted-foreground" : "mt-1.5 max-w-xs text-sm leading-6",
-    isStage ? "text-sm text-white/65" : "text-muted-foreground",
-    isOrbital &&
-      !isStage &&
-      layout !== "inline" &&
-      cn(t.label, "normal-case tracking-normal text-muted-foreground")
+    isStage ? "text-sm text-white/65" : "text-muted-foreground"
   );
 
   return (
     <div className={cn(layoutShell[layout], className)} role="alert">
       {showIcon ? (
-        <div
-          className={cn(
-            "mb-3 flex h-10 w-10 items-center justify-center rounded-full",
-            isOrbital
-              ? "border border-destructive/30 bg-destructive/10 text-destructive"
-              : "bg-destructive/10 text-destructive"
-          )}
-        >
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertTriangle className="h-5 w-5" aria-hidden="true" />
         </div>
       ) : null}

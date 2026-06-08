@@ -12,22 +12,19 @@ import {
   Maximize2,
   Minimize2,
   BadgeCheck,
-  Check,
-} from "lucide-react";
+  Check} from "lucide-react";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   X_POST_METRIC_ICON_CLASS,
   XPostLikeIcon,
   XPostReplyIcon,
-  XPostRepostIcon,
-} from "@/components/brands/x-post-metric-icons";
+  XPostRepostIcon} from "@/components/brands/x-post-metric-icons";
 import { Button } from "@/components/ui/button";
 import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
-import { orbital } from "@/components/orbital";
-import { useOrbitalTheme } from "@/components/providers";
+import { formatCompactCount } from "@/lib/format-metrics";
 import { useTypography } from "@/hooks/use-typography";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
@@ -58,20 +55,12 @@ interface BookmarkCardProps {
   onOpenExpanded?: (bookmarkId: string) => void;
 }
 
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
-}
-
 function TagPill({
   name,
-  onClick,
-  isOrbital = false,
-}: {
+  onClick}: {
   name: string;
   onClick?: () => void;
-  isOrbital?: boolean;
+  
 }) {
   return (
     <button
@@ -81,12 +70,7 @@ function TagPill({
         onClick?.();
       }}
       className={
-        isOrbital
-          ? cn(
-              orbital.pill,
-              "text-muted-foreground hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
-            )
-          : "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+        "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
       }
     >
       {name}
@@ -96,12 +80,10 @@ function TagPill({
 
 function BookmarkRank({
   rank,
-  compact = false,
-  isOrbital = false,
-}: {
+  compact = false}: {
   rank?: number;
   compact?: boolean;
-  isOrbital?: boolean;
+  
 }) {
   if (typeof rank !== "number") return null;
 
@@ -109,7 +91,7 @@ function BookmarkRank({
     <div
       aria-hidden="true"
       className={cn(
-        isOrbital ? orbital.data : "tabular-nums text-muted-foreground/55",
+        "tabular-nums text-muted-foreground/55",
         "flex shrink-0 flex-col items-center",
         compact ? "w-7 pt-0.5" : "w-8 pt-1"
       )}
@@ -132,8 +114,7 @@ function ActionButton({
   label,
   onClick,
   shortcut,
-  active,
-}: {
+  active}: {
   icon: React.ElementType;
   label: string;
   onClick: () => void;
@@ -163,8 +144,7 @@ function ActionButton({
 
 function SelectionToggle({
   selected,
-  onToggle,
-}: {
+  onToggle}: {
   selected?: boolean;
   onToggle: () => void;
 }) {
@@ -208,9 +188,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   isPerformanceHighlight = false,
   compactExpanded = false,
   onCompactExpandedChange,
-  onOpenExpanded,
-}: BookmarkCardProps) {
-  const { isOrbital } = useOrbitalTheme();
+  onOpenExpanded}: BookmarkCardProps) {
   const t = useTypography();
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
@@ -277,9 +255,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           isInteractive ? "cursor-pointer" : ""
         } ${
           selected
-            ? isOrbital
-              ? "border-l-2 border-l-primary/70 bg-primary/[0.04] " + orbital.glass
-              : "border-l-2 border-l-primary bg-primary/[0.04]"
+            ? "border-l-2 border-l-primary bg-primary/[0.04]"
             : ""
         }${className ? ` ${className}` : ""}`}
         data-dashboard-bookmark-id={bookmark.id}
@@ -297,7 +273,7 @@ export const BookmarkCard = memo(function BookmarkCard({
         onClick={isInteractive ? handleCardActivation : undefined}
         onKeyDown={handleCardKeyDown}
       >
-        <BookmarkRank rank={rank} compact isOrbital={isOrbital} />
+        <BookmarkRank rank={rank} compact  />
         {selectionMode && (
           <SelectionToggle
             selected={selected}
@@ -321,8 +297,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground text-xs whitespace-nowrap">
               {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
-                addSuffix: true,
-              })}
+                addSuffix: true})}
             </span>
             <XLogoMark
               className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -332,9 +307,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {isPerformanceHighlight && (
             <div
               className={
-                isOrbital
-                  ? cn(orbital.badge("cyan"), "inline-flex items-center gap-1 rounded-sm px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em]")
-                  : "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-primary"
+                "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-primary"
               }
             >
               Performance highlight • Top engagement unsorted
@@ -350,7 +323,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
-                  isOrbital={isOrbital}
+                  
                 />
               ))}
             </div>
@@ -360,11 +333,11 @@ export const BookmarkCard = memo(function BookmarkCard({
           <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
             <span className="flex items-center gap-1">
               <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-              {formatCount(metrics.like_count)}
+              {formatCompactCount(metrics.like_count)}
             </span>
             <span className="flex items-center gap-1">
               <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-              {formatCount(metrics.retweet_count)}
+              {formatCompactCount(metrics.retweet_count)}
             </span>
           </div>
         )}
@@ -379,12 +352,8 @@ export const BookmarkCard = memo(function BookmarkCard({
       } ${
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
-            ? isOrbital
-              ? "border-l-[3px] border-l-primary bg-primary/[0.05] " + orbital.glass + " ring-1 ring-inset ring-primary/25"
-              : "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
-            : isOrbital
-              ? "border-l-2 border-l-primary/70 bg-primary/[0.04] " + orbital.glass
-              : "border-l-2 border-l-primary bg-primary/[0.04]"
+            ? "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
+            : "border-l-2 border-l-primary bg-primary/[0.04]"
           : ""
       } ${
         compactExpanded
@@ -413,7 +382,7 @@ export const BookmarkCard = memo(function BookmarkCard({
       onKeyDown={handleCardKeyDown}
     >
       <div className="flex gap-3">
-        <BookmarkRank rank={rank} isOrbital={isOrbital} />
+        <BookmarkRank rank={rank}  />
         {selectionMode && (
           <SelectionToggle
             selected={selected}
@@ -458,8 +427,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 <span className="text-muted-foreground">·</span>
                 <span className="text-muted-foreground whitespace-nowrap">
                   {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
-                    addSuffix: true,
-                  })}
+                    addSuffix: true})}
                 </span>
               </div>
               <XLogoMark
@@ -545,8 +513,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               priority={priorityMedia}
               tweetLink={{
                 authorUsername: bookmark.authorUsername,
-                tweetId: bookmark.tweetId,
-              }}
+                tweetId: bookmark.tweetId}}
             />
           )}
 
@@ -584,7 +551,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
-                  isOrbital={isOrbital}
+                  
                 />
               ))}
             </div>
@@ -595,17 +562,17 @@ export const BookmarkCard = memo(function BookmarkCard({
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Replies</dt>
                 <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.reply_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.reply_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Reposts</dt>
                 <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.retweet_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.retweet_count)}</dd>
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <dt className="sr-only">Likes</dt>
                 <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCount(metrics.like_count)}</dd>
+                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.like_count)}</dd>
               </div>
             </dl>
           )}

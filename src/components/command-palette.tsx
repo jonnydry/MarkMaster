@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Search, Image, Video, Link, FileText, Sparkles, Type } from "lucide-react";
+import { Search, Image, Video, Link, FileText, Palette, Type } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme, useFontMode } from "@/components/providers";
-import { orbital, OrbitalBadge } from "@/components/orbital";
+import { useColorTheme, useFontMode } from "@/components/providers";
+import { COLOR_THEMES } from "@/lib/color-themes";
 import { useTypography } from "@/hooks/use-typography";
 import type { TagWithCount, MediaFilter } from "@/types";
 
@@ -31,7 +31,7 @@ const MEDIA_FILTERS: { value: MediaFilter; label: string; icon: React.ElementTyp
 type CommandItem =
   | { kind: "media"; value: MediaFilter; label: string; icon: React.ElementType; shortcut: string }
   | { kind: "tag"; id: string; name: string; color: string; count: number }
-  | { kind: "action"; id: string; label: string; description?: string; action: () => void; icon?: React.ElementType };
+  | { kind: "action"; id: string; label: string; description?: string; action: () => void; icon?: React.ElementType; active?: boolean };
 
 export function CommandPalette({
   open,
@@ -43,7 +43,7 @@ export function CommandPalette({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const normalizedQuery = query.trim().toLowerCase();
 
-  const { isOrbital, toggleOrbital } = useOrbitalTheme();
+  const { colorTheme, setColorTheme } = useColorTheme();
   const { fontMode, toggleFontMode } = useFontMode();
   const t = useTypography();
 
@@ -79,19 +79,30 @@ export function CommandPalette({
     return [];
   }, [normalizedQuery, tags, filteredTags]);
 
-  // Appearance actions (Orbital + Monospace) — shown when query matches or is empty for discoverability
+  // Appearance actions — shown when query matches or is empty for discoverability
   const appearanceActions = useMemo(() => {
     const q = normalizedQuery;
-    if (!q || q.includes("orbital") || q.includes("theme") || q.includes("mono") || q.includes("font") || q.includes("design")) {
+    if (
+      !q ||
+      q.includes("color") ||
+      q.includes("accent") ||
+      q.includes("theme") ||
+      q.includes("mono") ||
+      q.includes("font") ||
+      q.includes("design") ||
+      COLOR_THEMES.some((theme) => theme.name.toLowerCase().includes(q))
+    ) {
+      const colorActions = COLOR_THEMES.map((theme) => ({
+        kind: "action" as const,
+        id: `color-${theme.id}`,
+        label: `Use ${theme.name}`,
+        description: theme.description,
+        action: () => setColorTheme(theme.id),
+        icon: Palette,
+        active: colorTheme === theme.id,
+      }));
       return [
-        {
-          kind: "action" as const,
-          id: "toggle-orbital",
-          label: isOrbital ? "Disable Orbit Theme" : "Enable Orbit Theme",
-          description: "Futuristic minimalism • glassmorphism • mission control",
-          action: toggleOrbital,
-          icon: Sparkles,
-        },
+        ...colorActions,
         {
           kind: "action" as const,
           id: "toggle-mono",
@@ -99,11 +110,12 @@ export function CommandPalette({
           description: "JetBrains Mono for telemetry and terminal feel",
           action: toggleFontMode,
           icon: Type,
+          active: fontMode === "mono",
         },
       ];
     }
     return [];
-  }, [normalizedQuery, isOrbital, fontMode, toggleOrbital, toggleFontMode]);
+  }, [normalizedQuery, colorTheme, fontMode, setColorTheme, toggleFontMode]);
 
   const allItems = useMemo(() => {
     // Show appearance actions at the top when relevant for discoverability
@@ -205,11 +217,7 @@ export function CommandPalette({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className={cn(
-          "p-0 gap-0 max-w-[560px] overflow-hidden",
-          // Full orbital surface treatment on the palette container (glass + subtle ring) only when theme active
-          isOrbital && orbital.glass
-        )}
+        className="p-0 gap-0 max-w-[560px] overflow-hidden"
         onKeyDown={handleKeyDown}
         showCloseButton={false}
       >
@@ -236,11 +244,7 @@ export function CommandPalette({
         <div
           id="cmd-list"
           role="listbox"
-          className={cn(
-            "p-2 max-h-[400px] overflow-y-auto",
-            // Additional orbital container treatment for the results list area
-            isOrbital && "border-t border-primary/10 bg-surface-1/50"
-          )}
+          className="p-2 max-h-[400px] overflow-y-auto"
         >
           {allItems.map((item, i) => {
             const isFocused = i === resolvedFocusedIndex;
@@ -297,8 +301,7 @@ export function CommandPalette({
                   }}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-muted",
-                    isFocused && "menu-selection-active pr-5",
-                    item.kind === "action" && isOrbital && orbital.glass
+                    isFocused && "menu-selection-active pr-5"
                   )}
                 >
                   {item.kind === "media" ? (
@@ -317,26 +320,25 @@ export function CommandPalette({
                       <span className="text-xs text-muted-foreground">{item.count}</span>
                     </>
                   ) : (
-                    // Action items (Orbital / Monospace toggles) — full native orbital styling
                     <>
                       {item.icon ? (
-                        <item.icon className={cn("w-4 h-4 shrink-0", isOrbital ? orbital.icon : "text-muted-foreground")} />
+                        <item.icon className="w-4 h-4 shrink-0 text-muted-foreground" />
                       ) : (
-                        <div className={cn("w-4 h-4 rounded-sm shrink-0", isOrbital ? orbital.icon : "bg-muted text-muted-foreground")} />
+                        <div className="w-4 h-4 rounded-sm shrink-0 bg-muted text-muted-foreground" />
                       )}
                       <div className="flex-1 text-left min-w-0">
                         <div className="flex items-center gap-2">
                           <span>{item.label}</span>
-                          {/* Live state badge using canonical thin component */}
-                          {((item.id === "toggle-orbital" && isOrbital) || (item.id === "toggle-mono" && fontMode === "mono")) && (
-                            <OrbitalBadge tone="cyan" className="text-[9px] py-0">Active</OrbitalBadge>
+                          {item.active && (
+                            <span className="rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wider text-primary">
+                              Active
+                            </span>
                           )}
                         </div>
                         {item.description && (
-                          <div className={cn(
-                            "text-[10px] text-muted-foreground/70 mt-0.5",
-                            isOrbital && orbital.label
-                          )}>{item.description}</div>
+                          <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                            {item.description}
+                          </div>
                         )}
                       </div>
                     </>

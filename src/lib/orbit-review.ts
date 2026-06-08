@@ -110,6 +110,68 @@ export function createOrbitReviewDraft(
   );
 }
 
+export interface OrbitReviewAppliedImpact {
+  tagNames: string[];
+  collectionName: string | null;
+}
+
+export function getDraftAppliedImpact(
+  draft: OrbitReviewSuggestionDraft
+): OrbitReviewAppliedImpact {
+  const tagNames = orbitReviewDecisionUsesTags(draft.decision)
+    ? splitTagNames(draft.tagNames)
+    : [];
+  const collectionName =
+    orbitReviewDecisionUsesCollection(draft.decision) &&
+    draft.collectionName.trim()
+      ? draft.collectionName.trim()
+      : null;
+
+  return { tagNames, collectionName };
+}
+
+export function getGrokProposedImpact(
+  original: OrbitBookmarkSuggestion | null | undefined
+): OrbitReviewAppliedImpact {
+  if (!original) return { tagNames: [], collectionName: null };
+
+  return {
+    tagNames: original.tags.map((tag) => tag.name),
+    collectionName: original.collection?.name ?? null,
+  };
+}
+
+export interface OrbitReviewBatchImpactSummary {
+  tagNames: string[];
+  collectionNames: string[];
+}
+
+export function summarizeReviewBatchImpact(
+  drafts: OrbitReviewSuggestionDraft[]
+): OrbitReviewBatchImpactSummary {
+  const tagNames = new Map<string, string>();
+  const collectionNames = new Map<string, string>();
+
+  for (const draft of drafts) {
+    const impact = getDraftAppliedImpact(draft);
+    for (const tag of impact.tagNames) {
+      const key = normalizeKey(tag);
+      if (!tagNames.has(key)) tagNames.set(key, tag);
+    }
+    if (impact.collectionName) {
+      const key = normalizeKey(impact.collectionName);
+      if (!collectionNames.has(key)) {
+        collectionNames.set(key, impact.collectionName);
+      }
+    }
+  }
+
+  return {
+    tagNames: Array.from(tagNames.values()),
+    collectionNames: Array.from(collectionNames.values()),
+  };
+}
+
 export function buildReviewedOrbitPlan({
   sourcePlan,
   drafts,

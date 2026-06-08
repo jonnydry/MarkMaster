@@ -4,7 +4,6 @@ import type { ReactNode, RefObject } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Search, X } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
-import { useOrbitalTheme } from "@/components/providers";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
@@ -118,7 +117,6 @@ export function ToolbarSegmentControl<T extends string>({
   size = "sm",
   className,
 }: ToolbarSegmentControlProps<T>) {
-  const { isOrbital } = useOrbitalTheme();
   const buttonHeight = size === "md" ? "h-8" : "h-7";
 
   return (
@@ -129,7 +127,7 @@ export function ToolbarSegmentControl<T extends string>({
         "inline-flex rounded-sm border p-0.5",
         variant === "library"
           ? "border-hairline-soft bg-background/35"
-          : cn(orbitHairlineBorder(isOrbital), isOrbital ? "bg-surface-2/70" : "bg-white/[0.04]"),
+          : cn(orbitHairlineBorder(), "bg-white/[0.04]"),
         className
       )}
     >
@@ -147,9 +145,7 @@ export function ToolbarSegmentControl<T extends string>({
               ? "bg-primary text-primary-foreground"
               : variant === "library"
                 ? "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                : isOrbital
-                  ? "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                  : "text-white/60 hover:bg-white/[0.06] hover:text-white"
+                : "text-white/60 hover:bg-white/[0.06] hover:text-white"
           )}
         >
           {option.label}

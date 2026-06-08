@@ -18,7 +18,6 @@ import { MarkMasterLogo } from "@/components/markmaster-logo";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTypography } from "@/hooks/use-typography";
-import { useOrbitalTheme } from "@/components/providers";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
@@ -69,7 +68,6 @@ export function Sidebar({
   onSyncStateChange,
 }: SidebarProps) {
   const t = useTypography();
-  const { isOrbital } = useOrbitalTheme();
   const pathname = usePathname();
   const { expanded: ctxExpanded, toggle } = useSidebar();
   const expanded = forceExpanded ? true : ctxExpanded;
@@ -142,7 +140,6 @@ export function Sidebar({
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive =
             pathname === href || (href === "/dashboard" && pathname === "/");
-          const isOrbitNav = href === "/orbit";
           return (
             <Link
               key={href}
@@ -153,22 +150,11 @@ export function Sidebar({
                 isActive
                   ? "menu-selection-active font-semibold"
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground",
-                expanded ? "h-10 gap-3 px-2.5" : "h-10 w-10 justify-center",
-                isOrbitNav &&
-                  isOrbital &&
-                  !isActive &&
-                  "shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)] hover:shadow-[inset_0_0_12px_hsl(var(--primary)/0.08),inset_0_0_0_1px_hsl(var(--primary)/0.2)]",
-                isOrbitNav &&
-                  isOrbital &&
-                  isActive &&
-                  "shadow-[inset_0_0_16px_hsl(var(--primary)/0.12),inset_0_0_0_1px_hsl(var(--primary)/0.25)]"
+                expanded ? "h-10 gap-3 px-2.5" : "h-10 w-10 justify-center"
               )}
             >
               <Icon
-                className={cn(
-                  "size-5 shrink-0",
-                  isOrbitNav && isOrbital && "text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.45)]"
-                )}
+                className="size-5 shrink-0"
               />
               {expanded && (
                 <span className={cn(t.bodyStrong, "leading-none")}>{label}</span>

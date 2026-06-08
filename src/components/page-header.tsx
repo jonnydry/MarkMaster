@@ -5,8 +5,6 @@ import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
-import { useOrbitalTheme } from "@/components/providers";
-import { OrbitalBadge } from "@/components/orbital";
 
 type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   title?: ReactNode;
@@ -36,17 +34,12 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   const t = useTypography();
-  const { isOrbital } = useOrbitalTheme();
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
     "shrink-0",
     chromeless
       ? "border-b-0 bg-transparent"
-      : cn(
-          "border-b border-hairline-strong",
-          appChromeFrostedClassName,
-          isOrbital && "shadow-[inset_0_-1px_0_var(--accent-glow)]"
-        ),
+      : cn("border-b border-hairline-strong", appChromeFrostedClassName),
     sticky && "sticky top-0 z-[var(--z-sticky-header)]",
     className
   );
@@ -69,11 +62,6 @@ export function PageHeader({
                     >
                       {title}
                     </h1>
-                    {isOrbital ? (
-                      <OrbitalBadge tone="cyan" className="hidden shrink-0 sm:inline-flex">
-                        Orbit
-                      </OrbitalBadge>
-                    ) : null}
                   </div>
                 ) : null}
                 {description ? (

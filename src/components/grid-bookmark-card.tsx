@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { createTextHighlighter } from "@/lib/text-highlighter";
+import { formatCompactCount } from "@/lib/format-metrics";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -34,12 +35,6 @@ interface GridBookmarkCardProps {
   className?: string;
   priorityMedia?: boolean;
   isPerformanceHighlight?: boolean;
-}
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
 }
 
 function getGridMediaAspectClass(media?: BookmarkMediaJson): string {
@@ -119,7 +114,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   const hasNote = bookmark.notes.length > 0;
   const primaryTag = bookmark.tags[0]?.tag;
   const extraTagCount = Math.max(bookmark.tags.length - 1, 0);
-  const likeLabel = metrics?.like_count ? `${formatCount(metrics.like_count)} likes` : null;
+  const likeLabel = metrics?.like_count ? `${formatCompactCount(metrics.like_count)} likes` : null;
   const isInteractive = selectionMode || Boolean(onSelect);
   const highlighter = useMemo(
     () => createTextHighlighter(searchQuery),

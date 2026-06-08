@@ -1,6 +1,5 @@
 "use client";
 
-import { useOrbitalTheme } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import type { OrbitGraphStats } from "@/types";
 
@@ -13,37 +12,31 @@ export function OrbitMapStatsStrip({
   stats,
   truncatedCount,
 }: OrbitMapStatsStripProps) {
-  const { isOrbital } = useOrbitalTheme();
 
   return (
     <div
       className={cn(
         "pointer-events-none absolute bottom-4 left-4 z-20 hidden max-w-[calc(100%-6rem)] items-center gap-3 rounded-sm border px-3 py-2 backdrop-blur-xl lg:flex",
-        isOrbital
-          ? "border-hairline-soft bg-surface-1/75 text-muted-foreground"
-          : "border-white/[0.06] bg-[#0b1220]/58 text-white/60"
+        "border-white/[0.06] bg-[#0b1220]/58 text-white/60"
       )}
     >
       <MapMetric
         label="Loose"
         value={stats.looseBookmarks}
-        isOrbital={isOrbital}
       />
-      <MapMetricDivider isOrbital={isOrbital} />
-      <MapMetric label="Tags" value={stats.tagCount} isOrbital={isOrbital} />
-      <MapMetricDivider isOrbital={isOrbital} />
+      <MapMetricDivider />
+      <MapMetric label="Tags" value={stats.tagCount} />
+      <MapMetricDivider />
       <MapMetric
         label="Collections"
         value={stats.userCollectionCount + stats.xFolderCount}
-        isOrbital={isOrbital}
       />
       {truncatedCount > 0 && (
         <>
-          <MapMetricDivider isOrbital={isOrbital} />
+          <MapMetricDivider />
           <MapMetric
             label="Hidden"
             value={truncatedCount}
-            isOrbital={isOrbital}
           />
         </>
       )}
@@ -54,18 +47,16 @@ export function OrbitMapStatsStrip({
 function MapMetric({
   label,
   value,
-  isOrbital,
 }: {
   label: string;
   value: number;
-  isOrbital: boolean;
 }) {
   return (
     <div className="min-w-0">
       <p
         className={cn(
           "text-[10px] font-medium uppercase tracking-[0.2em]",
-          isOrbital ? "text-muted-foreground" : "text-white/35"
+          "text-white/35"
         )}
       >
         {label}
@@ -73,7 +64,7 @@ function MapMetric({
       <p
         className={cn(
           "text-sm font-semibold tabular-nums",
-          isOrbital ? "text-foreground" : "text-white/75"
+          "text-white/75"
         )}
       >
         {value.toLocaleString()}
@@ -82,12 +73,12 @@ function MapMetric({
   );
 }
 
-function MapMetricDivider({ isOrbital }: { isOrbital: boolean }) {
+function MapMetricDivider() {
   return (
     <span
       className={cn(
         "h-6 w-px",
-        isOrbital ? "bg-hairline-soft" : "bg-white/[0.08]"
+        "bg-white/[0.08]"
       )}
     />
   );

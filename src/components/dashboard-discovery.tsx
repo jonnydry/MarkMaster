@@ -6,21 +6,18 @@ import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import {
   HighlightScrollSlide,
-  HighlightScrollStrip,
-} from "@/components/highlight-scroll-strip";
+  HighlightScrollStrip} from "@/components/highlight-scroll-strip";
 import { HighlightCard } from "@/components/highlight-card";
 import { ModuleHeader } from "@/components/module-header";
 import { Button } from "@/components/ui/button";
 import {
   useDashboardDiscovery,
-  type DashboardDiscoveryParentData,
-} from "@/hooks/use-dashboard-discovery";
+  type DashboardDiscoveryParentData} from "@/hooks/use-dashboard-discovery";
 import { useTypography } from "@/hooks/use-typography";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
-import { useOrbitalTheme } from "@/components/providers";
 import type { BookmarkWithRelations } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
 import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
@@ -41,8 +38,7 @@ export interface DashboardDiscoveryProps {
 
 const variantShellClass: Record<NonNullable<DashboardDiscoveryProps["variant"]>, string> = {
   default: cn("mb-3", bookmarkFeedColumnClassName),
-  flush: "mb-0 max-w-none px-0",
-};
+  flush: "mb-0 max-w-none px-0"};
 
 export function DashboardDiscovery({
   feedReady = true,
@@ -53,10 +49,8 @@ export function DashboardDiscovery({
   onSaveAsCollection,
   explainer,
   variant = "default",
-  className,
-}: DashboardDiscoveryProps) {
+  className}: DashboardDiscoveryProps) {
   const router = useRouter();
-  const { isOrbital } = useOrbitalTheme();
   const t = useTypography();
 
   const {
@@ -69,8 +63,7 @@ export function DashboardDiscovery({
     ritualTotal = 0,
     resurfacedCount = 0,
     discoveryEngagement = 0,
-    itemLabels = {},
-  } = useDashboardDiscovery({ feedReady, parentData });
+    itemLabels = {}} = useDashboardDiscovery({ feedReady, parentData });
 
   const shellClass = variantShellClass[variant];
 
@@ -81,17 +74,14 @@ export function DashboardDiscovery({
     nurturedCount,
     celebration,
     handleReviewInOrbit,
-    handleSaveAsCollection,
-  } = useDiscoveryRitual({
+    handleSaveAsCollection} = useDiscoveryRitual({
     batch: ritualBatch,
-    onSaveAsCollection,
-  });
+    onSaveAsCollection});
 
   const handleOrbitReview = (id: string) => {
     trackFlywheelEvent("cta.review_in_orbit", {
       source: "discovery",
-      bookmarkId: id,
-    });
+      bookmarkId: id});
     router.push(`/orbit?highlightId=${id}`);
   };
 
@@ -255,9 +245,7 @@ export function DashboardDiscovery({
                   <div
                     className={cn(
                       "relative flex h-full min-h-[10rem] flex-col items-center justify-center rounded-sm border bg-surface-1/55 p-3.5 text-center",
-                      isOrbital
-                        ? "border-primary/30 bg-surface-1/70"
-                        : "border-primary/20 hover:border-primary/30"
+                      "border-primary/20 hover:border-primary/30"
                     )}
                   >
                     <span

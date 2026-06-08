@@ -2,9 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { useOrbitalTheme } from "@/components/providers";
-import { useTypography } from "@/hooks/use-typography";
-import { orbital } from "@/components/orbital";
 
 export type EmptyStateLayout = "page" | "panel" | "inline" | "stage";
 
@@ -36,8 +33,6 @@ export function EmptyState({
   layout = "page",
   className,
 }: EmptyStateProps) {
-  const { isOrbital } = useOrbitalTheme();
-  const t = useTypography();
   const isStage = layout === "stage";
 
   const titleClass = cn(
@@ -47,13 +42,12 @@ export function EmptyState({
         ? "text-lg font-medium"
         : "text-base font-semibold",
     isStage && "text-lg font-medium text-foreground",
-    !isStage && (isOrbital ? cn(t.display, "text-foreground") : "heading-font text-foreground")
+    !isStage && "heading-font text-foreground"
   );
 
   const descriptionClass = cn(
     layout === "panel" ? "mx-auto mt-2 max-w-md text-sm text-muted-foreground" : "mt-2 max-w-xs text-sm leading-6",
-    isStage ? "max-w-md text-sm text-muted-foreground" : "text-muted-foreground",
-    isOrbital && cn(t.label, "normal-case tracking-normal text-muted-foreground")
+    isStage ? "max-w-md text-sm text-muted-foreground" : "text-muted-foreground"
   );
 
   const iconWrapClass = cn(
@@ -74,11 +68,6 @@ export function EmptyState({
       {description ? <p className={descriptionClass}>{description}</p> : null}
       {action ? (
         <div className={layout === "page" ? "mt-5" : "mt-4"}>{action}</div>
-      ) : null}
-      {isOrbital && layout === "page" ? (
-        <div className={cn(orbital.label, "mt-6 text-primary/40")} aria-hidden>
-          ◌
-        </div>
       ) : null}
     </div>
   );

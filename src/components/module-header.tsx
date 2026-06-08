@@ -3,8 +3,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
-import { orbital } from "@/components/orbital";
-import { useOrbitalTheme } from "@/components/providers";
 import { useTypography } from "@/hooks/use-typography";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +29,6 @@ export function ModuleHeader({
   iconClassName,
   contentClassName,
 }: ModuleHeaderProps) {
-  const { isOrbital } = useOrbitalTheme();
   const t = useTypography();
 
   return (
@@ -39,8 +36,7 @@ export function ModuleHeader({
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <div
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm",
-            isOrbital ? orbital.icon : "bg-primary/10 text-primary",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary",
             iconClassName
           )}
         >
@@ -50,8 +46,7 @@ export function ModuleHeader({
           <p
             className={cn(
               t.sectionLabel,
-              "mb-0 text-primary/70",
-              !isOrbital && "text-muted-foreground"
+              "mb-0 text-primary/70 text-muted-foreground"
             )}
           >
             {eyebrow}

@@ -1,11 +1,7 @@
 /**
  * Central typography contract for MarkMaster.
  *
- * monoNative is true when either:
- * - Monospace UI toggle is on (`fontMode === "mono"`), or
- * - Orbit Theme is enabled (`isOrbital` / `.theme-orbital` on `html`).
- *
- * The /orbit route does not force mono; use orbit-route-chrome for blue-default chrome there.
+ * monoNative is true when the Monospace UI toggle is on (`fontMode === "mono"`).
  */
 
 export const MONO_LABEL = "text-mono-label tracking-[0.14em]";
@@ -24,9 +20,8 @@ export type FontMode = "default" | "mono";
 
 export function resolveMonoNative(opts: {
   fontMode?: FontMode;
-  isOrbital?: boolean;
 }): boolean {
-  return opts.fontMode === "mono" || !!opts.isOrbital;
+  return opts.fontMode === "mono";
 }
 
 export type TypographyClasses = {
@@ -53,7 +48,7 @@ export function getTypographyClasses(monoNative: boolean): TypographyClasses {
   };
 }
 
-/** Orbital surface tokens — mono tier classes apply under .theme-orbital (Orbit theme toggle). */
+/** Shared mono typography tokens for elevated panel components. */
 export const orbitalTypography = {
   label: MONO_LABEL,
   data: MONO_DATA,

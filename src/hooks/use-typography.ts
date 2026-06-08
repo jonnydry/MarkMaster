@@ -1,6 +1,6 @@
 "use client";
 
-import { useFontMode, useOrbitalTheme } from "@/components/providers";
+import { useFontMode } from "@/components/providers";
 import {
   getTypographyClasses,
   resolveMonoNative,
@@ -9,7 +9,6 @@ import {
 
 export function useTypography(): TypographyClasses {
   const { fontMode } = useFontMode();
-  const { isOrbital } = useOrbitalTheme();
-  const monoNative = resolveMonoNative({ fontMode, isOrbital });
+  const monoNative = resolveMonoNative({ fontMode });
   return getTypographyClasses(monoNative);
 }

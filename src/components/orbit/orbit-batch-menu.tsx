@@ -3,17 +3,14 @@
 import { Check, ChevronDown, Lock } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useOrbitalTheme } from "@/components/providers";
 import {
   orbitControlRadius,
   orbitLabelClass,
-  orbitMetaMuted,
-} from "@/lib/orbit-route-chrome";
+  orbitMetaMuted} from "@/lib/orbit-route-chrome";
 import {
   ORBIT_SCAN_BATCH_PROFILES,
   type OrbitScanBatchMode,
-  type OrbitScanBatchProfileId,
-} from "@/lib/orbit-config";
+  type OrbitScanBatchProfileId} from "@/lib/orbit-config";
 import { cn } from "@/lib/utils";
 
 const BATCH_OPTIONS: Array<{
@@ -25,18 +22,15 @@ const BATCH_OPTIONS: Array<{
   {
     mode: "quick",
     label: `Quick`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.quick.size} bookmarks · fastest pass`,
-  },
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.quick.size} bookmarks · fastest pass`},
   {
     mode: "balanced",
     label: `Balanced`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.balanced.size} bookmarks · when signal is reliable`,
-  },
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.balanced.size} bookmarks · when signal is reliable`},
   {
     mode: "deep",
     label: `Deep`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · largest pass`,
-  },
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · largest pass`},
 ];
 
 export interface OrbitBatchMenuProps {
@@ -62,9 +56,7 @@ export function OrbitBatchMenu({
   deepLockedReason,
   disabled = false,
   onBatchModeChange,
-  attached = false,
-}: OrbitBatchMenuProps) {
-  const { isOrbital } = useOrbitalTheme();
+  attached = false}: OrbitBatchMenuProps) {
 
   const triggerLabel =
     batchMode === "auto"
@@ -78,7 +70,7 @@ export function OrbitBatchMenu({
         aria-label={`Scan batch size: ${triggerLabel}`}
         className={cn(
           "inline-flex h-8 shrink-0 items-center gap-1 border border-hairline-soft bg-surface-2/70 px-2 text-[11px] font-semibold text-foreground/85 transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-50",
-          orbitControlRadius(isOrbital) ?? "rounded-sm",
+          orbitControlRadius() ?? "rounded-sm",
           attached && "rounded-l-none border-l-0"
         )}
         title={`Batch size — ${triggerLabel}`}
@@ -94,9 +86,9 @@ export function OrbitBatchMenu({
       <PopoverContent align="end" className="w-64 gap-1 p-1.5">
         <div
           className={cn(
-            orbitLabelClass(isOrbital),
+            orbitLabelClass(),
             "px-2 pb-1 pt-1.5 text-[9px]",
-            orbitMetaMuted(isOrbital)
+            orbitMetaMuted()
           )}
         >
           Grok batch size
@@ -134,7 +126,7 @@ export function OrbitBatchMenu({
                 <span
                   className={cn(
                     "block text-[10px] leading-4",
-                    orbitMetaMuted(isOrbital)
+                    orbitMetaMuted()
                   )}
                 >
                   {locked ? deepLockedReason : option.detail}

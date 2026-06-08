@@ -2,7 +2,6 @@
 
 import { Clock, Filter, Layers, Minus, Plus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme } from "@/components/providers";
 import type { GraphFilter } from "@/lib/orbit-worker-protocol";
 
 const FILTERS = [
@@ -28,9 +27,7 @@ export function OrbitMapCanvasControls({
   onZoomOut,
   onResetView,
   filterControlsClassName,
-  zoomControlsClassName,
-}: OrbitMapCanvasControlsProps) {
-  const { isOrbital } = useOrbitalTheme();
+  zoomControlsClassName}: OrbitMapCanvasControlsProps) {
 
   return (
     <>
@@ -50,12 +47,8 @@ export function OrbitMapCanvasControls({
             className={cn(
               "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
               activeFilter === key
-                ? isOrbital
-                  ? "border-hairline-soft bg-surface-1/90 text-foreground"
-                  : "border-white/[0.08] bg-white/[0.13] text-white"
-                : isOrbital
-                  ? "text-muted-foreground hover:bg-accent-soft/60 hover:text-foreground"
-                  : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+                ? "border-white/[0.08] bg-white/[0.13] text-white"
+                : "text-white/50 hover:bg-white/[0.06] hover:text-white"
             )}
             title={label}
           >
@@ -76,9 +69,7 @@ export function OrbitMapCanvasControls({
         <div
           className={cn(
             "pointer-events-auto inline-flex flex-col overflow-hidden rounded-full border shadow-none backdrop-blur-xl",
-            isOrbital
-              ? "border-hairline-soft bg-surface-1/80"
-              : "border-white/[0.055] bg-white/[0.035]"
+            "border-white/[0.055] bg-white/[0.035]"
           )}
         >
           <button
@@ -87,9 +78,7 @@ export function OrbitMapCanvasControls({
             onClick={onZoomIn}
             className={cn(
               "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-              isOrbital
-                ? "text-foreground/70 hover:bg-accent-soft hover:text-foreground"
-                : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+              "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >
             <Plus className="size-4" />
@@ -97,7 +86,7 @@ export function OrbitMapCanvasControls({
           <span
             className={cn(
               "h-px w-full",
-              isOrbital ? "bg-hairline-soft" : "bg-white/[0.08]"
+              "bg-white/[0.08]"
             )}
           />
           <button
@@ -106,9 +95,7 @@ export function OrbitMapCanvasControls({
             onClick={onZoomOut}
             className={cn(
               "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-              isOrbital
-                ? "text-foreground/70 hover:bg-accent-soft hover:text-foreground"
-                : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+              "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >
             <Minus className="size-4" />
@@ -116,7 +103,7 @@ export function OrbitMapCanvasControls({
           <span
             className={cn(
               "h-px w-full",
-              isOrbital ? "bg-hairline-soft" : "bg-white/[0.08]"
+              "bg-white/[0.08]"
             )}
           />
           <button
@@ -125,9 +112,7 @@ export function OrbitMapCanvasControls({
             onClick={onResetView}
             className={cn(
               "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-              isOrbital
-                ? "text-foreground/70 hover:bg-accent-soft hover:text-foreground"
-                : "text-white/70 hover:bg-white/[0.08] hover:text-white"
+              "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >
             <RotateCcw className="size-4" />

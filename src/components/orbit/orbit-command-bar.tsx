@@ -8,8 +8,7 @@ import {
   Loader2,
   Map as MapIcon,
   RefreshCw,
-  SquareCheckBig,
-} from "lucide-react";
+  SquareCheckBig} from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
@@ -17,23 +16,19 @@ import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { OrbitBatchMenu } from "@/components/orbit/orbit-batch-menu";
-import { useOrbitalTheme } from "@/components/providers";
 import {
   orbitControlRadius,
   orbitDataClass,
   orbitHairlineBorder,
   orbitMetaMuted,
-  orbitMetaSoft,
-} from "@/lib/orbit-route-chrome";
+  orbitMetaSoft} from "@/lib/orbit-route-chrome";
 import {
   type OrbitScanBatchMode,
-  type OrbitScanBatchProfileId,
-} from "@/lib/orbit-config";
+  type OrbitScanBatchProfileId} from "@/lib/orbit-config";
 import {
   ORBIT_RECENT_PAGE_SIZE,
   type OrbitSortDirection,
-  type OrbitView,
-} from "@/lib/orbit-navigation";
+  type OrbitView} from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 
@@ -83,18 +78,16 @@ export interface OrbitCommandBarProps {
 }
 
 function SegmentedControl({
-  isOrbital,
-  children,
-}: {
-  isOrbital: boolean;
+  children}: {
+  
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(
         "inline-flex items-center gap-0.5 rounded-sm border p-0.5",
-        orbitHairlineBorder(isOrbital),
-        isOrbital ? "bg-background/35" : "bg-background/45 dark:bg-white/[0.035]"
+        orbitHairlineBorder(),
+        "bg-background/45 dark:bg-white/[0.035]"
       )}
     >
       {children}
@@ -106,8 +99,7 @@ function Segment({
   active,
   onClick,
   children,
-  title,
-}: {
+  title}: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
@@ -173,11 +165,9 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       isUpdating,
       keyboardShortcutsOpen,
       onKeyboardShortcutsOpenChange,
-      shortcutGroups,
-    },
+      shortcutGroups},
     searchRef
   ) {
-    const { isOrbital } = useOrbitalTheme();
     const scanBusy = queueIsLoading || scanning;
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
     const reviewLabel =
@@ -191,10 +181,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         aria-busy={scanning}
         className={cn(
           "relative overflow-hidden rounded-sm border",
-          orbitHairlineBorder(isOrbital),
-          isOrbital
-            ? "glass-orbital"
-            : "bg-surface-1/70 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.75)] dark:bg-white/[0.035]"
+          orbitHairlineBorder(),
+          "bg-surface-1/70 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.75)] dark:bg-white/[0.035]"
         )}
       >
         {scanning ? <ScrollingProgressBar /> : null}
@@ -204,7 +192,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
             {/* Scope zone */}
             {canSelect ? (
               <div className="flex flex-wrap items-center gap-1.5">
-                <SegmentedControl isOrbital={isOrbital}>
+                <SegmentedControl >
                   <Segment
                     active={orbitView === "recent"}
                     onClick={() => onChangeView("recent")}
@@ -225,7 +213,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                   </Segment>
                 </SegmentedControl>
 
-                <SegmentedControl isOrbital={isOrbital}>
+                <SegmentedControl >
                   <Segment
                     active={sortDirection === "desc"}
                     onClick={() => onChangeSortDirection("desc")}
@@ -251,7 +239,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     size="sm"
                     className={cn(
                       "h-8 gap-1.5 px-3 text-xs",
-                      orbitControlRadius(isOrbital),
+                      orbitControlRadius(),
                       "bg-primary text-primary-foreground hover:bg-primary/90"
                     )}
                     disabled={scanning || applyingBatch}
@@ -271,7 +259,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     variant="outline"
                     className={cn(
                       "size-8 shrink-0 border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 hover:text-foreground dark:text-emerald-100",
-                      orbitControlRadius(isOrbital)
+                      orbitControlRadius()
                     )}
                     disabled={scanning || applyingBatch || !canApplyStrongMatches}
                     onClick={onApplyStrongMatches}
@@ -291,7 +279,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     variant="outline"
                     className={cn(
                       "size-8 shrink-0 border-hairline-soft bg-surface-2/70 text-foreground hover:border-primary/30 hover:bg-accent-soft",
-                      orbitControlRadius(isOrbital)
+                      orbitControlRadius()
                     )}
                     disabled={scanBusy || scanTargetCount === 0}
                     onClick={onScan}
@@ -311,10 +299,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     size="sm"
                     className={cn(
                       "h-8 gap-1.5 rounded-r-none px-3 text-xs",
-                      orbitControlRadius(isOrbital),
-                      isOrbital
-                        ? "border-primary/40 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                        : "border-foreground/80 bg-foreground text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
+                      orbitControlRadius(),
+                      "border-foreground/80 bg-foreground text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
                     )}
                     disabled={scanBusy || scanTargetCount === 0}
                     onClick={onScan}
@@ -342,7 +328,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 href={mapHref}
                 className={cn(
                   "inline-flex size-8 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-surface-2/70 text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft",
-                  orbitControlRadius(isOrbital)
+                  orbitControlRadius()
                 )}
                 aria-label="Open graph"
                 title="Open graph"
@@ -358,8 +344,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
             <div
               className={cn(
                 "relative min-w-0 flex-1 overflow-hidden rounded-sm border",
-                orbitHairlineBorder(isOrbital),
-                isOrbital ? "bg-background/35" : "bg-background/45 dark:bg-white/[0.035]"
+                orbitHairlineBorder(),
+                "bg-background/45 dark:bg-white/[0.035]"
               )}
             >
               <SearchBar
@@ -384,7 +370,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 onClick={onToggleSelectionMode}
                 className={cn(
                   "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors",
-                  orbitHairlineBorder(isOrbital),
+                  orbitHairlineBorder(),
                   selectionMode
                     ? "border-primary/30 bg-primary/15 text-primary"
                     : "bg-surface-2/70 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
@@ -403,8 +389,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               groups={shortcutGroups}
               description="Orbit queue navigation and review actions."
               className={cn(
-                "size-9 shrink-0 border-primary/20 bg-surface-2/70 text-primary/80 hover:border-primary/35 hover:bg-primary/10 hover:text-primary",
-                isOrbital && "shadow-[0_0_18px_rgba(37,99,235,0.08)]"
+                "size-9 shrink-0 border-primary/20 bg-surface-2/70 text-primary/80 hover:border-primary/35 hover:bg-primary/10 hover:text-primary"
               )}
             />
           </div>
@@ -415,15 +400,15 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <div
             className={cn(
               "flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]",
-              orbitMetaMuted(isOrbital)
+              orbitMetaMuted()
             )}
           >
-            <span className={cn(orbitDataClass(isOrbital), "normal-case")}>
+            <span className={cn(orbitDataClass(), "normal-case")}>
               {visibleStatusLabel}
             </span>
             {showTriageProgress ? (
               <span
-                className={cn(orbitDataClass(isOrbital), "normal-case", orbitMetaSoft(isOrbital))}
+                className={cn(orbitDataClass(), "normal-case", orbitMetaSoft())}
               >
                 {triagedCount} / {passTotal} triaged
               </span>
@@ -441,8 +426,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <div
             className={cn(
               "border-t p-3",
-              orbitHairlineBorder(isOrbital),
-              isOrbital ? "bg-background/30" : "bg-background/45"
+              orbitHairlineBorder(),
+              "bg-background/45"
             )}
           >
             {scanError}

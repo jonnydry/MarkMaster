@@ -21,8 +21,6 @@ import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
 import { analyticsChartSurfaceClass } from "./analytics-primitives";
 import { cn } from "@/lib/utils";
-import { useOrbitalTheme } from "@/components/providers";
-import { orbital, OrbitalCard } from "@/components/orbital";
 
 type ChartVariant = "card" | "flat";
 
@@ -57,14 +55,11 @@ function ChartShell({
   className?: string;
   children: React.ReactNode;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   if (variant === "flat") {
     return <section className={cn("py-6 first:pt-4", className)}>{children}</section>;
   }
-  const RootCard = isOrbital ? OrbitalCard : Card;
-  const rootClass = isOrbital
-    ? cn("animate-fade-in-up border-primary/10 p-5", className)
-    : cn(chartCardClass, "animate-fade-in-up", className);
+  const RootCard = Card;
+  const rootClass = cn(chartCardClass, "animate-fade-in-up", className);
   return <RootCard className={rootClass}>{children}</RootCard>;
 }
 
@@ -81,7 +76,6 @@ function SectionHeading({
   aside?: React.ReactNode;
   variant?: ChartVariant;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   if (variant === "flat") {
     return (
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -99,7 +93,7 @@ function SectionHeading({
         <span
           className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-            isOrbital ? orbital.icon : "bg-primary/8 text-primary"
+            "bg-primary/8 text-primary"
           )}
         >
           {icon}
@@ -107,7 +101,7 @@ function SectionHeading({
         <h2
           className={cn(
             "min-w-0 text-base font-semibold",
-            isOrbital ? cn(orbital.label, "text-primary/80") : "heading-font"
+            "heading-font"
           )}
         >
           {title}
@@ -119,7 +113,7 @@ function SectionHeading({
             <span
               className={cn(
                 "text-xs tabular-nums",
-                isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+                "text-muted-foreground"
               )}
             >
               {meta}
@@ -141,7 +135,6 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
   totalBookmarks: number;
   variant?: ChartVariant;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   const max = useMemo(() => authors.reduce((m, a) => Math.max(m, a.count), 0) || 1, [authors]);
   const topShare = useMemo(
     () =>
@@ -164,9 +157,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
       ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
       : cn(
           "flex flex-col overflow-hidden rounded-xl border",
-          isOrbital
-            ? cn(orbital.glass, "divide-primary/10 border-primary/20")
-            : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
+          "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
         );
 
   return (
@@ -185,15 +176,13 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
             <div
               className={cn(
                 "flex items-start gap-2 rounded-xl px-3 py-2 text-xs",
-                isOrbital
-                  ? cn(orbital.glass, "border border-primary/20 text-primary/90")
-                  : "border border-note/30 bg-note/8 text-foreground"
+                "border border-note/30 bg-note/8 text-foreground"
               )}
             >
               <AlertTriangle
                 className={cn(
                   "mt-0.5 h-3.5 w-3.5 shrink-0",
-                  isOrbital ? "text-primary" : "text-note"
+                  "text-note"
                 )}
               />
               <span>
@@ -217,13 +206,13 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                     href={`/dashboard?author=${encodeURIComponent(a.author)}`}
                     className={cn(
                       "group grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,2fr)_auto_auto] items-center gap-3 px-3 py-2.5 transition-colors",
-                      isOrbital ? "hover:bg-primary/5" : "hover:bg-surface-1"
+                      "hover:bg-surface-1"
                     )}
                   >
                     <span
                       className={cn(
                         "flex w-5 shrink-0 items-center justify-center text-[11px] font-semibold tabular-nums",
-                        isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+                        "text-muted-foreground"
                       )}
                     >
                       {idx + 1}
@@ -249,7 +238,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                         <span
                           className={cn(
                             "block truncate text-[11px]",
-                            isOrbital ? cn(orbital.label, "text-primary/50") : "text-muted-foreground"
+                            "text-muted-foreground"
                           )}
                         >
                           @{a.author}
@@ -266,7 +255,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                       <span
                         className={cn(
                           "text-sm font-medium tabular-nums",
-                          isOrbital ? orbital.data : ""
+                          ""
                         )}
                       >
                         {a.count.toLocaleString()}
@@ -274,7 +263,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                       <span
                         className={cn(
                           "text-[10px] tabular-nums",
-                          isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+                          "text-muted-foreground"
                         )}
                       >
                         {libraryShare.toFixed(1)}%
@@ -283,9 +272,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                     <ArrowUpRight
                       className={cn(
                         "h-3.5 w-3.5 transition-colors",
-                        isOrbital
-                          ? "text-primary/0 group-hover:text-primary/60"
-                          : "text-muted-foreground/0 group-hover:text-muted-foreground"
+                        "text-muted-foreground/0 group-hover:text-muted-foreground"
                       )}
                     />
                   </Link>
@@ -295,9 +282,9 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
           </ul>
 
           {totalBookmarks > 0 && authors.length >= 3 && !overexposed ? (
-            <p className={cn("px-1 text-xs", isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground")}>
+            <p className={cn("px-1 text-xs", "text-muted-foreground")}>
               Your top 3 voices account for{" "}
-              <span className={cn("font-medium tabular-nums", isOrbital ? "text-foreground" : "text-foreground")}>
+              <span className={cn("font-medium tabular-nums", "text-foreground")}>
                 {topShare.toFixed(0)}%
               </span>{" "}
               of your library.
@@ -316,7 +303,6 @@ export const ContentMixCard = React.memo(function ContentMixCard({
   breakdown: AnalyticsData["mediaBreakdown"];
   variant?: ChartVariant;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   const safeBreakdown = useMemo(() => breakdown ?? [], [breakdown]);
   const total = useMemo(() => safeBreakdown.reduce((s, m) => s + m.count, 0), [safeBreakdown]);
   const byKey = useMemo(() => new Map(safeBreakdown.map((b) => [b.type, b.count])), [safeBreakdown]);
@@ -354,9 +340,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
       ? analyticsChartSurfaceClass
       : cn(
           "rounded-xl border p-3",
-          isOrbital
-            ? cn(orbital.glass, "border-primary/20")
-            : "border-hairline-soft bg-surface-2"
+          "border-hairline-soft bg-surface-2"
         );
 
   return (
@@ -417,7 +401,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
                 <span
                   className={cn(
                     "flex-1 truncate",
-                    isOrbital ? cn(orbital.label, "text-primary/80") : "text-foreground"
+                    "text-foreground"
                   )}
                 >
                   {s.label}
@@ -425,7 +409,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
                 <span
                   className={cn(
                     "tabular-nums text-xs",
-                    isOrbital ? cn(orbital.data, "text-primary/70") : "text-muted-foreground"
+                    "text-muted-foreground"
                   )}
                 >
                   {s.pct.toFixed(0)}%
@@ -446,16 +430,13 @@ export const TagRankCard = React.memo(function TagRankCard({
   tags: AnalyticsData["tagDistribution"];
   variant?: ChartVariant;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   const max = useMemo(() => tags.reduce((m, t) => Math.max(m, t.count), 0) || 1, [tags]);
   const listClass =
     variant === "flat"
       ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
       : cn(
           "flex flex-col overflow-hidden rounded-xl border",
-          isOrbital
-            ? cn(orbital.glass, "divide-primary/10 border-primary/20")
-            : "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
+          "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
         );
 
   return (
@@ -478,7 +459,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                   href={`/dashboard?tag=${encodeURIComponent(t.id)}`}
                   className={cn(
                     "group grid grid-cols-[auto_minmax(0,1fr)_minmax(96px,38%)_auto_auto] items-center gap-3 px-3 py-2.5 transition-colors",
-                    isOrbital ? "hover:bg-primary/5" : "hover:bg-surface-1"
+                    "hover:bg-surface-1"
                   )}
                 >
                   <span
@@ -489,7 +470,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                   <span
                     className={cn(
                       "truncate text-sm font-medium",
-                      isOrbital ? cn(orbital.label, "text-primary/80") : ""
+                      ""
                     )}
                   >
                     {t.tag}
@@ -503,7 +484,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                   <span
                     className={cn(
                       "text-xs tabular-nums",
-                      isOrbital ? cn(orbital.data, "text-primary/70") : "text-muted-foreground"
+                      "text-muted-foreground"
                     )}
                   >
                     {t.count.toLocaleString()}
@@ -511,9 +492,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                   <ArrowUpRight
                     className={cn(
                       "h-3.5 w-3.5 transition-colors",
-                      isOrbital
-                        ? "text-primary/0 group-hover:text-primary/60"
-                        : "text-muted-foreground/0 group-hover:text-muted-foreground"
+                      "text-muted-foreground/0 group-hover:text-muted-foreground"
                     )}
                   />
                 </Link>
@@ -535,7 +514,6 @@ export const TimelineCard = React.memo(function TimelineCard({
   range: TimeRange;
   variant?: ChartVariant;
 }) {
-  const { isOrbital } = useOrbitalTheme();
   const timelineFillId = `timeline-fill-${useId().replace(/:/g, "")}`;
   const timeline = useMemo(() => buildTimeline(analytics, range), [analytics, range]);
   const peak = useMemo(() => findPeak(timeline.data), [timeline.data]);
@@ -554,9 +532,7 @@ export const TimelineCard = React.memo(function TimelineCard({
       ? cn(analyticsChartSurfaceClass, "px-3 py-4")
       : cn(
           "rounded-xl border px-3 py-4",
-          isOrbital
-            ? cn(orbital.glass, "border-primary/20")
-            : "border-hairline-soft bg-surface-2"
+          "border-hairline-soft bg-surface-2"
         );
 
   return (
@@ -643,7 +619,7 @@ export const TimelineCard = React.memo(function TimelineCard({
             <p
               className={cn(
                 "mt-2 px-1 text-[11px]",
-                isOrbital ? cn(orbital.label, "text-primary/60") : "text-muted-foreground"
+                "text-muted-foreground"
               )}
             >
               <span
@@ -660,16 +636,13 @@ export const TimelineCard = React.memo(function TimelineCard({
 });
 
 function EmptyBox({ height = 180 }: { height?: number }) {
-  const { isOrbital } = useOrbitalTheme();
   return (
     <div
       role="status"
       style={{ height }}
       className={cn(
         "flex items-center justify-center rounded-xl border border-dashed text-sm",
-        isOrbital
-          ? cn(orbital.glass, "border-primary/20 text-primary/60")
-          : "border-hairline-soft bg-surface-2 text-muted-foreground"
+        "border-hairline-soft bg-surface-2 text-muted-foreground"
       )}
     >
       Nothing here yet

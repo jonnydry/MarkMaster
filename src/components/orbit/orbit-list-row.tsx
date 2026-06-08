@@ -7,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
-import { useOrbitalTheme } from "@/components/providers";
 import {
   getOrbitRowQueueStatus,
   getOrbitRowSuggestion,
@@ -46,7 +45,6 @@ export const OrbitListRow = memo(function OrbitListRow({
   onToggleSelect,
   onQuickAction,
 }: OrbitListRowProps) {
-  const { isOrbital } = useOrbitalTheme();
   const author = bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
   const handle = bookmark.authorUsername ? `@${bookmark.authorUsername}` : "";
 
@@ -108,8 +106,7 @@ export const OrbitListRow = memo(function OrbitListRow({
   const hasMedia = Boolean(mediaItems?.length);
   const tweetLink = {
     authorUsername: bookmark.authorUsername,
-    tweetId: bookmark.tweetId,
-  };
+    tweetId: bookmark.tweetId};
 
   return (
     <div
@@ -121,13 +118,11 @@ export const OrbitListRow = memo(function OrbitListRow({
       onKeyDown={handleRowKeyDown}
       className={cn(
         "group flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all",
-        orbitHairlineBorder(isOrbital),
-        orbitHoverRowClass(isOrbital),
+        orbitHairlineBorder(),
+        orbitHoverRowClass(),
         !selectionMode &&
           selected &&
-          (isOrbital
-            ? "border-primary/20 bg-primary/10 shadow-[inset_3px_0_0_0_var(--primary)]"
-            : "border-primary/20 bg-primary/10 shadow-[inset_3px_0_0_0_#2563eb] dark:border-primary/10 dark:bg-[#0F0F0F] dark:shadow-[inset_3px_0_0_0_#38bdf8]"),
+          ("border-primary/20 bg-primary/10 shadow-[inset_3px_0_0_0_#2563eb] dark:border-primary/10 dark:bg-[#0F0F0F] dark:shadow-[inset_3px_0_0_0_#38bdf8]"),
         selectionMode && bulkSelected && "bg-primary/5",
         queueStatus === "dismissed" && "opacity-50",
         queueStatus === "applied" && "opacity-70"
@@ -147,9 +142,7 @@ export const OrbitListRow = memo(function OrbitListRow({
         className={cn(
           "mt-1 w-[3px] shrink-0 self-stretch rounded-full transition-all",
           selected
-            ? isOrbital
-              ? "bg-primary"
-              : "bg-sky-400"
+            ? "bg-primary"
             : "bg-transparent group-hover:bg-primary/25",
           queueStatus === "hasSuggestion" && !selected && "bg-primary/40"
         )}
@@ -159,50 +152,48 @@ export const OrbitListRow = memo(function OrbitListRow({
         <div
           className={cn(
             "flex min-w-0 items-center gap-1.5 truncate text-[10px]",
-            isOrbital
-              ? "text-primary/65"
-              : "text-muted-foreground dark:text-white/65"
+            "text-muted-foreground dark:text-white/65"
           )}
         >
           <span
             className={cn(
-              orbitLabelClass(isOrbital),
+              orbitLabelClass(),
               "shrink-0 normal-case font-medium tracking-normal",
-              isOrbital ? "text-foreground/90" : "text-foreground/90 dark:text-white/90"
+              "text-foreground/90 dark:text-white/90"
             )}
           >
             {author}
           </span>
           {handle ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
-              <span className={cn(orbitDataClass(isOrbital), "truncate normal-case")}>
+              <span className={cn(orbitDataClass(), "truncate normal-case")}>
                 {handle}
               </span>
             </>
           ) : null}
           {timeAgo ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
-              <span className={cn(orbitDataClass(isOrbital), "shrink-0 tabular-nums")}>
+              <span className={cn(orbitDataClass(), "shrink-0 tabular-nums")}>
                 {timeAgo}
               </span>
             </>
           ) : null}
           {engagement ? (
             <>
-              <span className={isOrbital ? "text-primary/25" : "text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50 dark:text-white/25"}>
                 ·
               </span>
               <span
                 className={cn(
-                  orbitDataClass(isOrbital),
+                  orbitDataClass(),
                   "hidden shrink-0 tabular-nums sm:inline",
-                  isOrbital ? "text-primary/50" : "text-muted-foreground dark:text-white/50"
+                  "text-muted-foreground dark:text-white/50"
                 )}
               >
                 {engagement}
@@ -221,7 +212,7 @@ export const OrbitListRow = memo(function OrbitListRow({
           stopClickPropagation
           textClassName={cn(
             "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
-            isOrbital ? "text-foreground" : "text-foreground dark:text-white",
+            "text-foreground dark:text-white",
             queueStatus === "dismissed" &&
               "line-through decoration-foreground/30 dark:decoration-white/30"
           )}
@@ -233,9 +224,7 @@ export const OrbitListRow = memo(function OrbitListRow({
               <span
                 className={cn(
                   "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-[11px]",
-                  isOrbital
-                    ? "border-primary/25 bg-primary/[0.07] text-foreground/90"
-                    : "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
+                  "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
                 )}
                 title={`Grok suggests: ${
                   suggestion.kind === "collection" ? "add to" : "tag as"
@@ -304,9 +293,7 @@ export const OrbitListRow = memo(function OrbitListRow({
               }}
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-sm border border-transparent transition-colors",
-                isOrbital
-                  ? "text-primary/45 hover:border-primary/20 hover:bg-primary/10 hover:text-primary"
-                  : "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-sky-200"
+                "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-primary"
               )}
               title="More actions"
               aria-label="More actions"

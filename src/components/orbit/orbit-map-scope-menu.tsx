@@ -3,12 +3,10 @@
 import { Check, ChevronDown } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useOrbitalTheme } from "@/components/providers";
 import {
   orbitHairlineBorder,
   orbitLabelClass,
-  orbitMetaMuted,
-} from "@/lib/orbit-route-chrome";
+  orbitMetaMuted} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitGraphScope } from "@/types";
 
@@ -20,13 +18,11 @@ const GRAPH_SCOPE_OPTIONS: Array<{
   {
     scope: "library",
     label: "Full library",
-    detail: "All bookmarks, tags, and collections.",
-  },
+    detail: "All bookmarks, tags, and collections."},
   {
     scope: "orbit",
     label: "Orbit queue",
-    detail: "Loose bookmarks that still need a home.",
-  },
+    detail: "Loose bookmarks that still need a home."},
 ];
 
 interface OrbitMapScopeMenuProps {
@@ -40,9 +36,7 @@ export function OrbitMapScopeMenu({
   graphScope,
   isLoading = false,
   onScopeChange,
-  className,
-}: OrbitMapScopeMenuProps) {
-  const { isOrbital } = useOrbitalTheme();
+  className}: OrbitMapScopeMenuProps) {
   const activeOption =
     GRAPH_SCOPE_OPTIONS.find((option) => option.scope === graphScope) ??
     GRAPH_SCOPE_OPTIONS[0];
@@ -54,7 +48,7 @@ export function OrbitMapScopeMenu({
         aria-label={`Graph view: ${activeOption.label}`}
         className={cn(
           "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
-          orbitHairlineBorder(isOrbital),
+          orbitHairlineBorder(),
           className
         )}
       >
@@ -67,9 +61,9 @@ export function OrbitMapScopeMenu({
       <PopoverContent align="end" className="w-64 gap-1 p-1.5">
         <div
           className={cn(
-            orbitLabelClass(isOrbital),
+            orbitLabelClass(),
             "px-2 pb-1 pt-1.5 text-[9px]",
-            orbitMetaMuted(isOrbital)
+            orbitMetaMuted()
           )}
         >
           Graph view
@@ -100,7 +94,7 @@ export function OrbitMapScopeMenu({
                 <span
                   className={cn(
                     "block text-[10px] leading-4",
-                    orbitMetaMuted(isOrbital)
+                    orbitMetaMuted()
                   )}
                 >
                   {option.detail}

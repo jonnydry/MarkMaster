@@ -12,24 +12,29 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import {
+  type ColorThemeId,
+  resolveColorTheme,
+} from "@/lib/color-themes";
 
 type Theme = "dark" | "light";
 type FontMode = "default" | "mono";
 type AppearanceSnapshot = {
   theme: Theme;
   fontMode: FontMode;
-  isOrbital: boolean;
+  colorTheme: ColorThemeId;
 };
 
 const THEME_STORAGE_KEY = "markmaster-theme";
 const FONT_MODE_STORAGE_KEY = "markmaster-font-mode";
-const ORBITAL_STORAGE_KEY = "markmaster-orbital";
+const COLOR_THEME_STORAGE_KEY = "markmaster-color-theme";
+const LEGACY_ORBITAL_STORAGE_KEY = "markmaster-orbital";
 const APPEARANCE_CHANGE_EVENT = "markmaster-appearance-change";
 
 const SERVER_APPEARANCE: AppearanceSnapshot = {
   theme: "dark",
   fontMode: "default",
-  isOrbital: false,
+  colorTheme: "horizon",
 };
 let cachedAppearance: AppearanceSnapshot = SERVER_APPEARANCE;
 
@@ -53,12 +58,12 @@ const FontModeContext = createContext<{
   toggleFontMode: () => {},
 });
 
-const OrbitalContext = createContext<{
-  isOrbital: boolean;
-  toggleOrbital: () => void;
+const ColorThemeContext = createContext<{
+  colorTheme: ColorThemeId;
+  setColorTheme: (colorTheme: ColorThemeId) => void;
 }>({
-  isOrbital: false,
-  toggleOrbital: () => {},
+  colorTheme: "horizon",
+  setColorTheme: () => {},
 });
 
 export function useTheme() {
@@ -69,15 +74,15 @@ export function useFontMode() {
   return useContext(FontModeContext);
 }
 
-export function useOrbitalTheme() {
-  return useContext(OrbitalContext);
+export function useColorTheme() {
+  return useContext(ColorThemeContext);
 }
 
 function memoizeAppearance(next: AppearanceSnapshot) {
   if (
     cachedAppearance.theme === next.theme &&
     cachedAppearance.fontMode === next.fontMode &&
-    cachedAppearance.isOrbital === next.isOrbital
+    cachedAppearance.colorTheme === next.colorTheme
   ) {
     return cachedAppearance;
   }
@@ -90,11 +95,15 @@ function readAppearance(): AppearanceSnapshot {
   if (typeof window === "undefined") return SERVER_APPEARANCE;
 
   try {
+    const legacyOrbital = localStorage.getItem(LEGACY_ORBITAL_STORAGE_KEY) === "true";
     return memoizeAppearance({
       theme: localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark",
       fontMode:
         localStorage.getItem(FONT_MODE_STORAGE_KEY) === "mono" ? "mono" : "default",
-      isOrbital: localStorage.getItem(ORBITAL_STORAGE_KEY) === "true",
+      colorTheme: resolveColorTheme(
+        localStorage.getItem(COLOR_THEME_STORAGE_KEY),
+        legacyOrbital
+      ),
     });
   } catch {
     return SERVER_APPEARANCE;
@@ -114,18 +123,19 @@ function subscribeAppearance(onStoreChange: () => void) {
   };
 }
 
-function applyAppearance({ theme, fontMode, isOrbital }: AppearanceSnapshot) {
+function applyAppearance({ theme, fontMode, colorTheme }: AppearanceSnapshot) {
   const root = document.documentElement;
   root.classList.toggle("dark", theme === "dark");
   root.setAttribute("data-font-mode", fontMode);
 
-  if (isOrbital) {
-    root.setAttribute("data-theme", "orbital");
-    root.classList.add("theme-orbital");
+  if (colorTheme === "horizon") {
+    root.removeAttribute("data-color-theme");
   } else {
-    root.removeAttribute("data-theme");
-    root.classList.remove("theme-orbital");
+    root.setAttribute("data-color-theme", colorTheme);
   }
+
+  root.removeAttribute("data-theme");
+  root.classList.remove("theme-orbital");
 }
 
 function emitAppearanceChange() {
@@ -152,13 +162,14 @@ function writeFontMode(fontMode: FontMode) {
   emitAppearanceChange();
 }
 
-function writeOrbital(isOrbital: boolean) {
+function writeColorTheme(colorTheme: ColorThemeId) {
   try {
-    localStorage.setItem(ORBITAL_STORAGE_KEY, isOrbital ? "true" : "false");
+    localStorage.setItem(COLOR_THEME_STORAGE_KEY, colorTheme);
+    localStorage.removeItem(LEGACY_ORBITAL_STORAGE_KEY);
   } catch {
     // Keep DOM state responsive when storage is unavailable.
   }
-  applyAppearance({ ...readAppearance(), isOrbital });
+  applyAppearance({ ...readAppearance(), colorTheme });
   emitAppearanceChange();
 }
 
@@ -189,9 +200,9 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
     writeFontMode(appearance.fontMode === "default" ? "mono" : "default");
   }, [appearance.fontMode]);
 
-  const toggleOrbital = useCallback(() => {
-    writeOrbital(!appearance.isOrbital);
-  }, [appearance.isOrbital]);
+  const setColorTheme = useCallback((colorTheme: ColorThemeId) => {
+    writeColorTheme(colorTheme);
+  }, []);
 
   const themeValue = useMemo(
     () => ({ theme: appearance.theme, setTheme, toggleTheme }),
@@ -205,20 +216,20 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
     }),
     [appearance.fontMode, setFontMode, toggleFontMode]
   );
-  const orbitalValue = useMemo(
+  const colorThemeValue = useMemo(
     () => ({
-      isOrbital: appearance.isOrbital,
-      toggleOrbital,
+      colorTheme: appearance.colorTheme,
+      setColorTheme,
     }),
-    [appearance.isOrbital, toggleOrbital]
+    [appearance.colorTheme, setColorTheme]
   );
 
   return (
     <ThemeContext.Provider value={themeValue}>
       <FontModeContext.Provider value={fontModeValue}>
-        <OrbitalContext.Provider value={orbitalValue}>
+        <ColorThemeContext.Provider value={colorThemeValue}>
           {children}
-        </OrbitalContext.Provider>
+        </ColorThemeContext.Provider>
       </FontModeContext.Provider>
     </ThemeContext.Provider>
   );

@@ -26,7 +26,6 @@ interface BookmarkListProps {
   selectionMode: boolean;
   selectedBookmarkIdSet: Set<string>;
   activeBookmarkId: string | null;
-  inspectorLayoutActive?: boolean;
   onSelect: (id: string) => void;
   onSelectionChange: (id: string, selected: boolean) => void;
   onTagClick: (tagId: string) => void;
@@ -46,7 +45,6 @@ export function BookmarkList({
   selectionMode,
   selectedBookmarkIdSet,
   activeBookmarkId,
-  inspectorLayoutActive = false,
   onSelect,
   onSelectionChange,
   onTagClick,
@@ -105,10 +103,7 @@ export function BookmarkList({
     );
   }
 
-  const listContainerClass = getBookmarkListContainerClassName(
-    inspectorLayoutActive,
-    viewMode
-  );
+  const listContainerClass = getBookmarkListContainerClassName(viewMode);
 
   return (
     <div className={listContainerClass}>
