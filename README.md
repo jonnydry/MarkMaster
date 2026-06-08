@@ -1,142 +1,206 @@
-# MarkMaster — X Bookmark Manager
+# MarkMaster
 
-Search, tag, annotate, and curate your X bookmarks. Built for power users who actually want to find what they saved.
+**Search, tag, annotate, and curate your X bookmarks** — with collections, analytics, Grok-powered triage, and a local archive that stays searchable after sync.
+
+[![CI](https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+---
+
+## Overview
+
+MarkMaster is a bookmark manager built for people who save a lot on X and need to **find, organize, and act on** what they kept. Your library syncs into PostgreSQL, stays full-text searchable, and gains structure through tags, collections, notes, and optional Grok-assisted workflows.
+
+| Module | What it does |
+|--------|----------------|
+| **Dashboard** | Browse, search, filter, and sort your full library with feed / compact / grid views |
+| **Discovery** | Surface high-engagement untouched saves and batch-review them in Orbit |
+| **Orbit** | Triage queue for unorganized bookmarks — Grok suggests tags and collections |
+| **Orbit Map** | Force-directed graph of tags, collections, and bookmark relationships |
+| **Collections** | Curated lists with manual ordering and public share links |
+| **Analytics** | Authors, content mix, engagement trends, and library health |
+| **Settings** | Sync, export, typography presets, themes, and Grok configuration |
+
+---
 
 ## Features
 
-- **Full-text search** across tweet content, authors, and notes
-- **Sort & filter** by date, engagement metrics, content type, author, and tags
-- **Custom tags** with color coding
-- **Collections** — curate themed bookmark lists with manual ordering
-- **Orbit AI scan** — use Grok to preview auto-tagging and collection sorting for bookmarks still in Orbit
-- **Share collections** via public links
-- **Analytics** — see who you bookmark most, content breakdown, and trends
-- **Export** to JSON or CSV with all metadata
-- **Keyboard shortcuts** — `j/k` navigate, `/` focus search, `cmd/ctrl+k` command palette, `cmd/ctrl+1..5` media filters, `t` tag, `c` collect, `n` note
-- **X folder sync** — import premium bookmark folders and mirror them into managed collections
-- **Dark/light theme** with blue accent; optional Orbit cyan theme
-- **Synced archive** — once bookmarks are synced into MarkMaster, they remain searchable locally
+### Library & search
+- Full-text search across tweet text, authors, and notes
+- Sort and filter by date, engagement, media type, author, and tags
+- Custom tags with colors; notes per bookmark
+- Keyboard shortcuts — `j`/`k` navigate, `/` search, `⌘K` command palette, `t` tag, `c` collect, `n` note
+- Export to JSON or CSV with metadata
 
-## Tech Stack
+### Organization
+- **Collections** with drag ordering and public `/share/[slug]` pages
+- **X folder sync** — import premium bookmark folders into managed collections
+- Incremental sync with encrypted token storage and local archive
 
-- **Next.js 16** (App Router) with TypeScript
-- **Tailwind CSS 4** + **shadcn/ui** components
-- **PostgreSQL** via **Prisma** ORM
-- **NextAuth.js** (Auth.js) with X/Twitter OAuth 2.0
-- **TanStack Query** for client-side state
-- **Recharts** for analytics charts
+### Orbit & Grok (optional)
+- Batch Grok scans with adaptive sizing (quick / balanced / deep)
+- Review overlay to accept, edit, or keep suggestions before applying
+- Strong-match auto-apply, author history hints, and decision telemetry
+- Flywheel flows from Discovery → Orbit review with digest batches
 
-## Getting Started
+### Presentation
+- Dark / light themes with accent presets and typography options (Orbit, Classic, Editorial)
+- Frosted app chrome aligned across dashboard, collections, and Orbit
+- Command palette for fast navigation and actions
+
+---
+
+## Tech stack
+
+| Layer | Choices |
+|-------|---------|
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
+| Styling | Tailwind CSS 4, shadcn/ui |
+| Data | PostgreSQL, Prisma |
+| Auth | Auth.js (NextAuth v5) — X OAuth 2.0 |
+| Client state | TanStack Query |
+| Charts | Recharts |
+| Graph | d3-force, Pixi.js (Orbit map) |
+| AI (optional) | xAI Grok via Responses API |
+
+---
+
+## Getting started
 
 ### Prerequisites
 
-- Node.js 18+
-- PostgreSQL database (local Docker, Neon, or Supabase)
-- X Developer App with OAuth 2.0 credentials (Basic tier or pay-per-use)
+- **Node.js 20+** (CI uses 20; 18+ may work locally)
+- **PostgreSQL** — local Docker, [Neon](https://neon.tech), or Supabase
+- **X Developer App** with OAuth 2.0 (`bookmark.read` scope)
+- **(Optional)** [xAI API key](https://console.x.ai/) for Orbit Grok scans
 
-### 1. Install dependencies
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/jonnydry/MarkMaster.git
+cd MarkMaster
 npm install
 ```
 
-### 2. Configure environment
-
-Copy `.env` and fill in your values:
+### 2. Environment
 
 ```bash
-DATABASE_URL="postgresql://user:password@localhost:5432/markmaster"
-AUTH_SECRET="openssl rand -base64 32"
-AUTH_TWITTER_ID="your-x-oauth2-client-id"
-AUTH_TWITTER_SECRET="your-x-oauth2-client-secret"
-NEXTAUTH_URL="http://localhost:3000"
-ENCRYPTION_KEY="openssl rand -hex 32"
-
-# Optional: Grok-powered Orbit scan
-XAI_API_KEY="your-xai-api-key"
-XAI_ORBIT_MODEL="grok-4.3"
-XAI_API_BASE_URL="https://api.x.ai/v1"
+cp .env.example .env
 ```
 
-`ENCRYPTION_KEY` must be a 64-character hex string. If an older deployment was
-using a shorter or non-hex key, rotate it before starting this version.
+Fill in required values, then validate:
 
-`XAI_API_KEY` is only required if you want the Orbit scan flow to call Grok.
-Create a key in the [xAI Console](https://console.x.ai/team/default/api-keys)
-and add account credits ([xAI quickstart](https://docs.x.ai/docs/quickstart)).
-By default MarkMaster uses `grok-4.3` through xAI's Responses API.
-You can override the model or point at a regional xAI endpoint with
-`XAI_ORBIT_MODEL` and `XAI_API_BASE_URL`. After editing `.env`, restart the dev
-server; `npm run env:check` reports whether optional `XAI_API_KEY` is set.
+```bash
+npm run env:check
+```
 
-### 3. Set up the database
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `AUTH_SECRET` | Yes | Session signing (`openssl rand -base64 32`) |
+| `AUTH_TWITTER_ID` / `AUTH_TWITTER_SECRET` | Yes | X OAuth 2.0 credentials |
+| `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
+| `ENCRYPTION_KEY` | Yes | 64-char hex for token encryption (`openssl rand -hex 32`) |
+| `XAI_API_KEY` | No | Enables Grok Orbit scans |
+| `UPSTASH_REDIS_*` | No | Distributed rate limiting in production |
+
+See [`.env.example`](.env.example) for the full list and production notes.
+
+### 3. Database
 
 ```bash
 npm run db:migrate
 ```
 
-`npm run dev` checks that migrations are current before starting the app. If it
-reports pending migrations, run `npm run db:migrate` and start dev again.
-For frontend-only work when you intentionally want to skip the database check,
-use `npm run dev:unchecked`.
+`npm run dev` checks migration status before starting. Use `npm run dev:unchecked` to skip that check during UI-only work.
 
-When creating new schema changes against a local development database, use
-`npx prisma migrate dev --name <change-name>` to generate the migration, then
-commit the new folder under `prisma/migrations`.
+New schema changes (local dev):
 
-### 4. Configure your X Developer App
+```bash
+npx prisma migrate dev --name <change-name>
+```
 
-1. Go to [developer.x.com](https://developer.x.com) and create a project/app
-2. Under **User authentication settings**, enable OAuth 2.0
-3. Set the callback URL to `http://localhost:3000/api/auth/callback/twitter`
-4. Request scopes: `tweet.read`, `users.read`, `bookmark.read`, `offline.access`
-5. Copy your Client ID and Client Secret into `.env`
+### 4. X Developer App
 
-### 5. Run the development server
+1. Create an app at [developer.x.com](https://developer.x.com)
+2. Enable **OAuth 2.0** under User authentication settings
+3. Callback URL: `http://localhost:3000/api/auth/callback/twitter`
+4. Scopes: `tweet.read`, `users.read`, `bookmark.read`, `offline.access`
+5. Copy Client ID and Secret into `.env`
+
+### 5. Run
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start.
+Open [http://localhost:3000](http://localhost:3000).
 
-Deployment builds should apply migrations explicitly before building:
+**Production build** (migrations + build):
 
 ```bash
 npm run deploy:build
 ```
 
-## Project Structure
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server (checks DB migrations first) |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
+| `npm run test` | Vitest unit tests |
+| `npm run db:migrate` | Apply Prisma migrations |
+| `npm run db:studio` | Open Prisma Studio |
+| `npm run env:check` | Validate environment variables |
+
+---
+
+## Project structure
 
 ```
 src/
 ├── app/
-│   ├── page.tsx                    # Landing page
-│   ├── login/page.tsx              # OAuth sign-in
-│   ├── (main)/                     # Auth-protected routes
-│   │   ├── dashboard/page.tsx      # Main bookmark browser
-│   │   ├── collections/page.tsx    # Collections list
-│   │   ├── collections/[id]/       # Collection detail
-│   │   ├── analytics/page.tsx      # Bookmark analytics
-│   │   └── settings/page.tsx       # User settings
-│   ├── share/[slug]/page.tsx       # Public collection view
-│   └── api/                        # API routes
-├── components/                     # React components
-├── lib/
-│   ├── auth.ts                     # NextAuth configuration
-│   ├── x-api.ts                    # X API client
-│   ├── sync.ts                     # Bookmark sync engine
-│   ├── auto-tag.ts                 # Tag suggestion rules
-│   ├── prisma.ts                   # Database client
-│   └── encryption.ts               # Token encryption
-└── types/                          # TypeScript types
+│   ├── page.tsx                 # Landing / sign-in
+│   ├── (main)/                  # Authenticated app shell
+│   │   ├── dashboard/           # Library browser
+│   │   ├── collections/         # Collections list & detail
+│   │   ├── orbit/               # Orbit queue & map
+│   │   ├── analytics/           # Insights
+│   │   └── settings/            # Sync, export, themes, Grok
+│   ├── share/[slug]/            # Public collection pages
+│   └── api/                     # REST API routes
+├── components/                  # UI (dashboard, orbit, collections, …)
+├── hooks/                       # Page and feature hooks
+├── lib/                         # Auth, sync, orbit, analytics, prisma
+└── types/                       # Shared TypeScript types
 ```
 
-## X API Costs
+Design notes and archived plans live under [`docs/design/`](docs/design/).
 
-MarkMaster requires X API bookmark access (Basic tier at $200/month or pay-per-use):
+---
 
-- **Reads**: $0.005 per API read (fetching bookmarks)
-- A full sync of 800 bookmarks costs approximately $4
+## X API costs
 
-The app uses incremental syncs and local storage to minimize repeated API calls.
+Bookmark access requires X API entitlement (Basic tier or pay-per-use):
+
+- Reads are billed per request (on the order of **~$0.005 per read**)
+- A full sync of ~800 bookmarks can cost roughly **$4**
+
+MarkMaster minimizes repeat calls through incremental sync and local storage.
+
+---
+
+## Development
+
+- **CI** runs lint, tests, and build on every push to `main` and on pull requests.
+- **AGENTS.md** documents Next.js conventions for AI-assisted development in this repo.
+- Report issues and ideas via [GitHub Issues](https://github.com/jonnydry/MarkMaster/issues).
+
+---
+
+## License
+
+[MIT](LICENSE) © Jonny Drybanski
