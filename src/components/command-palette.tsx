@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useColorTheme, useFontMode } from "@/components/providers";
 import { COLOR_THEMES } from "@/lib/color-themes";
+import { TYPOGRAPHY_PRESETS } from "@/lib/typography-presets";
 import { useTypography } from "@/hooks/use-typography";
 import type { TagWithCount, MediaFilter } from "@/types";
 
@@ -44,7 +45,7 @@ export function CommandPalette({
   const normalizedQuery = query.trim().toLowerCase();
 
   const { colorTheme, setColorTheme } = useColorTheme();
-  const { fontMode, toggleFontMode } = useFontMode();
+  const { typographyPreset, setTypographyPreset } = useFontMode();
   const t = useTypography();
 
   const filteredTags = useMemo(
@@ -89,8 +90,13 @@ export function CommandPalette({
       q.includes("theme") ||
       q.includes("mono") ||
       q.includes("font") ||
+      q.includes("type") ||
+      q.includes("typography") ||
       q.includes("design") ||
-      COLOR_THEMES.some((theme) => theme.name.toLowerCase().includes(q))
+      COLOR_THEMES.some((theme) => theme.name.toLowerCase().includes(q)) ||
+      TYPOGRAPHY_PRESETS.some((preset) =>
+        preset.name.toLowerCase().includes(q)
+      )
     ) {
       const colorActions = COLOR_THEMES.map((theme) => ({
         kind: "action" as const,
@@ -101,21 +107,28 @@ export function CommandPalette({
         icon: Palette,
         active: colorTheme === theme.id,
       }));
+      const typographyActions = TYPOGRAPHY_PRESETS.map((preset) => ({
+        kind: "action" as const,
+        id: `typography-${preset.id}`,
+        label: `Use ${preset.name} Typography`,
+        description: `${preset.bodyFace} body, ${preset.dataFace} data`,
+        action: () => setTypographyPreset(preset.id),
+        icon: Type,
+        active: typographyPreset === preset.id,
+      }));
       return [
         ...colorActions,
-        {
-          kind: "action" as const,
-          id: "toggle-mono",
-          label: fontMode === "mono" ? "Switch to Default Typography" : "Enable Monospace UI",
-          description: "JetBrains Mono for telemetry and terminal feel",
-          action: toggleFontMode,
-          icon: Type,
-          active: fontMode === "mono",
-        },
+        ...typographyActions,
       ];
     }
     return [];
-  }, [normalizedQuery, colorTheme, fontMode, setColorTheme, toggleFontMode]);
+  }, [
+    normalizedQuery,
+    colorTheme,
+    typographyPreset,
+    setColorTheme,
+    setTypographyPreset,
+  ]);
 
   const allItems = useMemo(() => {
     // Show appearance actions at the top when relevant for discoverability

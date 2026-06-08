@@ -16,16 +16,21 @@ import {
   type ColorThemeId,
   resolveColorTheme,
 } from "@/lib/color-themes";
+import {
+  DEFAULT_TYPOGRAPHY_PRESET,
+  resolveTypographyPreset,
+  type TypographyPresetId,
+} from "@/lib/typography-presets";
 
 type Theme = "dark" | "light";
-type FontMode = "default" | "mono";
 type AppearanceSnapshot = {
   theme: Theme;
-  fontMode: FontMode;
+  typographyPreset: TypographyPresetId;
   colorTheme: ColorThemeId;
 };
 
 const THEME_STORAGE_KEY = "markmaster-theme";
+const TYPOGRAPHY_PRESET_STORAGE_KEY = "markmaster-typography-preset";
 const FONT_MODE_STORAGE_KEY = "markmaster-font-mode";
 const COLOR_THEME_STORAGE_KEY = "markmaster-color-theme";
 const LEGACY_ORBITAL_STORAGE_KEY = "markmaster-orbital";
@@ -33,7 +38,7 @@ const APPEARANCE_CHANGE_EVENT = "markmaster-appearance-change";
 
 const SERVER_APPEARANCE: AppearanceSnapshot = {
   theme: "dark",
-  fontMode: "default",
+  typographyPreset: DEFAULT_TYPOGRAPHY_PRESET,
   colorTheme: "horizon",
 };
 let cachedAppearance: AppearanceSnapshot = SERVER_APPEARANCE;
@@ -49,12 +54,16 @@ const ThemeContext = createContext<{
 });
 
 const FontModeContext = createContext<{
-  fontMode: FontMode;
-  setFontMode: (mode: FontMode) => void;
+  fontMode: TypographyPresetId;
+  typographyPreset: TypographyPresetId;
+  setFontMode: (mode: TypographyPresetId) => void;
+  setTypographyPreset: (preset: TypographyPresetId) => void;
   toggleFontMode: () => void;
 }>({
-  fontMode: "default",
+  fontMode: DEFAULT_TYPOGRAPHY_PRESET,
+  typographyPreset: DEFAULT_TYPOGRAPHY_PRESET,
   setFontMode: () => {},
+  setTypographyPreset: () => {},
   toggleFontMode: () => {},
 });
 
@@ -81,7 +90,7 @@ export function useColorTheme() {
 function memoizeAppearance(next: AppearanceSnapshot) {
   if (
     cachedAppearance.theme === next.theme &&
-    cachedAppearance.fontMode === next.fontMode &&
+    cachedAppearance.typographyPreset === next.typographyPreset &&
     cachedAppearance.colorTheme === next.colorTheme
   ) {
     return cachedAppearance;
@@ -96,10 +105,13 @@ function readAppearance(): AppearanceSnapshot {
 
   try {
     const legacyOrbital = localStorage.getItem(LEGACY_ORBITAL_STORAGE_KEY) === "true";
+    const legacyFontMode = localStorage.getItem(FONT_MODE_STORAGE_KEY);
     return memoizeAppearance({
       theme: localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark",
-      fontMode:
-        localStorage.getItem(FONT_MODE_STORAGE_KEY) === "mono" ? "mono" : "default",
+      typographyPreset: resolveTypographyPreset(
+        localStorage.getItem(TYPOGRAPHY_PRESET_STORAGE_KEY),
+        legacyFontMode
+      ),
       colorTheme: resolveColorTheme(
         localStorage.getItem(COLOR_THEME_STORAGE_KEY),
         legacyOrbital
@@ -123,10 +135,18 @@ function subscribeAppearance(onStoreChange: () => void) {
   };
 }
 
-function applyAppearance({ theme, fontMode, colorTheme }: AppearanceSnapshot) {
+function applyAppearance({
+  theme,
+  typographyPreset,
+  colorTheme,
+}: AppearanceSnapshot) {
   const root = document.documentElement;
   root.classList.toggle("dark", theme === "dark");
-  root.setAttribute("data-font-mode", fontMode);
+  root.setAttribute("data-typography-preset", typographyPreset);
+  root.setAttribute(
+    "data-font-mode",
+    typographyPreset === "mono" ? "mono" : "default"
+  );
 
   if (colorTheme === "horizon") {
     root.removeAttribute("data-color-theme");
@@ -152,13 +172,17 @@ function writeTheme(theme: Theme) {
   emitAppearanceChange();
 }
 
-function writeFontMode(fontMode: FontMode) {
+function writeTypographyPreset(typographyPreset: TypographyPresetId) {
   try {
-    localStorage.setItem(FONT_MODE_STORAGE_KEY, fontMode);
+    localStorage.setItem(TYPOGRAPHY_PRESET_STORAGE_KEY, typographyPreset);
+    localStorage.setItem(
+      FONT_MODE_STORAGE_KEY,
+      typographyPreset === "mono" ? "mono" : "default"
+    );
   } catch {
     // Keep DOM state responsive when storage is unavailable.
   }
-  applyAppearance({ ...readAppearance(), fontMode });
+  applyAppearance({ ...readAppearance(), typographyPreset });
   emitAppearanceChange();
 }
 
@@ -192,13 +216,19 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
     writeTheme(appearance.theme === "dark" ? "light" : "dark");
   }, [appearance.theme]);
 
-  const setFontMode = useCallback((mode: FontMode) => {
-    writeFontMode(mode);
+  const setFontMode = useCallback((mode: TypographyPresetId) => {
+    writeTypographyPreset(mode);
+  }, []);
+
+  const setTypographyPreset = useCallback((preset: TypographyPresetId) => {
+    writeTypographyPreset(preset);
   }, []);
 
   const toggleFontMode = useCallback(() => {
-    writeFontMode(appearance.fontMode === "default" ? "mono" : "default");
-  }, [appearance.fontMode]);
+    writeTypographyPreset(
+      appearance.typographyPreset === "mono" ? DEFAULT_TYPOGRAPHY_PRESET : "mono"
+    );
+  }, [appearance.typographyPreset]);
 
   const setColorTheme = useCallback((colorTheme: ColorThemeId) => {
     writeColorTheme(colorTheme);
@@ -210,11 +240,18 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
   );
   const fontModeValue = useMemo(
     () => ({
-      fontMode: appearance.fontMode,
+      fontMode: appearance.typographyPreset,
+      typographyPreset: appearance.typographyPreset,
       setFontMode,
+      setTypographyPreset,
       toggleFontMode,
     }),
-    [appearance.fontMode, setFontMode, toggleFontMode]
+    [
+      appearance.typographyPreset,
+      setFontMode,
+      setTypographyPreset,
+      toggleFontMode,
+    ]
   );
   const colorThemeValue = useMemo(
     () => ({

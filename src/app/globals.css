@@ -7,9 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-ibm-plex-sans);
   --font-mono: var(--font-jetbrains-mono);
-  --font-heading: var(--font-dm-sans);
+  --font-heading: var(--font-ibm-plex-sans);
+  --font-label: var(--font-ibm-plex-mono);
+  --font-data: var(--font-jetbrains-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -409,14 +411,65 @@
   --markmaster-logo-brightness: 1.08;
 }
 
-/* Global Monospace Mode — full 3-tier suite (JetBrains body/data, IBM Plex labels) */
+/* Typography presets keep body, headings, labels, and data cohesive. */
+[data-typography-preset="orbit"] {
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-heading: var(--font-ibm-plex-sans);
+  --font-label: var(--font-ibm-plex-mono);
+  --font-data: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+[data-typography-preset="classic"] {
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-dm-sans);
+  --font-label: var(--font-inter);
+  --font-data: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+[data-typography-preset="editorial"] {
+  --font-sans: var(--font-instrument-sans);
+  --font-heading: var(--font-instrument-sans);
+  --font-label: var(--font-instrument-sans);
+  --font-data: var(--font-ibm-plex-mono);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+[data-typography-preset],
+[data-typography-preset] body,
+[data-typography-preset] button,
+[data-typography-preset] input,
+[data-typography-preset] textarea,
+[data-typography-preset] select,
+[data-typography-preset] .font-sans {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-typography-preset] .font-heading {
+  font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-typography-preset] .font-mono {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Global Monospace Mode: full 3-tier suite (JetBrains body/data, IBM Plex labels) */
+[data-typography-preset="mono"],
 [data-font-mode="mono"] {
   --font-sans: var(--font-jetbrains-mono);
   --font-heading: var(--font-jetbrains-mono);
+  --font-label: var(--font-ibm-plex-mono);
+  --font-data: var(--font-jetbrains-mono);
   --font-mono: var(--font-jetbrains-mono);
-  letter-spacing: -0.008em;
+  letter-spacing: 0;
 }
 
+[data-typography-preset="mono"] body,
+[data-typography-preset="mono"] button,
+[data-typography-preset="mono"] input,
+[data-typography-preset="mono"] textarea,
+[data-typography-preset="mono"] select,
 [data-font-mode="mono"] body,
 [data-font-mode="mono"] button,
 [data-font-mode="mono"] input,
@@ -699,7 +752,7 @@
     }
   }
   .heading-font {
-    font-family: var(--font-heading), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
   .menu-selection-active {
     position: relative;
@@ -773,17 +826,30 @@
     }
   }
 
-  /* 3-tier Monospace-Native Typography — active under mono toggle */
-  [data-font-mode="mono"] .text-mono-display {
-    font-family: var(--font-jetbrains-mono);
-    font-weight: 700;
-    letter-spacing: -0.01em;
+  .font-label {
+    font-family: var(--font-label), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .font-data {
+    font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+    font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
   }
 
+  /* 3-tier Monospace-Native Typography: active under the mono preset */
+  [data-typography-preset="mono"] .text-mono-display,
+  [data-font-mode="mono"] .text-mono-display {
+    font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+    font-weight: 700;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-typography-preset="mono"] .text-mono-ui,
+  [data-typography-preset="mono"] .text-mono-label,
   [data-font-mode="mono"] .text-mono-ui,
   [data-font-mode="mono"] .text-mono-label {
-    font-family: var(--font-ibm-plex-mono);
+    font-family: var(--font-label), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -791,52 +857,63 @@
     font-size: 0.625rem;
   }
 
+  [data-typography-preset="mono"] .text-mono-data,
   [data-font-mode="mono"] .text-mono-data {
-    font-family: var(--font-jetbrains-mono);
+    font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
   }
 
   /* Tier 1 — display headings */
+  [data-typography-preset="mono"] .text-heading-display,
+  [data-typography-preset="mono"] h1.heading-font,
   [data-font-mode="mono"] .text-heading-display,
   [data-font-mode="mono"] h1.heading-font {
-    font-family: var(--font-jetbrains-mono);
+    font-family: var(--font-heading), var(--font-data), ui-monospace, SFMono-Regular, monospace;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
   }
 
   /* Tier 2 — labels / chrome / section headers */
+  [data-typography-preset="mono"] label,
+  [data-typography-preset="mono"] [data-slot="label"],
+  [data-typography-preset="mono"] .app-chrome-label,
+  [data-typography-preset="mono"] h2.heading-font,
+  [data-typography-preset="mono"] [data-slot="dialog-title"],
   [data-font-mode="mono"] label,
   [data-font-mode="mono"] [data-slot="label"],
   [data-font-mode="mono"] .app-chrome-label,
   [data-font-mode="mono"] h2.heading-font,
   [data-font-mode="mono"] [data-slot="dialog-title"] {
-    font-family: var(--font-ibm-plex-mono);
+    font-family: var(--font-label), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     font-variant-numeric: tabular-nums;
   }
 
+  [data-typography-preset="mono"] .app-chrome-label,
   [data-font-mode="mono"] .app-chrome-label {
     letter-spacing: 0.14em;
     font-size: 0.625rem;
   }
 
+  [data-typography-preset="mono"] h2.heading-font,
   [data-font-mode="mono"] h2.heading-font {
     font-size: 0.6875rem;
   }
 
   /* Tier 3 — tabular data */
+  [data-typography-preset="mono"] .tabular-nums,
   [data-font-mode="mono"] .tabular-nums {
-    font-family: var(--font-jetbrains-mono);
+    font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
   }
 
   .text-heading-display {
-    font-family: var(--font-heading), var(--font-dm-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
 
   /* MarkMaster rocket logo — tint to match active accent theme */

@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme, useColorTheme, useFontMode } from "@/components/providers";
 import { COLOR_THEMES } from "@/lib/color-themes";
+import { TYPOGRAPHY_PRESETS } from "@/lib/typography-presets";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 
@@ -24,7 +25,7 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const { theme, toggleTheme } = useTheme();
-  const { fontMode, toggleFontMode } = useFontMode();
+  const { typographyPreset, setTypographyPreset } = useFontMode();
   const { colorTheme, setColorTheme } = useColorTheme();
 
   return (
@@ -68,15 +69,27 @@ export function UserNav({ user }: UserNavProps) {
           )}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={toggleFontMode}>
-          <Type className="w-4 h-4 mr-2" />
-          {fontMode === "mono" ? "Default Typography" : "Monospace UI"}
-          {fontMode === "mono" && (
-            <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
-              ON
-            </span>
-          )}
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Type className="w-4 h-4 mr-2" />
+            Typography
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {TYPOGRAPHY_PRESETS.map((option) => (
+              <DropdownMenuItem
+                key={option.id}
+                onClick={() => setTypographyPreset(option.id)}
+              >
+                {option.name}
+                {typographyPreset === option.id && (
+                  <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
+                    ON
+                  </span>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Palette className="w-4 h-4 mr-2" />

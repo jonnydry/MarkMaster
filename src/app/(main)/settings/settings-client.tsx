@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Braces,
+  Check,
   Download,
   Sun,
   Moon,
@@ -36,6 +37,10 @@ import {
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import {
+  TYPOGRAPHY_PRESETS,
+  type TypographyPresetId,
+} from "@/lib/typography-presets";
 import { cn } from "@/lib/utils";
 import {
   OrbitGrokStatusPanel,
@@ -88,7 +93,7 @@ export default function SettingsPage() {
   const { data: session, update: updateSession } = useSession();
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
-  const { fontMode, setFontMode } = useFontMode();
+  const { typographyPreset, setTypographyPreset } = useFontMode();
   const { colorTheme, setColorTheme } = useColorTheme();
   const { createCollection } = useCreateCollection();
   const [createOpen, setCreateOpen] = useState(false);
@@ -303,17 +308,21 @@ export default function SettingsPage() {
                       <SettingsRow label="Accent color">
                         <ColorThemePicker value={colorTheme} onChange={setColorTheme} />
                       </SettingsRow>
-                      <SettingsRow label="Typography" divider={false}>
-                        <SettingsSegment
-                          ariaLabel="Typography"
-                          value={fontMode}
-                          options={[
-                            { value: "default" as const, label: "Sans" },
-                            { value: "mono" as const, label: "Mono" },
-                          ]}
-                          onChange={setFontMode}
+                      <div className="border-t border-hairline-soft py-3">
+                        <div className="max-w-prose">
+                          <p className="text-sm font-medium text-foreground">
+                            Typography
+                          </p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                            Choose a cohesive type system for body text,
+                            headings, labels, and data.
+                          </p>
+                        </div>
+                        <TypographyPresetPicker
+                          value={typographyPreset}
+                          onChange={setTypographyPreset}
                         />
-                      </SettingsRow>
+                      </div>
                     </div>
                   </SettingsSection>
 
@@ -373,6 +382,84 @@ export default function SettingsPage() {
         onOpenChange={setCreateOpen}
         onCreateCollection={createCollection}
       />
+    </div>
+  );
+}
+
+function TypographyPresetPicker({
+  value,
+  onChange,
+}: {
+  value: TypographyPresetId;
+  onChange: (value: TypographyPresetId) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Typography family"
+      className="mt-3 grid gap-2 sm:grid-cols-2"
+    >
+      {TYPOGRAPHY_PRESETS.map((preset) => {
+        const selected = value === preset.id;
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={`${preset.name} typography preset`}
+            data-typography-preset={preset.id}
+            onClick={() => onChange(preset.id)}
+            className={cn(
+              "min-h-[6.25rem] rounded-sm border p-3 text-left font-sans transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              selected
+                ? "border-primary/55 bg-primary/10 ring-1 ring-primary/25"
+                : "border-hairline-soft bg-background/30 hover:border-primary/25 hover:bg-accent-soft/50"
+            )}
+          >
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="heading-font truncate text-sm font-semibold text-foreground">
+                  {preset.name}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                  {preset.description}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                  selected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-hairline-strong text-transparent"
+                )}
+                aria-hidden
+              >
+                <Check className="size-3" />
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+              <div className="min-w-0">
+                <p className="heading-font truncate text-[15px] font-semibold text-foreground">
+                  Signal Library
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {preset.previewCopy}
+                </p>
+              </div>
+              <span className="font-data text-xs text-muted-foreground">
+                128
+              </span>
+            </div>
+
+            <p className="font-label mt-2 truncate text-[10px] font-medium uppercase text-primary">
+              {preset.bodyFace} / {preset.dataFace}
+            </p>
+          </button>
+        );
+      })}
     </div>
   );
 }

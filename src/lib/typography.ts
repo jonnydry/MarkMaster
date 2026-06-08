@@ -1,8 +1,10 @@
 /**
  * Central typography contract for MarkMaster.
  *
- * monoNative is true when the Monospace UI toggle is on (`fontMode === "mono"`).
+ * monoNative is true when the Monospace typography preset is active.
  */
+
+import type { TypographyPresetId } from "./typography-presets";
 
 export const MONO_LABEL = "text-mono-label tracking-[0.14em]";
 export const MONO_DATA = "text-mono-data tabular-nums";
@@ -16,7 +18,7 @@ export const SANS_DATA = "tabular-nums text-foreground";
 export const SANS_SECTION_LABEL =
   "text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5";
 
-export type FontMode = "default" | "mono";
+export type FontMode = TypographyPresetId;
 
 export function resolveMonoNative(opts: {
   fontMode?: FontMode;
