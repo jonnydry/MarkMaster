@@ -127,7 +127,7 @@ export function OrbitMapRail({
           onClearSelection={onClearSelection}
           copyingCollectionId={copyingCollectionId}
           isOverlay={isOverlay}
-          
+
         />
       </section>
     </aside>
@@ -150,7 +150,7 @@ interface SelectedClusterBodyProps {
   onClearSelection: () => void;
   copyingCollectionId?: string | null;
   isOverlay: boolean;
-  
+
 }
 
 function SelectedClusterBody({
@@ -202,12 +202,12 @@ function SelectedClusterBody({
           <RailMetric
             label="Total"
             value={stats.totalBookmarks.toLocaleString()}
-            
+
           />
           <RailMetric
             label="Loose"
             value={stats.looseBookmarks.toLocaleString()}
-            
+
           />
         </div>
         {connected.length > 0 && (
@@ -216,7 +216,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            
+
           />
         )}
       </div>
@@ -269,7 +269,7 @@ function SelectedClusterBody({
           </Button>
           <DashboardLink
             href={`/dashboard?tag=${encodeURIComponent(node.id)}`}
-            
+
           />
         </div>
         {connected.length > 0 && (
@@ -278,7 +278,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            
+
           />
         )}
       </div>
@@ -356,7 +356,7 @@ function SelectedClusterBody({
           {node.variant !== "x_folder" && (
             <DashboardLink
               href={`/dashboard?collection=${encodeURIComponent(node.id)}`}
-              
+
             />
           )}
         </div>
@@ -366,7 +366,7 @@ function SelectedClusterBody({
             nodes={connected}
             onOpenBookmark={onOpenBookmark}
             isOverlay={isOverlay}
-            
+
           />
         )}
       </div>
@@ -399,7 +399,7 @@ function SelectedClusterBody({
           isLoose={isLoose}
           tagCount={tagConnections.length}
           collectionCount={collectionConnections.length}
-          
+
         />
 
         <div className="grid min-w-0 grid-cols-2 gap-2 min-[420px]:grid-cols-3">
@@ -567,7 +567,7 @@ function BookmarkInspectorStatus({
   isLoose: boolean;
   tagCount: number;
   collectionCount: number;
-  
+
 }) {
   const cardClass =
     "min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/45 px-2 py-2";
@@ -610,7 +610,7 @@ function ConnectedList({
   nodes: OrbitGraphNode[];
   onOpenBookmark: (bookmarkId: string) => void;
   isOverlay: boolean;
-  
+
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
   if (bookmarks.length === 0) return null;
@@ -658,7 +658,7 @@ function RailMetric({
   value}: {
   label: string;
   value: string;
-  
+
 }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/55 p-3">

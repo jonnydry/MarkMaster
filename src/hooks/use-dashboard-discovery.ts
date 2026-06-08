@@ -88,8 +88,8 @@ export function useDashboardDiscovery(options: {
   // Unified discovery carousel data (Phase 1 of Master Plan). Computed with useMemo.
   // Provides flat ordered list (raw front-loaded) + full ritualBatch preserving
   // exact batch construction, nurtured, cta.digest_review_together, digestIds + source=weekly-gems,
-  // and onSaveAsCollection contract. Only DashboardDiscovery (default/flush) consumes the new fields.
-  // HighlightsDigest / standalone WeeklyDigestPanel / perf SQL path untouched.
+  // and onSaveAsCollection contract. DashboardDiscovery (default/flush) consumes the new fields.
+  // The perf SQL path remains untouched.
   const discovery = useMemo(
     () =>
       buildDiscoveryCarouselItems(rawGems, libraryGems, {

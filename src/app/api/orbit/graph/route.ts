@@ -37,11 +37,18 @@ export async function GET(req: NextRequest) {
   // Validate query parameters with Zod
   const queryParams = Object.fromEntries(req.nextUrl.searchParams.entries());
   const parsed = orbitGraphQuerySchema.safeParse(queryParams);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Invalid query parameters",
+        details: parsed.error.flatten().fieldErrors,
+      },
+      { status: 400 }
+    );
+  }
 
-  const nodeCap = parsed.success
-    ? (parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP)
-    : DEFAULT_ORBIT_GRAPH_NODE_CAP;
-  const scope = parsed.success ? (parsed.data.scope ?? "library") : "library";
+  const nodeCap = parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP;
+  const scope = parsed.data.scope ?? "library";
 
   const orbitQueueWhere = {
     tags: { none: {} },

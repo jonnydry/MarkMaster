@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
 export type AuthorDecisionHistoryData =
@@ -95,25 +96,89 @@ export async function getAuthorPriorHintsForScan(
   ];
   if (unique.length === 0) return [];
 
-  const hints: Array<{
-    authorUsername: string;
-    priorCount: number;
-    tags: string[];
-    collections: string[];
-  }> = [];
-  await Promise.all(
-    unique.map(async (authorUsername) => {
-      const history = await getAuthorDecisionHistory(userId, authorUsername);
-      if (
-        !history ||
-        history.priorCount < MIN_PRIOR_HINT_COUNT ||
-        (history.tags.length === 0 && history.collections.length === 0)
-      ) {
-        return;
-      }
-      hints.push(history);
-    })
+  const [countRows, tagRows, collectionRows] = await Promise.all([
+    prisma.bookmark.groupBy({
+      by: ["authorUsername"],
+      where: {
+        userId,
+        authorUsername: { in: unique },
+      },
+      _count: { _all: true },
+    }),
+    prisma.$queryRaw<{ authorUsername: string; name: string }[]>(Prisma.sql`
+      SELECT ranked."authorUsername", ranked."name"
+      FROM (
+        SELECT
+          b."authorUsername",
+          t."name",
+          ROW_NUMBER() OVER (
+            PARTITION BY b."authorUsername"
+            ORDER BY COUNT(*) DESC, MAX(b."bookmarkedAt") DESC
+          ) AS rank
+        FROM "Bookmark" b
+        INNER JOIN "BookmarkTag" bt ON bt."bookmarkId" = b."id"
+        INNER JOIN "Tag" t ON t."id" = bt."tagId"
+        WHERE b."userId" = ${userId}
+          AND b."authorUsername" IN (${Prisma.join(unique)})
+        GROUP BY b."authorUsername", t."name"
+      ) ranked
+      WHERE ranked.rank <= 8
+      ORDER BY ranked."authorUsername" ASC, ranked.rank ASC
+    `),
+    prisma.$queryRaw<{ authorUsername: string; name: string }[]>(Prisma.sql`
+      SELECT ranked."authorUsername", ranked."name"
+      FROM (
+        SELECT
+          b."authorUsername",
+          c."name",
+          ROW_NUMBER() OVER (
+            PARTITION BY b."authorUsername"
+            ORDER BY COUNT(*) DESC, MAX(b."bookmarkedAt") DESC
+          ) AS rank
+        FROM "Bookmark" b
+        INNER JOIN "CollectionItem" ci ON ci."bookmarkId" = b."id"
+        INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+        WHERE b."userId" = ${userId}
+          AND b."authorUsername" IN (${Prisma.join(unique)})
+          AND c."type" = 'user_collection'
+        GROUP BY b."authorUsername", c."name"
+      ) ranked
+      WHERE ranked.rank <= 6
+      ORDER BY ranked."authorUsername" ASC, ranked.rank ASC
+    `),
+  ]);
+
+  const priorCountByAuthor = new Map(
+    countRows.map((row) => [row.authorUsername, row._count._all])
   );
+  const tagsByAuthor = new Map<string, string[]>();
+  const collectionsByAuthor = new Map<string, string[]>();
+
+  for (const row of tagRows) {
+    const tags = tagsByAuthor.get(row.authorUsername) ?? [];
+    tags.push(row.name);
+    tagsByAuthor.set(row.authorUsername, tags);
+  }
+
+  for (const row of collectionRows) {
+    const collections = collectionsByAuthor.get(row.authorUsername) ?? [];
+    collections.push(row.name);
+    collectionsByAuthor.set(row.authorUsername, collections);
+  }
+
+  const hints = unique.flatMap((authorUsername) => {
+    const priorCount = priorCountByAuthor.get(authorUsername) ?? 0;
+    const tags = tagsByAuthor.get(authorUsername) ?? [];
+    const collections = collectionsByAuthor.get(authorUsername) ?? [];
+    if (
+      priorCount < MIN_PRIOR_HINT_COUNT ||
+      (tags.length === 0 && collections.length === 0)
+    ) {
+      return [];
+    }
+
+    return [{ authorUsername, priorCount, tags, collections }];
+  });
 
   return hints.sort((a, b) => b.priorCount - a.priorCount);
 }

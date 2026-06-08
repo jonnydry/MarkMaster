@@ -82,6 +82,26 @@ export interface OrbitScanHandle extends OrbitScanState {
   clearPlan: () => void;
 }
 
+export function removeSuggestionsFromScanPlan(
+  current: OrbitScanResponsePayload | null,
+  bookmarkIds: Iterable<string>
+): OrbitScanResponsePayload | null {
+  if (!current) return null;
+
+  const removed = new Set(bookmarkIds);
+  if (removed.size === 0) return current;
+
+  const nextSuggestions = current.plan.suggestions.filter(
+    (suggestion) => !removed.has(suggestion.bookmarkId)
+  );
+  if (nextSuggestions.length === 0) return null;
+
+  return {
+    ...current,
+    plan: { ...current.plan, suggestions: nextSuggestions },
+  };
+}
+
 function isOrbitScanErrorPayload(value: unknown): value is OrbitScanErrorPayload {
   if (!value || typeof value !== "object") return false;
 
@@ -437,17 +457,7 @@ export function useOrbitScan(): OrbitScanHandle {
           return next;
         });
 
-        setPlan((current) => {
-          if (!current) return null;
-          const nextSuggestions = current.plan.suggestions.filter(
-            (suggestion) => !appliedIds.has(suggestion.bookmarkId)
-          );
-          if (nextSuggestions.length === 0) return null;
-          return {
-            ...current,
-            plan: { ...current.plan, suggestions: nextSuggestions },
-          };
-        });
+        setPlan((current) => removeSuggestionsFromScanPlan(current, appliedIds));
 
         return response.applied;
       } catch (err) {
@@ -516,6 +526,10 @@ export function useOrbitScan(): OrbitScanHandle {
           }
           return next;
         });
+
+        setPlan((current) =>
+          removeSuggestionsFromScanPlan(current, reviewedBookmarkIds)
+        );
 
         return response.applied;
       } catch (err) {

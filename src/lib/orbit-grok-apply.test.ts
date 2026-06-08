@@ -16,6 +16,51 @@ import {
   orbitScanPlanSchema,
 } from "@/lib/orbit-grok";
 
+function createMockTransaction(options?: {
+  tags?: unknown[];
+  collections?: unknown[];
+  tagCreate?: ReturnType<typeof vi.fn>;
+  collectionCreate?: ReturnType<typeof vi.fn>;
+  bookmarkTagCreateMany?: ReturnType<typeof vi.fn>;
+  collectionItemFindFirst?: ReturnType<typeof vi.fn>;
+  collectionItemCreateMany?: ReturnType<typeof vi.fn>;
+}) {
+  return {
+    $executeRaw: vi.fn(),
+    tag: {
+      findMany: vi.fn().mockResolvedValue(options?.tags ?? []),
+      create: options?.tagCreate ?? vi.fn(),
+      findUnique: vi.fn(),
+    },
+    bookmarkTag: {
+      createMany:
+        options?.bookmarkTagCreateMany ??
+        vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    collection: {
+      findMany: vi.fn().mockResolvedValue(options?.collections ?? []),
+      create: options?.collectionCreate ?? vi.fn(),
+    },
+    collectionItem: {
+      findFirst:
+        options?.collectionItemFindFirst ??
+        vi.fn().mockResolvedValue(null),
+      createMany:
+        options?.collectionItemCreateMany ??
+        vi.fn().mockResolvedValue({ count: 0 }),
+    },
+  };
+}
+
+function mockTransaction<T extends ReturnType<typeof createMockTransaction>>(
+  mockTx: T
+) {
+  vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
+    fn(mockTx as never)
+  );
+  return mockTx;
+}
+
 describe("applyOrbitScanPlan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,22 +71,13 @@ describe("applyOrbitScanPlan", () => {
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
-    const mockTx = {
-      tag: {
-        create: vi
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        tagCreate: vi
           .fn()
           .mockResolvedValue({ id: "t-new", name: "Alpha", color: "#22c55e" }),
-      },
-      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      collection: { create: vi.fn() },
-      collectionItem: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        createMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
-    };
-
-    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
-      fn(mockTx as never)
+        bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      })
     );
 
     const plan = orbitScanPlanSchema.parse({
@@ -113,18 +149,10 @@ describe("applyOrbitScanPlan", () => {
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
-    const mockTx = {
-      tag: { create: vi.fn() },
-      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
-      collection: { create: vi.fn() },
-      collectionItem: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        createMany: vi.fn(),
-      },
-    };
-
-    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
-      fn(mockTx as never)
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        collectionItemCreateMany: vi.fn(),
+      })
     );
 
     const plan = orbitScanPlanSchema.parse({
@@ -166,18 +194,12 @@ describe("applyOrbitScanPlan", () => {
     ]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
-    const mockTx = {
-      tag: { create: vi.fn() },
-      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      collection: { create: vi.fn() },
-      collectionItem: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        createMany: vi.fn(),
-      },
-    };
-
-    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
-      fn(mockTx as never)
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        tags: [{ id: "t-existing", userId: "u1", name: "AI", color: "#1d9bf0" }],
+        bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        collectionItemCreateMany: vi.fn(),
+      })
     );
 
     const plan = orbitScanPlanSchema.parse({
@@ -224,24 +246,15 @@ describe("applyOrbitScanPlan", () => {
     vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
     vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
 
-    const mockTx = {
-      tag: {
-        create: vi.fn().mockResolvedValue({
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        tagCreate: vi.fn().mockResolvedValue({
           id: "t-http-caching",
           name: "HTTP: Caching",
           color: "#22c55e",
         }),
-      },
-      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      collection: { create: vi.fn() },
-      collectionItem: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        createMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
-    };
-
-    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
-      fn(mockTx as never)
+        bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      })
     );
 
     const plan = orbitScanPlanSchema.parse({
@@ -301,18 +314,26 @@ describe("applyOrbitScanPlan", () => {
       },
     ]);
 
-    const mockTx = {
-      tag: { create: vi.fn() },
-      bookmarkTag: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
-      collection: { create: vi.fn() },
-      collectionItem: {
-        findFirst: vi.fn().mockResolvedValue({ sortOrder: 4 }),
-        createMany: vi.fn().mockResolvedValue({ count: 1 }),
-      },
-    };
-
-    vi.mocked(prisma.$transaction).mockImplementation(async (fn) =>
-      fn(mockTx as never)
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        collections: [
+          {
+            id: "c-existing",
+            userId: "u1",
+            name: "AI Papers",
+            description: "My AI papers.",
+            type: "user_collection",
+            isPublic: false,
+            shareSlug: null,
+            externalSource: null,
+            externalSourceId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        collectionItemFindFirst: vi.fn().mockResolvedValue({ sortOrder: 4 }),
+        collectionItemCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      })
     );
 
     const plan = orbitScanPlanSchema.parse({

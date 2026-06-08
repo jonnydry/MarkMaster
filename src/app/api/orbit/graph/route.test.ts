@@ -218,4 +218,18 @@ describe("/api/orbit/graph", () => {
       count: 3,
     });
   });
+
+  it("rejects invalid graph query parameters", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph?nodeCap=0")
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Invalid query parameters");
+    expect(prisma.bookmark.findMany).not.toHaveBeenCalled();
+  });
 });

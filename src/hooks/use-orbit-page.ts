@@ -132,6 +132,7 @@ export function useOrbitPage() {
     scanButtonLabel: scanSession.scanButtonLabel,
     triagedCount: scanSession.triagedCount,
     passTotal: scanSession.passTotal,
+    activeScanPlanSuggestionCount: scanSession.activeScanPlanSuggestionCount,
     scanTargetIds: scanSession.scanTargetIds,
     scanTargetCount: scanSession.scanTargetCount,
     selectedScanTargetIds: scanSession.selectedScanTargetIds,

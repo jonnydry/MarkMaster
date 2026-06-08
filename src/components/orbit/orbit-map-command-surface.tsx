@@ -94,7 +94,7 @@ export function OrbitMapCommandSurface({
                   <li key={node.id}>
                     <SearchResultButton
                       node={node}
-                      
+
                       onClick={() => {
                         onResultSelect(selectionForNode(node));
                         onSearchChange("");
@@ -125,7 +125,7 @@ function SearchResultButton({
   node,
   onClick}: {
   node: OrbitGraphNode;
-  
+
   onClick: () => void;
 }) {
   return (
@@ -175,7 +175,7 @@ function SearchResultButton({
 function ResultKindLabel({
   children}: {
   children: string;
-  
+
 }) {
   return (
     <span

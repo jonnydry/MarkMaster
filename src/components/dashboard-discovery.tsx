@@ -126,8 +126,8 @@ export function DashboardDiscovery({
   // Header pill + Ritual Anchor (final slide) are the first-class batch ritual CTAs.
   // All use the exact same machinery as before: handleReviewInOrbit, nurtured, celebration,
   // digestIds + source=weekly-gems, onSaveAsCollection("This Week’s Gems"), track cta.digest_review_together.
-  // No changes to HighlightsDigest, non-embedded WeeklyDigestPanel, PerformanceHighlights component,
-  // usePerformanceHighlights, or perf SQL. ParentData + flush variant fully supported.
+  // No changes to PerformanceHighlights, usePerformanceHighlights, or perf SQL.
+  // ParentData + flush variant fully supported.
   // See Unified-High-Engagement-Discovery-Carousel-Plan.md (Phase 1).
   const hasRitual = ritualTotal > 0;
   const itemCountForStrip = discoveryCarouselItems.length + (hasRitual ? 1 : 0);

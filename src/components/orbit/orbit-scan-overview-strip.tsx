@@ -31,7 +31,7 @@ function OverviewMetric({
   label}: {
   value: ReactNode;
   label: string;
-  
+
 }) {
   return (
     <div className="min-w-0 px-3 py-2.5">
@@ -59,7 +59,7 @@ function OverviewMetric({
 function SourceBadge({
   reuseExisting}: {
   reuseExisting: boolean;
-  
+
 }) {
   return (
     <span
@@ -79,7 +79,7 @@ function SourceBadge({
 function TagRollupChip({
   tag}: {
   tag: TagRollup;
-  
+
 }) {
   return (
     <span
@@ -111,7 +111,7 @@ function TagRollupChip({
 function CollectionRollupChip({
   collection}: {
   collection: CollectionRollup;
-  
+
 }) {
   return (
     <span
@@ -132,7 +132,7 @@ function CollectionRollupChip({
       </span>
       <SourceBadge
         reuseExisting={collection.reuseExisting}
-        
+
       />
     </span>
   );
@@ -147,7 +147,7 @@ function RollupSection({
   icon: ReactNode;
   count: number;
   children: ReactNode;
-  
+
 }) {
   return (
     <div className="space-y-2">
@@ -178,7 +178,7 @@ function StrategyLines({
   collectionStrategy}: {
   taggingStrategy: string;
   collectionStrategy: string;
-  
+
 }) {
   const [expanded, setExpanded] = useState(false);
   const tagLong = taggingStrategy.length > STRATEGY_PREVIEW;
@@ -311,17 +311,17 @@ export function OrbitScanOverviewStrip({
             <OverviewMetric
               value={summary.bookmarkCount}
               label="suggested"
-              
+
             />
             <OverviewMetric
               value={summary.bookmarksWithTags}
               label="tagged"
-              
+
             />
             <OverviewMetric
               value={summary.bookmarksWithCollections}
               label="collected"
-              
+
             />
           </div>
 
@@ -329,7 +329,7 @@ export function OrbitScanOverviewStrip({
             <StrategyLines
               taggingStrategy={overview.taggingStrategy}
               collectionStrategy={overview.collectionStrategy}
-              
+
             />
 
             {tagRollups.length > 0 ? (
@@ -337,13 +337,13 @@ export function OrbitScanOverviewStrip({
                 title="Tags"
                 icon={<Tags className="size-3.5" aria-hidden />}
                 count={tagRollups.length}
-                
+
               >
                 {tagRollups.map((tag) => (
                   <TagRollupChip
                     key={tag.name}
                     tag={tag}
-                    
+
                   />
                 ))}
               </RollupSection>
@@ -354,13 +354,13 @@ export function OrbitScanOverviewStrip({
                 title="Collections"
                 icon={<FolderOpen className="size-3.5" aria-hidden />}
                 count={collectionRollups.length}
-                
+
               >
                 {collectionRollups.map((col) => (
                   <CollectionRollupChip
                     key={col.name}
                     collection={col}
-                    
+
                   />
                 ))}
               </RollupSection>

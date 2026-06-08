@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
+import { getClientIp } from "@/lib/client-ip";
 import { debugAccessDeniedResponse } from "@/lib/debug-access";
+import { readJsonBody } from "@/lib/request-body";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 interface CspReport {
@@ -19,6 +22,20 @@ interface CspReport {
 
 // In-memory store for recent CSP violations (useful for the debug page)
 const MAX_RECENT_VIOLATIONS = 50;
+const MAX_CSP_REPORT_BODY_BYTES = 16 * 1024;
+const cspReportSchema = z.object({
+  "blocked-uri": z.string().trim().max(2048).optional(),
+  "document-uri": z.string().trim().max(2048).optional(),
+  "effective-directive": z.string().trim().max(120).optional(),
+  "violated-directive": z.string().trim().max(120).optional(),
+  "original-policy": z.string().trim().max(4096).optional(),
+  "source-file": z.string().trim().max(2048).optional(),
+  "line-number": z.number().int().min(0).max(1_000_000).optional(),
+  "column-number": z.number().int().min(0).max(1_000_000).optional(),
+  disposition: z.enum(["enforce", "report"]).optional(),
+  "script-sample": z.string().trim().max(240).optional(),
+  "status-code": z.number().int().min(0).max(999).optional(),
+});
 export const recentCspViolations: Array<{
   timestamp: string;
   report: CspReport;
@@ -35,26 +52,34 @@ export const recentCspViolations: Array<{
 export async function POST(req: NextRequest) {
   try {
     // Rate limit public CSP report ingestion to prevent abuse / log flooding
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const ip = getClientIp(req.headers);
     const rate = await checkRateLimit("csp-report", `csp:${ip}`);
     if (!rate.success) {
       return NextResponse.json({ error: "Too many reports" }, { status: 429 });
     }
 
-    const contentType = req.headers.get("content-type") || "";
-    let rawBody: unknown;
-
-    // Support both modern and legacy CSP report formats
-    if (contentType.includes("application/csp-report")) {
-      // Legacy format (older browsers)
-      rawBody = await req.json();
-    } else {
-      // Modern format: { "csp-report": { ... } }
-      const body = await req.json();
-      rawBody = body["csp-report"] || body;
+    const body = await readJsonBody(req, MAX_CSP_REPORT_BODY_BYTES);
+    if (!body.ok) {
+      return NextResponse.json({ error: body.error }, { status: body.status });
     }
 
-    const report = rawBody as CspReport;
+    const rawBody = body.data;
+    const reportInput =
+      rawBody && typeof rawBody === "object" && "csp-report" in rawBody
+        ? (rawBody as { "csp-report": unknown })["csp-report"]
+        : rawBody;
+    const parsed = cspReportSchema.safeParse(reportInput);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Invalid report",
+          details: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const report = parsed.data as CspReport;
 
     // Store for the debug UI
     recentCspViolations.unshift({
@@ -84,7 +109,7 @@ export async function POST(req: NextRequest) {
     }
     console.warn("");
 
-    return NextResponse.json({ status: "ok" }, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("[CSP Report] Failed to parse report:", error);
     return NextResponse.json({ error: "Invalid report" }, { status: 400 });

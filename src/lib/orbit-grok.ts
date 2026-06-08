@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { PRESET_COLORS } from "@/lib/constants";
@@ -1616,6 +1617,34 @@ export async function applyOrbitScanPlan(args: {
   };
 
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      SELECT pg_advisory_xact_lock(hashtext(${`orbit-apply:${args.userId}`}))
+    `);
+
+    const [lockedTags, lockedCollections] = await Promise.all([
+      tx.tag.findMany({
+        where: { userId: args.userId },
+        orderBy: { name: "asc" },
+      }),
+      tx.collection.findMany({
+        where: {
+          userId: args.userId,
+          type: "user_collection",
+        },
+        orderBy: { updatedAt: "desc" },
+      }),
+    ]);
+
+    tagMap.clear();
+    for (const tag of lockedTags) {
+      tagMap.set(normalizeKey(tag.name), tag);
+    }
+
+    collectionMap.clear();
+    for (const collection of lockedCollections) {
+      collectionMap.set(normalizeKey(collection.name), collection);
+    }
+
     for (const [tagKey, tagDefinition] of tagDefinitions) {
       const existingTag = tagMap.get(tagKey);
       if (existingTag) {
@@ -1623,16 +1652,39 @@ export async function applyOrbitScanPlan(args: {
         continue;
       }
 
-      const createdTag = await tx.tag.create({
-        data: {
-          userId: args.userId,
-          name: tagDefinition.name,
-          color: tagDefinition.color,
-        },
-      });
+      try {
+        const createdTag = await tx.tag.create({
+          data: {
+            userId: args.userId,
+            name: tagDefinition.name,
+            color: tagDefinition.color,
+          },
+        });
 
-      tagMap.set(tagKey, createdTag);
-      result.createdTags += 1;
+        tagMap.set(tagKey, createdTag);
+        result.createdTags += 1;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const recoveredTag = await tx.tag.findUnique({
+            where: {
+              userId_name: {
+                userId: args.userId,
+                name: tagDefinition.name,
+              },
+            },
+          });
+          if (recoveredTag) {
+            tagMap.set(tagKey, recoveredTag);
+            result.reusedTags += 1;
+            continue;
+          }
+        }
+
+        throw error;
+      }
     }
 
     if (tagAssignments.length > 0) {

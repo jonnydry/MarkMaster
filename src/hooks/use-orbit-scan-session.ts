@@ -178,6 +178,14 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     [scan.plan]
   );
 
+  const activePlanSuggestionIds = useMemo(
+    () =>
+      planSuggestionIds.filter(
+        (id) => !appliedBookmarkIds.has(id) && !scan.dismissedBookmarkIds.has(id)
+      ),
+    [appliedBookmarkIds, planSuggestionIds, scan.dismissedBookmarkIds]
+  );
+
   const passTotal = planSuggestionIds.length;
 
   const triagedCount = useMemo(
@@ -284,6 +292,7 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     scanButtonLabel,
     triagedCount,
     passTotal,
+    activeScanPlanSuggestionCount: activePlanSuggestionIds.length,
     scanTargetIds,
     scanTargetCount,
     selectedScanTargetIds,

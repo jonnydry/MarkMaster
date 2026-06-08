@@ -73,6 +73,29 @@ function draftHasChanges(
   );
 }
 
+function buildDecisionEvent(args: {
+  draft: OrbitReviewSuggestionDraft;
+  original: OrbitBookmarkSuggestion | null;
+  reviewed: OrbitBookmarkSuggestion | null;
+  source: string;
+}): OrbitDecisionEventPayload {
+  const action: OrbitDecisionEventPayload["action"] =
+    args.draft.decision === "keep"
+      ? "kept"
+      : draftHasChanges(args.draft, args.original)
+        ? "edited"
+        : "accepted";
+
+  return {
+    bookmarkId: args.draft.bookmarkId,
+    action,
+    source: args.source,
+    mode: "deep" as const,
+    originalSuggestion: args.original,
+    reviewedSuggestion: args.reviewed,
+  };
+}
+
 export function useOrbitReviewSession({
   open,
   plan,
@@ -201,25 +224,14 @@ export function useOrbitReviewSession({
         ? "weekly-gems"
         : "orbit-review");
 
-    return effectiveDrafts.map((draft) => {
-      const original = originalSuggestionById.get(draft.bookmarkId) ?? null;
-      const reviewed = reviewedSuggestionById.get(draft.bookmarkId) ?? null;
-      const action: OrbitDecisionEventPayload["action"] =
-        draft.decision === "keep"
-          ? "kept"
-          : draftHasChanges(draft, original)
-            ? "edited"
-            : "accepted";
-
-      return {
-        bookmarkId: draft.bookmarkId,
-        action,
+    return effectiveDrafts.map((draft) =>
+      buildDecisionEvent({
+        draft,
+        original: originalSuggestionById.get(draft.bookmarkId) ?? null,
+        reviewed: reviewedSuggestionById.get(draft.bookmarkId) ?? null,
         source: eventSource,
-        mode: "deep" as const,
-        originalSuggestion: original,
-        reviewedSuggestion: reviewed,
-      };
-    });
+      })
+    );
   }, [
     digestBookmarkIds,
     effectiveDrafts,
@@ -395,16 +407,21 @@ export function useOrbitReviewSession({
     [bookmarkById, originalSuggestionById, queryClient, updateDraft]
   );
 
-  const advanceAfterResolve = useCallback(() => {
-    if (
-      effectiveDrafts.length <= 1 ||
-      activeDraftIndex >= effectiveDrafts.length - 1
-    ) {
+  const advanceAfterResolve = useCallback((resolvedBookmarkId: string) => {
+    const remainingDrafts = effectiveDrafts.filter(
+      (draft) => draft.bookmarkId !== resolvedBookmarkId
+    );
+
+    if (remainingDrafts.length === 0) {
       onOpenChange(false);
       return;
     }
 
-    const nextId = effectiveDrafts[activeDraftIndex + 1]?.bookmarkId;
+    const fallbackIndex = Math.max(
+      0,
+      Math.min(activeDraftIndex, remainingDrafts.length - 1)
+    );
+    const nextId = remainingDrafts[fallbackIndex]?.bookmarkId;
     if (nextId) setActiveDraftId(nextId);
   }, [
     activeDraftIndex,
@@ -458,7 +475,7 @@ export function useOrbitReviewSession({
       decisionEvents: singleEvents,
     });
 
-    if (applied) advanceAfterResolve();
+    if (applied) advanceAfterResolve(activeDraft.bookmarkId);
   }, [
     activeDraft,
     advanceAfterResolve,
@@ -487,22 +504,31 @@ export function useOrbitReviewSession({
       existingTags,
       existingCollections,
     });
+    const keptEvent = buildDecisionEvent({
+      draft: keptDraft,
+      original: originalSuggestionById.get(activeDraft.bookmarkId) ?? null,
+      reviewed: null,
+      source:
+        source ?? (digestBookmarkIds && digestBookmarkIds.length > 0
+          ? "weekly-gems"
+          : "orbit-review"),
+    });
     const applied = await onApply(singlePlan, {
       createCollections,
       keptBookmarkIds: [activeDraft.bookmarkId],
-      decisionEvents: decisionEvents.filter(
-        (event) => event.bookmarkId === activeDraft.bookmarkId
-      ),
+      decisionEvents: [keptEvent],
     });
-    if (applied) advanceAfterResolve();
+    if (applied) advanceAfterResolve(activeDraft.bookmarkId);
   }, [
     activeDraft,
     advanceAfterResolve,
     createCollections,
-    decisionEvents,
+    digestBookmarkIds,
     existingCollections,
     existingTags,
     onApply,
+    originalSuggestionById,
+    source,
     sourcePlan,
     updateDraft,
   ]);

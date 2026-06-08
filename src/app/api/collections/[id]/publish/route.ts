@@ -4,6 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { generateShareContent } from "@/lib/share-content";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
+function getConfiguredShareOrigin(req: NextRequest) {
+  const configuredUrl =
+    process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configuredUrl) {
+    try {
+      return new URL(configuredUrl).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  return process.env.NODE_ENV === "production" ? null : req.nextUrl.origin;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -57,12 +71,20 @@ export async function POST(
     tweetText: item.bookmark.tweetText,
   }));
 
+  const shareOrigin = getConfiguredShareOrigin(req);
+  if (!shareOrigin) {
+    return NextResponse.json(
+      { error: "Share origin is not configured." },
+      { status: 500 }
+    );
+  }
+
   const shareContent = generateShareContent(
     collection.name,
     collection.description,
     bookmarks,
     collection.shareSlug,
-    req.nextUrl.origin
+    shareOrigin
   );
 
   return NextResponse.json(shareContent);

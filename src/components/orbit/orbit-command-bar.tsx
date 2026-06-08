@@ -79,7 +79,7 @@ export interface OrbitCommandBarProps {
 
 function SegmentedControl({
   children}: {
-  
+
   children: ReactNode;
 }) {
   return (

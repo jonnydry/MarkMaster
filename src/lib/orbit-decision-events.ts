@@ -30,6 +30,13 @@ type LabelCounts = {
   reasons: Set<string>;
 };
 
+export class OrbitDecisionEventOwnershipError extends Error {
+  constructor() {
+    super("One or more Orbit decision event bookmarks do not belong to the user.");
+    this.name = "OrbitDecisionEventOwnershipError";
+  }
+}
+
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -184,6 +191,19 @@ export async function recordOrbitDecisionEvents(args: {
   });
 
   if (events.length === 0) return { count: 0 };
+
+  const bookmarkIds = Array.from(new Set(events.map((event) => event.bookmarkId)));
+  const ownedBookmarks = await prisma.bookmark.findMany({
+    where: {
+      userId: args.userId,
+      id: { in: bookmarkIds },
+    },
+    select: { id: true },
+  });
+
+  if (ownedBookmarks.length !== bookmarkIds.length) {
+    throw new OrbitDecisionEventOwnershipError();
+  }
 
   const result = await prisma.orbitDecisionEvent.createMany({
     data: events,

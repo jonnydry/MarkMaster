@@ -60,7 +60,7 @@ function TagPill({
   onClick}: {
   name: string;
   onClick?: () => void;
-  
+
 }) {
   return (
     <button
@@ -83,7 +83,7 @@ function BookmarkRank({
   compact = false}: {
   rank?: number;
   compact?: boolean;
-  
+
 }) {
   if (typeof rank !== "number") return null;
 
@@ -323,7 +323,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
-                  
+
                 />
               ))}
             </div>
@@ -551,7 +551,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
-                  
+
                 />
               ))}
             </div>

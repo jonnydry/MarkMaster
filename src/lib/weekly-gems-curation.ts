@@ -93,7 +93,6 @@ export function filterDigestDisplayGems(
  * Visual distinction via context + existing itemLabels (for "Resurfaced" badges).
  *
  * This centralizes curation for the single carousel in DashboardDiscovery (default + flush).
- * Standalone HighlightsDigest + non-embedded WeeklyDigestPanel untouched.
  * Ritual contracts, telemetry, nurtured, onSaveAsCollection preserved exactly.
  *
  * See: docs/design/Unified-High-Engagement-Discovery-Carousel-Plan.md

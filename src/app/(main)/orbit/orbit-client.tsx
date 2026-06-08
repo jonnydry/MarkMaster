@@ -138,6 +138,7 @@ export default function OrbitPage() {
     scanButtonLabel,
     triagedCount,
     passTotal,
+    activeScanPlanSuggestionCount,
     scanTargetIds,
     scanTargetCount,
     selectedScanTargetIds,
@@ -259,8 +260,8 @@ export default function OrbitPage() {
                 queueIsLoading={queueIsLoading}
                 scanning={scan.scanning}
                 scanTargetCount={scanTargetIds.length}
-                hasScanPlan={!!scan.plan}
-                scanPlanSuggestionCount={scan.plan?.plan.suggestions.length ?? 0}
+                hasScanPlan={activeScanPlanSuggestionCount > 0}
+                scanPlanSuggestionCount={activeScanPlanSuggestionCount}
                 batchMode={resolvedScanBatchMode}
                 resolvedBatchProfile={scanBatchProfile}
                 deepUnlocked={deepUnlocked}

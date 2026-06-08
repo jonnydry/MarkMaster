@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   prisma: {
+    bookmark: {
+      findMany: vi.fn(),
+    },
     orbitDecisionEvent: {
       createMany: vi.fn(),
       findMany: vi.fn(),
@@ -22,6 +25,7 @@ describe("orbit decision events", () => {
   });
 
   it("records bounded review outcome events", async () => {
+    mocks.prisma.bookmark.findMany.mockResolvedValue([{ id: "bookmark-1" }]);
     mocks.prisma.orbitDecisionEvent.createMany.mockResolvedValue({ count: 1 });
 
     await expect(
@@ -72,6 +76,30 @@ describe("orbit decision events", () => {
         ],
       })
     );
+  });
+
+  it("rejects decision events for bookmarks outside the user scope", async () => {
+    mocks.prisma.bookmark.findMany.mockResolvedValue([]);
+
+    await expect(
+      recordOrbitDecisionEvents({
+        userId: "user-1",
+        events: [
+          {
+            bookmarkId: "bookmark-1",
+            action: "kept",
+            source: "orbit-review",
+            mode: "deep",
+            originalSuggestion: null,
+            reviewedSuggestion: null,
+          },
+        ],
+      })
+    ).rejects.toMatchObject({
+      name: "OrbitDecisionEventOwnershipError",
+    });
+
+    expect(mocks.prisma.orbitDecisionEvent.createMany).not.toHaveBeenCalled();
   });
 
   it("derives positive and negative hints from recent matching decisions", async () => {
