@@ -15,7 +15,11 @@ import { useSession } from "next-auth/react";
 
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useCollectionsQuery,
+  useLibraryStatsQuery,
+  useTagsQuery,
+} from "@/hooks/use-library-data";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { fetchJson } from "@/lib/fetch-json";
 import type { BookmarkResponse } from "@/lib/orbit-page-types";
@@ -26,7 +30,7 @@ import {
   type OrbitSortDirection,
   type OrbitView,
 } from "@/lib/orbit-navigation";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
 import type { DbUser } from "@/lib/auth";
 
 type UseOrbitQueueOptions = {
@@ -47,8 +51,9 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     () => parseOrbitUrlState(orbitSearch),
     [orbitSearch]
   );
-  const { data: session } = useSession() as {
+  const { data: session, update: updateSession } = useSession() as {
     data: { dbUser?: DbUser } | null;
+    update: (data?: { refresh: string }) => Promise<unknown>;
   };
   const actions = useBookmarkActions();
   const { createCollection, createCollectionQuick } = useCreateCollection();
@@ -65,6 +70,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
+  const { data: libraryStats } = useLibraryStatsQuery();
 
   const pageSize =
     orbitView === "recent" ? ORBIT_RECENT_PAGE_SIZE : ORBIT_ALL_PAGE_SIZE;
@@ -172,8 +178,10 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
   }, []);
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-  }, [queryClient]);
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
+  }, [queryClient, updateSession]);
 
   const goToTagOnDashboard = useCallback(
     (tagId: string) => {
@@ -191,6 +199,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     createCollectionQuick,
     tags,
     collections,
+    libraryStats,
     dbUser,
     orbitView,
     queueSortDirection,

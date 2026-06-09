@@ -111,8 +111,6 @@ export interface AnalyticsData {
   bookmarksByMonth: Array<{ month: string; count: number }>;
   bookmarksByDay: Array<{ day: string; count: number }>;
   totalBookmarks: number;
-  totalTags: number;
-  totalCollections: number;
   untaggedCount: number;
   untaggedOldestAt: string | null;
   orbitQueueCount: number;
@@ -335,6 +333,8 @@ export interface OrbitScanResponsePayload {
   summary: OrbitScanSummary;
   tagRollups: OrbitTagRollup[];
   collectionRollups: OrbitCollectionRollup[];
+  /** Full bookmark rows for the scanned ids (used by the review overlay). */
+  scannedBookmarks?: BookmarkWithRelations[];
 }
 
 export interface OrbitScanQualityPayload {

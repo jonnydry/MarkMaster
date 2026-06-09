@@ -4,35 +4,46 @@ import { forwardRef, type ReactNode } from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
+  CheckSquare,
   ListChecks,
   Loader2,
   Map as MapIcon,
   RefreshCw,
-  SquareCheckBig} from "lucide-react";
+} from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitPageIdentity } from "@/components/orbit/orbit-page-identity";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { OrbitBatchMenu } from "@/components/orbit/orbit-batch-menu";
+import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { ToolbarIconButton, ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import {
-  orbitControlRadius,
-  orbitDataClass,
-  orbitHairlineBorder,
-  orbitMetaMuted,
-  orbitMetaSoft} from "@/lib/orbit-route-chrome";
+  appContentGutterClassName,
+  appToolbarSurfaceClassName,
+  appToolbarSurfaceGroupClassName,
+  appToolbarSurfaceShellClassName,
+} from "@/lib/app-chrome";
+import { orbitControlRadius, orbitDataClass } from "@/lib/orbit-route-chrome";
 import {
   type OrbitScanBatchMode,
-  type OrbitScanBatchProfileId} from "@/lib/orbit-config";
+  type OrbitScanBatchProfileId,
+} from "@/lib/orbit-config";
 import {
   ORBIT_RECENT_PAGE_SIZE,
   type OrbitSortDirection,
-  type OrbitView} from "@/lib/orbit-navigation";
+  type OrbitView,
+} from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
+import type { DbUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export interface OrbitCommandBarProps {
+  mobileSidebar?: ReactNode;
+  user?: DbUser;
+
   // Scope
   orbitView: OrbitView;
   total: number;
@@ -77,60 +88,18 @@ export interface OrbitCommandBarProps {
   shortcutGroups: KeyboardShortcutGroup[];
 }
 
-function SegmentedControl({
-  children}: {
-
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-0.5 rounded-sm border p-0.5",
-        orbitHairlineBorder(),
-        "bg-background/45 dark:bg-white/[0.035]"
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Segment({
-  active,
-  onClick,
-  children,
-  title}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-sm px-2.5 text-xs font-medium transition-colors",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+const countBadgeClass =
+  "text-[10px] font-medium tabular-nums text-muted-foreground/80";
 
 /**
- * The Orbit command bar — one control surface that replaces the old stacked
- * header-meta strip, scan hero, queue toolbar, and search box. The unsorted
- * count and queue ordering live here and nowhere else.
+ * Dashboard-native Orbit toolbar — search strip in the sticky header, compact
+ * scope controls and scan actions on the row below.
  */
 export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps>(
   function OrbitCommandBar(
     {
+      mobileSidebar,
+      user,
       orbitView,
       total,
       sortDirection,
@@ -165,83 +134,105 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       isUpdating,
       keyboardShortcutsOpen,
       onKeyboardShortcutsOpenChange,
-      shortcutGroups},
+      shortcutGroups,
+    },
     searchRef
   ) {
     const scanBusy = queueIsLoading || scanning;
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
     const reviewLabel =
       scanPlanSuggestionCount === 1
-        ? "Review 1 suggestion"
-        : `Review ${scanPlanSuggestionCount.toLocaleString()} suggestions`;
+        ? "Review 1"
+        : `Review ${scanPlanSuggestionCount.toLocaleString()}`;
     const showTriageProgress = passTotal > 0 && triagedCount > 0;
 
     return (
-      <section
-        aria-busy={scanning}
+      <div
         className={cn(
-          "relative overflow-hidden rounded-sm border",
-          orbitHairlineBorder(),
-          "bg-surface-1/70 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.75)] dark:bg-white/[0.035]"
+          "orbit-toolbar relative space-y-1.5 py-1.5",
+          appContentGutterClassName
         )}
+        aria-busy={scanning}
       >
-        {scanning ? <ScrollingProgressBar /> : null}
+        {scanning ? <ScrollingProgressBar className="absolute inset-x-0 top-0" /> : null}
 
-        <div className="flex flex-col gap-2.5 px-3 py-2.5 sm:px-3.5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            {/* Scope zone */}
-            {canSelect ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <SegmentedControl >
-                  <Segment
-                    active={orbitView === "recent"}
-                    onClick={() => onChangeView("recent")}
-                  >
-                    Recent
-                    <span className="rounded-sm bg-black/5 px-1 py-0.5 text-[10px] tabular-nums dark:bg-white/10">
-                      {recentCount.toLocaleString()}
-                    </span>
-                  </Segment>
-                  <Segment
-                    active={orbitView === "all"}
-                    onClick={() => onChangeView("all")}
-                  >
-                    All
-                    <span className="rounded-sm bg-black/5 px-1 py-0.5 text-[10px] tabular-nums dark:bg-white/10">
-                      {total.toLocaleString()}
-                    </span>
-                  </Segment>
-                </SegmentedControl>
+        <div className="flex items-center gap-1.5">
+          {mobileSidebar ? <div className="shrink-0 md:hidden">{mobileSidebar}</div> : null}
 
-                <SegmentedControl >
-                  <Segment
-                    active={sortDirection === "desc"}
-                    onClick={() => onChangeSortDirection("desc")}
-                  >
-                    Newest
-                  </Segment>
-                  <Segment
-                    active={sortDirection === "asc"}
-                    onClick={() => onChangeSortDirection("asc")}
-                  >
-                    Oldest
-                  </Segment>
-                </SegmentedControl>
-              </div>
-            ) : null}
+          <OrbitPageIdentity queueTotal={total} />
 
-            {/* Action zone */}
-            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <div className={cn("overflow-hidden rounded-sm", appToolbarSurfaceShellClassName)}>
+              <SearchBar
+                ref={searchRef}
+                glass
+                value={search}
+                onChange={onSearchChange}
+                placeholder="Search Orbit by author, text, or notes…"
+                inputClassName="h-9"
+              />
+            </div>
+          </div>
+
+          {user ? (
+            <div className="hidden shrink-0 sm:block">
+              <UserNavDynamic user={user} />
+            </div>
+          ) : null}
+        </div>
+
+        {canSelect ? (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <ToolbarSegmentControl
+                value={orbitView}
+                onChange={onChangeView}
+                aria-label="Queue scope"
+                variant="library"
+                size="md"
+                className={appToolbarSurfaceGroupClassName}
+                options={[
+                  {
+                    value: "recent",
+                    label: "Recent",
+                    badge: (
+                      <span className={countBadgeClass}>
+                        {recentCount.toLocaleString()}
+                      </span>
+                    ),
+                  },
+                  {
+                    value: "all",
+                    label: "All",
+                    badge: (
+                      <span className={countBadgeClass}>{total.toLocaleString()}</span>
+                    ),
+                  },
+                ]}
+              />
+
+              <ToolbarSegmentControl
+                value={sortDirection}
+                onChange={onChangeSortDirection}
+                aria-label="Queue sort"
+                variant="library"
+                size="md"
+                className={appToolbarSurfaceGroupClassName}
+                options={[
+                  { value: "desc", label: "Newest" },
+                  { value: "asc", label: "Oldest" },
+                ]}
+              />
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1">
               {hasScanPlan ? (
                 <>
                   <Button
                     type="button"
+                    variant="highlight"
                     size="sm"
-                    className={cn(
-                      "h-8 gap-1.5 px-3 text-xs",
-                      orbitControlRadius(),
-                      "bg-primary text-primary-foreground hover:bg-primary/90"
-                    )}
+                    className="h-8 gap-1.5 px-2.5 text-xs"
                     disabled={scanning || applyingBatch}
                     onClick={onReviewPass}
                   >
@@ -250,57 +241,42 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     ) : (
                       <ListChecks className="size-3.5" />
                     )}
-                    {reviewLabel}
+                    <span className="hidden sm:inline">{reviewLabel}</span>
+                    <span className="sm:hidden">{scanPlanSuggestionCount}</span>
                   </Button>
 
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
+                  <ToolbarIconButton
+                    label="Apply strong matches"
+                    icon={BadgeCheck}
+                    onClick={() => {
+                      if (scanning || applyingBatch || !canApplyStrongMatches) return;
+                      onApplyStrongMatches();
+                    }}
                     className={cn(
-                      "size-8 shrink-0 border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 hover:text-foreground dark:text-emerald-100",
-                      orbitControlRadius()
+                      "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 dark:text-emerald-100",
+                      (scanning || applyingBatch || !canApplyStrongMatches) &&
+                        "opacity-50"
                     )}
-                    disabled={scanning || applyingBatch || !canApplyStrongMatches}
-                    onClick={onApplyStrongMatches}
-                    aria-label="Apply strong matches"
-                    title="Apply strong matches"
-                  >
-                    {applyingBatch ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <BadgeCheck className="size-3.5" />
-                    )}
-                  </Button>
+                  />
 
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className={cn(
-                      "size-8 shrink-0 border-hairline-soft bg-surface-2/70 text-foreground hover:border-primary/30 hover:bg-accent-soft",
-                      orbitControlRadius()
-                    )}
-                    disabled={scanBusy || scanTargetCount === 0}
-                    onClick={onScan}
-                    aria-label={scanButtonLabel}
-                    title={scanButtonLabel}
-                  >
-                    {scanBusy ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="size-3.5" />
-                    )}
-                  </Button>
+                  <ToolbarIconButton
+                    label={scanButtonLabel}
+                    icon={RefreshCw}
+                    onClick={() => {
+                      if (scanBusy || scanTargetCount === 0) return;
+                      onScan();
+                    }}
+                    className={scanBusy || scanTargetCount === 0 ? "opacity-50" : undefined}
+                  />
                 </>
               ) : (
                 <div className="flex items-stretch">
                   <Button
+                    variant="highlight"
                     size="sm"
                     className={cn(
-                      "h-8 gap-1.5 rounded-r-none px-3 text-xs",
-                      orbitControlRadius(),
-                      "border-foreground/80 bg-foreground text-background shadow-[0_14px_30px_-22px_rgba(59,130,246,0.75)] hover:bg-foreground/90"
+                      "h-8 gap-1.5 rounded-r-none px-2.5 text-xs",
+                      orbitControlRadius()
                     )}
                     disabled={scanBusy || scanTargetCount === 0}
                     onClick={onScan}
@@ -310,7 +286,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     ) : (
                       <GrokMark className="size-3.5" title="Grok" />
                     )}
-                    {scanButtonLabel}
+                    <span className="hidden sm:inline">{scanButtonLabel}</span>
+                    <span className="sm:hidden">Scan</span>
                   </Button>
                   <OrbitBatchMenu
                     attached
@@ -326,114 +303,77 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
 
               <Link
                 href={mapHref}
-                className={cn(
-                  "inline-flex size-8 shrink-0 items-center justify-center rounded-sm border border-hairline-soft bg-surface-2/70 text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft",
-                  orbitControlRadius()
-                )}
                 aria-label="Open graph"
                 title="Open graph"
-              >
-                <MapIcon className="size-3.5 text-primary" aria-hidden />
-              </Link>
-            </div>
-          </div>
-
-          {/* Utility row: search + select + help */}
-          {canSelect || search.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div
-              className={cn(
-                "relative min-w-0 flex-1 overflow-hidden rounded-sm border",
-                orbitHairlineBorder(),
-                "bg-background/45 dark:bg-white/[0.035]"
-              )}
-            >
-              <SearchBar
-                ref={searchRef}
-                glass
-                value={search}
-                onChange={onSearchChange}
-                placeholder="Search Orbit by author, text, or notes…"
-                inputClassName="h-9 rounded-sm"
-              />
-            </div>
-
-            {canSelect ? (
-              <button
-                type="button"
-                aria-pressed={selectionMode}
-                title={
-                  selectionMode
-                    ? "Exit bulk selection"
-                    : "Select bookmarks for bulk Grok scan"
-                }
-                onClick={onToggleSelectionMode}
                 className={cn(
-                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors",
-                  orbitHairlineBorder(),
-                  selectionMode
-                    ? "border-primary/30 bg-primary/15 text-primary"
-                    : "bg-surface-2/70 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                  appToolbarSurfaceClassName
                 )}
               >
-                <SquareCheckBig className="size-3.5" aria-hidden />
-                <span className="hidden sm:inline">
-                  {selectionMode ? "Done" : "Select"}
-                </span>
-              </button>
-            ) : null}
+                <MapIcon className="size-4 text-primary" aria-hidden />
+              </Link>
 
-            <KeyboardShortcutsHelpButton
-              open={keyboardShortcutsOpen}
-              onOpenChange={onKeyboardShortcutsOpenChange}
-              groups={shortcutGroups}
-              description="Orbit queue navigation and review actions."
-              className={cn(
-                "size-9 shrink-0 border-primary/20 bg-surface-2/70 text-primary/80 hover:border-primary/35 hover:bg-primary/10 hover:text-primary"
-              )}
-            />
+              <ToolbarIconButton
+                active={selectionMode}
+                pressed={selectionMode}
+                label={
+                  selectionMode ? "Exit selection mode" : "Enter selection mode"
+                }
+                icon={CheckSquare}
+                onClick={onToggleSelectionMode}
+                className={appToolbarSurfaceClassName}
+              />
+
+              <KeyboardShortcutsHelpButton
+                open={keyboardShortcutsOpen}
+                onOpenChange={onKeyboardShortcutsOpenChange}
+                groups={shortcutGroups}
+                description="Orbit queue navigation and review actions."
+                className={cn(
+                  "size-9 shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
+                  appToolbarSurfaceClassName
+                )}
+              />
+
+              {user ? (
+                <div className="shrink-0 sm:hidden">
+                  <UserNavDynamic user={user} />
+                </div>
+              ) : null}
+            </div>
           </div>
-          ) : null}
+        ) : null}
 
-          {/* Meta line: single authoritative count + triage progress + updating */}
-          {canSelect || search.length > 0 ? (
-          <div
-            className={cn(
-              "flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]",
-              orbitMetaMuted()
-            )}
-          >
+        {canSelect ? (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-[11px] text-muted-foreground">
             <span className={cn(orbitDataClass(), "normal-case")}>
               {visibleStatusLabel}
             </span>
             {showTriageProgress ? (
-              <span
-                className={cn(orbitDataClass(), "normal-case", orbitMetaSoft())}
-              >
+              <span className={cn(orbitDataClass(), "normal-case")}>
                 {triagedCount} / {passTotal} triaged
               </span>
             ) : null}
             {isUpdating ? (
               <span className="flex shrink-0 items-center gap-1">
-                <Loader2 className="size-3 animate-spin" /> Updating…
+                <Loader2 className="size-3 animate-spin" />
+                Updating…
               </span>
             ) : null}
           </div>
-          ) : null}
-        </div>
+        ) : null}
 
         {scanError ? (
           <div
             className={cn(
-              "border-t p-3",
-              orbitHairlineBorder(),
-              "bg-background/45"
+              "mt-2 rounded-sm border border-hairline-soft p-3",
+              appToolbarSurfaceClassName
             )}
           >
             {scanError}
           </div>
         ) : null}
-      </section>
+      </div>
     );
   }
 );

@@ -6,7 +6,11 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useCollectionsQuery,
+  useLibraryStatsQuery,
+  useTagsQuery,
+} from "@/hooks/use-library-data";
 import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
@@ -18,7 +22,7 @@ import {
 } from "@/lib/analytics";
 import { fetchJson } from "@/lib/fetch-json";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
 import type { AnalyticsData } from "@/types";
 import {
   parseAnalyticsTab,
@@ -52,7 +56,7 @@ export function useAnalyticsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const { createCollection } = useCreateCollection();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -76,6 +80,7 @@ export function useAnalyticsPage() {
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
+  const { data: libraryStats } = useLibraryStatsQuery();
 
   const oldestOrbitHref = analytics
     ? buildOrbitIntentHref({
@@ -111,9 +116,10 @@ export function useAnalyticsPage() {
   }, []);
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-    void queryClient.invalidateQueries({ queryKey: ["analytics"] });
-  }, [queryClient]);
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
+  }, [queryClient, updateSession]);
 
   const handleTabChange = useCallback(
     (tab: AnalyticsTab) => {
@@ -175,6 +181,7 @@ export function useAnalyticsPage() {
     showAnalyticsSkeleton,
     tags,
     collections,
+    libraryStats,
     oldestOrbitHref,
     lastSyncAt,
     triagedPct,
@@ -186,5 +193,3 @@ export function useAnalyticsPage() {
     handleTabChange,
   };
 }
-
-export type { AnalyticsTab, TimeRange };

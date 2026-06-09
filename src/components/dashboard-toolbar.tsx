@@ -5,9 +5,14 @@ import { CheckSquare, Keyboard, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { appContentGutterClassName } from "@/lib/app-chrome";
+import {
+  appContentGutterClassName,
+  appToolbarSurfaceClassName,
+  appToolbarSurfaceShellClassName,
+} from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
+import { highlightActiveClass, highlightInteractiveClass } from "@/lib/highlight-chrome";
 import type { DbUser } from "@/lib/auth";
 import type { SortField, TagWithCount, ViewMode } from "@/types";
 
@@ -64,7 +69,7 @@ export function DashboardToolbar({
         <div className="shrink-0 md:hidden">{mobileSidebar}</div>
 
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-sm border border-hairline-strong bg-background/35 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]">
+          <div className={cn("overflow-hidden rounded-sm", appToolbarSurfaceShellClassName)}>
             <SearchBar
               ref={searchInputRef}
               glass
@@ -89,7 +94,11 @@ export function DashboardToolbar({
             type="button"
             onClick={onResetPrimaryFilter}
             aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-hairline-strong border-l-2 border-l-primary bg-background/35 px-2.5 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+              highlightActiveClass,
+              highlightInteractiveClass
+            )}
           >
             <span className="hidden sm:inline">{primaryFilterLabel}</span>
             <span className="sm:hidden">{primaryFilterCompactLabel}</span>
@@ -103,7 +112,11 @@ export function DashboardToolbar({
               key={tag.id}
               type="button"
               onClick={() => onTagToggle(tag.id)}
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-primary/25 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/15"
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border px-2.5 text-xs font-semibold",
+                highlightActiveClass,
+                highlightInteractiveClass
+              )}
             >
               #{tag.name}
               <span className="text-primary/60" aria-hidden>
@@ -123,6 +136,7 @@ export function DashboardToolbar({
               pressed={showFilters}
               aria-controls="dashboard-filter-panel"
               showIndicator={hasActiveFilters}
+              className={appToolbarSurfaceClassName}
             />
           </div>
 
@@ -130,6 +144,7 @@ export function DashboardToolbar({
             label="Keyboard shortcuts"
             icon={Keyboard}
             onClick={onOpenKeyboardShortcuts}
+            className={appToolbarSurfaceClassName}
           />
 
           <ToolbarIconButton
@@ -138,6 +153,7 @@ export function DashboardToolbar({
             icon={CheckSquare}
             onClick={onToggleSelectionMode}
             pressed={selectionMode}
+            className={appToolbarSurfaceClassName}
           />
 
           <SortControls

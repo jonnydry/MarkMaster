@@ -20,8 +20,6 @@ import { AnalyticsHero, AnalyticsRangeSegment } from "./analytics-primitives";
 import { AnalyticsLoadingSkeleton } from "./analytics-loading-skeleton";
 import { AnalyticsTabPanel } from "./analytics-tab-panel";
 
-export type { TimeRange } from "./time-range";
-
 const CreateCollectionDialog = dynamic(
   () =>
     import("@/components/create-collection-dialog").then(
@@ -49,6 +47,7 @@ export default function AnalyticsPage() {
     showAnalyticsSkeleton,
     tags,
     collections,
+    libraryStats,
     oldestOrbitHref,
     lastSyncAt,
     triagedPct,
@@ -70,6 +69,9 @@ export default function AnalyticsPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={lastSyncAt}
+          totalBookmarks={
+            libraryStats?.libraryBookmarkCount ?? analytics?.totalBookmarks
+          }
           onSyncComplete={handleSyncComplete}
         />
       </div>
@@ -88,6 +90,10 @@ export default function AnalyticsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={handleCreateCollectionOpen}
+                  lastSyncAt={lastSyncAt}
+                  totalBookmarks={
+                    libraryStats?.libraryBookmarkCount ?? analytics?.totalBookmarks
+                  }
                   onSyncComplete={handleSyncComplete}
                 />
               </div>
@@ -142,6 +148,9 @@ export default function AnalyticsPage() {
                     totalBookmarks={analytics.totalBookmarks}
                     orbitQueueCount={analytics.orbitQueueCount}
                     untaggedCount={analytics.untaggedCount}
+                    rawHighlightsCount={analytics.rawHighlightsCount}
+                    totalTags={tags.length}
+                    totalCollections={collections.length}
                     triagedPct={triagedPct}
                     last30d={analytics.last30dCount}
                     velocityDelta={velocityDelta}
@@ -149,7 +158,7 @@ export default function AnalyticsPage() {
                     annotationPct={annotationPct}
                     oldestAt={analytics.untaggedOldestAt}
                     orbitHref={oldestOrbitHref}
-                    lastSyncAt={session?.dbUser?.lastSyncAt ?? null}
+                    lastSyncAt={lastSyncAt}
                   />
 
                   <AnalyticsTabPanel

@@ -14,6 +14,7 @@ import {
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateLibraryQueries } from "@/lib/query-invalidation";
 import type {
+  BookmarkWithRelations,
   OrbitApplyResult,
   OrbitBookmarkDecision,
   OrbitScanBatchMetadata,
@@ -45,6 +46,7 @@ export interface OrbitScanFailure {
 
 export interface OrbitScanState {
   plan: OrbitScanResponsePayload | null;
+  scannedBookmarks: BookmarkWithRelations[];
   scannedBookmarkIds: Set<string>;
   dismissedBookmarkIds: Set<string>;
   scanning: boolean;
@@ -265,6 +267,9 @@ export function useOrbitScan(): OrbitScanHandle {
   const queryClient = useQueryClient();
 
   const [plan, setPlan] = useState<OrbitScanResponsePayload | null>(null);
+  const [scannedBookmarks, setScannedBookmarks] = useState<BookmarkWithRelations[]>(
+    () => []
+  );
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [scanning, setScanning] = useState(false);
   const [applyingBookmarkId, setApplyingBookmarkId] = useState<string | null>(
@@ -325,6 +330,7 @@ export function useOrbitScan(): OrbitScanHandle {
           },
         });
         setPlan(result);
+        setScannedBookmarks(result.scannedBookmarks ?? []);
         setDismissed(new Set());
         const durationMs = Date.now() - startedAt;
         trackFlywheelEvent(
@@ -435,6 +441,7 @@ export function useOrbitScan(): OrbitScanHandle {
         await invalidateLibraryQueries(queryClient);
 
         setPlan(null);
+        setScannedBookmarks([]);
         setDismissed(new Set());
 
         return response.applied;
@@ -625,12 +632,14 @@ export function useOrbitScan(): OrbitScanHandle {
 
   const clearPlan = useCallback(() => {
     setPlan(null);
+    setScannedBookmarks([]);
     setDismissed(new Set());
     setError(null);
   }, []);
 
   return {
     plan,
+    scannedBookmarks,
     scannedBookmarkIds,
     dismissedBookmarkIds: dismissed,
     scanning,

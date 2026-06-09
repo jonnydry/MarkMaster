@@ -55,6 +55,8 @@ export default function CollectionsPage() {
     userCollections,
     xFolders,
     collectionStats,
+    libraryStats,
+    isLibraryStatsLoading,
     filteredCollections,
     visibleUserCollections,
     visibleXFolders,
@@ -80,6 +82,7 @@ export default function CollectionsPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={lastSyncAt}
+          totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
       </div>
@@ -98,6 +101,7 @@ export default function CollectionsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={handleCreateCollectionOpen}
+                  totalBookmarks={libraryStats?.libraryBookmarkCount}
                   onSyncComplete={handleSyncComplete}
                 />
               </div>
@@ -162,7 +166,11 @@ export default function CollectionsPage() {
             ) : (
               <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
                 <CollectionsOverview
-                  totalBookmarks={collectionStats.totalBookmarks}
+                  libraryBookmarkCount={libraryStats?.libraryBookmarkCount}
+                  organizedBookmarkCount={
+                    libraryStats?.organizedBookmarkCount ?? 0
+                  }
+                  isLibraryStatsLoading={isLibraryStatsLoading}
                   totalCollections={collections.length}
                   userCollections={userCollections.length}
                   xFolders={xFolders.length}

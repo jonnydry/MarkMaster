@@ -28,6 +28,10 @@ import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { useTheme, useFontMode, useColorTheme } from "@/components/providers";
+import {
+  highlightIndicatorActiveClass,
+  highlightSurfaceActiveClass,
+} from "@/lib/highlight-chrome";
 import { ColorThemePicker } from "@/components/color-theme-picker";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery } from "@/hooks/use-library-data";
@@ -36,7 +40,7 @@ import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
 import {
   TYPOGRAPHY_PRESETS,
   type TypographyPresetId,
@@ -120,8 +124,9 @@ export default function SettingsPage() {
   };
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-    void updateSession({ refresh: "lastSyncAt" });
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
   }, [queryClient, updateSession]);
 
   const scrollToSettingsSection = useCallback((sectionId: string) => {
@@ -414,7 +419,7 @@ function TypographyPresetPicker({
               "min-h-[6.25rem] rounded-sm border p-3 text-left font-sans transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               selected
-                ? "border-primary/55 bg-primary/10 ring-1 ring-primary/25"
+                ? highlightSurfaceActiveClass
                 : "border-hairline-soft bg-background/30 hover:border-primary/25 hover:bg-accent-soft/50"
             )}
           >
@@ -431,7 +436,7 @@ function TypographyPresetPicker({
                 className={cn(
                   "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
                   selected
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? highlightIndicatorActiveClass
                     : "border-hairline-strong text-transparent"
                 )}
                 aria-hidden

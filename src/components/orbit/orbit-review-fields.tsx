@@ -19,6 +19,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { buttonVariants } from "@/components/ui/button";
+import { highlightSegmentActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
@@ -337,10 +338,8 @@ export function OrbitReviewDecisionControl({
             role="radio"
             aria-checked={active}
             className={cn(
-              "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors",
-              active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+              "inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-2 text-xs font-medium",
+              active ? highlightSegmentActiveClass : highlightIdleClass
             )}
             onClick={() => onChange(option)}
           >

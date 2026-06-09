@@ -246,8 +246,8 @@ function SelectedClusterBody({
         <div className="grid min-w-0 grid-cols-2 gap-2">
           <Button
             size="sm"
-            variant="outline"
-            className="h-9 min-w-0 justify-center gap-1.5 border-primary/25 bg-primary/10 px-2 text-primary hover:bg-primary/15"
+            variant="highlight"
+            className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
             onClick={onAssign}
             disabled={!selectedBookmarkId}
           >
@@ -314,8 +314,8 @@ function SelectedClusterBody({
           {actionState.canCopyAsCollection ? (
             <Button
               size="sm"
-              variant="outline"
-              className="h-9 min-w-0 justify-center gap-1.5 border-primary/25 bg-primary/10 px-2 text-primary hover:bg-primary/15"
+              variant="highlight"
+              className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
               onClick={() => onCopyAsCollection(node.id)}
               disabled={isCopying}
             >
@@ -330,8 +330,8 @@ function SelectedClusterBody({
             <>
               <Button
                 size="sm"
-                variant="outline"
-                className="h-9 min-w-0 justify-center gap-1.5 border-primary/25 bg-primary/10 px-2 text-primary hover:bg-primary/15"
+                variant="highlight"
+                className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
                 onClick={onAssign}
                 disabled={!actionState.canAssign}
               >

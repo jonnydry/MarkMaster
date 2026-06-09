@@ -28,6 +28,9 @@ export type PerformanceHighlightsResponse = {
  *              and applies modest 1.4x boost for strong author/tag overlap (in addition
  *              to liked/disliked feedback boosts).
  */
+/** Default fetch size for raw untouched discovery pool. */
+export const DISCOVERY_RAW_POOL_LIMIT = 24;
+
 export function usePerformanceHighlights(
   raw = false,
   options?: {
@@ -38,6 +41,12 @@ export function usePerformanceHighlights(
     dislikedIds?: string[];
     /** Bookmark IDs the user has marked "good" (positive boost) */
     likedIds?: string[];
+    /** When true, removes disliked IDs from results instead of only deboosting them. */
+    hardExcludeDisliked?: boolean;
+    /** Server-side exclude list (e.g. recently shown in Discovery). */
+    excludeIds?: string[];
+    /** API result limit (default 4; discovery raw pool uses DISCOVERY_RAW_POOL_LIMIT). */
+    limit?: number;
     /** When true, appends personalBoost=1 so the API includes frequency-based authors (and tags) from the user's organized bookmarks for richer Phase 2 personalization (item 7). */
     usePersonalBoost?: boolean;
     enabled?: boolean;
@@ -49,6 +58,9 @@ export function usePerformanceHighlights(
     boostFactor = 1.4,
     dislikedIds = [],
     likedIds = [],
+    hardExcludeDisliked = false,
+    excludeIds = [],
+    limit = 4,
     usePersonalBoost = false,
     enabled = true,
   } = options || {};
@@ -64,19 +76,22 @@ export function usePerformanceHighlights(
     return () => window.removeEventListener("markmaster:highlight-feedback-changed", handler);
   }, []);
 
-  let highlightUrl = raw
-    ? "/api/bookmarks/highlights?raw=true&limit=4"
-    : "/api/bookmarks/highlights?limit=4";
-  if (usePersonalBoost) {
-    highlightUrl += "&personalBoost=true";
-  }
+  const params = new URLSearchParams();
+  if (raw) params.set("raw", "true");
+  params.set("limit", String(limit));
+  if (usePersonalBoost) params.set("personalBoost", "true");
+  if (excludeIds.length > 0) params.set("excludeIds", excludeIds.join(","));
+  const highlightUrl = `/api/bookmarks/highlights?${params.toString()}`;
 
   const cacheKey = [
     raw ? "raw" : "all",
+    String(limit),
+    excludeIds.join(","),
     boostAuthors.join(","),
     boostTags.join(","),
     dislikedIds.join(","),
     likedIds.join(","),
+    String(hardExcludeDisliked),
     String(usePersonalBoost),
     String(feedbackVersion),
   ].join("|");
@@ -87,6 +102,10 @@ export function usePerformanceHighlights(
       const data = await fetchJson<PerformanceHighlightsResponse>(highlightUrl);
 
       let processed = data.bookmarks;
+
+      if (hardExcludeDisliked && dislikedIds.length > 0) {
+        processed = processed.filter((b) => !dislikedSet.has(b.id));
+      }
 
       // Effective lists for Phase 2 richer personalization (item 7):
       // Merge any client-passed strong signals (e.g. frequent tags from _count) with server-provided
@@ -109,7 +128,7 @@ export function usePerformanceHighlights(
       }
 
       // Strongly deprioritize items the user has given negative feedback on
-      if (dislikedIds.length > 0) {
+      if (!hardExcludeDisliked && dislikedIds.length > 0) {
         processed = processed.map((b) => {
           if (dislikedSet.has(b.id)) {
             return { ...b, _boost: (((b as { _boost?: number })._boost || 1) * 0.15) };

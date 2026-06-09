@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { usePerformanceHighlights as usePerformanceHighlightsHook } from "@/hooks/use-performance-highlights";
-import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
+import { useHighlightFeedbackIds } from "@/hooks/use-highlight-feedback-ids";
+import {
+  usePerformanceHighlights as usePerformanceHighlightsHook,
+  DISCOVERY_RAW_POOL_LIMIT,
+} from "@/hooks/use-performance-highlights";
+import { getDiscoveryShownIds } from "@/lib/discovery-shown";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import type { BookmarkWithRelations, TagWithCount } from "@/types";
 
@@ -16,6 +20,7 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { createCollectionQuick } = useCreateCollection();
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   const strongPersonalTags = useMemo(
     () =>
@@ -26,8 +31,12 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
     [tags]
   );
 
-  const dislikedIds = getDislikedHighlightIds();
-  const likedIds = getLikedHighlightIds();
+  const { dislikedIds, likedIds, feedbackVersion } = useHighlightFeedbackIds();
+  const excludeIds = useMemo(
+    () => [...new Set([...getDiscoveryShownIds(), ...dislikedIds])],
+    [dislikedIds, refreshVersion, feedbackVersion]
+  );
+
   const {
     data: rawHighlightData,
     isLoading: rawHighlightsLoading,
@@ -36,6 +45,9 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
   } = usePerformanceHighlightsHook(true, {
     dislikedIds,
     likedIds,
+    hardExcludeDisliked: true,
+    excludeIds,
+    limit: DISCOVERY_RAW_POOL_LIMIT,
   });
   const {
     data: libraryHighlightData,
@@ -46,10 +58,12 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
     boostTags: strongPersonalTags,
     dislikedIds,
     likedIds,
+    hardExcludeDisliked: true,
     usePersonalBoost: true,
   });
 
   const refetchDiscovery = useCallback(() => {
+    setRefreshVersion((v) => v + 1);
     void refetchRawHighlights();
     void refetchLibraryHighlights();
   }, [refetchRawHighlights, refetchLibraryHighlights]);
@@ -82,12 +96,14 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
         libraryLoading: libraryHighlightsLoading,
         rawError: rawHighlightsError || libraryHighlightsError,
         refetchRaw: refetchDiscovery,
+        excludeIds,
+        refreshVersion,
       }}
       onSelectBookmark={(id) =>
         router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`)
       }
       onSaveAsCollection={handleSaveGemsAsCollection}
-      explainer="High-performing posts from your library — quick picks to triage in Orbit, plus a weekly mix for batch review."
+      explainer="High-engagement saves waiting for tags or collections — rotate the mix to triage more in Orbit."
     />
   );
 }

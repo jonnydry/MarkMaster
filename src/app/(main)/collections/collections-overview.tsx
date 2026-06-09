@@ -19,7 +19,9 @@ import {
 import type { CollectionWithCount } from "@/types";
 
 type CollectionsOverviewProps = {
-  totalBookmarks: number;
+  libraryBookmarkCount?: number;
+  organizedBookmarkCount: number;
+  isLibraryStatsLoading?: boolean;
   totalCollections: number;
   userCollections: number;
   xFolders: number;
@@ -32,7 +34,9 @@ type CollectionsOverviewProps = {
 };
 
 export function CollectionsOverview({
-  totalBookmarks,
+  libraryBookmarkCount,
+  organizedBookmarkCount,
+  isLibraryStatsLoading = false,
   totalCollections,
   userCollections,
   xFolders,
@@ -58,11 +62,40 @@ export function CollectionsOverview({
               <LibraryBig className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="heading-font text-2xl font-bold tracking-tight sm:text-3xl">
-                {bookmarkLabel(totalBookmarks)}
+              <h2
+                className="heading-font text-2xl font-bold tracking-tight sm:text-3xl"
+                aria-busy={isLibraryStatsLoading}
+              >
+                {isLibraryStatsLoading || libraryBookmarkCount === undefined ? (
+                  <span className="inline-block h-8 w-28 rounded skeleton-shimmer sm:h-9 sm:w-32" />
+                ) : (
+                  bookmarkLabel(libraryBookmarkCount)
+                )}
               </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Organized across {collectionLabel(totalCollections)}
+              <p
+                className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground"
+                aria-busy={isLibraryStatsLoading}
+              >
+                {isLibraryStatsLoading ? (
+                  <span className="inline-block h-4 w-56 rounded skeleton-shimmer" />
+                ) : (
+                  <>
+                    {organizedBookmarkCount.toLocaleString()}{" "}
+                    {organizedBookmarkCount === 1 ? "bookmark" : "bookmarks"} in{" "}
+                    {collectionLabel(totalCollections)}
+                    {libraryBookmarkCount !== undefined &&
+                    organizedBookmarkCount < libraryBookmarkCount ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {(
+                          libraryBookmarkCount - organizedBookmarkCount
+                        ).toLocaleString()}{" "}
+                        not yet shelved
+                      </>
+                    ) : null}
+                  </>
+                )}
               </p>
             </div>
           </div>

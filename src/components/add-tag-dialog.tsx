@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { PRESET_COLORS } from "@/lib/constants";
+import { highlightActiveClass } from "@/lib/highlight-chrome";
+import { cn } from "@/lib/utils";
 import { getBalancedTagColor } from "@/lib/tag-colors";
 import type { TagWithCount } from "@/types";
 
@@ -106,11 +108,12 @@ export function AddTagDialog({
                       type="button"
                       aria-pressed={isApplied}
                       disabled={isPending || pendingTagId !== null}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium transition-colors disabled:opacity-60 ${
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-60",
                         isApplied
-                          ? "bg-primary/10 text-primary"
-                          : "bg-card text-muted-foreground border border-border hover:text-foreground"
-                      }`}
+                          ? highlightActiveClass
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
+                      )}
                       onClick={async () => {
                         if (bookmarkIds.length === 0) return;
                         setPendingTagId(tag.id);

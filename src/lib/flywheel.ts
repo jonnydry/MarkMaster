@@ -31,7 +31,8 @@ export type FlywheelEventType =
   | "quick.keep"
   | "orbit.scan.completed"
   | "orbit.scan.failed"
-  | "orbit.review.applied";
+  | "orbit.review.applied"
+  | "discovery.refresh_clicked";
 
 export function trackFlywheelEvent(
   eventType: FlywheelEventType,

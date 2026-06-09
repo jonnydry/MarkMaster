@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import { cn } from "@/lib/utils";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
@@ -48,28 +49,17 @@ export function AnalyticsRangeSegment({
   onChange: (value: TimeRange) => void;
 }) {
   return (
-    <div
-      role="group"
+    <ToolbarSegmentControl
+      value={value}
+      onChange={onChange}
       aria-label="Time range"
-      className="inline-flex rounded-sm border border-hairline-soft bg-background/35 p-0.5"
-    >
-      {RANGE_OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "h-8 rounded-sm px-2.5 text-xs font-semibold tabular-nums transition-colors",
-            value === option.value
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+      variant="library"
+      size="md"
+      options={RANGE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: <span className="tabular-nums">{option.label}</span>,
+      }))}
+    />
   );
 }
 
@@ -119,6 +109,9 @@ export function AnalyticsHero({
   totalBookmarks,
   orbitQueueCount,
   untaggedCount,
+  rawHighlightsCount,
+  totalTags,
+  totalCollections,
   triagedPct,
   last30d,
   velocityDelta,
@@ -131,6 +124,9 @@ export function AnalyticsHero({
   totalBookmarks: number;
   orbitQueueCount: number;
   untaggedCount: number;
+  rawHighlightsCount: number;
+  totalTags: number;
+  totalCollections: number;
   triagedPct: number;
   last30d: number;
   velocityDelta: { pct: number | null; abs: number } | null;
@@ -218,6 +214,17 @@ export function AnalyticsHero({
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           {syncLabel}
+          <span className="text-muted-foreground/50"> · </span>
+          {totalTags.toLocaleString()} {totalTags === 1 ? "tag" : "tags"}
+          <span className="text-muted-foreground/50"> · </span>
+          {totalCollections.toLocaleString()}{" "}
+          {totalCollections === 1 ? "collection" : "collections"}
+          {rawHighlightsCount > 0 ? (
+            <>
+              <span className="text-muted-foreground/50"> · </span>
+              {rawHighlightsCount.toLocaleString()} ready for Discovery
+            </>
+          ) : null}
           {oldestLabel && !allTriaged ? (
             <>
               <span className="text-muted-foreground/50"> · </span>
@@ -253,30 +260,6 @@ function HeroStat({
       <dd className="text-lg font-semibold tabular-nums heading-font">{value}</dd>
       {hint ? <dd className="mt-0.5 text-xs text-muted-foreground">{hint}</dd> : null}
     </div>
-  );
-}
-
-export function AnalyticsSection({
-  title,
-  description,
-  children,
-  className,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={cn("py-6 first:pt-4", className)}>
-      <header className="mb-4">
-        <h2 className="text-sm font-semibold heading-font">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        ) : null}
-      </header>
-      {children}
-    </section>
   );
 }
 

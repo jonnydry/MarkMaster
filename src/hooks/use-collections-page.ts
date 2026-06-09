@@ -7,7 +7,11 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useCollectionsQuery,
+  useLibraryStatsQuery,
+  useTagsQuery,
+} from "@/hooks/use-library-data";
 import {
   scrollDataElementIntoView,
   useSurfaceKeyboardShortcuts,
@@ -22,10 +26,8 @@ import {
   type CollectionFilter,
 } from "@/lib/collections-presentation";
 import { sendJson } from "@/lib/fetch-json";
-import {
-  invalidateCollectionsQuery,
-  invalidateLibraryQueries,
-} from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
+import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 
 export const COLLECTION_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
@@ -52,7 +54,7 @@ export const COLLECTION_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 
 export function useCollectionsPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const queryClient = useQueryClient();
   const { createCollection } = useCreateCollection();
 
@@ -72,6 +74,11 @@ export function useCollectionsPage() {
   } = useCollectionsQuery();
 
   const { data: tags = [] } = useTagsQuery();
+
+  const {
+    data: libraryStats,
+    isLoading: isLibraryStatsLoading,
+  } = useLibraryStatsQuery();
 
   const { userCollections, xFolders } = useMemo(
     () => splitCollections(collections),
@@ -192,8 +199,10 @@ export function useCollectionsPage() {
   }, []);
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-  }, [queryClient]);
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
+  }, [queryClient, updateSession]);
 
   const handleCreateCollectionOpen = useCallback(() => {
     setCreateOpen(true);
@@ -243,6 +252,8 @@ export function useCollectionsPage() {
     userCollections,
     xFolders,
     collectionStats,
+    libraryStats,
+    isLibraryStatsLoading,
     filteredCollections,
     visibleUserCollections,
     visibleXFolders,
@@ -258,5 +269,3 @@ export function useCollectionsPage() {
     handleCreateCollectionOpen,
   };
 }
-
-export type { CollectionFilter };

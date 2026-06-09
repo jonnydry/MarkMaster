@@ -50,7 +50,6 @@ export async function GET(req: NextRequest) {
     monthRows,
     dayRows,
     tags,
-    collections,
     mediaCountsRows,
     untaggedRows,
     notedRows,
@@ -96,7 +95,6 @@ export async function GET(req: NextRequest) {
       where: { userId: user.id },
       include: { _count: { select: { bookmarks: true } } },
     }),
-    prisma.collection.count({ where: { userId: user.id } }),
     prisma.$queryRaw<
       {
         totalBookmarks: bigint;
@@ -370,8 +368,6 @@ export async function GET(req: NextRequest) {
     bookmarksByMonth,
     bookmarksByDay,
     totalBookmarks,
-    totalTags: tags.length,
-    totalCollections: collections,
     untaggedCount: Number(untagged.untaggedCount),
     untaggedOldestAt: untagged.oldestAt ? untagged.oldestAt.toISOString() : null,
     orbitQueueCount: Number(untagged.orbitQueueCount),

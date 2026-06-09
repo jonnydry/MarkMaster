@@ -15,6 +15,7 @@ import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { hasFeedPageWatermark } from "@/lib/feed-page-watermark";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTypography } from "@/hooks/use-typography";
@@ -69,6 +70,7 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useTypography();
   const pathname = usePathname();
+  const glassSidebar = hasFeedPageWatermark(pathname);
   const { expanded: ctxExpanded, toggle } = useSidebar();
   const expanded = forceExpanded ? true : ctxExpanded;
   const showToggle = !forceExpanded;
@@ -114,9 +116,12 @@ export function Sidebar({
           ? "Sidebar navigation. Click an empty area to show or hide the sidebar."
           : undefined
       }
-      className={`sidebar-embedded flex h-full min-h-0 shrink-0 flex-col overflow-hidden py-3 transition-[width,padding] duration-300 ease-out motion-reduce:transition-none ${
-        expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5"
-      } ${showToggle ? "cursor-col-resize" : ""}`}
+      className={cn(
+        "sidebar-embedded flex h-full min-h-0 shrink-0 flex-col overflow-hidden py-3 transition-[width,padding,background-color] duration-300 ease-out motion-reduce:transition-none",
+        glassSidebar && "sidebar-embedded-glass",
+        expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5",
+        showToggle && "cursor-col-resize"
+      )}
     >
       <button
         type="button"

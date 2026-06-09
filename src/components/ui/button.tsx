@@ -3,6 +3,10 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import {
+  highlightActiveClass,
+  highlightInteractiveClass,
+} from "@/lib/highlight-chrome"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -11,8 +15,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        highlight: cn(
+          highlightActiveClass,
+          highlightInteractiveClass,
+          "border font-semibold [a]:hover:opacity-100"
+        ),
         outline:
-          "border-hairline-strong bg-transparent hover:border-primary/35 hover:bg-accent-soft hover:text-foreground aria-expanded:border-primary/35 aria-expanded:bg-accent-soft aria-expanded:text-foreground",
+          "border-hairline-strong bg-transparent hover:border-primary/35 hover:bg-accent-soft hover:text-foreground aria-expanded:border-primary/25 aria-expanded:bg-primary/10 aria-expanded:text-foreground",
         secondary:
           "border-hairline-soft bg-transparent text-secondary-foreground hover:border-primary/25 hover:bg-accent-soft aria-expanded:bg-accent-soft aria-expanded:text-accent-foreground",
         ghost:

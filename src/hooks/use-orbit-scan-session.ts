@@ -122,8 +122,12 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     : bookmarks;
 
   const reviewBookmarks = useMemo(
-    () => mergeReviewBookmarks(bookmarks, scanCandidateBookmarks),
-    [bookmarks, scanCandidateBookmarks]
+    () =>
+      mergeReviewBookmarks(
+        mergeReviewBookmarks(bookmarks, scanCandidateBookmarks),
+        scan.scannedBookmarks
+      ),
+    [bookmarks, scan.scannedBookmarks, scanCandidateBookmarks]
   );
 
   const batchState = useMemo(

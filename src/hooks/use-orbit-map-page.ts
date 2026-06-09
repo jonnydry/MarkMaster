@@ -20,7 +20,11 @@ import type {
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useCollectionsQuery,
+  useLibraryStatsQuery,
+  useTagsQuery,
+} from "@/hooks/use-library-data";
 import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
@@ -36,7 +40,7 @@ import {
   resolveOrbitMapSelectionNode,
 } from "@/lib/orbit-map-graph-indexes";
 import { rankOrbitMapSearchResults } from "@/lib/orbit-map-search";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
 import type { BookmarkWithRelations, OrbitGraphScope } from "@/types";
 
 export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
@@ -64,7 +68,7 @@ export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 export function useOrbitMapPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const actions = useBookmarkActions();
   const { createCollection, createCollectionQuick } = useCreateCollection();
 
@@ -92,6 +96,7 @@ export function useOrbitMapPage() {
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
+  const { data: libraryStats } = useLibraryStatsQuery();
 
   const [copyingCollectionId, setCopyingCollectionId] = useState<string | null>(
     null
@@ -284,9 +289,11 @@ export function useOrbitMapPage() {
       : stats?.totalBookmarks === 0 || renderedBookmarkCount === 0);
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient);
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
     void refetch();
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, updateSession]);
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
@@ -360,6 +367,7 @@ export function useOrbitMapPage() {
     dbUser,
     tags,
     collections,
+    libraryStats,
     graph,
     graphScope,
     selection,

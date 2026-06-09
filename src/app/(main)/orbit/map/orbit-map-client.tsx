@@ -71,6 +71,7 @@ export default function OrbitMapPage() {
     dbUser,
     tags,
     collections,
+    libraryStats,
     graph,
     graphScope,
     selection,
@@ -145,6 +146,7 @@ export default function OrbitMapPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={lastSyncAt}
+          totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
       </div>
@@ -167,6 +169,7 @@ export default function OrbitMapPage() {
                 onTagToggle={goToTagOnDashboard}
                 onCreateCollection={handleCreateCollectionOpen}
                 lastSyncAt={lastSyncAt}
+                totalBookmarks={libraryStats?.libraryBookmarkCount}
                 onSyncComplete={handleSyncComplete}
               />
             </div>

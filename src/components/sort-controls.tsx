@@ -9,6 +9,11 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import type { SortField, ViewMode } from "@/types";
+import {
+  appToolbarSurfaceClassName,
+  appToolbarSurfaceGroupClassName,
+} from "@/lib/app-chrome";
+import { highlightActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] = [
@@ -49,7 +54,8 @@ export function SortControls({
         <SelectTrigger
           size="default"
           className={cn(
-            "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong bg-background/35 font-semibold hover:border-primary/30",
+            "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong font-semibold hover:border-primary/30",
+            appToolbarSurfaceClassName,
             compact
               ? "h-9 w-9 shrink-0 justify-center p-0 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
               : "h-9 min-w-[100px] flex-1 sm:flex-none"
@@ -70,7 +76,8 @@ export function SortControls({
       </Select>
       <div
         className={cn(
-          "dashboard-view-mode flex items-center gap-0.5 rounded-sm border border-hairline-soft bg-background/35 p-0.5",
+          "dashboard-view-mode flex items-center gap-0.5 rounded-sm border p-0.5",
+          appToolbarSurfaceGroupClassName,
           compact ? "shrink-0" : "flex-1 sm:flex-none"
         )}
       >
@@ -79,14 +86,18 @@ export function SortControls({
           return (
             <Button
               key={value}
-              variant={selected ? "default" : "ghost"}
+              variant="ghost"
               size="sm"
               aria-pressed={selected}
               className={cn(
-                "dashboard-view-button h-8 rounded-sm text-sm",
+                "dashboard-view-button h-8 rounded-sm border border-transparent text-sm",
                 compact ? "size-8 px-0" : "px-2.5",
-                !selected &&
-                  "border border-transparent text-muted-foreground hover:border-hairline-soft hover:text-foreground"
+                selected
+                  ? cn(highlightActiveClass, "border")
+                  : cn(
+                      highlightIdleClass,
+                      "hover:border-hairline-soft"
+                    )
               )}
               title={`${label} view`}
               onClick={() => onViewModeChange(value)}

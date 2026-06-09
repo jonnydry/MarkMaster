@@ -1,3 +1,4 @@
+import { shuffleWithSeed } from "@/lib/discovery-shown";
 import type { BookmarkWithRelations } from "@/types";
 
 export type WeeklyGemsCuration = {
@@ -13,6 +14,12 @@ type CuratedMix = {
   resurfacedGems: BookmarkWithRelations[];
   otherStrong: BookmarkWithRelations[];
 };
+
+/** Minimum filtered raw candidates before library filler is added. */
+export const DISCOVERY_THIN_POOL_THRESHOLD = 3;
+
+/** Minimum raw pool depth to fill carousel with raw-only items. */
+export const DISCOVERY_RAW_HEALTHY_THRESHOLD = 4;
 
 /**
  * Shared core computation for both legacy digest curation and the new unified
@@ -36,6 +43,14 @@ function computeCuratedMix(
     .slice(0, 3);
 
   return { primary, resurfacedGems, otherStrong };
+}
+
+function filterExcluded(
+  gems: BookmarkWithRelations[],
+  exclude?: Set<string>
+): BookmarkWithRelations[] {
+  if (!exclude?.size) return gems;
+  return gems.filter((g) => !exclude.has(g.id));
 }
 
 export function buildWeeklyGemsCuration(
@@ -105,7 +120,15 @@ export type DiscoveryCarouselItem = {
 export function buildDiscoveryCarouselItems(
   rawGems: BookmarkWithRelations[],
   libraryGems: BookmarkWithRelations[],
-  options?: { excludeIdsForBatch?: Set<string>; maxCarouselBookmarks?: number }
+  options?: {
+    excludeIdsForBatch?: Set<string>;
+    /** Shown + disliked IDs to omit from carousel selection. */
+    excludeIds?: Set<string>;
+    maxCarouselBookmarks?: number;
+    rotationSeed?: string;
+    thinPoolThreshold?: number;
+    rawHealthyThreshold?: number;
+  }
 ): {
   carouselItems: DiscoveryCarouselItem[];
   ritualBatch: BookmarkWithRelations[];
@@ -113,69 +136,75 @@ export function buildDiscoveryCarouselItems(
   totalMixCount: number;
   resurfacedCount: number;
   totalEngagement: number;
+  rawCarouselCount: number;
 } {
   const maxBm = options?.maxCarouselBookmarks ?? 6;
+  const thinThreshold = options?.thinPoolThreshold ?? DISCOVERY_THIN_POOL_THRESHOLD;
+  const healthyThreshold = options?.rawHealthyThreshold ?? DISCOVERY_RAW_HEALTHY_THRESHOLD;
 
-  // Front-load raw untouched high-performers (capped at 3 to exactly match primaryForOverlap
-  // slice used in ritualBatch below; ensures every visible carousel item participates in the
-  // "full mix" batch CTA + digestIds payload. Prevents misalignment bug.)
-  const rawFrontCount = Math.min(3, maxBm);
-  const rawFront = rawGems.slice(0, rawFrontCount);
+  const exclude = new Set<string>([
+    ...(options?.excludeIds ? [...options.excludeIds] : []),
+    ...(options?.excludeIdsForBatch ? [...options.excludeIdsForBatch] : []),
+  ]);
 
-  // Use shared curation core (eliminates duplication with buildWeeklyGemsCuration)
-  const { primary: primaryForOverlap, resurfacedGems, otherStrong } =
-    computeCuratedMix(rawGems, libraryGems);
+  let rawCandidates = filterExcluded(rawGems, exclude);
+  if (options?.rotationSeed) {
+    rawCandidates = shuffleWithSeed(rawCandidates, options.rotationSeed);
+  }
 
-  // Build ordered flat carousel list (raw first, then resurf, then strong; deduped)
-  const seen = new Set<string>();
+  const { resurfacedGems, otherStrong } = computeCuratedMix(rawGems, libraryGems);
+  const libraryFiller = filterExcluded(
+    [...resurfacedGems, ...otherStrong],
+    exclude
+  );
+
   const carouselItems: DiscoveryCarouselItem[] = [];
-  for (const b of rawFront) {
-    if (!seen.has(b.id) && carouselItems.length < maxBm) {
-      seen.add(b.id);
-      carouselItems.push({ bookmark: b, context: "raw" });
+  const seen = new Set<string>();
+
+  const addItem = (bookmark: BookmarkWithRelations, context: DiscoveryCarouselItem["context"]) => {
+    if (seen.has(bookmark.id) || carouselItems.length >= maxBm) return;
+    seen.add(bookmark.id);
+    carouselItems.push({ bookmark, context });
+  };
+
+  const useRawOnly =
+    rawCandidates.length >= healthyThreshold;
+
+  if (useRawOnly) {
+    for (const b of rawCandidates) {
+      addItem(b, "raw");
     }
-  }
-  for (const b of resurfacedGems) {
-    if (!seen.has(b.id) && carouselItems.length < maxBm) {
-      seen.add(b.id);
-      carouselItems.push({ bookmark: b, context: "resurfaced" });
+  } else {
+    for (const b of rawCandidates) {
+      addItem(b, "raw");
     }
-  }
-  for (const b of otherStrong) {
-    if (!seen.has(b.id) && carouselItems.length < maxBm) {
-      seen.add(b.id);
-      carouselItems.push({ bookmark: b, context: "strong" });
+    if (rawCandidates.length < thinThreshold) {
+      for (const b of libraryFiller) {
+        const context: DiscoveryCarouselItem["context"] = resurfacedGems.some(
+          (g) => g.id === b.id
+        )
+          ? "resurfaced"
+          : "strong";
+        addItem(b, context);
+      }
     }
   }
 
-  // Ritual batch: EXACT overlap logic from WeeklyDigestPanel for correct N, digestIds payload,
-  // cta.digest_review_together gems count, and /orbit?source=weekly-gems contract.
-  // Includes quick-pick overlap + curated extras.
-  const allCuration = [...primaryForOverlap, ...resurfacedGems, ...otherStrong];
-  const exclude = options?.excludeIdsForBatch;
-  const curatedPortion = exclude
-    ? allCuration.filter((g) => !exclude.has(g.id))
-    : allCuration;
-  const fromQuickPicks = exclude
-    ? primaryForOverlap.filter((g) => exclude.has(g.id))
-    : [];
-  let ritualBatch = [...fromQuickPicks, ...curatedPortion];
-  const seenBatch = new Set<string>();
-  ritualBatch = ritualBatch.filter((b) => {
-    if (seenBatch.has(b.id)) return false;
-    seenBatch.add(b.id);
-    return true;
-  });
-
-  const itemLabels = buildDigestItemLabels(resurfacedGems);
+  const ritualBatch = carouselItems.map((item) => item.bookmark);
+  const visibleResurfaced = carouselItems.filter((i) => i.context === "resurfaced");
+  const itemLabels = buildDigestItemLabels(
+    visibleResurfaced.map((i) => i.bookmark)
+  );
   const totalEngagement = computeDigestEngagement(ritualBatch);
+  const rawCarouselCount = carouselItems.filter((i) => i.context === "raw").length;
 
   return {
     carouselItems,
     ritualBatch,
     itemLabels,
     totalMixCount: ritualBatch.length,
-    resurfacedCount: resurfacedGems.length,
+    resurfacedCount: visibleResurfaced.length,
     totalEngagement,
+    rawCarouselCount,
   };
 }

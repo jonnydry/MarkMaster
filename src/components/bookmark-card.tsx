@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
+import { highlightIndicatorActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 import { formatCompactCount } from "@/lib/format-metrics";
@@ -130,11 +131,12 @@ function ActionButton({
         onClick();
       }}
       aria-label={label}
-      className={`rounded-sm border border-transparent ${
+      className={cn(
+        "rounded-sm border border-transparent",
         active
-          ? "border-primary/30 bg-primary/10 text-primary"
+          ? highlightIndicatorActiveClass
           : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-      }`}
+      )}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
       <Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -157,11 +159,12 @@ function SelectionToggle({
       }}
       aria-pressed={selected}
       aria-label="Select bookmark"
-      className={`flex items-center justify-center w-5 h-5 rounded-sm border transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+      className={cn(
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         selected
-          ? "bg-primary border-primary text-primary-foreground"
-          : "bg-background border-border text-transparent hover:border-primary/50"
-      }`}
+          ? highlightIndicatorActiveClass
+          : "border-border bg-background text-transparent hover:border-primary/50"
+      )}
     >
       <Check className="w-3.5 h-3.5" />
     </button>

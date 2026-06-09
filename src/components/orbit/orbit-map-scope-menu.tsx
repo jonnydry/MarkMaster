@@ -7,6 +7,10 @@ import {
   orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted} from "@/lib/orbit-route-chrome";
+import {
+  highlightIdleClass,
+  highlightSegmentActiveClass,
+} from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitGraphScope } from "@/types";
 
@@ -80,8 +84,8 @@ export function OrbitMapScopeMenu({
               className={cn(
                 "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
                 active
-                  ? "bg-primary/10 text-primary"
-                  : "text-foreground hover:bg-accent-soft"
+                  ? highlightSegmentActiveClass
+                  : cn("text-foreground", highlightIdleClass)
               )}
             >
               <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">

@@ -2,13 +2,18 @@
 
 import type { ComponentProps, ReactNode } from "react";
 
+import {
+  highlightActiveClass,
+  highlightIdleClass,
+  highlightInteractiveClass,
+} from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 type ChipTone = "neutral" | "primary" | "success" | "warning";
 
 const statusToneClassName: Record<ChipTone, string> = {
   neutral: "border-hairline-soft bg-surface-2 text-muted-foreground",
-  primary: "border-primary/25 bg-primary/10 text-primary",
+  primary: cn(highlightActiveClass, "border"),
   success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
   warning: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-100",
 };
@@ -26,10 +31,14 @@ export function FilterChip({
       type="button"
       aria-pressed={active}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+        "inline-flex h-8 items-center gap-1.5 rounded-sm border px-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
         active
-          ? "border-primary/35 bg-primary/10 text-foreground"
-          : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground",
+          ? cn(highlightActiveClass, "border")
+          : cn(
+              highlightIdleClass,
+              highlightInteractiveClass,
+              "hover:border-hairline-soft"
+            ),
         className
       )}
       {...props}

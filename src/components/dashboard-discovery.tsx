@@ -1,18 +1,21 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, Sparkles, RotateCcw, Plus } from "lucide-react";
+import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import {
   HighlightScrollSlide,
-  HighlightScrollStrip} from "@/components/highlight-scroll-strip";
+  HighlightScrollStrip,
+} from "@/components/highlight-scroll-strip";
 import { HighlightCard } from "@/components/highlight-card";
 import { ModuleHeader } from "@/components/module-header";
 import { Button } from "@/components/ui/button";
 import {
   useDashboardDiscovery,
-  type DashboardDiscoveryParentData} from "@/hooks/use-dashboard-discovery";
+  type DashboardDiscoveryParentData,
+} from "@/hooks/use-dashboard-discovery";
 import { useTypography } from "@/hooks/use-typography";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
@@ -31,14 +34,152 @@ export interface DashboardDiscoveryProps {
   onSaveAsCollection?: (bookmarks: BookmarkWithRelations[], suggestedName: string) => void;
   /** Override default Discovery header copy (e.g. collections context). */
   explainer?: string;
-  /** default — align with the dashboard feed column; flush — span parent width (collections). */
+  /** default — chromeless strip aligned with feed; flush — frosted module (collections). */
   variant?: "default" | "flush";
   className?: string;
 }
 
 const variantShellClass: Record<NonNullable<DashboardDiscoveryProps["variant"]>, string> = {
-  default: cn("mb-3", bookmarkFeedColumnClassName),
-  flush: "mb-0 max-w-none px-0"};
+  default: cn("border-b border-hairline-soft pb-2 pt-0.5", bookmarkFeedColumnClassName),
+  flush: "mb-0 max-w-none px-0",
+};
+
+function DiscoveryFeedHeader({
+  meta,
+  hint,
+  actions,
+}: {
+  meta?: string;
+  hint?: string;
+  actions: ReactNode;
+}) {
+  const t = useTypography();
+
+  return (
+    <div
+      className="mb-1 flex items-center justify-between gap-2"
+      title={hint}
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Compass className="h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />
+        <p className={cn(t.sectionLabel, "truncate text-muted-foreground")}>
+          <span className="text-primary/70">Discovery</span>
+          {meta ? (
+            <>
+              <span className="mx-1 text-muted-foreground/35" aria-hidden>
+                ·
+              </span>
+              <span className="font-normal normal-case tracking-normal text-muted-foreground/65">
+                {meta}
+              </span>
+            </>
+          ) : null}
+        </p>
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+function DiscoveryCelebration({
+  celebration,
+  className,
+}: {
+  celebration: { gems: number; engagement: number };
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-sm border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm",
+        className
+      )}
+    >
+      <div className="flex items-center gap-2 text-emerald-200">
+        <Sparkles className="h-4 w-4 shrink-0" />
+        <span>
+          Nurtured{" "}
+          <span className="font-medium tabular-nums">{celebration.gems}</span> gems
+          {celebration.engagement > 0 && (
+            <>
+              {" "}
+              · ~
+              <span className="font-medium tabular-nums">
+                {celebration.engagement.toLocaleString()}
+              </span>{" "}
+              engagement
+            </>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function DiscoveryHeaderActions({
+  hasRitual,
+  ritualTotal,
+  onRefresh,
+  onReview,
+  onSave,
+  showSave,
+  dense,
+}: {
+  hasRitual: boolean;
+  ritualTotal: number;
+  onRefresh: () => void;
+  onReview: () => void;
+  onSave?: () => void;
+  showSave: boolean;
+  /** Tighter toolbar-style controls for the dashboard feed strip. */
+  dense?: boolean;
+}) {
+  const btnClass = dense ? "h-7 gap-1 px-2 text-xs" : "h-8 gap-1.5";
+
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onRefresh}
+        className={btnClass}
+        aria-label="Refresh discovery mix with different untouched posts"
+      >
+        <RefreshCw className="h-3 w-3" />
+        {dense ? null : "Refresh"}
+      </Button>
+      {hasRitual ? (
+        <>
+          <Button
+            type="button"
+            variant="highlight"
+            size="sm"
+            onClick={onReview}
+            className={btnClass}
+            aria-label={`Review all ${ritualTotal} in Orbit`}
+          >
+            <RotateCcw className="h-3 w-3" />
+            Review{dense ? ` (${ritualTotal})` : ` all (${ritualTotal})`}
+          </Button>
+          {showSave && onSave ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onSave}
+              className={btnClass}
+              aria-label="Save discovery mix as collection"
+            >
+              <Plus className="h-3 w-3" />
+              {dense ? null : "Save"}
+            </Button>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 export function DashboardDiscovery({
   feedReady = true,
@@ -49,7 +190,8 @@ export function DashboardDiscovery({
   onSaveAsCollection,
   explainer,
   variant = "default",
-  className}: DashboardDiscoveryProps) {
+  className,
+}: DashboardDiscoveryProps) {
   const router = useRouter();
   const t = useTypography();
 
@@ -58,32 +200,54 @@ export function DashboardDiscovery({
     isLoading,
     hasError,
     refetch,
+    refreshMix,
     discoveryCarouselItems = [],
     ritualBatch = [],
     ritualTotal = 0,
     resurfacedCount = 0,
     discoveryEngagement = 0,
-    itemLabels = {}} = useDashboardDiscovery({ feedReady, parentData });
+    itemLabels = {},
+  } = useDashboardDiscovery({ feedReady, parentData });
 
   const shellClass = variantShellClass[variant];
+  const isFeedIntegrated = variant === "default";
 
-  // Shared ritual logic (nurtured count, celebration, batch handlers).
-  // Extracted to eliminate duplication with WeeklyDigestPanel while keeping
-  // identical behavior and telemetry.
   const {
     nurturedCount,
     celebration,
     handleReviewInOrbit,
-    handleSaveAsCollection} = useDiscoveryRitual({
+    handleSaveAsCollection,
+  } = useDiscoveryRitual({
     batch: ritualBatch,
-    onSaveAsCollection});
+    onSaveAsCollection,
+  });
 
   const handleOrbitReview = (id: string) => {
     trackFlywheelEvent("cta.review_in_orbit", {
       source: "discovery",
-      bookmarkId: id});
+      bookmarkId: id,
+    });
     router.push(`/orbit?highlightId=${id}`);
   };
+
+  const handleRefreshMix = () => {
+    trackFlywheelEvent("discovery.refresh_clicked", {
+      shown: discoveryCarouselItems.length,
+      rawPool: rawTotal,
+    });
+    refreshMix();
+  };
+
+  const defaultExplainer =
+    "Popular untouched saves — tag or collect them to clear the queue.";
+  const feedMetaLine =
+    rawTotal > 0 ? `${rawTotal.toLocaleString()} untouched` : undefined;
+  const moduleMetaLine =
+    rawTotal > 0
+      ? `${rawTotal.toLocaleString()} waiting for triage${
+          resurfacedCount > 0 ? ` · ${resurfacedCount} resurfaced` : ""
+        }`
+      : undefined;
 
   if (isLoading) {
     return (
@@ -92,8 +256,13 @@ export function DashboardDiscovery({
         aria-busy
         aria-label="Loading Discovery"
       >
-        <div className="h-4 w-32 rounded skeleton-shimmer" />
-        <div className="h-24 rounded-sm border border-hairline-soft skeleton-shimmer" />
+        <div className="h-4 w-28 rounded skeleton-shimmer" />
+        <div
+          className={cn(
+            "h-20 skeleton-shimmer",
+            !isFeedIntegrated && "rounded-sm border border-hairline-soft"
+          )}
+        />
       </div>
     );
   }
@@ -103,35 +272,145 @@ export function DashboardDiscovery({
       <ErrorState
         layout="inline"
         title="Could not load Discovery."
-        action={
-          <RetryButton onClick={() => refetch()} className="mt-0 shrink-0" />
-        }
+        action={<RetryButton onClick={() => refetch()} className="mt-0 shrink-0" />}
         className={cn(shellClass, className)}
       />
     );
   }
 
-  // Updated for unified carousel (raw front-loaded high-performers + curated resurfaced/strong).
-  // Replaces prior showQuickPicks + embedded WeeklyDigestPanel stack.
-  // showModule now requires actual mix content (prevents empty frosted card shell when
-  // feedReady=true but builder yields zero items/ritualBatch after load). Loading skeleton
-  // still covers the fetch window; zero-content case returns null cleanly (no empty UI).
   const showModule = discoveryCarouselItems.length > 0 || ritualTotal > 0;
-
   if (!showModule) return null;
 
-  // Unified single-carousel renderer for the Discovery card (dashboard + collections flush).
-  // One HighlightScrollStrip combining raw high-performers (front-loaded, isRawMode) +
-  // resurfaced/strong curated items (itemLabel badges for visual distinction).
-  // Header pill + Ritual Anchor (final slide) are the first-class batch ritual CTAs.
-  // All use the exact same machinery as before: handleReviewInOrbit, nurtured, celebration,
-  // digestIds + source=weekly-gems, onSaveAsCollection("This Week’s Gems"), track cta.digest_review_together.
-  // No changes to PerformanceHighlights, usePerformanceHighlights, or perf SQL.
-  // ParentData + flush variant fully supported.
-  // See Unified-High-Engagement-Discovery-Carousel-Plan.md (Phase 1).
   const hasRitual = ritualTotal > 0;
-  const itemCountForStrip = discoveryCarouselItems.length + (hasRitual ? 1 : 0);
-  const isFeedIntegrated = variant === "default";
+  const headerActions = (
+    <DiscoveryHeaderActions
+      hasRitual={hasRitual}
+      ritualTotal={ritualTotal}
+      onRefresh={handleRefreshMix}
+      onReview={handleReviewInOrbit}
+      onSave={handleSaveAsCollection}
+      showSave={Boolean(onSaveAsCollection)}
+      dense={isFeedIntegrated}
+    />
+  );
+
+  const carouselSlides = discoveryCarouselItems.map(
+    (item: DiscoveryCarouselItem, index: number) => (
+      <HighlightScrollSlide
+        key={item.bookmark.id}
+        index={index}
+        desktopTwoUp={!isFeedIntegrated}
+        className={isFeedIntegrated ? "w-full" : undefined}
+      >
+        <HighlightCard
+          bookmark={item.bookmark}
+          index={index}
+          active={activeBookmarkId === item.bookmark.id}
+          itemLabel={itemLabels[item.bookmark.id]}
+          isRawMode={item.context === "raw"}
+          layout="carousel"
+          onSelect={onSelectBookmark}
+          onFocusForTriage={onFocusForTriage}
+          onOrbitReview={isFeedIntegrated ? undefined : handleOrbitReview}
+        />
+      </HighlightScrollSlide>
+    )
+  );
+
+  const flushRitualAnchor =
+    !isFeedIntegrated && hasRitual ? (
+      <HighlightScrollSlide
+        key="ritual-anchor"
+        index={discoveryCarouselItems.length}
+      >
+        <div
+          className={cn(
+            "relative flex h-full min-h-[10rem] flex-col items-center justify-center rounded-sm border bg-surface-1/55 p-3.5 text-center",
+            "border-primary/20 hover:border-primary/30"
+          )}
+        >
+          <div className="flex max-w-full items-center justify-center gap-2">
+            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+            <span
+              className={cn(
+                "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+                t.monoNative && t.label
+              )}
+            >
+              Weekly Ritual
+            </span>
+          </div>
+          <p className="mt-2 line-clamp-2 max-w-md text-sm font-semibold text-foreground">
+            Review full mix together in Orbit
+          </p>
+          <p
+            className={cn(
+              "mt-1.5 line-clamp-1 max-w-md text-[10px] text-muted-foreground/65",
+              t.monoNative && t.label
+            )}
+          >
+            {ritualTotal} gems
+            {resurfacedCount > 0 ? ` · ${resurfacedCount} resurfaced` : ""}
+            {discoveryEngagement > 0
+              ? ` · ~${discoveryEngagement.toLocaleString()} engagements`
+              : ""}
+            {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
+          </p>
+          <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft/70 pt-2.5">
+            <Button
+              size="sm"
+              variant="highlight"
+              className="h-7 gap-1 px-2.5 text-[10px] text-primary"
+              onClick={handleReviewInOrbit}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Review all
+            </Button>
+            {onSaveAsCollection ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 px-2.5 text-[10px]"
+                onClick={handleSaveAsCollection}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Save as collection
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </HighlightScrollSlide>
+    ) : null;
+
+  const stripItemCount =
+    discoveryCarouselItems.length + (flushRitualAnchor ? 1 : 0);
+
+  if (isFeedIntegrated) {
+    return (
+      <section
+        className={cn(shellClass, "w-full", className)}
+        aria-label="Discovery"
+        title={explainer ?? defaultExplainer}
+      >
+        <DiscoveryFeedHeader
+          meta={feedMetaLine}
+          hint={explainer ?? defaultExplainer}
+          actions={headerActions}
+        />
+        {celebration ? (
+          <DiscoveryCelebration celebration={celebration} className="mb-1.5" />
+        ) : null}
+        {discoveryCarouselItems.length > 0 ? (
+          <HighlightScrollStrip
+            ariaLabel="Untouched high-engagement saves"
+            itemCount={discoveryCarouselItems.length}
+          >
+            {carouselSlides}
+          </HighlightScrollStrip>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -140,13 +419,8 @@ export function DashboardDiscovery({
     >
       <div
         className={cn(
-          "overflow-hidden rounded-sm border",
-          isFeedIntegrated
-            ? "border-hairline-soft bg-background/55 shadow-none supports-[backdrop-filter]:bg-background/45"
-            : cn(
-                "border-hairline-strong pb-4 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
-                appChromeFrostedClassName
-              )
+          "overflow-hidden rounded-sm border border-hairline-strong pb-4 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
+          appChromeFrostedClassName
         )}
       >
         <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
@@ -154,165 +428,24 @@ export function DashboardDiscovery({
             icon={Compass}
             eyebrow="Discovery"
             className="flex-col gap-2 sm:flex-row sm:gap-3"
-            description={
-              explainer ??
-              "Highest-engagement posts from your library — prioritized for review."
-            }
-            meta={
-              hasRitual
-                ? `${ritualTotal} high-engagement • ${rawTotal.toLocaleString()} untouched • ${resurfacedCount} resurfaced`
-                : undefined
-            }
-            action={
-              hasRitual ? (
-              <button
-                type="button"
-                onClick={handleReviewInOrbit}
-                className={cn(
-                  "inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft bg-surface-1/60 px-2.5 text-[10px] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:bg-accent-soft/60",
-                  "max-sm:w-full max-sm:justify-center",
-                  t.monoNative && t.label
-                )}
-                aria-label={`Review full mix of ${ritualTotal} gems in Orbit`}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <RotateCcw className="h-3 w-3" />
-                  Review full mix ({ritualTotal})
-                </span>
-              </button>
-              ) : null
-            }
+            description={explainer ?? defaultExplainer}
+            meta={moduleMetaLine}
+            action={headerActions}
           />
         </div>
 
         <div className="px-4 pt-3 sm:px-5">
-          {/* Celebration banner (exact markup preserved for ritual reinforcement UX) */}
           {celebration ? (
-            <div className="mb-3 rounded-sm border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 text-sm">
-              <div className="flex items-center gap-2 text-emerald-200">
-                <Sparkles className="h-4 w-4" />
-                <span>
-                  Ritual reinforced — nurtured{" "}
-                  <span className="font-medium tabular-nums">{celebration.gems}</span> gems
-                  {celebration.engagement > 0 && (
-                    <>
-                      {" "}
-                      · ~
-                      <span className="font-medium tabular-nums">
-                        {celebration.engagement.toLocaleString()}
-                      </span>{" "}
-                      engagement impact
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
+            <DiscoveryCelebration celebration={celebration} className="mb-3" />
           ) : null}
 
-          {itemCountForStrip > 0 ? (
+          {stripItemCount > 0 ? (
             <HighlightScrollStrip
               ariaLabel="High-engagement discovery mix"
-              itemCount={itemCountForStrip}
+              itemCount={stripItemCount}
             >
-              {discoveryCarouselItems.map((item: DiscoveryCarouselItem, index: number) => (
-                <HighlightScrollSlide
-                  key={item.bookmark.id}
-                  index={index}
-                  desktopTwoUp={!isFeedIntegrated}
-                  className={isFeedIntegrated ? "w-full" : undefined}
-                >
-                  <HighlightCard
-                    bookmark={item.bookmark}
-                    index={index}
-                    active={activeBookmarkId === item.bookmark.id}
-                    itemLabel={itemLabels[item.bookmark.id]}
-                    isRawMode={item.context === "raw"}
-                    layout="carousel"
-                    onSelect={onSelectBookmark}
-                    onFocusForTriage={onFocusForTriage}
-                    onOrbitReview={handleOrbitReview}
-                  />
-                </HighlightScrollSlide>
-              ))}
-
-              {/* Ritual Anchor as final slide — visually distinct strong CTA (second complementary affordance) */}
-              {hasRitual && (
-                <HighlightScrollSlide
-                  key="ritual-anchor"
-                  index={discoveryCarouselItems.length}
-                  className={isFeedIntegrated ? "w-full" : undefined}
-                >
-                  <div
-                    className={cn(
-                      "relative flex h-full min-h-[10rem] flex-col items-center justify-center rounded-sm border bg-surface-1/55 p-3.5 text-center",
-                      "border-primary/20 hover:border-primary/30"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        t.data,
-                        "absolute right-3.5 top-3.5 text-[10px] font-bold text-muted-foreground/55"
-                      )}
-                    >
-                      {itemCountForStrip} / {itemCountForStrip}
-                    </span>
-                    <div className="flex max-w-full items-center justify-center gap-2">
-                      <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                      <span
-                        className={cn(
-                          "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
-                          t.monoNative && t.label
-                        )}
-                      >
-                        Weekly Ritual
-                      </span>
-                    </div>
-                    <p
-                      className={cn(
-                        "mt-2 line-clamp-2 max-w-md text-[13px] font-semibold leading-5 text-foreground sm:text-sm",
-                        t.monoNative && "text-mono-data"
-                      )}
-                    >
-                      Review full mix together in Orbit
-                    </p>
-                    <div
-                      className={cn(
-                        "mt-1.5 line-clamp-1 max-w-md text-[10px] text-muted-foreground/65",
-                        t.monoNative && t.label
-                      )}
-                    >
-                      {ritualTotal} gems
-                      {resurfacedCount > 0 ? ` · ${resurfacedCount} resurfaced` : ""}
-                      {discoveryEngagement > 0
-                        ? ` · ~${discoveryEngagement.toLocaleString()} engagements`
-                        : ""}
-                      {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
-                    </div>
-
-                    <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft/70 pt-2.5">
-                      <Button
-                        size="sm"
-                        className="h-7 gap-1 px-2.5 text-[10px]"
-                        onClick={handleReviewInOrbit}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Review all
-                      </Button>
-                      {onSaveAsCollection ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 gap-1 px-2.5 text-[10px]"
-                          onClick={handleSaveAsCollection}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Save as collection
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </HighlightScrollSlide>
-              )}
+              {carouselSlides}
+              {flushRitualAnchor}
             </HighlightScrollStrip>
           ) : null}
         </div>

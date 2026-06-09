@@ -12,6 +12,7 @@ import { ORBIT_SCAN_ENRICHMENT } from "@/lib/orbit-config";
 import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { enrichBookmarksForScan } from "@/lib/orbit-scan-enrichment";
 import { getOrbitNeighborHintsForScan } from "@/lib/orbit-scan-neighbors";
+import { mapOrbitScannedBookmarksForClient } from "@/lib/orbit-scan-bookmarks";
 import { computeOrbitScanSignalQuality } from "@/lib/orbit-scan-signal-quality";
 import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
@@ -191,7 +192,10 @@ export async function POST(req: NextRequest) {
         ...(enrichmentMetadata ? { enrichment: enrichmentMetadata } : {}),
       };
 
-      return NextResponse.json(scan);
+      return NextResponse.json({
+        ...scan,
+        scannedBookmarks: mapOrbitScannedBookmarksForClient(bookmarksWithFolderHints),
+      });
     }
 
     const applied = await applyOrbitScanPlan({

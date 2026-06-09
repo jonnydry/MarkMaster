@@ -15,11 +15,9 @@ function collection(
 ): CollectionWithCount {
   return {
     description: null,
-    color: "#000000",
     isPublic: false,
     type: "user_collection",
     createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
     _count: { items: 0 },
     ...overrides,
   };
@@ -51,7 +49,7 @@ describe("filterCollections", () => {
 });
 
 describe("computeCollectionStats", () => {
-  it("summarizes bookmark totals and largest shelf", () => {
+  it("summarizes largest shelf and public counts", () => {
     const userCollections = [
       collection({ id: "a", name: "Small", _count: { items: 1 } }),
       collection({ id: "b", name: "Big", isPublic: true, _count: { items: 5 } }),
@@ -59,7 +57,6 @@ describe("computeCollectionStats", () => {
 
     const stats = computeCollectionStats(userCollections, userCollections);
 
-    expect(stats.totalBookmarks).toBe(6);
     expect(stats.publicCount).toBe(1);
     expect(stats.largestCollection?.id).toBe("b");
     expect(stats.maxItems).toBe(5);

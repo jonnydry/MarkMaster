@@ -11,6 +11,12 @@ import {
   ORBIT_SCAN_BATCH_PROFILES,
   type OrbitScanBatchMode,
   type OrbitScanBatchProfileId} from "@/lib/orbit-config";
+import {
+  highlightActiveClass,
+  highlightIdleClass,
+  highlightInteractiveClass,
+  highlightSegmentActiveClass,
+} from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 const BATCH_OPTIONS: Array<{
@@ -69,9 +75,15 @@ export function OrbitBatchMenu({
         disabled={disabled}
         aria-label={`Scan batch size: ${triggerLabel}`}
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1 border border-hairline-soft bg-surface-2/70 px-2 text-[11px] font-semibold text-foreground/85 transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-50",
-          orbitControlRadius() ?? "rounded-sm",
-          attached && "rounded-l-none border-l-0"
+          "inline-flex h-8 shrink-0 items-center gap-1 border px-2 text-[11px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
+          attached
+            ? cn(
+                highlightActiveClass,
+                highlightInteractiveClass,
+                "rounded-l-none border-l-0 text-primary"
+              )
+            : "border-hairline-strong bg-background/35 text-foreground hover:border-primary/30 hover:bg-accent-soft",
+          orbitControlRadius() ?? "rounded-sm"
         )}
         title={`Batch size — ${triggerLabel}`}
       >
@@ -107,8 +119,8 @@ export function OrbitBatchMenu({
               className={cn(
                 "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors",
                 active
-                  ? "bg-primary/10 text-primary"
-                  : "text-foreground hover:bg-accent-soft",
+                  ? highlightSegmentActiveClass
+                  : cn("text-foreground", highlightIdleClass),
                 locked && "cursor-not-allowed opacity-55 hover:bg-transparent"
               )}
             >

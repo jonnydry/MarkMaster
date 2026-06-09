@@ -7,12 +7,13 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
-import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { appFeedHeaderFrostedClassName } from "@/lib/app-chrome";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
+import { DashboardPageWatermark } from "@/components/dashboard-page-watermark";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -80,6 +81,7 @@ function DashboardContent() {
     createCollectionQuick,
     tags,
     collections,
+    libraryStats,
     dbUser,
     viewMode,
     setViewMode,
@@ -151,8 +153,9 @@ function DashboardContent() {
   } = useDashboardPage();
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-hidden">
-      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
+    <div className="app-shell-bg app-viewport relative flex overflow-hidden">
+      <DashboardPageWatermark />
+      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -160,25 +163,27 @@ function DashboardContent() {
           onTagToggle={filters.toggleTag}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-          totalBookmarks={total}
+          totalBookmarks={libraryStats?.libraryBookmarkCount ?? total}
           onSyncComplete={handleSyncComplete}
           onSyncStateChange={handleSyncStateChange}
         />
       </div>
 
       <div
-        className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        className="relative z-[1] flex h-full min-h-0 min-w-0 flex-1 flex-col"
         aria-busy={syncProgressVisible}
       >
-        {syncProgressVisible ? <ScrollingProgressBar className="z-50" /> : null}
+        {syncProgressVisible ? (
+          <ScrollingProgressBar className="relative z-50" />
+        ) : null}
 
-        <div className="app-main-scroll h-full overflow-x-hidden scrollbar-thin">
+        <div className="app-main-scroll relative z-[1] h-full overflow-x-hidden scrollbar-thin">
           <PageHeader
             sticky
             chromeless
             className={cn(
-              "isolate border-b border-hairline-strong",
-              appChromeFrostedClassName
+              "border-b border-hairline-strong",
+              appFeedHeaderFrostedClassName
             )}
             bodyClassName="px-0 py-0"
           >
@@ -193,7 +198,7 @@ function DashboardContent() {
                       lastSyncAt={
                         dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
                       }
-                      totalBookmarks={total}
+                      totalBookmarks={libraryStats?.libraryBookmarkCount ?? total}
                       onSyncComplete={handleSyncComplete}
                       onSyncStateChange={handleSyncStateChange}
                     />

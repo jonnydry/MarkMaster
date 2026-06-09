@@ -3,6 +3,8 @@ import {
   buildDiscoveryCarouselItems,
   buildWeeklyGemsCuration,
   computeDigestEngagement,
+  DISCOVERY_RAW_HEALTHY_THRESHOLD,
+  DISCOVERY_THIN_POOL_THRESHOLD,
 } from "./weekly-gems-curation";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -40,22 +42,93 @@ function gem(
   };
 }
 
+describe("buildDiscoveryCarouselItems", () => {
+  it("excludes shown or disliked IDs from the carousel", () => {
+    const rawGems = [
+      gem("raw1", 100),
+      gem("raw2", 50),
+      gem("raw3", 25),
+      gem("raw4", 20),
+      gem("raw5", 15),
+    ];
+
+    const discovery = buildDiscoveryCarouselItems(rawGems, [], {
+      excludeIds: new Set(["raw1", "raw2"]),
+      rotationSeed: "test-seed",
+    });
+
+    const ids = discovery.carouselItems.map((item) => item.bookmark.id);
+    expect(ids).not.toContain("raw1");
+    expect(ids).not.toContain("raw2");
+    expect(discovery.rawCarouselCount).toBeGreaterThan(0);
+  });
+
+  it("fills the carousel with raw-only items when the untouched pool is healthy", () => {
+    const rawGems = Array.from({ length: 8 }, (_, i) => gem(`raw${i + 1}`, 100 - i));
+
+    const discovery = buildDiscoveryCarouselItems(rawGems, [gem("lib1", 10, { bookmarkedDaysAgo: 45 })], {
+      rotationSeed: "stable-seed",
+    });
+
+    expect(rawGems.length).toBeGreaterThanOrEqual(DISCOVERY_RAW_HEALTHY_THRESHOLD);
+    expect(discovery.carouselItems).toHaveLength(6);
+    expect(discovery.carouselItems.every((item) => item.context === "raw")).toBe(true);
+    expect(discovery.resurfacedCount).toBe(0);
+  });
+
+  it("adds library filler only when the filtered raw pool is thin", () => {
+    const rawGems = [gem("raw1", 100), gem("raw2", 50)];
+    const libraryGems = [
+      gem("lib1", 80, { bookmarkedDaysAgo: 45 }),
+      gem("lib2", 70),
+    ];
+
+    const discovery = buildDiscoveryCarouselItems(rawGems, libraryGems, {
+      rotationSeed: "thin-pool",
+    });
+
+    expect(rawGems.length).toBeLessThan(DISCOVERY_THIN_POOL_THRESHOLD);
+    expect(discovery.carouselItems.some((item) => item.context !== "raw")).toBe(true);
+    expect(discovery.resurfacedCount).toBeGreaterThan(0);
+  });
+
+  it("uses a rotation seed to change ordering without changing membership", () => {
+    const rawGems = Array.from({ length: 6 }, (_, i) => gem(`raw${i + 1}`, 100 - i));
+
+    const first = buildDiscoveryCarouselItems(rawGems, [], { rotationSeed: "day-one" });
+    const second = buildDiscoveryCarouselItems(rawGems, [], { rotationSeed: "day-two" });
+
+    const firstIds = first.carouselItems.map((item) => item.bookmark.id);
+    const secondIds = second.carouselItems.map((item) => item.bookmark.id);
+
+    expect(new Set(firstIds)).toEqual(new Set(secondIds));
+    expect(firstIds).not.toEqual(secondIds);
+  });
+
+  it("aligns ritualBatch engagement with visible carousel items", () => {
+    const rawGems = [gem("raw1", 100), gem("raw2", 50), gem("raw3", 25), gem("raw4", 10)];
+    const libraryGems = [gem("lib1", 5, { bookmarkedDaysAgo: 45 })];
+
+    const discovery = buildDiscoveryCarouselItems(rawGems, libraryGems, {
+      rotationSeed: "engagement",
+    });
+
+    expect(discovery.totalEngagement).toBe(
+      computeDigestEngagement(discovery.ritualBatch)
+    );
+    expect(discovery.ritualBatch).toHaveLength(discovery.carouselItems.length);
+  });
+});
+
 describe("weekly gems ritual batch engagement", () => {
-  it("buildDiscoveryCarouselItems counts engagement from full ritualBatch including quick-pick overlap", () => {
+  it("buildWeeklyGemsCuration still supports legacy digest excludeIds", () => {
     const rawGems = [gem("raw1", 100), gem("raw2", 50), gem("raw3", 25)];
     const libraryGems = [gem("lib1", 10, { bookmarkedDaysAgo: 45 })];
     const exclude = new Set(["raw1"]);
 
-    const discovery = buildDiscoveryCarouselItems(rawGems, libraryGems, {
-      excludeIdsForBatch: exclude,
-    });
-
     const curation = buildWeeklyGemsCuration(rawGems, libraryGems, { excludeIds: exclude });
-    const fromQuickPicks = curation.primaryGems.filter((g) => exclude.has(g.id));
-    const panelBatch = [...fromQuickPicks, ...curation.allGems];
 
     expect(computeDigestEngagement(curation.allGems)).toBe(10 + 50 + 25);
-    expect(computeDigestEngagement(panelBatch)).toBe(100 + 10 + 50 + 25);
-    expect(discovery.totalEngagement).toBe(computeDigestEngagement(panelBatch));
+    expect(curation.allGems.map((g) => g.id)).not.toContain("raw1");
   });
 });

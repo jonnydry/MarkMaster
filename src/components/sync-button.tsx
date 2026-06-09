@@ -148,9 +148,9 @@ export function SyncButton({
           aria-label={buttonLabel}
           aria-busy={isAnySyncRunning}
           title={syncTitle}
-          variant="outline"
+          variant="highlight"
           disabled={isRateLimited}
-          className="relative h-10 w-10 border-primary/45 bg-primary/10 p-0 text-foreground hover:border-primary/70 hover:bg-primary/15 disabled:opacity-70"
+          className="relative h-10 w-10 p-0 disabled:opacity-70"
         >
           <RefreshCw
             className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
@@ -171,9 +171,9 @@ export function SyncButton({
         type="button"
         onClick={handleSync}
         aria-busy={isAnySyncRunning}
-        variant="outline"
+        variant="highlight"
         disabled={isRateLimited}
-        className="h-9 w-full gap-2 border-primary/45 bg-primary/10 text-sm font-semibold text-foreground hover:border-primary/70 hover:bg-primary/15 disabled:opacity-70"
+        className="h-9 w-full gap-2 text-sm disabled:opacity-70"
       >
         <RefreshCw
           className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}

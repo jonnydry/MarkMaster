@@ -43,14 +43,19 @@ export function BookmarkOverlayToolButton({
   return (
     <Button
       type="button"
-      variant={tone === "danger" ? "destructive" : tone === "primary" ? "default" : "secondary"}
+      variant={
+        tone === "danger"
+          ? "destructive"
+          : tone === "primary"
+            ? "highlight"
+            : "secondary"
+      }
       size="sm"
       onClick={onClick}
       className={cn(
         "h-9 justify-start gap-2 rounded-sm text-xs",
         tone === "neutral" &&
-          "border-hairline-soft bg-surface-1/55 text-foreground hover:border-primary/30 hover:bg-accent-soft",
-        tone === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90"
+          "border-hairline-soft bg-surface-1/55 text-foreground hover:border-primary/30 hover:bg-accent-soft"
       )}
     >
       <Icon className="size-3.5" aria-hidden="true" />

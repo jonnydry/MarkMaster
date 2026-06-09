@@ -81,6 +81,7 @@ export function useOrbitPage() {
     scan: scanSession.scan,
     tags: queue.tags,
     collections: queue.collections,
+    libraryStats: queue.libraryStats,
     dbUser: queue.dbUser,
     bookmarks: queue.bookmarks,
     reviewBookmarks: scanSession.reviewBookmarks,

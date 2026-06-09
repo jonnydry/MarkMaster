@@ -16,6 +16,7 @@ import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
+import { highlightIndicatorActiveClass } from "@/lib/highlight-chrome";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { cn } from "@/lib/utils";
@@ -73,11 +74,12 @@ function SelectionToggle({
       }}
       aria-pressed={selected}
       aria-label="Select bookmark"
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+      className={cn(
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         selected
-          ? "border-primary bg-primary text-primary-foreground"
+          ? highlightIndicatorActiveClass
           : "border-border bg-background text-transparent hover:border-primary/50"
-      }`}
+      )}
     >
       <Check className="h-3.5 w-3.5" />
     </button>
@@ -326,7 +328,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               className={cn(
                 "rounded-sm border border-transparent",
                 hasTag
-                  ? "border-primary/25 bg-primary/10 text-primary"
+                  ? highlightIndicatorActiveClass
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
               )}
               aria-label={hasTag ? "Edit tags" : "Add tags"}
@@ -346,7 +348,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               className={cn(
                 "rounded-sm border border-transparent",
                 hasCollection
-                  ? "border-primary/25 bg-primary/10 text-primary"
+                  ? highlightIndicatorActiveClass
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
               )}
               aria-label={hasCollection ? "Change collection" : "Add to collection"}
@@ -366,7 +368,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               className={cn(
                 "rounded-sm border border-transparent",
                 hasNote
-                  ? "border-primary/25 bg-primary/10 text-primary"
+                  ? highlightIndicatorActiveClass
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
               )}
               aria-label={hasNote ? "Edit note" : "Add note"}

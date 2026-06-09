@@ -534,6 +534,13 @@ export function useOrbitReviewSession({
   ]);
 
   useEffect(() => {
+    if (!open) return;
+    if (effectiveDrafts.length === 0) {
+      onOpenChange(false);
+    }
+  }, [open, effectiveDrafts.length, onOpenChange]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!open) return;
       const target = event.target as HTMLElement | null;

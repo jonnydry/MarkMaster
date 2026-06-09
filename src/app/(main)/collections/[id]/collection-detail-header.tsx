@@ -11,6 +11,8 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { highlightActiveClass } from "@/lib/highlight-chrome";
+import { cn } from "@/lib/utils";
 import type { CollectionDetail } from "@/hooks/use-collection-detail-page";
 
 type CollectionDetailHeaderActionsProps = {
@@ -40,7 +42,7 @@ export function CollectionDetailHeaderActions({
         <>
           <Badge
             variant="outline"
-            className="gap-1.5 border-primary/25 bg-accent-soft text-primary"
+            className={cn("gap-1.5 text-primary", highlightActiveClass)}
           >
             Synced from X
           </Badge>

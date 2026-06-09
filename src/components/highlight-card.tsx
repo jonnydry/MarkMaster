@@ -157,8 +157,8 @@ export function HighlightCard({
         "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
         isCarouselLayout ? "min-h-[10rem] p-3.5" : "min-h-[8.5rem] p-3",
         active
-          ? "border-primary/45 bg-accent-soft/60"
-          : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1",
+          ? "border-primary/45 bg-accent-soft/60 hover:bg-accent-soft/70"
+          : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1/70",
         className
       )}
       aria-label={`Open highlighted bookmark ${index + 1} from ${bookmark.authorDisplayName}`}

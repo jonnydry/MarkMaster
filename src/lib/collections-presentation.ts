@@ -3,7 +3,6 @@ import type { CollectionWithCount } from "@/types";
 export type CollectionFilter = "all" | "mine" | "public" | "x_folders";
 
 export type CollectionStats = {
-  totalBookmarks: number;
   emptyCount: number;
   publicCount: number;
   maxItems: number;
@@ -87,13 +86,11 @@ export function computeCollectionStats(
   collections: CollectionWithCount[],
   userCollections: CollectionWithCount[]
 ): CollectionStats {
-  let totalBookmarks = 0;
   let emptyCount = 0;
   let largestCollection: CollectionWithCount | null = null;
 
   for (const collection of collections) {
     const count = getCollectionItemCount(collection);
-    totalBookmarks += count;
     if (count === 0) emptyCount += 1;
     if (
       !largestCollection ||
@@ -104,7 +101,6 @@ export function computeCollectionStats(
   }
 
   return {
-    totalBookmarks,
     emptyCount,
     publicCount: userCollections.filter((collection) => collection.isPublic)
       .length,

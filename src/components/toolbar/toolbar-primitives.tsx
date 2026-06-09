@@ -5,6 +5,12 @@ import type { LucideIcon } from "lucide-react";
 import { Search, X } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
+import {
+  highlightActiveClass,
+  highlightIdleClass,
+  highlightInteractiveClass,
+  highlightSegmentActiveClass,
+} from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 interface ToolbarSearchFieldProps {
@@ -118,16 +124,17 @@ export function ToolbarSegmentControl<T extends string>({
   className,
 }: ToolbarSegmentControlProps<T>) {
   const buttonHeight = size === "md" ? "h-8" : "h-7";
+  const buttonPadding = size === "md" ? "px-2.5" : "px-2";
 
   return (
     <div
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex rounded-sm border p-0.5",
+        "inline-flex shrink-0 rounded-sm border p-0.5",
         variant === "library"
           ? "border-hairline-soft bg-background/35"
-          : cn(orbitHairlineBorder(), "bg-white/[0.04]"),
+          : cn(orbitHairlineBorder(), "bg-background/35"),
         className
       )}
     >
@@ -139,13 +146,14 @@ export function ToolbarSegmentControl<T extends string>({
           disabled={option.disabled}
           onClick={() => onChange(option.value)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-sm px-2 text-xs font-semibold transition-colors disabled:opacity-50",
+            "inline-flex items-center gap-1 rounded-sm text-xs font-semibold transition-colors disabled:opacity-50",
             buttonHeight,
+            buttonPadding,
             value === option.value
-              ? "bg-primary text-primary-foreground"
+              ? highlightSegmentActiveClass
               : variant === "library"
-                ? "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                : "text-white/60 hover:bg-white/[0.06] hover:text-white"
+                ? highlightIdleClass
+                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
           )}
         >
           {option.label}
@@ -190,8 +198,12 @@ export function ToolbarIconButton({
       className={cn(
         "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
         isActive
-          ? "border-primary/35 bg-primary/10 text-foreground"
-          : "border-hairline-strong bg-background/35 text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
+          ? highlightActiveClass
+          : cn(
+              "border-hairline-strong bg-background/35 text-muted-foreground",
+              highlightInteractiveClass,
+              "hover:text-foreground"
+            ),
         className
       )}
     >
@@ -202,3 +214,11 @@ export function ToolbarIconButton({
     </button>
   );
 }
+
+// Re-export highlight tokens for toolbar consumers.
+export {
+  highlightActiveClass,
+  highlightIdleClass,
+  highlightInteractiveClass,
+  highlightSegmentActiveClass,
+} from "@/lib/highlight-chrome";

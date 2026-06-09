@@ -17,6 +17,8 @@ export function invalidateLibraryQueries(
     queryClient.invalidateQueries({ queryKey: ["performance-highlights"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["tags"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["collections"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["library-stats"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["analytics"], refetchType }),
     invalidateOrbitGraphQuery(queryClient),
   ]);
 }
@@ -24,6 +26,7 @@ export function invalidateLibraryQueries(
 export function invalidateCollectionsQuery(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["collections"] }),
+    queryClient.invalidateQueries({ queryKey: ["library-stats"] }),
     invalidateOrbitGraphQuery(queryClient),
   ]);
 }
@@ -46,6 +49,7 @@ export function invalidateCollectionQueries(
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["collection", collectionId] }),
     queryClient.invalidateQueries({ queryKey: ["collections"] }),
+    queryClient.invalidateQueries({ queryKey: ["library-stats"] }),
     invalidateOrbitGraphQuery(queryClient),
   ]);
 }

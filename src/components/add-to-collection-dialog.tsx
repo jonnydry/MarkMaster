@@ -11,6 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FolderOpen, Plus, Check, Loader2 } from "lucide-react";
+import { highlightSegmentActiveClass } from "@/lib/highlight-chrome";
+import { cn } from "@/lib/utils";
 import type { CollectionWithCount } from "@/types";
 
 interface AddToCollectionDialogProps {
@@ -97,13 +99,14 @@ export function AddToCollectionDialog({
                       }
                     }}
                     disabled={isIn || isManaged || isPending}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left disabled:opacity-60 ${
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left text-sm transition-colors disabled:opacity-60",
                       isIn
-                        ? "bg-primary/10 text-primary"
+                        ? highlightSegmentActiveClass
                         : isManaged
-                          ? "bg-muted/60 text-muted-foreground cursor-not-allowed"
-                          : "hover:bg-muted text-foreground"
-                    }`}
+                          ? "cursor-not-allowed bg-muted/60 text-muted-foreground"
+                          : "text-foreground hover:bg-muted"
+                    )}
                   >
                     <FolderOpen className="w-4 h-4 shrink-0" />
                     <span className="truncate">{col.name}</span>

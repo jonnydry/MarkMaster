@@ -8,7 +8,18 @@ import { prisma } from "@/lib/prisma";
 const highlightsQuerySchema = z.object({
   raw: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   personalBoost: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
-  limit: z.coerce.number().int().min(1).max(12).default(4),
+  limit: z.coerce.number().int().min(1).max(24).default(4),
+  excludeIds: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+        : []
+    ),
 });
 
 const bookmarkInclude = {
@@ -27,8 +38,18 @@ const performanceScoreSql = Prisma.sql`(
   6.0 * LN(1 + COALESCE((b."publicMetrics"->>'bookmark_count')::int, 0))
 )`;
 
-function buildHighlightsWhereSql(userId: string, raw: boolean) {
+function buildHighlightsWhereSql(
+  userId: string,
+  raw: boolean,
+  excludeIds: string[] = []
+) {
   const conditions: Prisma.Sql[] = [Prisma.sql`b."userId" = ${userId}`];
+
+  if (excludeIds.length > 0) {
+    conditions.push(
+      Prisma.sql`b."id" NOT IN (${Prisma.join(excludeIds.map((id) => Prisma.sql`${id}`))})`
+    );
+  }
 
   if (raw) {
     conditions.push(Prisma.sql`
@@ -79,8 +100,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { raw, personalBoost, limit } = parsed.data;
-  const whereSql = buildHighlightsWhereSql(user.id, raw);
+  const { raw, personalBoost, limit, excludeIds } = parsed.data;
+  const whereSql = buildHighlightsWhereSql(user.id, raw, excludeIds);
 
   const [pageRows, totalRows, personalBoostAuthors] = await Promise.all([
     prisma.$queryRaw<{ id: string }[]>(Prisma.sql`

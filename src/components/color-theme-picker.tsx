@@ -1,5 +1,6 @@
 "use client";
 
+import { highlightSurfaceActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { COLOR_THEMES, type ColorThemeId } from "@/lib/color-themes";
 
@@ -30,7 +31,7 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
             className={cn(
               "group flex min-w-[5.5rem] flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors",
               selected
-                ? "border-primary/40 bg-primary/5"
+                ? highlightSurfaceActiveClass
                 : "border-hairline-soft bg-surface-2/40 hover:border-primary/20 hover:bg-accent-soft/40"
             )}
           >

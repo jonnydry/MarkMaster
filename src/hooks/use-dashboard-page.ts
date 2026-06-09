@@ -10,12 +10,16 @@ import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { useCreateCollection } from "@/hooks/use-create-collection";
-import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
+import {
+  useCollectionsQuery,
+  useLibraryStatsQuery,
+  useTagsQuery,
+} from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { fetchJson } from "@/lib/fetch-json";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import type { ViewMode, BookmarkWithRelations, MediaFilter } from "@/types";
 
@@ -36,7 +40,7 @@ export function useDashboardPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
 
   const filters = useBookmarkFilters();
   const actions = useBookmarkActions();
@@ -82,6 +86,7 @@ export function useDashboardPage() {
   const { data: tags = [] } = useTagsQuery();
 
   const { data: collections = [] } = useCollectionsQuery();
+  const { data: libraryStats } = useLibraryStatsQuery();
   const { data: syncStatus } = useSyncStatus();
 
   const feedReady = !isLoading && !isError;
@@ -269,8 +274,10 @@ export function useDashboardPage() {
   );
 
   const handleSyncComplete = useCallback(() => {
-    void invalidateLibraryQueries(queryClient, { refetchType: "all" });
-  }, [queryClient]);
+    completeLibrarySync(queryClient, {
+      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
+    });
+  }, [queryClient, updateSession]);
 
   const handleSyncStateChange = useCallback((syncing: boolean) => {
     setSyncRequestLoading(syncing);
@@ -363,6 +370,7 @@ export function useDashboardPage() {
     createCollectionQuick,
     tags,
     collections,
+    libraryStats,
     dbUser,
     viewMode,
     setViewMode,

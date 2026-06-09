@@ -81,15 +81,12 @@ export function CollectionsControlBar({
                 key={filter.value}
                 active={active}
                 onClick={() => onFilterChange(filter.value)}
-                className={
-                  active ? "border-primary bg-primary text-primary-foreground" : undefined
-                }
               >
                 <span>{filter.label}</span>
                 <span
                   className={`tabular-nums ${
                     active
-                      ? "text-primary-foreground/75"
+                      ? "text-muted-foreground/80"
                       : "text-muted-foreground/60"
                   }`}
                 >

@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { StatusBadge } from "@/components/ui/chip";
+import { ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import { cn } from "@/lib/utils";
 import type { DbUser } from "@/lib/auth";
 import type { OrbitXaiStatusPayload } from "@/types";
@@ -199,28 +200,14 @@ export function SettingsSegment<T extends string>({
   ariaLabel: string;
 }) {
   return (
-    <div
-      role="group"
+    <ToolbarSegmentControl
+      value={value}
+      options={options}
+      onChange={onChange}
       aria-label={ariaLabel}
-      className="inline-flex rounded-sm border border-hairline-soft bg-background/35 p-0.5"
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "h-8 rounded-sm px-2.5 text-xs font-semibold transition-colors",
-            value === option.value
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+      variant="library"
+      size="md"
+    />
   );
 }
 

@@ -20,7 +20,6 @@ import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { UserNavDynamic } from "@/components/user-nav-dynamic";
 const OrbitReviewDialog = dynamic(
   () =>
     import("@/components/orbit/orbit-review-dialog").then((m) => m.OrbitReviewDialog),
@@ -28,8 +27,8 @@ const OrbitReviewDialog = dynamic(
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
+import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
-import { OrbitHeaderLogoAccent } from "@/components/orbit/orbit-header-logo-accent";
 import { OrbitScanFailureNotice } from "@/components/orbit/orbit-scan-failure-notice";
 import { OrbitList } from "@/components/orbit/orbit-list";
 import { OrbitContextualMenu } from "@/components/orbit/orbit-quick-actions";
@@ -46,7 +45,10 @@ import {
   orbitSelectionBarClass,
   orbitShellClass,
 } from "@/lib/orbit-route-chrome";
-import { appContentGutterClassName } from "@/lib/app-chrome";
+import {
+  appContentGutterClassName,
+  appFeedHeaderFrostedClassName,
+} from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { useOrbitPage } from "@/hooks/use-orbit-page";
 import { cn } from "@/lib/utils";
@@ -89,6 +91,7 @@ export default function OrbitPage() {
     scan,
     tags,
     collections,
+    libraryStats,
     dbUser,
     bookmarks,
     reviewBookmarks,
@@ -134,7 +137,6 @@ export default function OrbitPage() {
     isFetching,
     isSearchPending,
     queueIsLoading,
-    scanHelperText,
     scanButtonLabel,
     triagedCount,
     passTotal,
@@ -186,8 +188,9 @@ export default function OrbitPage() {
   } = useOrbitPage();
 
   return (
-    <div className={orbitShellClass()}>
-      <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <div className={cn(orbitShellClass(), "relative")}>
+      <OrbitPageWatermark />
+      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -195,31 +198,25 @@ export default function OrbitPage() {
           onTagToggle={goToTagOnDashboard}
           onCreateCollection={handleCreateCollectionOpen}
           lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+          totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="app-main-scroll scrollbar-thin">
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="app-main-scroll relative z-[1] scrollbar-thin">
           <PageHeader
             sticky
-            className="isolate overflow-hidden"
-            bodyClassName="relative overflow-hidden"
-            title={
-              <span className="flex items-center gap-2">
-                <OrbitLogoMark className="size-5" />
-                Orbit
-                <span
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] text-mono-label text-primary"
-                  aria-live="polite"
-                >
-                  {total > 0 ? `${total.toLocaleString()} waiting` : "Queue clear"}
-                </span>
-              </span>
-            }
-            description={scanHelperText}
-            leading={
-              <div className="md:hidden">
+            chromeless
+            className={cn(
+              "border-b border-hairline-strong",
+              appFeedHeaderFrostedClassName
+            )}
+            bodyClassName="px-0 py-0"
+          >
+            <OrbitCommandBar
+              ref={searchInputRef}
+              mobileSidebar={
                 <MobileSidebar
                   tags={tags}
                   collections={collections}
@@ -229,74 +226,65 @@ export default function OrbitPage() {
                   lastSyncAt={
                     dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null
                   }
+                  totalBookmarks={libraryStats?.libraryBookmarkCount}
                   onSyncComplete={handleSyncComplete}
                 />
-              </div>
-            }
-            actions={
-              <>
-                {dbUser ? <UserNavDynamic user={dbUser} /> : null}
-              </>
-            }
-          >
-            <OrbitHeaderLogoAccent />
+              }
+              user={dbUser ?? undefined}
+              orbitView={orbitView}
+              total={total}
+              sortDirection={queueSortDirection}
+              onChangeView={handleOrbitViewChange}
+              onChangeSortDirection={handleQueueSortDirectionChange}
+              canSelect={total > 0}
+              selectionMode={selectionMode}
+              onToggleSelectionMode={toggleSelectionMode}
+              triagedCount={triagedCount}
+              passTotal={passTotal}
+              scanButtonLabel={scanButtonLabel}
+              queueIsLoading={queueIsLoading}
+              scanning={scan.scanning}
+              scanTargetCount={scanTargetIds.length}
+              hasScanPlan={activeScanPlanSuggestionCount > 0}
+              scanPlanSuggestionCount={activeScanPlanSuggestionCount}
+              batchMode={resolvedScanBatchMode}
+              resolvedBatchProfile={scanBatchProfile}
+              deepUnlocked={deepUnlocked}
+              deepLockedReason={deepLockedReason}
+              applyingBatch={scan.applyingBatch}
+              canApplyStrongMatches={canApplyStrongMatches}
+              mapHref={orbitMapHref}
+              onBatchModeChange={setScanBatchMode}
+              onScan={handleScan}
+              onApplyStrongMatches={handleApplyStrongMatches}
+              onReviewPass={handleOpenReviewAll}
+              search={search}
+              onSearchChange={handleSearchChange}
+              visibleStatusLabel={visibleStatusLabel}
+              isUpdating={(isFetching || isSearchPending) && !isLoading}
+              keyboardShortcutsOpen={keyboardShortcutsOpen}
+              onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
+              shortcutGroups={ORBIT_SHORTCUT_GROUPS}
+              scanError={
+                scan.error ? (
+                  <OrbitScanFailureNotice
+                    error={scan.error}
+                    retryTargetCount={
+                      lastScanRequest?.targetIds.length ?? scanTargetCount
+                    }
+                    selectionTargetCount={selectedScanTargetIds.length}
+                    canRescanCurrentSelection={canRescanCurrentSelection}
+                    scanning={scan.scanning}
+                    onRetry={handleRetryScan}
+                    onRescanCurrentSelection={handleRescanCurrentSelection}
+                  />
+                ) : null
+              }
+            />
           </PageHeader>
 
           <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-4")}>
-            <section className={cn(bookmarkFeedColumnClassName, "space-y-3 pt-1")}>
-              <OrbitCommandBar
-                ref={searchInputRef}
-                orbitView={orbitView}
-                total={total}
-                sortDirection={queueSortDirection}
-                onChangeView={handleOrbitViewChange}
-                onChangeSortDirection={handleQueueSortDirectionChange}
-                canSelect={total > 0}
-                selectionMode={selectionMode}
-                onToggleSelectionMode={toggleSelectionMode}
-                triagedCount={triagedCount}
-                passTotal={passTotal}
-                scanButtonLabel={scanButtonLabel}
-                queueIsLoading={queueIsLoading}
-                scanning={scan.scanning}
-                scanTargetCount={scanTargetIds.length}
-                hasScanPlan={activeScanPlanSuggestionCount > 0}
-                scanPlanSuggestionCount={activeScanPlanSuggestionCount}
-                batchMode={resolvedScanBatchMode}
-                resolvedBatchProfile={scanBatchProfile}
-                deepUnlocked={deepUnlocked}
-                deepLockedReason={deepLockedReason}
-                applyingBatch={scan.applyingBatch}
-                canApplyStrongMatches={canApplyStrongMatches}
-                mapHref={orbitMapHref}
-                onBatchModeChange={setScanBatchMode}
-                onScan={handleScan}
-                onApplyStrongMatches={handleApplyStrongMatches}
-                onReviewPass={handleOpenReviewAll}
-                search={search}
-                onSearchChange={handleSearchChange}
-                visibleStatusLabel={visibleStatusLabel}
-                isUpdating={(isFetching || isSearchPending) && !isLoading}
-                keyboardShortcutsOpen={keyboardShortcutsOpen}
-                onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
-                shortcutGroups={ORBIT_SHORTCUT_GROUPS}
-                scanError={
-                  scan.error ? (
-                    <OrbitScanFailureNotice
-                      error={scan.error}
-                      retryTargetCount={
-                        lastScanRequest?.targetIds.length ?? scanTargetCount
-                      }
-                      selectionTargetCount={selectedScanTargetIds.length}
-                      canRescanCurrentSelection={canRescanCurrentSelection}
-                      scanning={scan.scanning}
-                      onRetry={handleRetryScan}
-                      onRescanCurrentSelection={handleRescanCurrentSelection}
-                    />
-                  ) : null
-                }
-              />
-
+            <section className={cn(bookmarkFeedColumnClassName, "space-y-3")}>
               <OrbitTriageHint />
 
               {scan.plan ? (
@@ -321,8 +309,8 @@ export default function OrbitPage() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
-                    className="h-9 shrink-0 border-primary/35 bg-primary/10 text-primary hover:bg-primary/20"
+                    variant="highlight"
+                    className="h-9 shrink-0 text-primary"
                     onClick={handleClearScanPlan}
                   >
                     Dismiss plan
@@ -373,8 +361,8 @@ export default function OrbitPage() {
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="h-8 gap-1.5 border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                      variant="highlight"
+                      className="h-8 gap-1.5 text-primary"
                       onClick={handleScan}
                       disabled={scan.scanning || scanTargetIds.length === 0}
                     >

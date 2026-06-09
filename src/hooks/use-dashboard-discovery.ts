@@ -1,15 +1,23 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   usePerformanceHighlights,
+  DISCOVERY_RAW_POOL_LIMIT,
   type PerformanceHighlightsResponse,
 } from "@/hooks/use-performance-highlights";
-import { getDislikedHighlightIds, getLikedHighlightIds } from "@/lib/highlight-feedback";
+import { useHighlightFeedbackIds } from "@/hooks/use-highlight-feedback-ids";
+import { getDislikedHighlightIds } from "@/lib/highlight-feedback";
+import {
+  getDiscoveryShownIds,
+  addDiscoveryShownIds,
+  getDailyRotationSeed,
+} from "@/lib/discovery-shown";
 import {
   buildWeeklyGemsCuration,
   buildDiscoveryCarouselItems,
 } from "@/lib/weekly-gems-curation";
+
 export type DashboardDiscoveryParentData = {
   rawData?: PerformanceHighlightsResponse;
   libraryData?: PerformanceHighlightsResponse;
@@ -17,6 +25,9 @@ export type DashboardDiscoveryParentData = {
   libraryLoading?: boolean;
   rawError?: boolean;
   refetchRaw?: () => void;
+  /** When set, discovery uses parent fetches (collections panel) with these exclude/rotation inputs. */
+  excludeIds?: string[];
+  refreshVersion?: number;
 };
 
 export function useDashboardDiscovery(options: {
@@ -25,10 +36,32 @@ export function useDashboardDiscovery(options: {
 }) {
   const { feedReady = true, parentData } = options;
 
-  const dislikedIds = getDislikedHighlightIds();
-  const likedIds = getLikedHighlightIds();
+  const { dislikedIds, likedIds, feedbackVersion } = useHighlightFeedbackIds();
+  const [shownVersion, setShownVersion] = useState(0);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+
+  useEffect(() => {
+    const onShown = () => setShownVersion((v) => v + 1);
+    window.addEventListener("markmaster:discovery-shown-changed", onShown);
+    return () => {
+      window.removeEventListener("markmaster:discovery-shown-changed", onShown);
+    };
+  }, []);
+  const excludeIds = useMemo(
+    () => [
+      ...new Set([
+        ...getDiscoveryShownIds(),
+        ...getDislikedHighlightIds(),
+        ...(parentData?.excludeIds ?? []),
+      ]),
+    ],
+    // feedbackVersion / shownVersion / refreshVersion bust cache after localStorage updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- version counters intentionally drive re-reads
+    [parentData?.excludeIds, feedbackVersion, shownVersion, refreshVersion]
+  );
 
   const useParent = parentData !== undefined;
+  const effectiveRefreshVersion = parentData?.refreshVersion ?? refreshVersion;
 
   const {
     data: rawFetched,
@@ -38,6 +71,9 @@ export function useDashboardDiscovery(options: {
   } = usePerformanceHighlights(true, {
     dislikedIds,
     likedIds,
+    hardExcludeDisliked: true,
+    excludeIds,
+    limit: DISCOVERY_RAW_POOL_LIMIT,
     enabled: !useParent,
   });
 
@@ -45,9 +81,11 @@ export function useDashboardDiscovery(options: {
     data: libraryFetched,
     isLoading: libraryLoading,
     isError: libraryError,
+    refetch: refetchLibrary,
   } = usePerformanceHighlights(false, {
     dislikedIds,
     likedIds,
+    hardExcludeDisliked: true,
     enabled: feedReady && !useParent,
   });
 
@@ -85,18 +123,39 @@ export function useDashboardDiscovery(options: {
   const hasDigestBatch = curation.allGems.length > 0;
   const hasDigestExtras = digestDisplayGems.length > 0;
 
-  // Unified discovery carousel data (Phase 1 of Master Plan). Computed with useMemo.
-  // Provides flat ordered list (raw front-loaded) + full ritualBatch preserving
-  // exact batch construction, nurtured, cta.digest_review_together, digestIds + source=weekly-gems,
-  // and onSaveAsCollection contract. DashboardDiscovery (default/flush) consumes the new fields.
-  // The perf SQL path remains untouched.
+  const rotationSeed = `${getDailyRotationSeed()}-${effectiveRefreshVersion}`;
+
   const discovery = useMemo(
     () =>
       buildDiscoveryCarouselItems(rawGems, libraryGems, {
-        excludeIdsForBatch: quickPickIds,
+        excludeIds: new Set(excludeIds),
+        rotationSeed,
       }),
-    [rawGems, libraryGems, quickPickIds]
+    [rawGems, libraryGems, excludeIds, rotationSeed]
   );
+
+  const refreshMix = useCallback(() => {
+    const rawIds = discovery.carouselItems
+      .filter((item) => item.context === "raw")
+      .map((item) => item.bookmark.id);
+    if (rawIds.length > 0) {
+      addDiscoveryShownIds(rawIds);
+    }
+    setRefreshVersion((v) => v + 1);
+    if (!useParent) {
+      void refetchRaw();
+      if (feedReady) void refetchLibrary();
+    } else if (parentData?.refetchRaw) {
+      parentData.refetchRaw();
+    }
+  }, [
+    discovery.carouselItems,
+    feedReady,
+    parentData,
+    refetchLibrary,
+    refetchRaw,
+    useParent,
+  ]);
 
   return {
     quickPicks,
@@ -107,19 +166,17 @@ export function useDashboardDiscovery(options: {
     digestDisplayGems,
     hasDigestBatch,
     hasDigestExtras,
-    // New unified carousel fields (additive only; old returns + buildWeeklyGemsCuration path
-    // retained verbatim for safety / standalone surfaces per Master Plan). This increases
-    // hook surface but was the minimal transition that avoided breaking any call sites or
-    // future drift on the old curation contract. Only consumed by DashboardDiscovery.
     discoveryCarouselItems: discovery.carouselItems,
     ritualBatch: discovery.ritualBatch,
     ritualTotal: discovery.totalMixCount,
     resurfacedCount: discovery.resurfacedCount,
+    rawCarouselCount: discovery.rawCarouselCount,
     discoveryEngagement: discovery.totalEngagement,
     itemLabels: discovery.itemLabels,
     hasMixContent: discovery.carouselItems.length > 0 || discovery.ritualBatch.length > 0,
     isLoading,
     hasError,
     refetch,
+    refreshMix,
   };
 }
