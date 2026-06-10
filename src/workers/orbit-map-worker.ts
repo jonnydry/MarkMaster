@@ -33,6 +33,7 @@ import {
   type FocusPulseMessage,
   type FocusOnMessage,
   type SetSelectionMessage,
+  type SetHighlightMessage,
   type WheelMessage,
   type DoubleClickMessage,
   type CursorChangedMessage,
@@ -42,7 +43,16 @@ import {
 
 import type { OrbitGraphPayload, OrbitGraphNode, OrbitGraphEdge } from '@/types';
 import type { GraphFilter, OrbitMapSelection } from '@/lib/orbit-worker-protocol';
-import { Container, Graphics, Text, BitmapFont, BitmapFontManager, BitmapText } from 'pixi.js';
+import {
+  Container,
+  Graphics,
+  Sprite,
+  Text,
+  Texture,
+  BitmapFont,
+  BitmapFontManager,
+  BitmapText,
+} from 'pixi.js';
 import {
   forceSimulation,
   forceLink,
@@ -71,6 +81,8 @@ import {
   getOrbitMapNodeVisualStyle,
   getOrbitMapLabelText,
   shouldShowOrbitMapLabel,
+  mixOrbitMapColors,
+  type OrbitMapNodeVisualStyle,
 } from './orbit-map-rendering';
 import {
   easeOrbitMapOutCubic,
@@ -89,6 +101,11 @@ interface SimulationNode {
   x?: number;
   y?: number;
   radius: number;
+  visual: OrbitMapNodeVisualStyle;
+  /** 0-based importance rank among hubs (by count); top hubs always show labels. */
+  labelRank?: number;
+  /** Per-node delay (ms) for the one-shot entrance fade-in. */
+  entranceDelay?: number;
   recent?: boolean;
   affiliated?: boolean;
   fx?: number;
@@ -103,6 +120,8 @@ interface SimulationLink {
   source: string | SimulationNode;
   target: string | SimulationNode;
   kind: string;
+  /** Cached edge color (derived from the hub endpoint) — set in rebuildScene. */
+  color?: number;
 }
 
 /**
@@ -156,6 +175,17 @@ let isPanning = false;
 let panDragLast: { x: number; y: number } | null = null;
 let currentCursor: CursorChangedMessage['cursor'] = 'default';
 
+// Drag state (node dragging + drag-to-assign). A pointer-down on a node only
+// becomes a drag after the cursor travels past DRAG_THRESHOLD_PX; otherwise
+// the pointer-up is treated as a click (select / deselect).
+const DRAG_THRESHOLD_PX = 4;
+let dragCandidate: { id: string; startX: number; startY: number } | null = null;
+let draggingNodeId: string | null = null;
+let dropTargetId: string | null = null;
+let panStart: { x: number; y: number } | null = null;
+let panMoved = false;
+let hubDropTargets: SimulationNode[] = [];
+
 function postCursorChange(cursor: CursorChangedMessage['cursor']) {
   if (currentCursor === cursor) return;
   currentCursor = cursor;
@@ -167,11 +197,30 @@ function postCursorChange(cursor: CursorChangedMessage['cursor']) {
 }
 
 // Pixi containers for organization
+let backgroundContainer: Container | null = null; // Screen-space vignette (not camera-transformed)
+let starfieldContainer: Container | null = null;  // Distant stars with parallax (fractional camera follow)
 let linksContainer: Container | null = null;
+let glowContainer: Container | null = null;       // Soft glow sprites under hub nodes (camera space)
 let nodesContainer: Container | null = null;
+let ringsContainer: Container | null = null; // Selection / neighbor highlight rings (drawn in world space)
 let labelsContainer: Container | null = null;
 let effectsContainer: Container | null = null; // For temporary effects like pulses and animations
 let linkGraphics: Graphics | null = null;
+let ringGraphics: Graphics | null = null;
+let vignetteSprite: Sprite | null = null;
+let glowTexture: Texture | null = null;
+const glowSpriteMap = new Map<string, Sprite>();
+
+// One-shot entrance fade-in (per worker lifetime, i.e. per page visit)
+let hasPlayedEntrance = false;
+let entranceStartedAt: number | null = null;
+const ENTRANCE_NODE_FADE_MS = 380;
+const ENTRANCE_MAX_DELAY_MS = 420;
+const ENTRANCE_BASE_DELAY_MS = 180;
+const ENTRANCE_TOTAL_MS =
+  ENTRANCE_BASE_DELAY_MS + ENTRANCE_MAX_DELAY_MS + ENTRANCE_NODE_FADE_MS;
+const STARFIELD_PARALLAX = 0.35;
+const HUB_GLOW_ALPHA = 0.22;
 
 // Label management for LOD
 const labelMap = new Map<string, Text | BitmapText>(); // nodeId -> Text or BitmapText object
@@ -179,7 +228,13 @@ const labelMap = new Map<string, Text | BitmapText>(); // nodeId -> Text or Bitm
 // d3-force simulation (runs in the worker)
 let simulation: Simulation<SimulationNode, SimulationLink> | null = null;
 let nodeData: SimulationNode[] = [];
+let nodeById = new Map<string, SimulationNode>();
 let linkData: SimulationLink[] = [];
+
+// Whether the manual rAF tick loop is currently running. The d3 internal
+// timer is never used — all ticks are driven from startSimulationLoop — so
+// anything that raises alpha must also ensure the loop is alive (kickSimulation).
+let simulationLoopRunning = false;
 
 // Camera state (position + zoom)
 let camera = { x: 0, y: 0, zoom: 1 };
@@ -190,6 +245,9 @@ const nodeGraphicsMap = new Map<string, Graphics>();
 // Current interaction state (hover / selection) for visual feedback
 let currentHover: { id: string; kind: string } | null = null;
 let currentSelection: OrbitMapSelection | null = null;
+
+// Live search-match highlight (null = inactive). Non-members are dimmed.
+let highlightedNodeIds: Set<string> | null = null;
 
 // Adjacency map for efficient neighbor highlighting
 const adjacency = new Map<string, Set<string>>();
@@ -204,7 +262,7 @@ function isSameOrbitMapHover(
 }
 
 // Label visibility thresholds (based on zoom level)
-const LABEL_ZOOM_THRESHOLD = 0.95;          // Below this, hide text labels and let the graph read as structure.
+const LABEL_ZOOM_THRESHOLD = 0.6;           // Below this, only top-ranked hubs keep their labels.
 const LABEL_BASE_FONT_SIZE = 18;
 const LABEL_MIN_WORLD_SCALE = 0.16;
 const LABEL_MAX_WORLD_SCALE = 2.35;
@@ -329,6 +387,15 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
       handleSetSelection(msg as SetSelectionMessage);
       break;
 
+    case WorkerMessageType.SET_HIGHLIGHT: {
+      const highlightMsg = msg as SetHighlightMessage;
+      highlightedNodeIds = highlightMsg.nodeIds
+        ? new Set(highlightMsg.nodeIds)
+        : null;
+      updateNodeStyles();
+      break;
+    }
+
     case WorkerMessageType.RESET_VIEW:
       handleResetView();
       break;
@@ -424,6 +491,7 @@ function handleResize(msg: ResizeMessage) {
   if (!app || !isInitialized) return;
 
   app.renderer.resize(msg.width, msg.height);
+  layoutVignette(msg.width, msg.height);
   constrainCamera();
   applyCameraTransform();
   app.renderer.render(app.stage);
@@ -471,7 +539,20 @@ function handleSetFilter(msg: SetFilterMessage) {
   const nextFilter = msg.filter as GraphFilter;
   if (currentFilter === nextFilter) return;
   currentFilter = nextFilter;
+  // Carry current positions over so the filtered scene warm-starts in place
+  // instead of re-running the layout from scratch.
+  captureCurrentPositions();
   rebuildScene();
+}
+
+/** Snapshots live simulation positions into the initial-positions map. */
+function captureCurrentPositions() {
+  for (const datum of nodeData) {
+    const position = { x: datum.x ?? NaN, y: datum.y ?? NaN };
+    if (isFiniteOrbitMapPosition(position)) {
+      currentInitialPositions.set(datum.id, position);
+    }
+  }
 }
 
 function handleDestroy() {
@@ -479,13 +560,145 @@ function handleDestroy() {
     simulation.stop();
     simulation = null;
   }
+  simulationLoopRunning = false;
   activeAnimations.length = 0;
   labelMap.clear();
   nodeGraphicsMap.clear();
+  glowSpriteMap.clear();
+  nodeById.clear();
   adjacency.clear();
+  backgroundContainer = null;
+  starfieldContainer = null;
+  glowContainer = null;
+  vignetteSprite = null;
+  glowTexture = null;
   app?.destroy();
   app = null;
   isInitialized = false;
+}
+
+/* ============================================================
+   ATMOSPHERE (vignette, starfield, hub glow)
+   ============================================================ */
+
+/** Renders a radial gradient onto an OffscreenCanvas and wraps it in a Texture. */
+function createRadialGradientTexture(
+  size: number,
+  stops: Array<[number, string]>
+): Texture {
+  const canvas = new OffscreenCanvas(size, size);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Texture.WHITE;
+  const gradient = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2
+  );
+  for (const [offset, color] of stops) {
+    gradient.addColorStop(offset, color);
+  }
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return Texture.from(canvas);
+}
+
+/** Mulberry32 — tiny deterministic PRNG so the starfield is stable per session. */
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Builds the vignette + starfield once per worker lifetime. */
+function buildBackground() {
+  if (!app || !backgroundContainer || !starfieldContainer) return;
+
+  glowTexture =
+    glowTexture ??
+    createRadialGradientTexture(64, [
+      [0, 'rgba(255,255,255,0.85)'],
+      [0.35, 'rgba(255,255,255,0.28)'],
+      [1, 'rgba(255,255,255,0)'],
+    ]);
+
+  if (!vignetteSprite) {
+    const vignetteTexture = createRadialGradientTexture(256, [
+      [0, 'rgba(30,41,59,0.5)'],
+      [0.55, 'rgba(15,23,42,0.22)'],
+      [1, 'rgba(0,0,0,0)'],
+    ]);
+    vignetteSprite = new Sprite(vignetteTexture);
+    vignetteSprite.anchor.set(0.5);
+    backgroundContainer.addChild(vignetteSprite);
+  }
+  layoutVignette(app.renderer.width, app.renderer.height);
+
+  if (starfieldContainer.children.length === 0) {
+    const random = createSeededRandom(0x0c0ffee);
+    const stars = new Graphics();
+    for (let i = 0; i < 240; i++) {
+      const x = (random() - 0.5) * 6000;
+      const y = (random() - 0.5) * 6000;
+      const radius = 0.4 + random() * 1.0;
+      const blue = random() > 0.7;
+      stars.circle(x, y, radius);
+      stars.fill({
+        color: blue ? 0x93c5fd : 0xffffff,
+        alpha: 0.05 + random() * 0.14,
+      });
+    }
+    starfieldContainer.addChild(stars);
+  }
+}
+
+function layoutVignette(width: number, height: number) {
+  if (!vignetteSprite) return;
+  vignetteSprite.position.set(width / 2, height / 2);
+  const diameter = Math.max(width, height) * 1.5;
+  vignetteSprite.width = diameter;
+  vignetteSprite.height = diameter;
+}
+
+/**
+ * One-shot entrance fade-in: hubs first, bookmarks staggered in behind them.
+ * Runs from the simulation tick loop; restores normal styling when done.
+ */
+function applyEntranceProgress() {
+  if (entranceStartedAt === null) return;
+
+  const elapsed = Date.now() - entranceStartedAt;
+  const focusContext = getFocusContext();
+
+  for (const datum of nodeData) {
+    const delay = datum.entranceDelay ?? 0;
+    const t = Math.min(
+      Math.max((elapsed - delay) / ENTRANCE_NODE_FADE_MS, 0),
+      1
+    );
+    const factor = easeOrbitMapOutCubic(t);
+    const g = nodeGraphicsMap.get(datum.id);
+    if (g) g.alpha = getNodeAlpha(datum, focusContext) * factor;
+    const glow = glowSpriteMap.get(datum.id);
+    if (glow) glow.alpha = HUB_GLOW_ALPHA * factor;
+  }
+
+  if (linksContainer) {
+    linksContainer.alpha = easeOrbitMapOutCubic(Math.min(elapsed / 800, 1));
+  }
+
+  if (elapsed >= ENTRANCE_TOTAL_MS) {
+    entranceStartedAt = null;
+    if (linksContainer) linksContainer.alpha = 1;
+    updateNodeStyles();
+  }
 }
 
 /**
@@ -505,7 +718,15 @@ function rebuildScene() {
 
   // Clear scene
   if (linksContainer) linksContainer.removeChildren();
+  if (glowContainer) {
+    for (const glow of glowSpriteMap.values()) {
+      glow.destroy();
+    }
+    glowSpriteMap.clear();
+    glowContainer.removeChildren();
+  }
   if (nodesContainer) nodesContainer.removeChildren();
+  if (ringsContainer) ringsContainer.removeChildren();
   if (labelsContainer) {
     for (const label of labelMap.values()) {
       label.destroy();
@@ -515,16 +736,37 @@ function rebuildScene() {
   }
   if (effectsContainer) effectsContainer.removeChildren();
   linkGraphics = null;
+  ringGraphics = null;
   nodeGraphicsMap.clear();
+  nodeById.clear();
 
+  // Container creation order defines z-order:
+  // background → starfield → links → glow → nodes → rings → labels → effects
+  if (!backgroundContainer) {
+    backgroundContainer = new Container();
+    app.stage.addChild(backgroundContainer);
+  }
+  if (!starfieldContainer) {
+    starfieldContainer = new Container();
+    app.stage.addChild(starfieldContainer);
+  }
   if (!linksContainer) {
     linksContainer = new Container();
     app.stage.addChild(linksContainer);
+  }
+  if (!glowContainer) {
+    glowContainer = new Container();
+    app.stage.addChild(glowContainer);
   }
   if (!nodesContainer) {
     nodesContainer = new Container();
     app.stage.addChild(nodesContainer);
   }
+  if (!ringsContainer) {
+    ringsContainer = new Container();
+    app.stage.addChild(ringsContainer);
+  }
+  buildBackground();
   if (!labelsContainer) {
     labelsContainer = new Container();
     app!.stage.addChild(labelsContainer);
@@ -560,13 +802,17 @@ function rebuildScene() {
     visibleNodeIds.add(node.id);
   }
 
-  // Prepare nodes for d3-force using our internal SimulationNode type
+  // Prepare nodes for d3-force using our internal SimulationNode type.
+  // Track how many nodes already have known positions so we can warm-start
+  // the simulation instead of re-exploding a layout the user has seen before.
+  let positionedCount = 0;
   nodeData = visibleNodes.map((node) => {
     const datum: SimulationNode = {
       id: node.id,
       kind: node.kind,
       node,
       radius: getOrbitMapNodeRadius(node),
+      visual: getOrbitMapNodeVisualStyle(node),
     };
 
     // Use persisted positions if available (from server or previous layout)
@@ -575,6 +821,7 @@ function rebuildScene() {
     if (initialPosition) {
       datum.x = initialPosition.x;
       datum.y = initialPosition.y;
+      positionedCount++;
     } else if (
       typeof simNode.x === 'number' &&
       Number.isFinite(simNode.x) &&
@@ -583,6 +830,7 @@ function rebuildScene() {
     ) {
       datum.x = simNode.x;
       datum.y = simNode.y;
+      positionedCount++;
     } else {
       const pos = getSeededOrbitMapPosition(node.id);
       datum.x = pos.x;
@@ -590,6 +838,58 @@ function rebuildScene() {
     }
     return datum;
   });
+  nodeById = new Map(nodeData.map((datum) => [datum.id, datum]));
+  hubDropTargets = nodeData.filter(
+    (datum) => datum.kind === 'tag' || datum.kind === 'collection'
+  );
+
+  // Hub importance ranks: the most-connected hubs keep labels at any zoom.
+  const hubCount = (datum: SimulationNode) =>
+    datum.node.kind === 'tag' || datum.node.kind === 'collection'
+      ? datum.node.count
+      : 0;
+  [...hubDropTargets]
+    .sort((a, b) => hubCount(b) - hubCount(a))
+    .forEach((datum, rank) => {
+      datum.labelRank = rank;
+    });
+  for (const datum of nodeData) {
+    if (datum.kind === 'core') datum.labelRank = 0;
+  }
+
+  // Tint bookmarks by their dominant tag (fallback: collection) color so
+  // clusters read as colored constellations instead of uniform gray.
+  for (const datum of nodeData) {
+    if (datum.kind !== 'bookmark') continue;
+    const neighbors = adjacency.get(datum.id);
+    if (!neighbors) continue;
+    let accent: number | null = null;
+    let collectionAccent: number | null = null;
+    for (const neighborId of neighbors) {
+      const hub = nodeById.get(neighborId);
+      if (!hub) continue;
+      if (hub.kind === 'tag') {
+        accent = hub.visual.color;
+        break;
+      }
+      if (hub.kind === 'collection' && collectionAccent === null) {
+        collectionAccent = hub.visual.color;
+      }
+    }
+    accent = accent ?? collectionAccent;
+    if (accent !== null) {
+      datum.visual = {
+        ...datum.visual,
+        color: mixOrbitMapColors(datum.visual.color, accent, 0.55),
+        strokeColor: mixOrbitMapColors(datum.visual.strokeColor, accent, 0.4),
+      };
+    }
+  }
+  draggingNodeId = null;
+  dropTargetId = null;
+  dragCandidate = null;
+  const warmStart =
+    nodeData.length > 0 && positionedCount / nodeData.length >= 0.8;
 
   // Build links using a helper for clarity
   linkData = [];
@@ -655,10 +955,45 @@ function rebuildScene() {
     )
     .force('center', forceCenter(0, 0).strength(0.055));
 
+  // Cache per-link colors now that forceLink has resolved endpoints to nodes.
+  // Edges inherit the color of their hub endpoint so clusters read as colored
+  // threads; everything else keeps the neutral slate.
+  for (const link of linkData) {
+    const target = resolveLinkNode(link.target);
+    link.color =
+      target && (target.kind === 'tag' || target.kind === 'collection')
+        ? target.visual.color
+        : 0x334155;
+  }
+
+  // We drive ticks manually via requestAnimationFrame; kill the internal timer
+  // d3 starts on creation so the simulation never advances twice per frame.
+  simulation.stop();
+  simulation.alpha(warmStart ? 0.1 : 1);
+
   // Initial render + auto fit
+  buildScene();
   autoFitCamera(app.renderer.width, app.renderer.height);
-  renderSceneFromSimulation();
-  applyCameraTransform();
+  updateNodeStyles();
+
+  // Broadcast the fitted camera so the minimap viewport is correct on load.
+  postToMain({
+    type: MainMessageType.CAMERA_CHANGED,
+    protocolVersion: 1,
+    camera: { ...camera },
+  });
+
+  // Schedule the one-shot entrance fade-in on the first graph of this visit.
+  if (!hasPlayedEntrance && nodeData.length > 0) {
+    hasPlayedEntrance = true;
+    entranceStartedAt = Date.now();
+    nodeData.forEach((datum, index) => {
+      datum.entranceDelay = datum.visual.isHub
+        ? 0
+        : ENTRANCE_BASE_DELAY_MS + ((index * 7919) % ENTRANCE_MAX_DELAY_MS);
+    });
+    applyEntranceProgress();
+  }
   const firstRenderMs = Math.round(
     (typeof performance !== 'undefined' ? performance.now() : Date.now()) -
       graphStartedAt
@@ -667,119 +1002,172 @@ function rebuildScene() {
     firstRenderMs,
     visibleNodes: nodeData.length,
     visibleEdges: linkData.length,
+    warmStart: warmStart ? 1 : 0,
   });
 
-  // Start the simulation loop inside the worker
+  // Start the simulation loop inside the worker. Any loop left over from a
+  // previous graph bails out on its next frame (it no longer owns `simulation`).
+  simulationLoopRunning = false;
   startSimulationLoop();
 }
 
-/** Renders nodes and links from the current simulation state */
-function renderSceneFromSimulation() {
-  if (!linksContainer || !nodesContainer) return;
+/**
+ * Builds the persistent Pixi scene for the current graph: one Graphics object
+ * per node plus shared link/ring layers. Called only when the graph or filter
+ * changes — per-frame and per-interaction updates mutate these objects instead
+ * of recreating them (see updateNodeStyles).
+ */
+function buildScene() {
+  if (!linksContainer || !nodesContainer || !ringsContainer) return;
 
   linksContainer.removeChildren();
   nodesContainer.removeChildren();
+  ringsContainer.removeChildren();
   nodeGraphicsMap.clear();
-
-  const focusContext = getFocusContext();
 
   linkGraphics = new Graphics();
   linkGraphics.alpha = 1;
   linksContainer.addChild(linkGraphics);
-  drawLinks(focusContext);
 
-  nodeData.forEach((datum) => {
+  ringGraphics = new Graphics();
+  ringsContainer.addChild(ringGraphics);
+
+  for (const datum of nodeData) {
     const g = new Graphics();
-    const node = datum.node;
-
-    const visualStyle = getOrbitMapNodeVisualStyle(node);
-
-    // === Neighbor Dimming Logic ===
-    const isActive = datum.id === focusContext.activeId;
-    const isNeighbor = focusContext.neighborIds.has(datum.id);
-    const isAssignedBookmark = node.kind === 'bookmark' && node.affiliated;
-
-    let alpha = 1.0;
-    let strokeAlpha = 0.6;
-
-    if (focusContext.activeId) {
-      if (isActive) {
-        alpha = 1.0;
-        strokeAlpha = 0.96;
-      } else if (isNeighbor) {
-        alpha = focusContext.hasSelection ? 0.94 : 0.78;
-        strokeAlpha = focusContext.hasSelection ? 0.82 : 0.6;
-      } else {
-        if (focusContext.hasSelection) {
-          alpha = visualStyle.isHub ? 0.34 : isAssignedBookmark ? 0.18 : 0.24;
-          strokeAlpha = visualStyle.isHub ? 0.24 : 0.2;
-        } else {
-          alpha = visualStyle.isHub ? 0.26 : isAssignedBookmark ? 0.16 : 0.22;
-          strokeAlpha = visualStyle.isHub ? 0.2 : 0.16;
-        }
-      }
-    } else if (camera.zoom < 0.26 && node.kind === 'bookmark') {
-      alpha = node.affiliated ? 0.5 : 0.7;
-      strokeAlpha = 0.24;
-    }
+    const visualStyle = datum.visual;
 
     if (visualStyle.isHub) {
       g.circle(0, 0, datum.radius + 1.5);
-      g.fill({ color: visualStyle.color, alpha: alpha * 0.16 });
+      g.fill({ color: visualStyle.color, alpha: 0.16 });
       g.stroke({
         width: visualStyle.strokeWidth,
         color: visualStyle.strokeColor,
-        alpha: Math.max(strokeAlpha, 0.42) * alpha,
+        alpha: 0.6,
       });
       g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
-      g.fill({ color: visualStyle.color, alpha });
-      g.stroke({ width: 1, color: 0xffffff, alpha: strokeAlpha * 0.72 });
+      g.fill({ color: visualStyle.color, alpha: 1 });
+      g.stroke({ width: 1, color: 0xffffff, alpha: 0.43 });
     } else {
       g.circle(0, 0, datum.radius);
-      g.fill({ color: visualStyle.color, alpha });
+      g.fill({ color: visualStyle.color, alpha: 1 });
       g.stroke({
         width: visualStyle.strokeWidth,
         color: visualStyle.strokeColor,
-        alpha: strokeAlpha,
+        alpha: 0.6,
       });
-    }
-
-    // Stronger ring for active node
-    if (isActive) {
-      const ringColor = currentSelection ? 0xfacc15 : 0x38bdf8;
-      g.circle(0, 0, datum.radius + 10);
-      g.stroke({ width: 5, color: ringColor, alpha: 0.2 });
-      g.circle(0, 0, datum.radius + 6);
-      g.stroke({ width: 2.4, color: ringColor, alpha: 0.98 });
-    } else if (isNeighbor && focusContext.hasSelection && visualStyle.isHub) {
-      g.circle(0, 0, datum.radius + 5);
-      g.stroke({ width: 1.6, color: 0x60a5fa, alpha: 0.58 });
     }
 
     g.position.set(datum.x ?? 0, datum.y ?? 0);
-    nodesContainer!.addChild(g);
+    nodesContainer.addChild(g);
     nodeGraphicsMap.set(datum.id, g);
-  });
 
-  renderEffects();
-
-  // === Label Rendering with Level of Detail (LOD) ===
-  if (!labelsContainer) {
-    labelsContainer = new Container();
-    app!.stage.addChild(labelsContainer);
+    // Soft glow halo under hubs, tinted to match.
+    if (visualStyle.isHub && glowTexture && glowContainer) {
+      const glow = new Sprite(glowTexture);
+      glow.anchor.set(0.5);
+      glow.tint = visualStyle.color;
+      glow.alpha = HUB_GLOW_ALPHA;
+      const glowSize = datum.radius * 6;
+      glow.width = glowSize;
+      glow.height = glowSize;
+      glow.position.set(datum.x ?? 0, datum.y ?? 0);
+      glowContainer.addChild(glow);
+      glowSpriteMap.set(datum.id, glow);
+    }
   }
+}
+
+/**
+ * Computes the dimming alpha for a node given the current hover/selection
+ * focus. The emphasis the old full-rebuild renderer baked into fills is now
+ * applied via the node's container alpha; rings carry the active emphasis.
+ */
+function getNodeAlpha(
+  datum: SimulationNode,
+  focusContext: ReturnType<typeof getFocusContext>
+) {
+  const node = datum.node;
+  const isActive = datum.id === focusContext.activeId;
+  const isNeighbor = focusContext.neighborIds.has(datum.id);
+  const isAssignedBookmark = node.kind === 'bookmark' && node.affiliated;
+
+  // Search highlight dominates: matches at full strength, the rest recede.
+  if (highlightedNodeIds && !isActive) {
+    return highlightedNodeIds.has(datum.id)
+      ? 1.0
+      : datum.visual.isHub
+        ? 0.22
+        : 0.14;
+  }
+
+  if (focusContext.activeId) {
+    if (isActive) return 1.0;
+    if (isNeighbor) return focusContext.hasSelection ? 0.94 : 0.78;
+    if (focusContext.hasSelection) {
+      return datum.visual.isHub ? 0.34 : isAssignedBookmark ? 0.18 : 0.24;
+    }
+    return datum.visual.isHub ? 0.26 : isAssignedBookmark ? 0.16 : 0.22;
+  }
+  if (camera.zoom < 0.26 && node.kind === 'bookmark') {
+    return node.affiliated ? 0.5 : 0.7;
+  }
+  return 1.0;
+}
+
+/** Draws the active-selection and hub-neighbor highlight rings in world space. */
+function drawRings(focusContext = getFocusContext()) {
+  if (!ringGraphics) return;
+
+  ringGraphics.clear();
+
+  // Candidate hub while a bookmark is being dragged toward it
+  if (dropTargetId) {
+    const target = nodeById.get(dropTargetId);
+    if (target) {
+      ringGraphics.circle(target.x ?? 0, target.y ?? 0, target.radius + 12);
+      ringGraphics.stroke({ width: 4, color: 0x34d399, alpha: 0.22 });
+      ringGraphics.circle(target.x ?? 0, target.y ?? 0, target.radius + 7);
+      ringGraphics.stroke({ width: 2.2, color: 0x34d399, alpha: 0.95 });
+    }
+  }
+
+  if (!focusContext.activeId) return;
+
+  const active = nodeById.get(focusContext.activeId);
+  if (active) {
+    const ringColor = currentSelection ? 0xfacc15 : 0x38bdf8;
+    ringGraphics.circle(active.x ?? 0, active.y ?? 0, active.radius + 10);
+    ringGraphics.stroke({ width: 5, color: ringColor, alpha: 0.2 });
+    ringGraphics.circle(active.x ?? 0, active.y ?? 0, active.radius + 6);
+    ringGraphics.stroke({ width: 2.4, color: ringColor, alpha: 0.98 });
+  }
+
+  if (focusContext.hasSelection) {
+    for (const neighborId of focusContext.neighborIds) {
+      const neighbor = nodeById.get(neighborId);
+      if (!neighbor || !neighbor.visual.isHub) continue;
+      ringGraphics.circle(
+        neighbor.x ?? 0,
+        neighbor.y ?? 0,
+        neighbor.radius + 5
+      );
+      ringGraphics.stroke({ width: 1.6, color: 0x60a5fa, alpha: 0.58 });
+    }
+  }
+}
+
+/** Creates, destroys, and styles labels for the current zoom + focus (LOD). */
+function updateLabels(focusContext = getFocusContext()) {
+  if (!labelsContainer) return;
+
+  const bounds = getLabelViewBounds();
 
   // First, remove labels for nodes that no longer qualify for the current LOD.
   for (const [nodeId, label] of labelMap) {
-    const datum = nodeData.find((d) => d.id === nodeId);
-    const node = datum?.node;
-
-    let shouldKeep = false;
-
-    if (node && datum) {
-      shouldKeep = shouldRenderLabel(datum, focusContext);
-    }
-
+    const datum = nodeById.get(nodeId);
+    const shouldKeep = datum
+      ? shouldRenderLabel(datum, focusContext, bounds)
+      : false;
     if (!shouldKeep) {
       labelsContainer.removeChild(label);
       label.destroy();
@@ -788,16 +1176,14 @@ function renderSceneFromSimulation() {
   }
 
   // Now create or update labels for nodes that should have them
-  nodeData.forEach((datum) => {
+  for (const datum of nodeData) {
     const node = datum.node;
     const nodeId = datum.id;
 
     const isActive = datum.id === focusContext.activeId;
     const isNeighbor = focusContext.neighborIds.has(nodeId);
 
-    if (!shouldRenderLabel(datum, focusContext)) {
-      return;
-    }
+    if (!shouldRenderLabel(datum, focusContext, bounds)) continue;
 
     const labelText = getOrbitMapLabelText(node);
 
@@ -816,30 +1202,55 @@ function renderSceneFromSimulation() {
 
       label.anchor.set(0.5, 1); // bottom center
       labelMap.set(nodeId, label);
-      labelsContainer!.addChild(label);
-    } else {
-      // Update existing label if needed
-      if (label.text !== labelText) {
-        label.text = labelText;
-      }
+      labelsContainer.addChild(label);
+    } else if (label.text !== labelText) {
+      label.text = labelText;
     }
 
     label.style.fill = isActive ? 0xf8fafc : isNeighbor ? 0xcbd5e1 : 0xe2e8f0;
     label.style.fontWeight = isActive ? '600' : '400';
 
     positionLabel(label, datum, focusContext);
-  });
-
-  if (app) {
-    applyCameraTransform();
-    app.renderer.render(app.stage);
   }
 }
 
+/**
+ * Refreshes interaction-dependent visuals (dimming, rings, links, labels)
+ * without rebuilding the scene. Cheap enough to run on every hover, zoom,
+ * and selection change.
+ */
+function updateNodeStyles() {
+  if (!app || !nodesContainer) return;
+
+  const focusContext = getFocusContext();
+
+  for (const datum of nodeData) {
+    const g = nodeGraphicsMap.get(datum.id);
+    if (!g) continue;
+    const alpha = getNodeAlpha(datum, focusContext);
+    g.alpha = alpha;
+    // Keep positions in sync even when the tick loop is idle (e.g. a kick
+    // moved nodes between interactions).
+    g.position.set(datum.x ?? 0, datum.y ?? 0);
+
+    const glow = glowSpriteMap.get(datum.id);
+    if (glow) {
+      glow.alpha = HUB_GLOW_ALPHA * alpha;
+      glow.position.set(datum.x ?? 0, datum.y ?? 0);
+    }
+  }
+
+  drawLinks(focusContext);
+  drawRings(focusContext);
+  updateLabels(focusContext);
+  renderEffects();
+
+  applyCameraTransform();
+  app.renderer.render(app.stage);
+}
+
 function resolveLinkNode(endpoint: string | SimulationNode): SimulationNode | undefined {
-  return typeof endpoint === 'string'
-    ? nodeData.find((node) => node.id === endpoint)
-    : endpoint;
+  return typeof endpoint === 'string' ? nodeById.get(endpoint) : endpoint;
 }
 
 function getFocusContext() {
@@ -851,12 +1262,48 @@ function getFocusContext() {
   };
 }
 
+interface LabelViewBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * World-space rect covering the viewport plus a half-viewport margin on each
+ * side. Bookmark labels outside it are skipped — there can be over a thousand
+ * bookmarks, and labels are only meaningful near the visible area.
+ */
+function getLabelViewBounds(): LabelViewBounds | null {
+  if (!app) return null;
+  const margin = 0.5;
+  const width = app.renderer.width / camera.zoom;
+  const height = app.renderer.height / camera.zoom;
+  const minX = -camera.x / camera.zoom - width * margin;
+  const minY = -camera.y / camera.zoom - height * margin;
+  return {
+    minX,
+    minY,
+    maxX: minX + width * (1 + margin * 2),
+    maxY: minY + height * (1 + margin * 2),
+  };
+}
+
 function shouldRenderLabel(
   datum: SimulationNode,
-  focusContext: ReturnType<typeof getFocusContext>
+  focusContext: ReturnType<typeof getFocusContext>,
+  bounds: LabelViewBounds | null = null
 ) {
   const isActive = datum.id === focusContext.activeId;
   const isNeighbor = focusContext.neighborIds.has(datum.id);
+
+  if (bounds && datum.kind === 'bookmark' && !isActive) {
+    const x = datum.x ?? 0;
+    const y = datum.y ?? 0;
+    if (x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY) {
+      return false;
+    }
+  }
 
   return shouldShowOrbitMapLabel(
     datum.node.kind,
@@ -865,6 +1312,7 @@ function shouldRenderLabel(
     {
       isActive,
       isSelectedNeighbor: focusContext.hasSelection && isNeighbor,
+      importanceRank: datum.labelRank,
     }
   );
 }
@@ -882,7 +1330,7 @@ function drawLinks(focusContext = getFocusContext()) {
       Boolean(focusContext.activeId) &&
       (source.id === focusContext.activeId || target.id === focusContext.activeId);
     const linkAlpha = !focusContext.activeId
-      ? 0.16
+      ? 0.14
       : touchesActive
         ? focusContext.hasSelection
           ? 0.86
@@ -895,10 +1343,28 @@ function drawLinks(focusContext = getFocusContext()) {
         ? 2.05
         : 1.35
       : 0.85;
-    const linkColor = touchesActive ? 0xcbd5e1 : 0x334155;
+    const baseColor = link.color ?? 0x334155;
+    const linkColor = touchesActive
+      ? mixOrbitMapColors(baseColor, 0xffffff, 0.45)
+      : baseColor;
 
-    linkGraphics!.moveTo(source.x ?? 0, source.y ?? 0);
-    linkGraphics!.lineTo(target.x ?? 0, target.y ?? 0);
+    const sx = source.x ?? 0;
+    const sy = source.y ?? 0;
+    const tx = target.x ?? 0;
+    const ty = target.y ?? 0;
+    const dx = tx - sx;
+    const dy = ty - sy;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return;
+
+    // Gentle quadratic curve (perpendicular bend ~8% of length) so dense
+    // clusters read as organic threads rather than a wireframe.
+    const bend = len * 0.08;
+    const cx = (sx + tx) / 2 - (dy / len) * bend;
+    const cy = (sy + ty) / 2 + (dx / len) * bend;
+
+    linkGraphics!.moveTo(sx, sy);
+    linkGraphics!.quadraticCurveTo(cx, cy, tx, ty);
     linkGraphics!.stroke({ width: linkWidth, color: linkColor, alpha: linkAlpha });
   });
 }
@@ -929,7 +1395,7 @@ function positionLabel(
 
 function updateLabelPositions() {
   for (const [nodeId, label] of labelMap) {
-    const datum = nodeData.find((node) => node.id === nodeId);
+    const datum = nodeById.get(nodeId);
     if (datum) {
       positionLabel(label, datum);
     }
@@ -943,7 +1409,7 @@ function renderEffects() {
 
   activeAnimations.forEach((anim) => {
     if (anim.type === 'pulse') {
-      const datum = nodeData.find((d) => d.id === anim.nodeId);
+      const datum = nodeById.get(anim.nodeId);
       if (!datum) return;
 
       const progress = getOrbitMapAnimationProgress(anim);
@@ -976,7 +1442,7 @@ function renderEffects() {
       anim.fromX !== undefined && anim.fromY !== undefined &&
       anim.targetX !== undefined && anim.targetY !== undefined
     ) {
-      const datum = nodeData.find((d) => d.id === anim.nodeId);
+      const datum = nodeById.get(anim.nodeId);
       if (!datum) return;
 
       // Elegant flight path line.
@@ -996,10 +1462,15 @@ function renderEffects() {
   });
 }
 
-/** Runs the simulation inside the worker */
+/**
+ * Runs the manual simulation + render loop inside the worker. Alpha is set by
+ * the caller (rebuildScene for cold/warm starts, kickSimulation for reheats).
+ * No-ops when a loop is already running for the current simulation.
+ */
 function startSimulationLoop() {
   const activeSimulation = simulation;
-  if (!activeSimulation || !app) return;
+  if (!activeSimulation || !app || simulationLoopRunning) return;
+  simulationLoopRunning = true;
 
   let layoutUpdateTickCounter = 0;
   const LAYOUT_UPDATE_INTERVAL = 35; // send layout every ~35 ticks while running
@@ -1007,11 +1478,16 @@ function startSimulationLoop() {
     typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   const tick = () => {
+    // A newer graph owns the loop now (or the worker was destroyed) — bail
+    // without touching simulationLoopRunning, which the new loop manages.
+    if (simulation !== activeSimulation) return;
+
     activeSimulation.tick();
 
     // Update animations (assign flights, pulses, etc.)
     updateAnimations();
     drawLinks();
+    drawRings();
 
     // Update Pixi positions from simulation data
     nodeData.forEach((datum) => {
@@ -1020,7 +1496,12 @@ function startSimulationLoop() {
         g.position.set(datum.x ?? 0, datum.y ?? 0);
         g.scale.set(datum.scale || 1);
       }
+      const glow = glowSpriteMap.get(datum.id);
+      if (glow) {
+        glow.position.set(datum.x ?? 0, datum.y ?? 0);
+      }
     });
+    applyEntranceProgress();
     updateLabelPositions();
     renderEffects();
 
@@ -1046,6 +1527,7 @@ function startSimulationLoop() {
     if (stillAnimating) {
       requestAnimationFrame(tick);
     } else {
+      simulationLoopRunning = false;
       // Send one final stabilized layout update
       sendLayoutUpdate(true);
       const settledMs = Math.round(
@@ -1060,8 +1542,17 @@ function startSimulationLoop() {
     }
   };
 
-  activeSimulation.alpha(1).restart();
   tick();
+}
+
+/**
+ * Reheats the simulation to at least `alpha` and ensures the render loop is
+ * alive so the reaction is actually drawn (the loop stops once settled).
+ */
+function kickSimulation(alpha: number) {
+  if (!simulation) return;
+  simulation.alpha(Math.max(simulation.alpha(), alpha));
+  startSimulationLoop();
 }
 
 /* ============================================================
@@ -1125,7 +1616,7 @@ function handleCameraMessage(msg: CameraControlMessage) {
 
   if (cameraChanged) {
     if (sceneNeedsRefresh) {
-      renderSceneFromSimulation();
+      updateNodeStyles();
     } else {
       applyCameraTransform();
       app.renderer.render(app.stage);
@@ -1146,7 +1637,7 @@ function handleCameraMessage(msg: CameraControlMessage) {
 
 function handleSetSelection(msg: SetSelectionMessage) {
   currentSelection = msg.selection;
-  renderSceneFromSimulation();
+  updateNodeStyles();
 }
 
 function handleResetView() {
@@ -1164,7 +1655,7 @@ function handleResetView() {
   camera.y = app.renderer.height / 2 - cy * nextZoom;
   constrainCamera();
 
-  renderSceneFromSimulation();
+  updateNodeStyles();
 
   postToMain({
     type: MainMessageType.CAMERA_CHANGED,
@@ -1193,7 +1684,7 @@ function handleWheel(msg: WheelMessage) {
   camera.zoom = newZoom;
   constrainCamera();
 
-  renderSceneFromSimulation();
+  updateNodeStyles();
 
   postToMain({
     type: MainMessageType.CAMERA_CHANGED,
@@ -1228,12 +1719,16 @@ function handlePointerEvent(msg: PointerEventMessage) {
 
   // PointerLeaveMessage doesn't carry coordinates, so we handle it separately
   if (msg.type === WorkerMessageType.POINTER_LEAVE) {
+    endNodeDrag(false);
     isPointerDown = false;
     isPanning = false;
     panDragLast = null;
+    panStart = null;
+    panMoved = false;
+    dragCandidate = null;
     if (currentHover) {
       currentHover = null;
-      renderSceneFromSimulation();
+      updateNodeStyles();
       postToMain({
         type: MainMessageType.HOVER_CHANGED,
         protocolVersion: 1,
@@ -1250,31 +1745,65 @@ function handlePointerEvent(msg: PointerEventMessage) {
   const worldX = (x - camera.x) / camera.zoom;
   const worldY = (y - camera.y) / camera.zoom;
 
-  const closest = findClosestOrbitMapNode(
-    nodeData,
-    { x: worldX, y: worldY },
-    10
-  );
-
-  const newHover = closest ? { id: closest.id, kind: closest.node.kind } : null;
-
   if (type === WorkerMessageType.POINTER_MOVE) {
+    // Active node drag: pin the node to the cursor and track drop targets.
+    if (draggingNodeId && isPointerDown) {
+      moveNodeDrag(worldX, worldY);
+      postCursorChange('grabbing');
+      return;
+    }
+
+    // Promote a pressed node into a drag once past the movement threshold.
+    if (dragCandidate && isPointerDown && !draggingNodeId) {
+      const travelled = Math.hypot(
+        x - dragCandidate.startX,
+        y - dragCandidate.startY
+      );
+      if (travelled > DRAG_THRESHOLD_PX) {
+        beginNodeDrag(dragCandidate.id, worldX, worldY);
+        postCursorChange('grabbing');
+      }
+      return;
+    }
+
     if (isPanning && isPointerDown && panDragLast) {
       const dx = x - panDragLast.x;
       const dy = y - panDragLast.y;
       panDragLast = { x, y };
+      if (
+        panStart &&
+        Math.hypot(x - panStart.x, y - panStart.y) > DRAG_THRESHOLD_PX
+      ) {
+        panMoved = true;
+      }
       camera.x += dx;
       camera.y += dy;
       constrainCamera();
       applyCameraTransform();
       app.renderer.render(app.stage);
       postCursorChange("grabbing");
+
+      // Keep the main thread (minimap, URL sync) in step with drag panning.
+      postToMain({
+        type: MainMessageType.CAMERA_CHANGED,
+        protocolVersion: 1,
+        camera: { ...camera },
+      });
       return;
     }
 
+    const closest = findClosestOrbitMapNode(
+      nodeData,
+      { x: worldX, y: worldY },
+      10
+    );
+    const newHover = closest
+      ? { id: closest.id, kind: closest.node.kind }
+      : null;
+
     if (!isSameOrbitMapHover(newHover, currentHover)) {
       currentHover = newHover;
-      renderSceneFromSimulation();
+      updateNodeStyles();
 
       postToMain({
         type: MainMessageType.HOVER_CHANGED,
@@ -1292,41 +1821,165 @@ function handlePointerEvent(msg: PointerEventMessage) {
     } else {
       postCursorChange("grab");
     }
+    return;
   }
 
   if (type === WorkerMessageType.POINTER_DOWN) {
     isPointerDown = true;
+    panMoved = false;
 
-    if (newHover) {
+    const closest = findClosestOrbitMapNode(
+      nodeData,
+      { x: worldX, y: worldY },
+      10
+    );
+
+    if (closest) {
+      // Selection happens on pointer-up so a drag doesn't also select.
+      dragCandidate = { id: closest.id, startX: x, startY: y };
       isPanning = false;
       panDragLast = null;
-      currentSelection = newHover;
-      renderSceneFromSimulation();
-
-      postToMain({
-        type: MainMessageType.SELECTION_CHANGED,
-        protocolVersion: 1,
-        selection: newHover,
-      });
+      panStart = null;
       postCursorChange("pointer");
     } else {
+      dragCandidate = null;
       isPanning = true;
       panDragLast = { x, y };
+      panStart = { x, y };
       postCursorChange("grabbing");
     }
+    return;
   }
 
   if (type === WorkerMessageType.POINTER_UP) {
+    const wasDragging = Boolean(draggingNodeId);
+    const clickedNodeId = !wasDragging && dragCandidate ? dragCandidate.id : null;
+    const wasEmptyClick = !wasDragging && !dragCandidate && isPanning && !panMoved;
+    const didPan = isPanning && panMoved;
+
+    if (wasDragging) {
+      endNodeDrag(true);
+    }
+
     isPointerDown = false;
     isPanning = false;
     panDragLast = null;
+    panStart = null;
+    panMoved = false;
+    dragCandidate = null;
 
-    if (newHover) {
-      postCursorChange("pointer");
-    } else {
-      postCursorChange("grab");
+    if (clickedNodeId) {
+      const datum = nodeById.get(clickedNodeId);
+      if (datum) {
+        currentSelection = { id: datum.id, kind: datum.node.kind };
+        updateNodeStyles();
+        postToMain({
+          type: MainMessageType.SELECTION_CHANGED,
+          protocolVersion: 1,
+          selection: currentSelection,
+        });
+      }
+    } else if (wasEmptyClick && currentSelection) {
+      currentSelection = null;
+      updateNodeStyles();
+      postToMain({
+        type: MainMessageType.SELECTION_CHANGED,
+        protocolVersion: 1,
+        selection: null,
+      });
+    } else if (didPan) {
+      // Refresh viewport-culled labels for the newly visible area.
+      updateNodeStyles();
+    }
+
+    const closest = findClosestOrbitMapNode(
+      nodeData,
+      { x: worldX, y: worldY },
+      10
+    );
+    postCursorChange(closest ? "pointer" : "grab");
+  }
+}
+
+/* ============================================================
+   NODE DRAGGING + DRAG-TO-ASSIGN
+   ============================================================ */
+
+/** Starts dragging a node: pin it to the cursor and reheat the simulation. */
+function beginNodeDrag(nodeId: string, worldX: number, worldY: number) {
+  const datum = nodeById.get(nodeId);
+  if (!datum || !simulation) return;
+
+  draggingNodeId = nodeId;
+  dropTargetId = null;
+  datum.fx = worldX;
+  datum.fy = worldY;
+
+  // Keep the simulation warm for the whole drag so connected nodes follow.
+  simulation.alphaTarget(0.3);
+  kickSimulation(0.3);
+}
+
+function moveNodeDrag(worldX: number, worldY: number) {
+  const datum = draggingNodeId ? nodeById.get(draggingNodeId) : null;
+  if (!datum) return;
+
+  datum.fx = worldX;
+  datum.fy = worldY;
+
+  // Drag-to-assign: bookmarks can be dropped onto tag/collection hubs.
+  if (datum.node.kind === 'bookmark') {
+    const target = findClosestOrbitMapNode(
+      hubDropTargets,
+      { x: worldX, y: worldY },
+      14
+    );
+    dropTargetId = target ? target.id : null;
+  }
+}
+
+/** Ends a node drag; when `commit` is true a hub drop posts NODE_DROPPED. */
+function endNodeDrag(commit: boolean) {
+  if (!draggingNodeId) return;
+  const datum = nodeById.get(draggingNodeId);
+
+  if (commit && dropTargetId && datum?.node.kind === 'bookmark') {
+    const target = nodeById.get(dropTargetId);
+    if (
+      target &&
+      (target.node.kind === 'tag' || target.node.kind === 'collection')
+    ) {
+      postToMain({
+        type: MainMessageType.NODE_DROPPED,
+        protocolVersion: 1,
+        bookmarkId: draggingNodeId,
+        anchorId: dropTargetId,
+        anchorKind: target.node.kind,
+      });
+
+      // Arrival feedback on the hub.
+      const existingPulse = activeAnimations.findIndex(
+        (a) => a.nodeId === dropTargetId && a.type === 'pulse'
+      );
+      if (existingPulse !== -1) activeAnimations.splice(existingPulse, 1);
+      activeAnimations.push({
+        id: `pulse-${dropTargetId}-${Date.now()}`,
+        type: 'pulse',
+        nodeId: dropTargetId,
+        startTime: Date.now(),
+        duration: 420,
+      });
     }
   }
+
+  if (datum) {
+    delete datum.fx;
+    delete datum.fy;
+  }
+  draggingNodeId = null;
+  dropTargetId = null;
+  if (simulation) simulation.alphaTarget(0);
+  startSimulationLoop();
 }
 
 /* ============================================================
@@ -1336,8 +1989,8 @@ function handlePointerEvent(msg: PointerEventMessage) {
 function handleAnimateAssign(msg: AnimateAssignMessage) {
   const { bookmarkId, anchorId, duration = 520 } = msg;
 
-  const bookmarkDatum = nodeData.find((d) => d.id === bookmarkId);
-  const anchorDatum = nodeData.find((d) => d.id === anchorId);
+  const bookmarkDatum = nodeById.get(bookmarkId);
+  const anchorDatum = nodeById.get(anchorId);
 
   if (!bookmarkDatum || !anchorDatum) {
     console.warn('[OrbitWorker] Cannot animate assign - nodes not found');
@@ -1370,15 +2023,13 @@ function handleAnimateAssign(msg: AnimateAssignMessage) {
   delete bookmarkDatum.scale;
 
   // Give the simulation a little kick so other nodes react
-  if (simulation) {
-    simulation.alpha(0.3).restart();
-  }
+  kickSimulation(0.3);
 }
 
 function handleFocusPulse(msg: FocusPulseMessage) {
   const { nodeId, duration = 750 } = msg;
 
-  const datum = nodeData.find((d) => d.id === nodeId);
+  const datum = nodeById.get(nodeId);
   if (!datum) return;
 
   // Remove existing pulse on this node
@@ -1394,6 +2045,10 @@ function handleFocusPulse(msg: FocusPulseMessage) {
   };
 
   activeAnimations.push(animation);
+
+  // Make sure the render loop is alive so the pulse actually draws even when
+  // the simulation has already settled.
+  startSimulationLoop();
 }
 
 function handleFocusOn(msg: FocusOnMessage) {
@@ -1404,7 +2059,7 @@ function handleFocusOn(msg: FocusOnMessage) {
   const currentApp = app;
 
   // Find the target node in our simulation data
-  const target = nodeData.find((d) => d.id === selection.id);
+  const target = nodeById.get(selection.id);
   if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') {
     return;
   }
@@ -1469,9 +2124,7 @@ function handleFocusOn(msg: FocusOnMessage) {
       });
 
       // Stronger simulation kick now that the camera has arrived
-      if (simulation) {
-        simulation.alpha(0.35).restart();
-      }
+      kickSimulation(0.35);
 
       // Notify main thread
       postToMain({
@@ -1485,9 +2138,7 @@ function handleFocusOn(msg: FocusOnMessage) {
   animateCamera();
 
   // Initial simulation kick so nodes start reacting to the focus action
-  if (simulation) {
-    simulation.alpha(0.2).restart();
-  }
+  kickSimulation(0.2);
 
   // Notify selection change
   postToMain({
@@ -1508,7 +2159,7 @@ function updateAnimations() {
   const toRemove: number[] = [];
 
   activeAnimations.forEach((anim, index) => {
-    const datum = nodeData.find((d) => d.id === anim.nodeId);
+    const datum = nodeById.get(anim.nodeId);
     if (!datum) {
       toRemove.push(index);
       return;
@@ -1560,9 +2211,7 @@ function updateAnimations() {
         });
 
         // Stronger simulation kick on arrival so nearby nodes react nicely
-        if (simulation) {
-          simulation.alpha(0.45).restart();
-        }
+        kickSimulation(0.45);
 
         // Notify the main thread (OrbitMapCanvasHost can resolve its promise)
         postToMain({
@@ -1605,13 +2254,23 @@ function applyCameraTransform() {
 
   for (const container of [
     linksContainer,
+    glowContainer,
     nodesContainer,
+    ringsContainer,
     labelsContainer,
     effectsContainer,
   ]) {
     if (!container) continue;
     container.position.set(tx, ty);
     container.scale.set(scale);
+  }
+
+  // Distant stars follow the camera at a fraction of its speed for depth.
+  if (starfieldContainer) {
+    starfieldContainer.position.set(
+      tx * STARFIELD_PARALLAX,
+      ty * STARFIELD_PARALLAX
+    );
   }
 }
 

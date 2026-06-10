@@ -88,6 +88,7 @@ export default function OrbitMapPage() {
     setSearch,
     searchDeferred,
     searchResults,
+    highlightedNodeIds,
     searchInputRef,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
@@ -108,12 +109,13 @@ export default function OrbitMapPage() {
     goToTagOnDashboard,
     handleCreateCollectionOpen,
     handleSyncComplete,
-    handleSelectionChange,
+    handleCanvasSelectionChange,
     handleScopeChange,
     handleLayoutUpdated,
     handleHoverChange,
     handleOpenBookmark,
     handleAssign,
+    handleNodeDropped,
     openTagDialog,
     openCollectionDialog,
     handleCopyAsCollection,
@@ -276,9 +278,11 @@ export default function OrbitMapPage() {
                 ref={canvasRef}
                 data={graph}
                 selection={selection}
-                onSelectionChange={handleSelectionChange}
+                highlightedNodeIds={highlightedNodeIds}
+                onSelectionChange={handleCanvasSelectionChange}
                 onHoverChange={handleHoverChange}
                 onOpenBookmark={handleOpenBookmark}
+                onNodeDropped={handleNodeDropped}
                 onLayoutUpdated={handleLayoutUpdated}
                 layoutScope={graphScope}
                 focus={focus}

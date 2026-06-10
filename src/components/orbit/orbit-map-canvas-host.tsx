@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import type { OrbitGraphPayload } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
+import { OrbitMapMinimap } from './orbit-map-minimap';
 import { OrbitMapUnsupportedState } from './orbit-map-unsupported-state';
 import { loadOrbitMapPositions } from '@/lib/orbit-map-layout-storage';
 
@@ -12,6 +13,7 @@ import {
   type SetGraphMessage,
   WorkerMessageType,
   MainMessageType,
+  type CameraState,
   type GraphFilter,
   type OrbitMapSelection,
   type OrbitMapFocus,
@@ -23,9 +25,17 @@ interface OrbitMapCanvasHostProps {
   filter?: GraphFilter;
   selection?: OrbitMapSelection | null;
   focus?: OrbitMapFocus | null;
+  /** Node ids to highlight (e.g. live search matches); null/undefined clears. */
+  highlightedNodeIds?: string[] | null;
   onSelectionChange?: (selection: OrbitMapSelection | null) => void;
   onHoverChange?: (hover: OrbitMapSelection | null, position?: { x: number; y: number }) => void;
   onOpenBookmark?: (bookmarkId: string) => void;
+  /** Called when a bookmark node is dragged and dropped onto a tag/collection hub */
+  onNodeDropped?: (
+    bookmarkId: string,
+    anchorId: string,
+    anchorKind: 'tag' | 'collection'
+  ) => void;
   /** Called whenever the worker sends an updated layout (useful for persistence) */
   onLayoutUpdated?: (positions: Record<string, { x: number; y: number }>) => void;
   className?: string;
@@ -105,6 +115,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const [useFallback, setUseFallback] = useState(false);
     const [workerGeneration, setWorkerGeneration] = useState(0);
     const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
+    // Minimap inputs: live camera, viewport size, and a version counter that
+    // bumps when fresh node positions arrive.
+    const [minimapCamera, setMinimapCamera] = useState<CameraState | null>(null);
+    const [layoutVersion, setLayoutVersion] = useState(0);
+    const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
     const activeFilter = filter ?? internalFilter;
     const layoutScope = props.layoutScope ?? 'library';
 
@@ -228,8 +243,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
               case MainMessageType.CAMERA_CHANGED:
                 if (msg.camera) {
-                  // Could expose via a prop later for minimap / URL sync
-                  // console.log('[OrbitMapHost] Camera changed:', msg.camera);
+                  setMinimapCamera(msg.camera);
                 }
                 break;
 
@@ -253,6 +267,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
               case MainMessageType.OPEN_BOOKMARK:
                 if (msg.bookmarkId) {
                   propsRef.current.onOpenBookmark?.(msg.bookmarkId);
+                }
+                break;
+
+              case MainMessageType.NODE_DROPPED:
+                if (msg.bookmarkId && msg.anchorId) {
+                  propsRef.current.onNodeDropped?.(
+                    msg.bookmarkId,
+                    msg.anchorId,
+                    msg.anchorKind
+                  );
                 }
                 break;
 
@@ -283,6 +307,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     // Notify parent for persistence (e.g. localStorage)
                     propsRef.current.onLayoutUpdated?.({ ...stablePositionsRef.current });
                   }
+
+                  // Let the minimap redraw with the fresh positions
+                  setLayoutVersion((version) => version + 1);
                 }
                 break;
 
@@ -393,6 +420,15 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }, [props.selection, useFallback, workerGeneration]);
 
     useEffect(() => {
+      if (!workerRef.current || useFallback) return;
+      workerRef.current.postMessage({
+        type: WorkerMessageType.SET_HIGHLIGHT,
+        protocolVersion: 1,
+        nodeIds: props.highlightedNodeIds ?? null,
+      });
+    }, [props.highlightedNodeIds, useFallback, workerGeneration]);
+
+    useEffect(() => {
       if (!workerRef.current || useFallback || !props.focus) return;
       workerRef.current.postMessage({
         type: WorkerMessageType.FOCUS_ON,
@@ -415,6 +451,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         const entry = entries[0];
         if (!entry) return;
 
+        setViewportSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
         workerRef.current?.postMessage({
           type: WorkerMessageType.RESIZE,
           protocolVersion: 1,
@@ -557,18 +597,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         });
       };
 
+      // Single-finger gestures are handled by the pointer events above (the
+      // browser fires pointer events for touches); only pinch-zoom needs the
+      // raw touch stream. Panning here too would double-apply the gesture.
       let lastTouchDist = 0;
-      let lastTouchX = 0;
-      let lastTouchY = 0;
 
       const handleTouchStart = (e: TouchEvent) => {
         if (e.touches.length === 2) {
           const dx = e.touches[0].clientX - e.touches[1].clientX;
           const dy = e.touches[0].clientY - e.touches[1].clientY;
           lastTouchDist = Math.hypot(dx, dy);
-        } else if (e.touches.length === 1) {
-          lastTouchX = e.touches[0].clientX;
-          lastTouchY = e.touches[0].clientY;
         }
       };
 
@@ -591,17 +629,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             factor,
             focalX: cx,
             focalY: cy,
-          });
-        } else if (e.touches.length === 1) {
-          const dx = e.touches[0].clientX - lastTouchX;
-          const dy = e.touches[0].clientY - lastTouchY;
-          lastTouchX = e.touches[0].clientX;
-          lastTouchY = e.touches[0].clientY;
-          send({
-            type: WorkerMessageType.PAN,
-            protocolVersion: 1,
-            dx,
-            dy,
           });
         }
       };
@@ -672,6 +699,20 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       postToWorker({
         type: WorkerMessageType.RESET_VIEW,
         protocolVersion: 1,
+      });
+    };
+
+    const handleMinimapJump = (worldX: number, worldY: number) => {
+      if (!viewportSize) return;
+      const zoom = minimapCamera?.zoom ?? 1;
+      postToWorker({
+        type: WorkerMessageType.SET_CAMERA,
+        protocolVersion: 1,
+        camera: {
+          x: viewportSize.width / 2 - worldX * zoom,
+          y: viewportSize.height / 2 - worldY * zoom,
+          zoom,
+        },
       });
     };
 
@@ -779,6 +820,17 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           filterControlsClassName={props.filterControlsClassName}
           zoomControlsClassName={props.zoomControlsClassName}
         />
+        {graph && layoutVersion > 0 ? (
+          <OrbitMapMinimap
+            graph={graph}
+            positions={latestPositionsRef.current}
+            layoutVersion={layoutVersion}
+            camera={minimapCamera}
+            viewport={viewportSize}
+            onJump={handleMinimapJump}
+            className="absolute bottom-[4.25rem] left-4 z-10 hidden lg:block"
+          />
+        ) : null}
       </div>
     );
   }

@@ -64,6 +64,7 @@ export const WorkerMessageType = {
   SET_FILTER: "SET_FILTER",
   SET_SELECTION: "SET_SELECTION",
   SET_CAMERA: "SET_CAMERA",
+  SET_HIGHLIGHT: "SET_HIGHLIGHT",
 
   // Imperative commands (exposed via OrbitMapCanvasHandle)
   FOCUS_ON: "FOCUS_ON",
@@ -101,6 +102,9 @@ export const MainMessageType = {
 
   // Side effects requested by worker (e.g. open bookmark on double-click)
   OPEN_BOOKMARK: "OPEN_BOOKMARK",
+
+  // A bookmark node was dragged and dropped onto a tag/collection hub
+  NODE_DROPPED: "NODE_DROPPED",
 } as const;
 
 export type MainMessageType =
@@ -318,6 +322,16 @@ export interface SetCameraMessage {
   camera: CameraState;
 }
 
+/**
+ * Highlights a set of nodes (e.g. live search matches) by dimming everything
+ * else. Pass null to clear.
+ */
+export interface SetHighlightMessage {
+  type: typeof WorkerMessageType.SET_HIGHLIGHT;
+  protocolVersion: number;
+  nodeIds: string[] | null;
+}
+
 // --- High-level commands (from OrbitMapCanvasHandle and search/rail) ---
 export interface FocusOnMessage {
   type: typeof WorkerMessageType.FOCUS_ON;
@@ -376,6 +390,7 @@ export type WorkerMessage =
   | SetFilterMessage
   | SetSelectionMessage
   | SetCameraMessage
+  | SetHighlightMessage
   | FocusOnMessage
   | ResetViewMessage
   | AnimateAssignMessage
@@ -474,6 +489,18 @@ export interface OpenBookmarkMessage {
   bookmarkId: string;
 }
 
+/**
+ * Emitted when the user drags a bookmark node onto a tag or collection hub.
+ * The main thread performs the actual assignment (and offers undo).
+ */
+export interface NodeDroppedMessage {
+  type: typeof MainMessageType.NODE_DROPPED;
+  protocolVersion: number;
+  bookmarkId: string;
+  anchorId: string;
+  anchorKind: "tag" | "collection";
+}
+
 /** Union of all messages the worker may send to the main thread. */
 export type MainMessage =
   | ReadyMessage
@@ -484,7 +511,8 @@ export type MainMessage =
   | LayoutUpdatedMessage
   | CursorChangedMessage
   | AnimateAssignCompleteMessage
-  | OpenBookmarkMessage;
+  | OpenBookmarkMessage
+  | NodeDroppedMessage;
 
 /* ------------------------------------------------------------------ */
 /* Utility Type Guards (optional but convenient)                      */

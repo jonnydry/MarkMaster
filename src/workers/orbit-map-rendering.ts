@@ -74,6 +74,12 @@ export function getOrbitMapNodeRadius(node: OrbitGraphNode) {
   }
 }
 
+/** The N most-connected hubs keep their labels at every zoom level. */
+export const ORBIT_MAP_TOP_HUB_LABEL_COUNT = 12;
+
+/** Zoom level at which bookmark @handle labels appear. */
+export const ORBIT_MAP_BOOKMARK_LABEL_ZOOM = 1.2;
+
 export function shouldShowOrbitMapLabel(
   kind: OrbitGraphNode["kind"],
   zoom: number,
@@ -81,16 +87,38 @@ export function shouldShowOrbitMapLabel(
   options: {
     isActive?: boolean;
     isSelectedNeighbor?: boolean;
+    /** 0-based rank among hubs sorted by count; top hubs are always labeled. */
+    importanceRank?: number;
   } = {}
 ) {
-  const isHub = kind === "core" || kind === "tag" || kind === "collection";
-  if (!isHub) {
-    return false;
-  }
   if (options.isActive) {
     return true;
   }
-  return zoom >= threshold;
+
+  const isHub = kind === "core" || kind === "tag" || kind === "collection";
+
+  if (options.isSelectedNeighbor) {
+    // Hubs connected to the selection are always worth naming; bookmark
+    // neighbors only label once moderately zoomed in, or selecting a large
+    // hub floods the canvas with handles.
+    if (isHub) return true;
+    if (kind === "bookmark") return zoom >= ORBIT_MAP_BOOKMARK_LABEL_ZOOM / 2;
+    return true;
+  }
+
+  if (isHub) {
+    if ((options.importanceRank ?? Infinity) < ORBIT_MAP_TOP_HUB_LABEL_COUNT) {
+      return true;
+    }
+    return zoom >= threshold;
+  }
+  if (kind === "bookmark") {
+    return zoom >= ORBIT_MAP_BOOKMARK_LABEL_ZOOM;
+  }
+  if (kind === "overflow") {
+    return zoom >= threshold;
+  }
+  return false;
 }
 
 export function getOrbitMapLabelText(node: OrbitGraphNode) {
@@ -101,5 +129,22 @@ export function getOrbitMapLabelText(node: OrbitGraphNode) {
     const handle = node.authorUsername?.trim();
     return handle && handle !== "unknown" ? `@${handle}` : "Bookmark";
   }
+  if (node.kind === "overflow") {
+    return `+${node.remaining}`;
+  }
+  if (node.kind === "core") {
+    return "Orbit";
+  }
   return "Node";
+}
+
+/** Channel-wise linear blend between two 0xRRGGBB colors (t=0 → a, t=1 → b). */
+export function mixOrbitMapColors(a: number, b: number, t: number): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  const mix = (shift: number) => {
+    const ca = (a >> shift) & 0xff;
+    const cb = (b >> shift) & 0xff;
+    return Math.round(ca + (cb - ca) * clamped) << shift;
+  };
+  return mix(16) | mix(8) | mix(0);
 }

@@ -241,6 +241,8 @@ export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1500;
 
 export const orbitGraphScopeSchema = z.enum(["library", "orbit"]).default("library");
 
+export const MAX_ORBIT_GRAPH_EXPAND_ANCHORS = 10;
+
 export const orbitGraphQuerySchema = z.object({
   nodeCap: z.coerce
     .number()
@@ -250,4 +252,16 @@ export const orbitGraphQuerySchema = z.object({
     .default(DEFAULT_ORBIT_GRAPH_NODE_CAP)
     .optional(),
   scope: orbitGraphScopeSchema.optional(),
+  /** Comma-separated tag/collection ids whose overflow bookmarks should be included. */
+  expand: z
+    .string()
+    .trim()
+    .max(1000)
+    .transform((value) =>
+      [...new Set(value.split(",").map((id) => id.trim()).filter(Boolean))].slice(
+        0,
+        MAX_ORBIT_GRAPH_EXPAND_ANCHORS
+      )
+    )
+    .optional(),
 });

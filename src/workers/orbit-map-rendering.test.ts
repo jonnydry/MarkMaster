@@ -4,7 +4,10 @@ import {
   getOrbitMapLabelText,
   getOrbitMapNodeRadius,
   getOrbitMapNodeVisualStyle,
+  mixOrbitMapColors,
   shouldShowOrbitMapLabel,
+  ORBIT_MAP_BOOKMARK_LABEL_ZOOM,
+  ORBIT_MAP_TOP_HUB_LABEL_COUNT,
 } from "./orbit-map-rendering";
 import type { OrbitGraphNode } from "@/types";
 
@@ -106,26 +109,77 @@ describe("getOrbitMapNodeVisualStyle", () => {
     expect(getOrbitMapLabelText(bookmark)).toBe("@author");
   });
 
-  it("does not show bookmark labels on the canvas, even when focused", () => {
+  it("shows bookmark labels when zoomed in or focused, hides them when far out", () => {
     expect(
-      shouldShowOrbitMapLabel("bookmark", 2, 0.95, { isActive: true })
-    ).toBe(false);
-    expect(
-      shouldShowOrbitMapLabel("bookmark", 2, 0.95, {
-        isSelectedNeighbor: true,
-      })
-    ).toBe(false);
-  });
-
-  it("keeps focused hub labels while hiding ambient and selected-neighbor hub labels below threshold", () => {
-    expect(shouldShowOrbitMapLabel("tag", 0.35, 0.95)).toBe(false);
-    expect(
-      shouldShowOrbitMapLabel("tag", 0.35, 0.95, { isActive: true })
+      shouldShowOrbitMapLabel("bookmark", 0.4, 0.6, { isActive: true })
     ).toBe(true);
     expect(
-      shouldShowOrbitMapLabel("collection", 0.35, 0.95, {
+      shouldShowOrbitMapLabel("bookmark", ORBIT_MAP_BOOKMARK_LABEL_ZOOM, 0.6)
+    ).toBe(true);
+    expect(shouldShowOrbitMapLabel("bookmark", 0.4, 0.6)).toBe(false);
+    // Selected-neighbor bookmarks need moderate zoom to avoid label storms
+    expect(
+      shouldShowOrbitMapLabel("bookmark", 0.4, 0.6, {
         isSelectedNeighbor: true,
       })
     ).toBe(false);
+    expect(
+      shouldShowOrbitMapLabel(
+        "bookmark",
+        ORBIT_MAP_BOOKMARK_LABEL_ZOOM / 2,
+        0.6,
+        { isSelectedNeighbor: true }
+      )
+    ).toBe(true);
+  });
+
+  it("always labels top-ranked hubs and zoom-gates the rest", () => {
+    expect(
+      shouldShowOrbitMapLabel("tag", 0.2, 0.6, { importanceRank: 0 })
+    ).toBe(true);
+    expect(
+      shouldShowOrbitMapLabel("tag", 0.2, 0.6, {
+        importanceRank: ORBIT_MAP_TOP_HUB_LABEL_COUNT,
+      })
+    ).toBe(false);
+    expect(shouldShowOrbitMapLabel("tag", 0.35, 0.6)).toBe(false);
+    expect(shouldShowOrbitMapLabel("tag", 0.65, 0.6)).toBe(true);
+    expect(
+      shouldShowOrbitMapLabel("tag", 0.35, 0.6, { isActive: true })
+    ).toBe(true);
+    expect(
+      shouldShowOrbitMapLabel("collection", 0.35, 0.6, {
+        isSelectedNeighbor: true,
+      })
+    ).toBe(true);
+  });
+
+  it("labels overflow nodes with their remaining count and the core as Orbit", () => {
+    const overflow: OrbitGraphNode = {
+      kind: "overflow",
+      id: "tag-overflow-1",
+      anchorId: "tag-1",
+      anchorKind: "tag",
+      remaining: 42,
+    };
+    const core: OrbitGraphNode = {
+      kind: "core",
+      id: "orbit-index",
+      totalBookmarks: 100,
+      looseBookmarks: 10,
+    };
+
+    expect(getOrbitMapLabelText(overflow)).toBe("+42");
+    expect(getOrbitMapLabelText(core)).toBe("Orbit");
+  });
+});
+
+describe("mixOrbitMapColors", () => {
+  it("blends channel-wise and clamps t", () => {
+    expect(mixOrbitMapColors(0x000000, 0xffffff, 0)).toBe(0x000000);
+    expect(mixOrbitMapColors(0x000000, 0xffffff, 1)).toBe(0xffffff);
+    expect(mixOrbitMapColors(0x000000, 0xffffff, 0.5)).toBe(0x808080);
+    expect(mixOrbitMapColors(0x000000, 0xffffff, 2)).toBe(0xffffff);
+    expect(mixOrbitMapColors(0xff0000, 0x0000ff, 0.5)).toBe(0x800080);
   });
 });

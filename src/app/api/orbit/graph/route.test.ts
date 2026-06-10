@@ -219,6 +219,69 @@ describe("/api/orbit/graph", () => {
     });
   });
 
+  it("merges deduplicated bookmarks for expanded anchors", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    const baseBookmark = {
+      id: "bookmark-base",
+      tweetText: "Already rendered",
+      authorUsername: "base",
+      authorDisplayName: "Base",
+      bookmarkedAt: new Date(),
+      tags: [{ tagId: "tag-1" }],
+      collectionItems: [],
+    };
+    const expandedBookmark = {
+      id: "bookmark-expanded",
+      tweetText: "Beyond the cap, pulled in by expansion",
+      authorUsername: "expanded",
+      authorDisplayName: "Expanded",
+      bookmarkedAt: new Date(),
+      tags: [{ tagId: "tag-1" }],
+      collectionItems: [],
+    };
+
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([
+      {
+        id: "tag-1",
+        name: "History",
+        color: "#1569cb",
+        _count: { bookmarks: 3 },
+      },
+    ]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(0);
+    vi.mocked(prisma.bookmark.findMany)
+      .mockResolvedValueOnce([baseBookmark])
+      .mockResolvedValueOnce([baseBookmark, expandedBookmark]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph?expand=tag-1")
+    );
+    const payload = (await response.json()) as OrbitGraphPayload;
+
+    expect(response.status).toBe(200);
+    expect(prisma.bookmark.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.bookmark.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { tags: { some: { tagId: { in: ["tag-1"] } } } },
+          ]),
+        }),
+      })
+    );
+
+    const bookmarkIds = payload.nodes
+      .filter((node) => node.kind === "bookmark")
+      .map((node) => node.id);
+    expect(bookmarkIds).toEqual(["bookmark-base", "bookmark-expanded"]);
+    expect(payload.stats.renderedBookmarks).toBe(2);
+  });
+
   it("rejects invalid graph query parameters", async () => {
     const { prisma } = await import("@/lib/prisma");
     const { GET } = await import("./route");

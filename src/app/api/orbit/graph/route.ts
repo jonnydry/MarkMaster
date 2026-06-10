@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
 
   const nodeCap = parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP;
   const scope = parsed.data.scope ?? "library";
+  const expandAnchorIds = parsed.data.expand ?? [];
 
   const orbitQueueWhere = {
     tags: { none: {} },
@@ -88,25 +89,53 @@ export async function GET(req: NextRequest) {
   const totalBookmarks = await prisma.bookmark.count({
     where: { userId: user.id },
   });
-  const bookmarksRaw = await prisma.bookmark.findMany({
-    where: bookmarkWhere,
-    select: {
-      id: true,
-      tweetText: true,
-      authorUsername: true,
-      authorDisplayName: true,
-      bookmarkedAt: true,
-      tags: { select: { tagId: true } },
-      collectionItems: {
-        select: {
-          collectionId: true,
-          collection: { select: { type: true } },
-        },
+  const bookmarkSelect = {
+    id: true,
+    tweetText: true,
+    authorUsername: true,
+    authorDisplayName: true,
+    bookmarkedAt: true,
+    tags: { select: { tagId: true } },
+    collectionItems: {
+      select: {
+        collectionId: true,
+        collection: { select: { type: true } },
       },
     },
+  } as const;
+
+  let bookmarksRaw = await prisma.bookmark.findMany({
+    where: bookmarkWhere,
+    select: bookmarkSelect,
     orderBy: { bookmarkedAt: "desc" },
     take: nodeCap,
   });
+
+  // Expanded anchors (from clicking "+N more" overflow nodes) pull in their
+  // member bookmarks even beyond the node cap / scope filter.
+  if (expandAnchorIds.length > 0) {
+    const expandedBookmarks = await prisma.bookmark.findMany({
+      where: {
+        userId: user.id,
+        OR: [
+          { tags: { some: { tagId: { in: expandAnchorIds } } } },
+          {
+            collectionItems: {
+              some: { collectionId: { in: expandAnchorIds } },
+            },
+          },
+        ],
+      },
+      select: bookmarkSelect,
+      orderBy: { bookmarkedAt: "desc" },
+      take: 600,
+    });
+    const seen = new Set(bookmarksRaw.map((bookmark) => bookmark.id));
+    bookmarksRaw = [
+      ...bookmarksRaw,
+      ...expandedBookmarks.filter((bookmark) => !seen.has(bookmark.id)),
+    ];
+  }
 
   const nodes: OrbitGraphNode[] = [];
   const edges: OrbitGraphEdge[] = [];

@@ -33,7 +33,8 @@ import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { useOrbitMapLayout } from "@/hooks/use-orbit-map-layout";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { fetchJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
@@ -103,6 +104,7 @@ export function useOrbitMapPage() {
   );
   const [search, setSearch] = useState("");
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [expandedAnchors, setExpandedAnchors] = useState<string[]>([]);
   const searchDeferred = useDeferredValue(search.trim().toLowerCase());
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +116,7 @@ export function useOrbitMapPage() {
     error,
     refetch,
     isFetching,
-  } = useOrbitGraphQuery(graphScope);
+  } = useOrbitGraphQuery(graphScope, expandedAnchors);
 
   const graphIndexes = useMemo(
     () => buildOrbitMapGraphIndexes(graph),
@@ -163,6 +165,12 @@ export function useOrbitMapPage() {
   const searchResults = useMemo(() => {
     return graph ? rankOrbitMapSearchResults(graph.nodes, searchDeferred) : [];
   }, [graph, searchDeferred]);
+
+  // Live canvas highlight for search matches (capped to keep messages small).
+  const highlightedNodeIds = useMemo(() => {
+    if (!searchDeferred) return null;
+    return searchResults.slice(0, 400).map((node) => node.id);
+  }, [searchDeferred, searchResults]);
 
   useEffect(() => {
     if (!focusBookmarkIdParam || !graphIndexes) return;
@@ -235,6 +243,65 @@ export function useOrbitMapPage() {
     await refetch();
   }, [actions, activeSelectionNode, refetch, selectedBookmarkId]);
 
+  const handleNodeDropped = useCallback(
+    async (
+      bookmarkId: string,
+      anchorId: string,
+      anchorKind: "tag" | "collection"
+    ) => {
+      const anchor = resolveOrbitMapSelectionNode(
+        { kind: anchorKind, id: anchorId },
+        graphIndexes
+      );
+      if (!anchor) return;
+
+      try {
+        if (anchor.kind === "tag") {
+          await actions.handleAddTag(bookmarkId, anchor.name, anchor.color);
+          toast.success(`Tagged #${anchor.name}`, {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void actions
+                  .handleRemoveTag(bookmarkId, anchorId)
+                  .then(() => refetch());
+              },
+            },
+          });
+        } else if (anchor.kind === "collection") {
+          if (anchor.variant === "x_folder") {
+            toast.info(
+              "X folders are synced from X and can't be edited. Copy it as a collection first."
+            );
+            return;
+          }
+          await actions.handleAddToCollection(bookmarkId, anchor.id);
+          toast.success(`Added to ${anchor.name}`, {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void sendJson(`/api/collections/${anchor.id}/items`, {
+                  method: "DELETE",
+                  body: { bookmarkIds: [bookmarkId] },
+                }).then(() => {
+                  invalidateCollectionsQuery(queryClient);
+                  void queryClient.invalidateQueries({
+                    queryKey: ["bookmarks"],
+                  });
+                  void refetch();
+                });
+              },
+            },
+          });
+        }
+        await refetch();
+      } catch {
+        // Failure toasts come from the underlying mutations in useBookmarkActions.
+      }
+    },
+    [actions, graphIndexes, queryClient, refetch]
+  );
+
   const openTagDialog = useCallback(() => {
     if (selectedBookmarkId) {
       dialogs.openTagForBookmark(selectedBookmarkId);
@@ -297,12 +364,37 @@ export function useOrbitMapPage() {
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
+      setExpandedAnchors([]);
       applyScopeChange(next, () => {
         flushPendingLayoutSave();
         resetHover();
       });
     },
     [applyScopeChange, flushPendingLayoutSave, resetHover]
+  );
+
+  // Clicking a "+N more" overflow node expands its anchor's cluster in place
+  // (and selects the anchor); everything else flows through as-is.
+  const handleCanvasSelectionChange = useCallback(
+    (next: OrbitMapSelection | null) => {
+      if (next?.kind === "overflow" && graphIndexes) {
+        const node = graphIndexes.nodesById.get(next.id);
+        if (
+          node?.kind === "overflow" &&
+          (node.anchorKind === "tag" || node.anchorKind === "collection")
+        ) {
+          setExpandedAnchors((prev) =>
+            prev.includes(node.anchorId) || prev.length >= 10
+              ? prev
+              : [...prev, node.anchorId]
+          );
+          handleSelectionChange({ kind: node.anchorKind, id: node.anchorId });
+          return;
+        }
+      }
+      handleSelectionChange(next);
+    },
+    [graphIndexes, handleSelectionChange]
   );
 
   const handleClearSelection = useCallback(() => {
@@ -384,6 +476,7 @@ export function useOrbitMapPage() {
     setSearch,
     searchDeferred,
     searchResults,
+    highlightedNodeIds,
     searchInputRef,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
@@ -405,11 +498,13 @@ export function useOrbitMapPage() {
     handleCreateCollectionOpen,
     handleSyncComplete,
     handleSelectionChange,
+    handleCanvasSelectionChange,
     handleScopeChange,
     handleLayoutUpdated,
     handleHoverChange,
     handleOpenBookmark,
     handleAssign,
+    handleNodeDropped,
     openTagDialog,
     openCollectionDialog,
     handleCopyAsCollection,
