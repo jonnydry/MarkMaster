@@ -7,6 +7,8 @@ type MarkMasterLogoProps = {
   width?: number;
   height?: number;
   priority?: boolean;
+  /** Disable the drop-shadow glow (keeps theme tint) — for watermark scale. */
+  glow?: boolean;
 };
 
 export function MarkMasterLogo({
@@ -14,6 +16,7 @@ export function MarkMasterLogo({
   width = 28,
   height = 28,
   priority = false,
+  glow = true,
 }: MarkMasterLogoProps) {
   return (
     <Image
@@ -21,7 +24,11 @@ export function MarkMasterLogo({
       alt="MarkMaster"
       width={width}
       height={height}
-      className={cn("markmaster-logo block object-contain", className)}
+      className={cn(
+        glow ? "markmaster-logo" : "markmaster-logo-flat",
+        "block object-contain",
+        className
+      )}
       priority={priority}
     />
   );

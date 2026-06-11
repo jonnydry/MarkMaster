@@ -12,68 +12,46 @@ type PageWatermarkProps = {
   className?: string;
 };
 
-/* Two stacked layers per mark: a soft blended back layer and a crisper front. */
-const WATERMARK_LAYERS: Record<
-  PageWatermarkVariant,
-  { back: ReactNode; front: ReactNode }
-> = {
-  markmaster: {
-    back: (
-      <MarkMasterLogo
-        width={480}
-        height={480}
-        className={cn(
-          "absolute -left-[6%] top-[2.5rem] h-auto w-[min(40vw,32rem)] max-w-none",
-          "opacity-[0.07] saturate-[0.55] mix-blend-soft-light",
-          "dark:opacity-[0.085] dark:mix-blend-plus-lighter"
-        )}
-      />
-    ),
-    front: (
-      <MarkMasterLogo
-        width={448}
-        height={448}
-        className={cn(
-          "absolute left-[4%] top-[3.25rem] h-auto w-[min(38vw,30rem)] max-w-none",
-          "opacity-[0.11] saturate-[0.7]",
-          "dark:opacity-[0.13]"
-        )}
-      />
-    ),
-  },
-  orbit: {
-    back: (
-      <OrbitLogoMark
-        className={cn(
-          "absolute -left-[6%] top-[2.5rem] size-[min(40vw,32rem)]",
-          "opacity-[0.08] saturate-[0.65] mix-blend-soft-light",
-          "dark:opacity-[0.095] dark:mix-blend-plus-lighter"
-        )}
-      />
-    ),
-    front: (
-      <OrbitLogoMark
-        className={cn(
-          "absolute left-[4%] top-[3.25rem] size-[min(38vw,30rem)]",
-          "opacity-[0.13] saturate-[0.75]",
-          "dark:opacity-[0.15]"
-        )}
-      />
-    ),
-  },
+/*
+ * One treatment for every brand watermark: a single layer (no offset echo),
+ * theme tint without the header logo's glow, low opacity, and a bottom-left
+ * corner anchor so the mark rises partially into frame — ambient texture,
+ * not a poster. The dense dashboard feed runs quieter than the sparse Orbit
+ * queue, which is the only per-variant difference besides the mark itself.
+ */
+const WATERMARK_MARKS: Record<PageWatermarkVariant, ReactNode> = {
+  markmaster: (
+    <MarkMasterLogo
+      width={480}
+      height={480}
+      glow={false}
+      className={cn(
+        "absolute -bottom-[14%] -left-[8%] h-auto w-[min(36vw,28rem)] max-w-none",
+        "opacity-[0.05] saturate-[0.6]",
+        "dark:opacity-[0.07]"
+      )}
+    />
+  ),
+  orbit: (
+    <OrbitLogoMark
+      className={cn(
+        "absolute -bottom-[16%] -left-[10%] size-[min(38vw,30rem)]",
+        "opacity-[0.08] saturate-[0.7]",
+        "dark:opacity-[0.11]"
+      )}
+    />
+  ),
 };
 
 /**
  * Large, translucent brand mark — shell-level tattoo under sidebar + feed.
  */
 export function PageWatermark({ variant, className }: PageWatermarkProps) {
-  const layers = WATERMARK_LAYERS[variant];
   return (
     <div className={cn(feedPageWatermarkShellClass, className)} aria-hidden>
       <div className="relative h-full min-h-[32rem] w-full">
-        <div className="absolute -left-16 top-[3.25rem] size-[32rem] rounded-full bg-primary/[0.05] blur-3xl" />
-        {layers.back}
-        {layers.front}
+        <div className="absolute -left-20 bottom-12 size-[28rem] rounded-full bg-primary/[0.05] blur-3xl" />
+        {WATERMARK_MARKS[variant]}
       </div>
     </div>
   );

@@ -901,6 +901,14 @@
     font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
 
+  /* Theme tint only — for watermark-scale logos where the glow would wash. */
+  .markmaster-logo-flat {
+    filter:
+      hue-rotate(var(--markmaster-logo-hue, 0deg))
+      saturate(var(--markmaster-logo-saturate, 1))
+      brightness(var(--markmaster-logo-brightness, 1));
+  }
+
   /* MarkMaster rocket logo — tint to match active accent theme */
   .markmaster-logo {
     filter:
