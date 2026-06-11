@@ -1,51 +1,63 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  Check,
+  FolderOpen,
+  RefreshCw,
+  Search,
+  StickyNote,
+  Tag,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 
-const FEATURES = [
+const FEATURES: {
+  title: string;
+  outcome: string;
+  desc: string;
+  icon: LucideIcon;
+}[] = [
   {
     title: "Search",
     outcome: "Find fast",
     desc: "Full-text search across posts, authors, and your notes.",
+    icon: Search,
   },
   {
     title: "Tags",
     outcome: "Stay sorted",
     desc: "Color-coded labels. Filter your archive in one click.",
+    icon: Tag,
   },
   {
     title: "Collections",
     outcome: "Curate",
     desc: "Ordered, shareable lists. Keep topics organized over time.",
+    icon: FolderOpen,
   },
   {
     title: "Notes",
     outcome: "Remember why",
     desc: "Annotations stay attached to every save, forever.",
+    icon: StickyNote,
   },
   {
     title: "Analytics",
     outcome: "See patterns",
     desc: "Who you save, when, and what type. Real reading habits.",
+    icon: BarChart3,
   },
   {
     title: "Sync",
     outcome: "Keep history",
     desc: "Bookmarks stay permanently. One-way read sync from X.",
+    icon: RefreshCw,
   },
-] as const;
-
-const FEATURE_ICONS: Record<string, string> = {
-  Search: "🔍",
-  Tags: "🏷️",
-  Collections: "📁",
-  Notes: "📝",
-  Analytics: "📊",
-  Sync: "🔄",
-};
+];
 
 const STAGGER_CLASSES = [
   "stagger-1",
@@ -56,10 +68,20 @@ const STAGGER_CLASSES = [
   "stagger-6",
 ];
 
+/** Demo tag chip matching the in-app tag chip language (square, color dot). */
+function DemoTagChip({ label, dotClassName }: { label: string; dotClassName: string }) {
+  return (
+    <span className="surface-inset inline-flex items-center gap-1.5 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <span className={`size-1.5 rounded-full ${dotClassName}`} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
 export function LandingExperience() {
   return (
     <div className="app-min-viewport bg-background text-foreground font-sans selection:bg-primary/30">
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-lg">
+      <header className="sticky top-0 z-50 border-b border-hairline-strong bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
           <div className="flex items-center gap-3">
             <MarkMasterLogo width={36} height={36} className="shrink-0" priority />
@@ -71,7 +93,7 @@ export function LandingExperience() {
             <Button
               variant="outline"
               size="sm"
-              className="h-9 rounded-lg px-4 text-sm font-medium"
+              className="h-9 px-4 text-sm font-medium"
             >
               Sign in
             </Button>
@@ -80,13 +102,13 @@ export function LandingExperience() {
       </header>
 
       <main>
-      <section className="relative border-b border-border overflow-hidden">
+      <section className="relative border-b border-hairline-strong overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-emerald/[0.03] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-primary/[0.04] rounded-full blur-[120px] pointer-events-none" />
         <div className="relative mx-auto grid max-w-6xl grid-cols-1 gap-12 px-8 py-16 sm:grid-cols-2 sm:px-12 sm:py-24">
           <div className="flex flex-col justify-center gap-6 animate-fade-in">
             <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary animate-fade-in stagger-1">
+              <p className="text-2xs font-medium uppercase tracking-[0.14em] text-primary animate-fade-in stagger-1">
                 Your bookmark archive
               </p>
               <h1 className="text-3xl sm:text-[2.75rem] font-extrabold leading-tight sm:leading-[1.06] tracking-tight sm:tracking-[-0.03em] heading-font animate-fade-in stagger-2">
@@ -104,10 +126,7 @@ export function LandingExperience() {
 
             <div className="flex flex-col gap-3 animate-fade-in stagger-4">
               <Link href="/login">
-                <Button
-                  size="lg"
-                  className="h-11 gap-2 rounded-lg px-6 text-sm font-bold shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/25 transition-shadow"
-                >
+                <Button size="lg" className="h-11 gap-2 px-6 text-sm font-bold">
                   Connect with X
                   <ArrowRight className="size-4" strokeWidth={2.5} />
                 </Button>
@@ -118,20 +137,20 @@ export function LandingExperience() {
             </div>
           </div>
 
-          <div className="animate-fade-in-up stagger-3 overflow-hidden rounded-xl border border-border bg-card shadow-xl shadow-black/[0.04] dark:shadow-black/20">
-            <div className="flex items-center gap-3 border-b border-border px-5 py-3 bg-secondary/80">
+          <div className="animate-fade-in-up stagger-3 overflow-hidden surface-solid">
+            <div className="flex items-center gap-3 border-b border-hairline-soft bg-surface-2/70 px-5 py-3">
               <MarkMasterLogo width={32} height={32} className="shrink-0" />
               <span className="text-sm font-semibold text-foreground">
                 MarkMaster
               </span>
               <div className="ml-auto flex gap-2">
-                <div className="h-7 w-20 rounded-lg bg-muted-foreground/10" />
-                <div className="h-7 w-20 rounded-lg bg-primary" />
+                <div className="h-7 w-20 rounded-sm bg-muted-foreground/10" />
+                <div className="h-7 w-20 rounded-sm bg-primary" />
               </div>
             </div>
 
             <div>
-              <div className="flex gap-4 border-b border-border px-5 py-4">
+              <div className="flex gap-4 border-b border-hairline-soft px-5 py-4">
                 <div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex items-center gap-2">
@@ -152,14 +171,8 @@ export function LandingExperience() {
                     feature and tells the user how to feel about progress.
                   </p>
                   <div className="mb-2 flex gap-1.5">
-                    {["copywriting", "product"].map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary font-medium"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                    <DemoTagChip label="copywriting" dotClassName="bg-primary" />
+                    <DemoTagChip label="product" dotClassName="bg-emerald" />
                   </div>
                   <div className="flex gap-3 text-xs text-muted-foreground/50">
                     <span>↩ 122</span>
@@ -169,7 +182,7 @@ export function LandingExperience() {
                 </div>
               </div>
 
-              <div className="flex gap-4 border-b border-border px-5 py-4">
+              <div className="flex gap-4 border-b border-hairline-soft px-5 py-4">
                 <div className="size-10 shrink-0 rounded-full bg-muted-foreground/10" />
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex items-center gap-2">
@@ -188,8 +201,8 @@ export function LandingExperience() {
                         A good market map is less about categorizing competitors and
                         more about exposing whitespace where new behavior is forming.
                       </p>
-                      <div className="rounded-md border-l-2 border-l-note px-3 py-2 bg-secondary/60">
-                        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/60">
+                      <div className="surface-inset border-l-2 border-l-note px-3 py-2">
+                        <p className="mb-1 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/60">
                           Note
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -197,17 +210,11 @@ export function LandingExperience() {
                         </p>
                       </div>
                     </div>
-                    <div className="h-16 w-28 shrink-0 rounded-xl bg-muted-foreground/10" />
+                    <div className="h-16 w-28 shrink-0 rounded-sm bg-muted-foreground/10" />
                   </div>
                   <div className="flex gap-1.5">
-                    {["strategy", "positioning"].map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary font-medium"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                    <DemoTagChip label="strategy" dotClassName="bg-chart-4" />
+                    <DemoTagChip label="positioning" dotClassName="bg-chart-5" />
                   </div>
                 </div>
               </div>
@@ -234,11 +241,11 @@ export function LandingExperience() {
         </div>
       </section>
 
-      <section className="border-b border-border">
+      <section className="border-b border-hairline-strong">
         <div className="mx-auto max-w-6xl px-8 py-16 sm:px-12 sm:py-24">
           <div className="mb-12 flex items-end justify-between gap-8">
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
+              <p className="text-2xs font-medium uppercase tracking-[0.14em] text-primary">
                 What you get
               </p>
               <h2 className="text-2xl sm:text-[1.75rem] font-extrabold tracking-[-0.02em] heading-font">
@@ -252,19 +259,21 @@ export function LandingExperience() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ title, outcome, desc }, i) => (
+            {FEATURES.map(({ title, outcome, desc, icon: Icon }, i) => (
               <div
                 key={title}
-                className={`group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 animate-fade-in ${STAGGER_CLASSES[i] ?? ""}`}
+                className={`group flex flex-col gap-3 surface-card p-5 transition-colors hover:border-primary/25 animate-fade-in ${STAGGER_CLASSES[i] ?? ""}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-lg">{FEATURE_ICONS[title]}</span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" aria-hidden />
+                    </span>
                     <h3 className="text-base font-bold heading-font">
                       {title}
                     </h3>
                   </div>
-                  <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary">
+                  <span className="rounded-sm bg-primary/10 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-primary">
                     {outcome}
                   </span>
                 </div>

@@ -101,7 +101,7 @@ export function OrbitalAuthExperience({
         <button
           type="button"
           onClick={handleSignIn}
-          className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[15px] font-semibold text-white/90 shadow-[0_1px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-white/10 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-sm px-4 py-2 text-[15px] font-semibold text-white/90 shadow-[0_1px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-white/10 hover:text-white"
         >
           Sign in
           <ArrowRight className="size-4 opacity-80" aria-hidden="true" />
@@ -151,7 +151,7 @@ export function OrbitalAuthExperience({
                 <Button
                   size="lg"
                   onClick={handleSignIn}
-                  className="auth-splash__primary-button group h-[58px] rounded-full border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
+                  className="auth-splash__primary-button group h-[58px] rounded-sm border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
                 >
                   <XLogoMark
                     className="mr-2.5 size-[22px] text-primary-foreground"
@@ -184,7 +184,7 @@ export function OrbitalAuthExperience({
             />
 
             <div className="relative z-10">
-              <p className="text-[13px] font-bold uppercase tracking-[0.22em] text-[#A9B9D1]">
+              <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#A9B9D1]">
                 HOW IT WORKS
               </p>
               <h2 className="auth-splash__aside-title heading-font mt-5 max-w-[320px] text-[2.25rem] font-extrabold leading-[1.08] text-white drop-shadow-[0_2px_22px_rgba(0,0,0,0.76)] sm:text-[2.45rem]">
@@ -223,7 +223,7 @@ export function OrbitalAuthExperience({
                 </span>{" "}
                 Grok suggests tags and collections; you approve every move.
                 Scans run with{" "}
-                <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/90">
+                <code className="rounded-sm bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/90">
                   store: false
                 </code>
                 .
