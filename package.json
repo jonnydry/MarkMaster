@@ -53,6 +53,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -60,6 +63,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.7",
     "fast-check": "^4.8.0",
+    "jsdom": "^29.1.1",
     "shadcn": "^4.1.2",
     "tailwindcss": "^4",
     "typescript": "^5",
