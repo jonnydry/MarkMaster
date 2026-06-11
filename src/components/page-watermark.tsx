@@ -25,10 +25,12 @@ const WATERMARK_MARKS: Record<PageWatermarkVariant, ReactNode> = {
       width={480}
       height={480}
       glow={false}
+      // No Tailwind filter utilities here: they'd override the theme-tint
+      // filter from .markmaster-logo-flat (both set `filter`).
       className={cn(
         "absolute -bottom-[14%] -left-[8%] h-auto w-[min(36vw,28rem)] max-w-none",
-        "opacity-[0.05] saturate-[0.6]",
-        "dark:opacity-[0.07]"
+        "opacity-[0.06]",
+        "dark:opacity-[0.1]"
       )}
     />
   ),
