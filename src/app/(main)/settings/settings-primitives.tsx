@@ -186,7 +186,7 @@ export function SettingsRow({
 }
 
 export const settingsSurfaceClass =
-  "rounded-sm border border-hairline-soft bg-surface-2/40";
+  "surface-inset";
 
 export function SettingsSegment<T extends string>({
   value,

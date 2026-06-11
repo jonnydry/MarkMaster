@@ -154,7 +154,7 @@ export function HighlightCard({
         }
       }}
       className={cn(
-        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer",
+        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 cursor-pointer",
         isCarouselLayout ? "min-h-[10rem] p-3.5" : "min-h-[8.5rem] p-3",
         active
           ? "border-primary/45 bg-accent-soft/60 hover:bg-accent-soft/70"
@@ -167,7 +167,7 @@ export function HighlightCard({
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             className={cn(
-              "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+              "truncate text-[10px] font-bold uppercase tracking-[0.08em] text-primary",
               t.monoNative && t.label
             )}
           >
@@ -260,7 +260,7 @@ export function HighlightCard({
             "shrink-0 text-[10px] text-muted-foreground/75",
             isCarouselLayout
               ? "normal-case tracking-[0.02em]"
-              : "uppercase tracking-[0.05em]",
+              : "uppercase tracking-[0.08em]",
             t.monoNative && t.data
           )}
         >
@@ -271,7 +271,7 @@ export function HighlightCard({
       {isCarouselLayout ? (
         <div
           className={cn(
-            "mt-2 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70",
+            "mt-2 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70",
             t.monoNative && t.label
           )}
           onClick={(e) => e.stopPropagation()}
@@ -284,7 +284,7 @@ export function HighlightCard({
           {reviewButton ? <div className="mt-1">{reviewButton}</div> : null}
           <div
             className={cn(
-              "mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.05em] text-muted-foreground/70",
+              "mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70",
               t.monoNative && t.label
             )}
             onClick={(e) => e.stopPropagation()}

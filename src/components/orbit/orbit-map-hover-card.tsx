@@ -27,8 +27,8 @@ export function OrbitMapHoverCard({
     <div
       data-orbit-hover-card
       className={cn(
-        "pointer-events-none absolute z-20 w-64 p-3 opacity-95 shadow-none backdrop-blur-xl transition-[opacity,transform] duration-150 ease-out will-change-transform",
-        "rounded-2xl border border-white/[0.08] bg-[#07111d]/72"
+        "pointer-events-none absolute z-20 w-64 p-3 opacity-95 shadow-none transition-[opacity,transform] duration-150 ease-out will-change-transform",
+        "map-glass rounded-sm"
       )}
       style={{
         left: Math.min(Math.max(sideAwareLeft, 8), maxLeft),

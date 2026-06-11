@@ -140,7 +140,7 @@ export const OrbitListRow = memo(function OrbitListRow({
 
       <div
         className={cn(
-          "mt-1 w-[3px] shrink-0 self-stretch rounded-full transition-all",
+          "mt-1 w-[3px] shrink-0 self-stretch rounded-none transition-all",
           selected
             ? "bg-primary"
             : "bg-transparent group-hover:bg-primary/25",
@@ -248,7 +248,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-wide",
+                    "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-[0.08em]",
                     suggestion.reuseExisting
                       ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
                       : "border-primary/25 bg-primary/10 text-primary/80"

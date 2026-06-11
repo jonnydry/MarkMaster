@@ -333,7 +333,7 @@ export function DashboardDiscovery({
             <Sparkles className="h-4 w-4 shrink-0 text-primary" />
             <span
               className={cn(
-                "truncate text-[10px] font-bold uppercase tracking-[0.12em] text-primary",
+                "truncate text-[10px] font-bold uppercase tracking-[0.08em] text-primary",
                 t.monoNative && t.label
               )}
             >

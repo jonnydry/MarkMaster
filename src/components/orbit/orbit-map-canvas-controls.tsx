@@ -45,7 +45,7 @@ export function OrbitMapCanvasControls({
             type="button"
             onClick={() => onFilterChange(key)}
             className={cn(
-              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
+              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
               activeFilter === key
                 ? "border-white/[0.08] bg-white/[0.13] text-white"
                 : "text-white/50 hover:bg-white/[0.06] hover:text-white"
@@ -68,7 +68,7 @@ export function OrbitMapCanvasControls({
       >
         <div
           className={cn(
-            "pointer-events-auto inline-flex flex-col overflow-hidden rounded-full border shadow-none backdrop-blur-xl",
+            "pointer-events-auto inline-flex flex-col overflow-hidden rounded-sm border shadow-none backdrop-blur-xl",
             "border-white/[0.055] bg-white/[0.035]"
           )}
         >
@@ -77,7 +77,7 @@ export function OrbitMapCanvasControls({
             aria-label="Zoom in"
             onClick={onZoomIn}
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
               "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >
@@ -94,7 +94,7 @@ export function OrbitMapCanvasControls({
             aria-label="Zoom out"
             onClick={onZoomOut}
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
               "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >
@@ -111,7 +111,7 @@ export function OrbitMapCanvasControls({
             aria-label="Reset view"
             onClick={onResetView}
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
               "text-white/70 hover:bg-white/[0.08] hover:text-white"
             )}
           >

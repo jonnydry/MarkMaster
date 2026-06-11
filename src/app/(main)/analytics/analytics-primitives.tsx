@@ -206,9 +206,9 @@ export function AnalyticsHero({
           <span>Tagged {triagedPct.toFixed(0)}%</span>
           <span>Untagged {untaggedPct.toFixed(0)}%</span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
           <div
-            className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
+            className="h-full rounded-[2px] bg-primary transition-all duration-700 ease-out"
             style={{ width: `${triagedPct}%` }}
           />
         </div>
@@ -264,7 +264,7 @@ function HeroStat({
 }
 
 export const analyticsChartSurfaceClass =
-  "rounded-sm border border-hairline-soft bg-surface-2/40 p-3";
+  "surface-inset p-3";
 
 const SOURCE_LABELS: Record<string, string> = {
   highlights: "Highlights",

@@ -135,7 +135,7 @@ export default function CollectionsPage() {
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-32 rounded-sm border border-hairline-soft bg-surface-1 p-4 skeleton-shimmer"
+                      className="h-32 surface-solid p-4 skeleton-shimmer"
                     />
                   ))}
                 </div>

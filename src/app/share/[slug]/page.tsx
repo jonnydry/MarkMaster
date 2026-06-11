@@ -285,7 +285,7 @@ export default async function PublicSharePage({
               {topTags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground"
                 >
                   <span
                     className="size-2 rounded-full"
@@ -359,7 +359,7 @@ function ShareStat({
   value: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2.5">
+    <div className="rounded-sm border border-border bg-secondary/50 px-3 py-2.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="size-3.5" aria-hidden />
         {label}

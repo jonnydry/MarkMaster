@@ -14,9 +14,9 @@ export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
-            className={`mb-3 inline-block w-full break-inside-avoid rounded-sm border border-hairline-soft bg-surface-1/70 p-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
+            className={`mb-3 inline-block w-full break-inside-avoid surface-card p-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
           >
-            <div className="aspect-video w-full rounded-md skeleton-shimmer mb-3" />
+            <div className="aspect-video w-full rounded-sm skeleton-shimmer mb-3" />
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-20 rounded skeleton-shimmer" />

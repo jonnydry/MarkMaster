@@ -34,8 +34,8 @@ const OrbitMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center rounded-[28px] border border-white/10 bg-background">
-        <div className="flex items-center gap-2 text-sm text-white/60">
+      <div className="flex h-full items-center justify-center rounded-sm border border-hairline-strong dark:border-white/10 bg-background dark:bg-black">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
           <Loader2 className="size-4 animate-spin" />
           Charting graph…
         </div>
@@ -193,7 +193,7 @@ export default function OrbitMapPage() {
               <Link
                 href="/orbit"
                 aria-label="Back to Orbit queue"
-                className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               >
                 <ArrowLeft className="size-4" />
                 <span className="hidden sm:inline">Orbit queue</span>
@@ -213,7 +213,7 @@ export default function OrbitMapPage() {
             ref={stageRef}
             className={cn(
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
-              "rounded-sm border border-white/[0.055] bg-background dark:bg-black"
+              "rounded-sm border border-hairline-strong dark:border-white/[0.055] bg-background dark:bg-black"
             )}
           >
             {isLoading ? (
@@ -223,7 +223,7 @@ export default function OrbitMapPage() {
                   "bg-background dark:bg-black"
                 )}
               >
-                <div className="flex items-center gap-2 text-sm text-white/60">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
                   <Loader2 className="size-4 animate-spin" />
                   Charting graph…
                 </div>

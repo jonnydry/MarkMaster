@@ -13,7 +13,7 @@ function ReuseBadge({ reuseExisting }: { reuseExisting: boolean }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-wide",
+        "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-[0.08em]",
         reuseExisting
           ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
           : "border-primary/25 bg-primary/10 text-primary/80"
@@ -121,7 +121,7 @@ export function OrbitReviewGrokProposal({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
+      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
         {declined ? "Grok proposed (not applying)" : "Grok proposed"}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -196,7 +196,7 @@ export function OrbitReviewBatchImpactChips({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80">
+      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
         Batch impact
       </div>
       <div className="flex flex-wrap gap-1.5">

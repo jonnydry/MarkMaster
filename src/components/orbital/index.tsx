@@ -83,7 +83,7 @@ export function OrbitalBadge({
     <span
       className={cn(
         orbital.badge(tone),
-        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]",
+        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em]",
         t.monoNative && t.label,
         className
       )}

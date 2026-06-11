@@ -31,7 +31,7 @@ export function KeyboardShortcutsDialog({
 }: KeyboardShortcutsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md border border-hairline-strong bg-surface-1/95 p-0 shadow-[0_24px_90px_-48px_rgba(0,0,0,0.9)]">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md surface-overlay p-0">
         <DialogHeader className="border-b border-hairline-soft px-4 py-4">
           <div className="flex items-center gap-2">
             <span className="flex size-8 items-center justify-center rounded-sm border border-primary/20 bg-primary/10 text-primary">
@@ -49,7 +49,7 @@ export function KeyboardShortcutsDialog({
         <div className="grid gap-4 px-4 pb-4">
           {groups.map((group) => (
             <section key={group.title}>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {group.title}
               </h3>
               <div className="overflow-hidden rounded-sm border border-hairline-soft">

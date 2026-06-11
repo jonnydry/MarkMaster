@@ -53,7 +53,7 @@ export function OrbitScanFailureNotice({
             <span
               className={cn(
                 orbital.label,
-                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.2em]",
+                "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em]",
                 presentation.badgeClassName
               )}
             >
@@ -77,7 +77,7 @@ export function OrbitScanFailureNotice({
           type="button"
           size="sm"
           variant="outline"
-          className="h-9 rounded-lg border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+          className="h-9 rounded-sm border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
           disabled={scanning || retryTargetCount === 0}
           onClick={onRetry}
         >
@@ -94,7 +94,7 @@ export function OrbitScanFailureNotice({
             href={error.recoveryHref}
             className={cn(
               buttonVariants({ size: "sm", variant: "outline" }),
-              "h-9 rounded-lg border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+              "h-9 rounded-sm border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
             )}
           >
             <Settings2 className="size-3.5" />
@@ -106,7 +106,7 @@ export function OrbitScanFailureNotice({
           <Button
             type="button"
             size="sm"
-            className="h-9 rounded-lg bg-foreground text-background hover:bg-foreground/90"
+            className="h-9 rounded-sm bg-foreground text-background hover:bg-foreground/90"
             disabled={scanning || selectionTargetCount === 0}
             onClick={onRescanCurrentSelection}
           >

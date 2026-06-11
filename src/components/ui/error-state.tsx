@@ -16,7 +16,7 @@ interface ErrorStateProps {
 const layoutShell: Record<ErrorStateLayout, string> = {
   page: "mx-auto flex min-h-[16rem] w-full max-w-md flex-col items-center justify-center text-center",
   panel:
-    "mx-auto w-full max-w-md rounded-sm border border-hairline-soft bg-surface-1/70 p-5 text-center",
+    "mx-auto w-full max-w-md surface-card p-5 text-center",
   inline:
     "flex w-full flex-wrap items-center justify-between gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive",
   stage: "mx-auto max-w-md space-y-3 text-center",

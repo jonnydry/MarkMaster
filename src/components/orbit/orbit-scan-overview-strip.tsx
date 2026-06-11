@@ -84,7 +84,7 @@ function TagRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-sm border border-hairline-soft bg-surface-2/70 px-2 text-[11px] text-foreground/85",
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-[11px] text-foreground/85",
         "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
       )}
     >
@@ -116,7 +116,7 @@ function CollectionRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-sm border border-hairline-soft bg-surface-2/70 px-2 text-[11px] text-foreground/85",
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-[11px] text-foreground/85",
         "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
       )}
     >
@@ -161,7 +161,7 @@ function RollupSection({
         <span
           className={cn(
             orbitDataClass(),
-            "rounded-sm border border-hairline-soft bg-surface-2/60 px-1.5 py-0.5 text-[10px]",
+            "surface-inset-strong px-1.5 py-0.5 text-[10px]",
             orbitMetaSoft()
           )}
         >
@@ -195,7 +195,7 @@ function StrategyLines({
       : `${collectionStrategy.slice(0, STRATEGY_PREVIEW)}…`;
 
   const lineClass = cn(
-    "grid gap-1 rounded-sm border border-hairline-soft bg-surface-2/45 px-3 py-2 text-xs leading-relaxed sm:grid-cols-[7rem_minmax(0,1fr)]",
+    "grid gap-1 surface-inset px-3 py-2 text-xs leading-relaxed sm:grid-cols-[7rem_minmax(0,1fr)]",
     "text-muted-foreground dark:border-white/10 dark:bg-white/[0.035] dark:text-white/60"
   );
 
@@ -282,7 +282,7 @@ export function OrbitScanOverviewStrip({
             <span
               className={cn(
                 orbitDataClass(),
-                "rounded-sm border border-hairline-soft bg-surface-2/60 px-1.5 py-0.5 text-[10px]",
+                "surface-inset-strong px-1.5 py-0.5 text-[10px]",
                 orbitMetaSoft()
               )}
             >

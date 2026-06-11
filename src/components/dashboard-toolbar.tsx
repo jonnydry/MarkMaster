@@ -95,7 +95,7 @@ export function DashboardToolbar({
             onClick={onResetPrimaryFilter}
             aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
             className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
               highlightActiveClass,
               highlightInteractiveClass
             )}

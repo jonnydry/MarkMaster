@@ -306,7 +306,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 aria-label="Open graph"
                 title="Open graph"
                 className={cn(
-                  "inline-flex size-9 shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                   appToolbarSurfaceClassName
                 )}
               >

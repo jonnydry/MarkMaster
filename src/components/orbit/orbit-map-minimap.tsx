@@ -145,7 +145,7 @@ export function OrbitMapMinimap({
         if (event.buttons & 1) jumpToEvent(event);
       }}
       className={cn(
-        "cursor-pointer rounded-sm border border-white/[0.08] bg-black/55 backdrop-blur-xl",
+        "map-glass cursor-pointer rounded-sm",
         className
       )}
       style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}

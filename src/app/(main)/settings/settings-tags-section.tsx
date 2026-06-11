@@ -105,7 +105,7 @@ export function SettingsTagsSection({
           No tags match &ldquo;{tagSearch.trim()}&rdquo;
         </div>
       ) : (
-        <div className="max-h-[min(28rem,50vh)] overflow-y-auto rounded-sm border border-hairline-soft bg-surface-2/50">
+        <div className="max-h-[min(28rem,50vh)] overflow-y-auto surface-inset">
           {filteredTags.map((tag, index) =>
             editingTag === tag.id ? (
               <TagEditRow

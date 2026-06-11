@@ -151,7 +151,7 @@ export function Sidebar({
               href={href}
               title={label}
               className={cn(
-                "flex items-center rounded-sm border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                "flex items-center rounded-sm border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                 isActive
                   ? "menu-selection-active font-semibold"
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground",
@@ -189,7 +189,7 @@ export function Sidebar({
                           type="button"
                           onClick={() => onTagToggle(tag.id)}
                           aria-pressed={isSelected}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isSelected
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
@@ -215,7 +215,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllTags((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllTags ? "Show less" : `Show all ${tags.length}`}
@@ -240,7 +240,7 @@ export function Sidebar({
                     type="button"
                     onClick={onCreateCollection}
                     aria-label="Create collection"
-                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-hairline-soft text-base leading-none text-muted-foreground/60 transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-hairline-soft text-base leading-none text-muted-foreground/60 transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                   >
                     <span aria-hidden>+</span>
                   </button>
@@ -259,7 +259,7 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
@@ -279,7 +279,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllCollections((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllCollections
@@ -311,7 +311,7 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
@@ -331,7 +331,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllFolders((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllFolders

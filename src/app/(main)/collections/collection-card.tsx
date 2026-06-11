@@ -38,7 +38,7 @@ function itemLabel(count: number) {
 }
 
 const compactCardClassName =
-  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/75 px-3.5 py-3 text-left shadow-sm transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 [content-visibility:auto] [contain-intrinsic-size:88px]";
+  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden surface-card px-3.5 py-3 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 [content-visibility:auto] [contain-intrinsic-size:88px]";
 
 function getScaleWidth(itemCount: number, maxItems: number) {
   if (itemCount <= 0 || maxItems <= 0) return 0;
@@ -122,9 +122,9 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
             </>
           ) : null}
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
+        <div className="mt-2 h-1 overflow-hidden rounded-[2px] bg-surface-3">
           <div
-            className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
+            className="h-full rounded-[2px] bg-primary transition-all duration-700 ease-out"
             style={{ width: `${scaleWidth}%` }}
           />
         </div>
@@ -135,7 +135,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
           {itemCount.toLocaleString()}
         </p>
         <p className={cn(
-          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em]",
+          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em]",
           "text-muted-foreground/70"
         )}>
           saved
@@ -223,9 +223,9 @@ export const XFolderCard = React.memo(function XFolderCard({
             </>
           ) : null}
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3">
+        <div className="mt-2 h-1 overflow-hidden rounded-[2px] bg-surface-3">
           <div
-            className="h-full rounded-full bg-note transition-all duration-700 ease-out"
+            className="h-full rounded-[2px] bg-note transition-all duration-700 ease-out"
             style={{ width: `${scaleWidth}%` }}
           />
         </div>
@@ -236,7 +236,7 @@ export const XFolderCard = React.memo(function XFolderCard({
           {itemCount.toLocaleString()}
         </p>
         <p className={cn(
-          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em]",
+          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em]",
           "text-muted-foreground/70"
         )}>
           synced

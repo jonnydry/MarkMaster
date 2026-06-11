@@ -44,7 +44,7 @@ export function PaginationControls({
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
           )}
         >
@@ -81,7 +81,7 @@ export function PaginationControls({
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
           )}
         >
@@ -89,9 +89,9 @@ export function PaginationControls({
         </button>
       </div>
       {isLibrary ? (
-        <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
+        <div className="h-1 w-24 overflow-hidden rounded-[2px] bg-muted">
           <div
-            className="h-full rounded-full bg-primary/40 transition-all duration-300"
+            className="h-full rounded-[2px] bg-primary/40 transition-all duration-300"
             style={{
               width: `${((page - 1) / Math.max(totalPages - 1, 1)) * 100}%`,
             }}

@@ -60,7 +60,7 @@ export function CollectionsControlBar({
         {searchQuery ? (
           <button
             type="button"
-            className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onSearchChange("")}
             aria-label="Clear search"
           >

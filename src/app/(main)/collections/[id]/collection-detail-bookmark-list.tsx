@@ -37,7 +37,7 @@ export function CollectionDetailBookmarkList({
   if (sortedItems.length === 0) {
     return (
       <div className="py-20 text-center">
-        <div className="mx-auto max-w-md rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-8">
+        <div className="mx-auto max-w-md surface-card px-6 py-8">
           {isSyncedFromX ? (
             <FolderOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
           ) : (
@@ -149,7 +149,7 @@ export function CollectionDetailLoadingState() {
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="rounded-sm border border-hairline-soft bg-surface-1 px-4 py-4"
+              className="surface-solid px-4 py-4"
             >
               <div className="flex gap-3">
                 <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
@@ -178,7 +178,7 @@ export function CollectionDetailErrorState({
 }) {
   return (
     <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
-      <div className="max-w-md rounded-sm border border-hairline-soft bg-surface-1 p-6 text-center">
+      <div className="max-w-md surface-solid p-6 text-center">
         <p className="text-sm font-medium text-foreground">
           {isNotFound ? "Collection not found" : "Collection could not be loaded"}
         </p>

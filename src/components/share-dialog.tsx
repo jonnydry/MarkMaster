@@ -60,7 +60,7 @@ export function ShareDialog({
           <div>
             <h3 className="text-sm font-medium mb-2">Public Link</h3>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md truncate">
+              <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-sm truncate">
                 {shareContent.shareUrl}
               </code>
               <Button
@@ -87,7 +87,7 @@ export function ShareDialog({
                 ? "Post to X (Single Tweet)"
                 : "Post to X (Summary + Link)"}
             </h3>
-            <div className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap mb-2">
+            <div className="bg-muted rounded-sm p-3 text-sm whitespace-pre-wrap mb-2">
               {shareContent.summaryTweet}
             </div>
             <div className="flex items-center gap-2">
@@ -134,7 +134,7 @@ export function ShareDialog({
                 {shareContent.thread.map((tweet, i) => (
                   <div
                     key={i}
-                    className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap"
+                    className="bg-muted rounded-sm p-3 text-sm whitespace-pre-wrap"
                   >
                     <span className="text-xs text-muted-foreground block mb-1">
                       Tweet {i + 1}
@@ -166,7 +166,7 @@ export function ShareDialog({
 
           {/* Info for large collections */}
           {!isSmallCollection && (
-            <div className="bg-muted/50 rounded-md p-3 text-xs text-muted-foreground">
+            <div className="bg-muted/50 rounded-sm p-3 text-xs text-muted-foreground">
               This collection has {shareContent.itemCount} bookmarks. For better
               readability on X, we recommend sharing the public link with a summary
               tweet. The full collection is always viewable at the link above.

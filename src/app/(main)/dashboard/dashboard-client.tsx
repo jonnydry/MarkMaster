@@ -324,7 +324,7 @@ function DashboardContent() {
               {performanceFocusedId && (
                 <div className={cn("pb-2", bookmarkFeedColumnClassName)}>
                   <div className="flex flex-wrap items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary">
                       Performance Highlight
                     </span>
                     <span className="text-muted-foreground text-xs">
@@ -336,7 +336,7 @@ function DashboardContent() {
                         setBookmarkId("");
                         setActiveBookmarkId(null);
                       }}
-                      className="ml-auto rounded-sm px-2 py-0.5 text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="ml-auto rounded-sm px-2 py-0.5 text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/45"
                     >
                       Exit focus
                     </button>

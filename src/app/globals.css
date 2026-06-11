@@ -567,6 +567,40 @@
   }
 }
 
+/* === Surface chrome contract — the canonical card/panel recipes. ===
+   These six utilities are the only sanctioned surface treatments. Compose
+   extras (padding, hover, focus) at the call site; never re-derive the
+   border/background pairing by hand. */
+@utility surface-card {
+  /* Primary content card over the page shell. */
+  @apply rounded-sm border border-hairline-soft bg-surface-1/70;
+}
+@utility surface-veil {
+  /* Translucent card — ambient background and watermarks read through. */
+  @apply rounded-sm border border-hairline-soft bg-surface-1/55;
+}
+@utility surface-solid {
+  /* Fully opaque card (hover swap-ins, surfaces that must mask content). */
+  @apply rounded-sm border border-hairline-soft bg-surface-1;
+}
+@utility surface-inset {
+  /* Nested well inside a card — settings rows, field groups. */
+  @apply rounded-sm border border-hairline-soft bg-surface-2/45;
+}
+@utility surface-inset-strong {
+  /* Stronger well — strips, stat tiles, emphasized insets. */
+  @apply rounded-sm border border-hairline-soft bg-surface-2/70;
+}
+@utility surface-overlay {
+  /* Large overlay shells (bookmark/review overlays, oversized dialogs). */
+  border: 1px solid var(--hairline-strong);
+  background-color: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  box-shadow: 0 30px 120px -50px rgba(0, 0, 0, 0.95);
+  @supports (backdrop-filter: blur(1px)) {
+    backdrop-filter: blur(40px);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -962,6 +996,15 @@
     .markmaster-logo {
       transition: none;
     }
+  }
+
+  /* Floating chrome over the Orbit map canvas. The canvas always paints
+     space-black regardless of theme, so these are intentionally literal. */
+  .map-glass {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
   .glass-orbital {

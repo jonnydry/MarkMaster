@@ -44,7 +44,7 @@ const tooltipStyle = {
 
 const chartTickStyle = { fontSize: 11, fontFamily: "var(--font-sans)" };
 
-const chartCardClass = "border-hairline-soft bg-surface-1 p-5 shadow-sm";
+const chartCardClass = "border-hairline-soft bg-surface-1 p-5";
 
 function ChartShell({
   variant,
@@ -92,7 +92,7 @@ function SectionHeading({
       <div className="flex min-w-0 items-center gap-2">
         <span
           className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-sm",
             "bg-primary/8 text-primary"
           )}
         >
@@ -154,9 +154,9 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
 
   const listClass =
     variant === "flat"
-      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
+      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden surface-inset"
       : cn(
-          "flex flex-col overflow-hidden rounded-xl border",
+          "flex flex-col overflow-hidden rounded-sm border",
           "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
         );
 
@@ -175,7 +175,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
           {overexposed ? (
             <div
               className={cn(
-                "flex items-start gap-2 rounded-xl px-3 py-2 text-xs",
+                "flex items-start gap-2 rounded-sm px-3 py-2 text-xs",
                 "border border-note/30 bg-note/8 text-foreground"
               )}
             >
@@ -245,9 +245,9 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                         </span>
                       </div>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
                       <div
-                        className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                        className="h-full rounded-[2px] bg-primary transition-all duration-500 ease-out"
                         style={{ width: `${share}%` }}
                       />
                     </div>
@@ -339,7 +339,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
     variant === "flat"
       ? analyticsChartSurfaceClass
       : cn(
-          "rounded-xl border p-3",
+          "rounded-sm border p-3",
           "border-hairline-soft bg-surface-2"
         );
 
@@ -433,9 +433,9 @@ export const TagRankCard = React.memo(function TagRankCard({
   const max = useMemo(() => tags.reduce((m, t) => Math.max(m, t.count), 0) || 1, [tags]);
   const listClass =
     variant === "flat"
-      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden rounded-sm border border-hairline-soft bg-surface-2/40"
+      ? "flex flex-col divide-y divide-hairline-soft overflow-hidden surface-inset"
       : cn(
-          "flex flex-col overflow-hidden rounded-xl border",
+          "flex flex-col overflow-hidden rounded-sm border",
           "divide-y divide-hairline-soft border-hairline-soft bg-surface-2"
         );
 
@@ -475,9 +475,9 @@ export const TagRankCard = React.memo(function TagRankCard({
                   >
                     {t.tag}
                   </span>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
+                  <div className="h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
                     <div
-                      className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                      className="h-full rounded-[2px] bg-primary transition-all duration-500 ease-out"
                       style={{ width: `${share}%` }}
                     />
                   </div>
@@ -531,7 +531,7 @@ export const TimelineCard = React.memo(function TimelineCard({
     variant === "flat"
       ? cn(analyticsChartSurfaceClass, "px-3 py-4")
       : cn(
-          "rounded-xl border px-3 py-4",
+          "rounded-sm border px-3 py-4",
           "border-hairline-soft bg-surface-2"
         );
 
@@ -641,7 +641,7 @@ function EmptyBox({ height = 180 }: { height?: number }) {
       role="status"
       style={{ height }}
       className={cn(
-        "flex items-center justify-center rounded-xl border border-dashed text-sm",
+        "flex items-center justify-center rounded-sm border border-dashed text-sm",
         "border-hairline-soft bg-surface-2 text-muted-foreground"
       )}
     >

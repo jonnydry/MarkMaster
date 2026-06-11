@@ -56,7 +56,7 @@ interface OrbitMapRailProps {
 /** Shared panel surface for both rail and overlay variants, theme-aware. */
 function panelClass( isOverlay: boolean) {
   if (isOverlay) return "min-w-0 shrink-0";
-  return "min-w-0 shrink-0 rounded-sm border border-hairline-soft bg-surface-2/70 p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
+  return "min-w-0 shrink-0 surface-inset-strong p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
 }
 
 function pluralize(count: number, singular: string, plural?: string) {
@@ -442,7 +442,7 @@ function SelectedClusterBody({
         </div>
 
         {tagConnections.length > 0 || collectionConnections.length > 0 ? (
-          <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/35 p-3">
+          <div className="min-w-0 space-y-2 overflow-x-hidden surface-veil p-3">
             <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
               Relationships
             </p>
@@ -452,7 +452,7 @@ function SelectedClusterBody({
                   t.kind === "tag" ? (
                     <span
                       key={t.id}
-                      className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/60 px-2 py-1 text-xs text-foreground/85"
+                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground/85"
                     >
                       <span
                         className="inline-block size-2 shrink-0 rounded-full"
@@ -470,7 +470,7 @@ function SelectedClusterBody({
                   c.kind === "collection" ? (
                     <span
                       key={c.id}
-                      className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/60 px-2 py-1 text-xs text-foreground/85"
+                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground/85"
                     >
                       <Folder className="size-3 shrink-0 text-primary" />
                       <span className="min-w-0 truncate">{c.name}</span>
@@ -489,7 +489,7 @@ function SelectedClusterBody({
         {focusedBookmarkLoading && !focusedBookmark ? (
           <p className={bodyText}>Loading…</p>
         ) : focusedBookmark ? (
-          <div className="min-w-0 space-y-2 overflow-x-hidden rounded-sm border border-hairline-soft bg-surface-1/25 p-3">
+          <div className="min-w-0 space-y-2 overflow-x-hidden surface-veil p-3">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
               <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
                 Evidence
@@ -570,7 +570,7 @@ function BookmarkInspectorStatus({
 
 }) {
   const cardClass =
-    "min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/45 px-2 py-2";
+    "min-w-0 overflow-hidden surface-veil px-2 py-2";
   const labelClass = cn(
     orbitLabelClass(),
     orbitMetaSoft(),
@@ -661,7 +661,7 @@ function RailMetric({
 
 }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/55 p-3">
+    <div className="min-w-0 overflow-hidden surface-veil p-3">
       <p className={cn(orbitLabelClass(), orbitMetaSoft(), "truncate")}>
         {label}
       </p>

@@ -109,7 +109,7 @@ export function OrbitReviewOverlay({
       <DialogContent
         showCloseButton={false}
         overlayClassName="bg-background/35 supports-backdrop-filter:backdrop-blur-xl dark:bg-black/45"
-        className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1180px] overflow-hidden border border-hairline-strong bg-surface-1/78 p-0 shadow-[0_30px_120px_-50px_rgba(0,0,0,0.95)] supports-[backdrop-filter]:backdrop-blur-2xl sm:max-w-[1180px]"
+        className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1180px] overflow-hidden surface-overlay p-0 sm:max-w-[1180px]"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">
@@ -159,7 +159,7 @@ export function OrbitReviewOverlay({
                     />
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
                       {title}
                     </span>
@@ -182,7 +182,7 @@ export function OrbitReviewOverlay({
                   size="icon-sm"
                   onClick={() => onOpenChange(false)}
                   aria-label="Close review"
-                  className="rounded-sm border border-hairline-soft bg-surface-2/60 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                  className="surface-inset-strong text-muted-foreground hover:bg-accent-soft hover:text-foreground"
                 >
                   <X className="size-4" aria-hidden="true" />
                 </Button>
@@ -206,7 +206,7 @@ export function OrbitReviewOverlay({
               />
 
               {activeBookmark.quotedTweet ? (
-                <div className="mt-4 rounded-sm border border-hairline-soft bg-surface-2/45 p-3">
+                <div className="mt-4 surface-inset p-3">
                   <div className="mb-1 flex items-center gap-1.5 text-sm">
                     <span className="font-medium text-foreground">
                       {activeBookmark.quotedTweet.author?.name}
@@ -227,7 +227,7 @@ export function OrbitReviewOverlay({
               <div className="scrollbar-native min-h-0 flex-1 overflow-y-auto px-4 py-4">
                 {/* Collapsed batch summary */}
                 {plan && effectiveDrafts.length > 1 ? (
-                  <div className="mb-4 rounded-sm border border-hairline-soft bg-surface-1/55">
+                  <div className="mb-4 surface-veil">
                     <button
                       type="button"
                       onClick={() => setBatchOpen((v) => !v)}
@@ -240,7 +240,7 @@ export function OrbitReviewOverlay({
                         <ChevronRight className="size-3.5 shrink-0 text-primary/70" />
                       )}
                       <ListChecks className="size-3.5 shrink-0 text-primary/70" />
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         Batch
                       </span>
                       <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
@@ -251,27 +251,27 @@ export function OrbitReviewOverlay({
                     {batchOpen ? (
                       <div className="border-t border-hairline-soft px-3 pb-3 pt-2">
                         <div className="grid grid-cols-3 gap-1.5 text-center">
-                          <div className="rounded-sm border border-hairline-soft bg-surface-2/45 px-1 py-1.5">
+                          <div className="surface-inset px-1 py-1.5">
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarkCount}
                             </div>
-                            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
                               suggested
                             </div>
                           </div>
-                          <div className="rounded-sm border border-hairline-soft bg-surface-2/45 px-1 py-1.5">
+                          <div className="surface-inset px-1 py-1.5">
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarksWithTags}
                             </div>
-                            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
                               tagged
                             </div>
                           </div>
-                          <div className="rounded-sm border border-hairline-soft bg-surface-2/45 px-1 py-1.5">
+                          <div className="surface-inset px-1 py-1.5">
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarksWithCollections}
                             </div>
-                            <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
                               collected
                             </div>
                           </div>
@@ -321,7 +321,7 @@ export function OrbitReviewOverlay({
 
                 {/* Grok suggestion */}
                 <div className="rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/80">
                     <GrokMark className="size-3.5" />
                     Grok suggestion
                   </div>
@@ -335,7 +335,7 @@ export function OrbitReviewOverlay({
                     decision={activeDraft.decision}
                     className="mt-3"
                   />
-                  <div className="mt-3 rounded-sm border border-hairline-soft bg-surface-2/45 px-2.5 py-2">
+                  <div className="mt-3 surface-inset px-2.5 py-2">
                     <OrbitReviewDraftImpactLine
                       tagNames={activeDraftImpact?.tagNames ?? []}
                       collectionName={activeDraftImpact?.collectionName ?? null}
@@ -359,7 +359,7 @@ export function OrbitReviewOverlay({
                     <div className="space-y-3">
                       {orbitReviewDecisionUsesTags(activeDraft.decision) ? (
                         <div>
-                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                             <Tags className="size-3" />
                             Tags
                           </div>
@@ -375,7 +375,7 @@ export function OrbitReviewOverlay({
                       ) : null}
                       {orbitReviewDecisionUsesCollection(activeDraft.decision) ? (
                         <div>
-                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                             <FolderInput className="size-3" />
                             Collection
                           </div>
@@ -438,7 +438,7 @@ export function OrbitReviewOverlay({
                 {/* Compact queue */}
                 {effectiveDrafts.length > 1 ? (
                   <div className="mt-4">
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Queue
                     </div>
                     <div className="scrollbar-native max-h-36 overflow-y-auto">
@@ -476,7 +476,7 @@ export function OrbitReviewOverlay({
                                 </span>
                               </div>
                               <div className="mt-1 flex flex-wrap gap-1">
-                                <span className="rounded-sm border border-hairline-soft bg-surface-2/70 px-1 py-0.5 text-[9px] text-muted-foreground">
+                                <span className="surface-inset-strong px-1 py-0.5 text-[9px] text-muted-foreground">
                                   {getDecisionLabel(draft.decision)}
                                 </span>
                                 {draftHasChanges(draft) ? (

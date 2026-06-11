@@ -174,7 +174,7 @@ export function CollectionDetailTitle({
       ) : (
         <button
           type="button"
-          className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2"
           onClick={onStartEditingName}
           aria-label={`Edit collection name ${collection.name}`}
         >

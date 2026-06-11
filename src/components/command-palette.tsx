@@ -313,7 +313,7 @@ export function CommandPalette({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-muted",
+                    "flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-all hover:bg-accent-soft",
                     isFocused && "menu-selection-active pr-5"
                   )}
                 >

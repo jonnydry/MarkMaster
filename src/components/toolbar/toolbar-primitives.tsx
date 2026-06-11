@@ -79,7 +79,7 @@ export function ToolbarSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
         className={cn(
-          "w-full rounded-sm border border-hairline-strong bg-background/35 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+          "w-full rounded-sm border border-hairline-strong bg-background/35 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
           heightClass
         )}
       />
@@ -196,7 +196,7 @@ export function ToolbarIconButton({
       aria-label={label}
       aria-controls={ariaControls}
       className={cn(
-        "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+        "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         isActive
           ? highlightActiveClass
           : cn(

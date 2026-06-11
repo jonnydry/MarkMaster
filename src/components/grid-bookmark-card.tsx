@@ -75,7 +75,7 @@ function SelectionToggle({
       aria-pressed={selected}
       aria-label="Select bookmark"
       className={cn(
-        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2",
         selected
           ? highlightIndicatorActiveClass
           : "border-border bg-background text-transparent hover:border-primary/50"
@@ -207,7 +207,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             }}
           />
           <div className="pointer-events-none absolute left-2 top-2">
-            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-white/85 shadow-sm backdrop-blur-sm">
+            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/85 shadow-sm backdrop-blur-sm">
               {getGridMediaLabel(mediaItems)}
             </span>
           </div>
@@ -289,7 +289,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
                   e.stopPropagation();
                   onTagClick?.(primaryTag.id);
                 }}
-                className="inline-flex h-5 max-w-full items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground"
+                className="inline-flex h-5 max-w-full items-center gap-1 surface-inset-strong px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground"
                 title={primaryTag.name}
               >
                 <span
@@ -309,7 +309,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               </span>
             ) : null}
             {hasNote ? (
-              <span className="inline-flex h-5 items-center rounded-sm border border-hairline-soft bg-surface-2/70 px-1.5 text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex h-5 items-center surface-inset-strong px-1.5 text-[10px] font-medium text-muted-foreground">
                 Note
               </span>
             ) : null}

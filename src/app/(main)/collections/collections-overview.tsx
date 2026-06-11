@@ -55,7 +55,7 @@ export function CollectionsOverview({
 
   return (
     <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
-      <div className="relative overflow-hidden rounded-sm border border-hairline-soft bg-surface-1/80 p-4 shadow-sm sm:p-5">
+      <div className="relative overflow-hidden surface-card p-4 shadow-sm sm:p-5">
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
@@ -137,7 +137,7 @@ export function CollectionsOverview({
         </div>
       </div>
 
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/70 p-4 shadow-sm sm:p-5">
+      <div className="surface-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-note/10 text-note">
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -152,7 +152,7 @@ export function CollectionsOverview({
         {largestCollection ? (
           <button
             type="button"
-            className="mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onOpenCollection(largestCollection.id)}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -166,9 +166,9 @@ export function CollectionsOverview({
               </div>
               <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-[2px] bg-surface-3">
               <div
-                className="h-full rounded-full bg-note transition-all duration-700 ease-out"
+                className="h-full rounded-[2px] bg-note transition-all duration-700 ease-out"
                 style={{ width: `${largestWidth}%` }}
               />
             </div>

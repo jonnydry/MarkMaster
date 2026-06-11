@@ -31,7 +31,7 @@ export function FilterChip({
       type="button"
       aria-pressed={active}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-sm border px-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+        "inline-flex h-8 items-center gap-1.5 rounded-sm border px-2 text-xs font-semibold focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         active
           ? cn(highlightActiveClass, "border")
           : cn(

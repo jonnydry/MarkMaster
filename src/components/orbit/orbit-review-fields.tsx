@@ -108,7 +108,7 @@ export function OrbitReviewTagField({
           parsed.map((label, idx) => (
             <span
               key={`${label}-${idx}`}
-              className="inline-flex items-center gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 py-0.5 pl-2 pr-1 text-[11px] text-foreground"
+              className="inline-flex items-center gap-1 surface-inset-strong py-0.5 pl-2 pr-1 text-[11px] text-foreground"
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
@@ -325,7 +325,7 @@ export function OrbitReviewDecisionControl({
 }) {
   return (
     <div
-      className="grid grid-cols-2 gap-1 rounded-sm border border-hairline-soft bg-surface-2/70 p-1 sm:inline-grid sm:grid-cols-4"
+      className="grid grid-cols-2 gap-1 surface-inset-strong p-1 sm:inline-grid sm:grid-cols-4"
       role="radiogroup"
       aria-label="Review decision"
     >

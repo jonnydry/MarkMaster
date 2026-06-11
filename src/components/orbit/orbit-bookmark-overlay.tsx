@@ -126,7 +126,7 @@ export function OrbitBookmarkOverlay({
                 closeLabel="Close Orbit review"
                 badges={
                   <>
-                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
                       Orbit
                     </span>
@@ -151,7 +151,7 @@ export function OrbitBookmarkOverlay({
               <div className="mt-5 rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/80">
                       <GrokMark className="size-3.5" />
                       Grok suggestion
                     </div>

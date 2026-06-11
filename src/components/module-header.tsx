@@ -44,10 +44,7 @@ export function ModuleHeader({
         </div>
         <div className={cn("min-w-0", contentClassName)}>
           <p
-            className={cn(
-              t.sectionLabel,
-              "mb-0 text-primary/70 text-muted-foreground"
-            )}
+            className={cn(t.sectionLabel, "mb-0")}
           >
             {eyebrow}
           </p>

@@ -13,7 +13,7 @@ const CollectionsDiscoveryPanel = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-44 rounded-sm border border-hairline-soft bg-surface-1/45" />
+      <div className="h-44 surface-veil" />
     ),
   }
 );
@@ -56,7 +56,7 @@ export function LazyCollectionsDiscoverySlot({
       {visible ? (
         <CollectionsDiscoveryPanel tags={tags} />
       ) : (
-        <div className="h-44 rounded-sm border border-hairline-soft bg-surface-1/45" />
+        <div className="h-44 surface-veil" />
       )}
     </div>
   );

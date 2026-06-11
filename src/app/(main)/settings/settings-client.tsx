@@ -298,7 +298,7 @@ export default function SettingsPage() {
                     icon={theme === "dark" ? Moon : Sun}
                     title="Appearance"
                   >
-                    <div className="rounded-sm border border-hairline-soft bg-surface-2/40 px-4">
+                    <div className="surface-inset px-4">
                       <SettingsRow label="Color mode" divider={false}>
                         <SettingsSegment
                           ariaLabel="Color mode"

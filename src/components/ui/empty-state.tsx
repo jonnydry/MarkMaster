@@ -19,7 +19,7 @@ interface EmptyStateProps {
 const layoutShell: Record<EmptyStateLayout, string> = {
   page: "mx-auto flex min-h-[20rem] w-full max-w-md flex-col items-center justify-center text-center",
   panel:
-    "mx-auto flex w-full max-w-xl flex-col items-center justify-center rounded-sm border border-hairline-soft bg-surface-1/70 px-6 py-8 text-center sm:px-8",
+    "mx-auto flex w-full max-w-xl flex-col items-center justify-center surface-card px-6 py-8 text-center sm:px-8",
   inline: "border-y border-hairline-soft py-10 text-center",
   stage: "mx-auto flex max-w-md flex-col items-center justify-center text-center",
 };

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
 export const BOOKMARK_OVERLAY_DIALOG_CLASS =
-  "max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1120px] overflow-hidden border border-hairline-strong bg-surface-1/78 p-0 shadow-[0_30px_120px_-50px_rgba(0,0,0,0.95)] supports-[backdrop-filter]:backdrop-blur-2xl sm:max-w-[1120px]";
+  "max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1120px] overflow-hidden surface-overlay p-0 sm:max-w-[1120px]";
 
 export const BOOKMARK_OVERLAY_OVERLAY_CLASS =
   "bg-background/35 supports-backdrop-filter:backdrop-blur-xl dark:bg-black/45";
@@ -71,7 +71,7 @@ export function BookmarkOverlayMetricsGrid({
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+      <div className="surface-veil p-2">
         <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.like_count)}
@@ -80,7 +80,7 @@ export function BookmarkOverlayMetricsGrid({
           Likes
         </div>
       </div>
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+      <div className="surface-veil p-2">
         <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.retweet_count)}
@@ -89,7 +89,7 @@ export function BookmarkOverlayMetricsGrid({
           Reposts
         </div>
       </div>
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/55 p-2">
+      <div className="surface-veil p-2">
         <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.reply_count)}
@@ -104,7 +104,7 @@ export function BookmarkOverlayMetricsGrid({
 
 export function BookmarkOverlaySectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
       {children}
     </div>
   );
@@ -112,7 +112,7 @@ export function BookmarkOverlaySectionLabel({ children }: { children: ReactNode 
 
 export function BookmarkOverlayTagPill({ name, color }: { name: string; color: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-sm border border-hairline-soft bg-surface-1/55 px-2 py-1 text-xs text-muted-foreground">
+    <span className="inline-flex max-w-full items-center gap-1.5 surface-veil px-2 py-1 text-xs text-muted-foreground">
       <span
         aria-hidden
         className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -199,7 +199,7 @@ export function BookmarkOverlayQuotedTweet({
   quotedTweet: NonNullable<BookmarkWithRelations["quotedTweet"]>;
 }) {
   return (
-    <div className="mt-4 rounded-sm border border-hairline-soft bg-surface-2/45 p-3">
+    <div className="mt-4 surface-inset p-3">
       <div className="mb-1 flex items-center gap-1.5 text-sm">
         <span className="font-medium text-foreground">{quotedTweet.author?.name}</span>
         <span className="text-xs text-muted-foreground">
@@ -263,7 +263,7 @@ export function BookmarkOverlayAuthorHeader({
         size="icon-sm"
         onClick={onClose}
         aria-label={closeLabel}
-        className="rounded-sm border border-hairline-soft bg-surface-2/60 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+        className="surface-inset-strong text-muted-foreground hover:bg-accent-soft hover:text-foreground"
       >
         <X className="size-4" aria-hidden="true" />
       </Button>

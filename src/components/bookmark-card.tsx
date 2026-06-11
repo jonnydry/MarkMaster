@@ -71,7 +71,7 @@ function TagPill({
         onClick?.();
       }}
       className={
-        "rounded-sm border border-hairline-soft bg-surface-2/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+        "surface-inset px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
       }
     >
       {name}
@@ -160,7 +160,7 @@ function SelectionToggle({
       aria-pressed={selected}
       aria-label="Select bookmark"
       className={cn(
-        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2",
         selected
           ? highlightIndicatorActiveClass
           : "border-border bg-background text-transparent hover:border-primary/50"

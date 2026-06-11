@@ -59,7 +59,7 @@ export function DiscoveryBatchBar({
         </div>
       ) : null}
 
-      <div className="rounded-sm border border-hairline-soft bg-surface-1/40 p-4">
+      <div className="surface-veil p-4">
         <div className="space-y-1">
           <p className="text-sm font-semibold text-foreground">
             Batch review this week&apos;s mix

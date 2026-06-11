@@ -122,7 +122,7 @@ export function WeeklyDigestPanel({
       <button
         type="button"
         onClick={() => router.push("/orbit")}
-        className="mt-4 rounded-sm border border-hairline-soft bg-surface-1 px-3 py-1.5 text-xs uppercase tracking-[0.06em] text-primary hover:bg-surface-2 focus-visible:outline-none"
+        className="mt-4 surface-solid px-3 py-1.5 text-xs uppercase tracking-[0.08em] text-primary hover:bg-surface-2 focus-visible:outline-none"
       >
         Start reviewing in Orbit
       </button>

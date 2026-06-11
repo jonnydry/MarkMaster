@@ -13,7 +13,7 @@ const GridBookmarkCard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="mb-3 h-48 break-inside-avoid rounded-sm border border-hairline-soft bg-surface-1/55" />
+      <div className="mb-3 h-48 break-inside-avoid surface-veil" />
     ),
   }
 );
