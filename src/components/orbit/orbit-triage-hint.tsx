@@ -39,7 +39,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
       className={cn(
         "flex items-center gap-2 rounded-sm border px-3 py-2 text-xs leading-relaxed",
         orbitHairlineBorder(),
-        "border-hairline-soft bg-surface-2/50 dark:border-white/10 dark:bg-white/[0.03]",
+        "border-hairline-soft bg-surface-2/45 dark:border-white/10 dark:bg-white/[0.03]",
         orbitMetaMuted(),
         className
       )}

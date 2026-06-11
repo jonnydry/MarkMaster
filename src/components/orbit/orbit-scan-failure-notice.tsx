@@ -43,7 +43,7 @@ export function OrbitScanFailureNotice({
         <div
           className={cn(
             "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border",
-            "border-hairline-soft bg-surface-2/80 dark:border-white/12 dark:bg-black/15"
+            "border-hairline-soft bg-surface-2/70 dark:border-white/12 dark:bg-black/15"
           )}
         >
           <Icon className={cn("size-4", presentation.iconClassName)} />
@@ -77,7 +77,7 @@ export function OrbitScanFailureNotice({
           type="button"
           size="sm"
           variant="outline"
-          className="h-9 rounded-sm border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+          className="h-9 rounded-sm border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
           disabled={scanning || retryTargetCount === 0}
           onClick={onRetry}
         >
@@ -94,7 +94,7 @@ export function OrbitScanFailureNotice({
             href={error.recoveryHref}
             className={cn(
               buttonVariants({ size: "sm", variant: "outline" }),
-              "h-9 rounded-sm border-hairline-soft bg-surface-2/80 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+              "h-9 rounded-sm border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
             )}
           >
             <Settings2 className="size-3.5" />

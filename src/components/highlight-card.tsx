@@ -259,7 +259,7 @@ export function HighlightCard({
           className={cn(
             "shrink-0 text-2xs text-muted-foreground/75",
             isCarouselLayout
-              ? "normal-case tracking-[0.02em]"
+              ? "normal-case tracking-normal"
               : "uppercase tracking-[0.08em]",
             t.monoNative && t.data
           )}

@@ -223,7 +223,7 @@ export function OrbitReviewOverlay({
             </div>
 
             {/* Review sidebar */}
-            <aside className="flex min-h-0 flex-col border-t border-hairline-soft bg-surface-2/48 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
+            <aside className="flex min-h-0 flex-col border-t border-hairline-soft bg-surface-2/45 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
               <div className="scrollbar-native min-h-0 flex-1 overflow-y-auto px-4 py-4">
                 {/* Collapsed batch summary */}
                 {plan && effectiveDrafts.length > 1 ? (

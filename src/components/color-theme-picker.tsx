@@ -32,7 +32,7 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
               "group flex min-w-[5.5rem] flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors",
               selected
                 ? highlightSurfaceActiveClass
-                : "border-hairline-soft bg-surface-2/40 hover:border-primary/20 hover:bg-accent-soft/40"
+                : "border-hairline-soft bg-surface-2/45 hover:border-primary/20 hover:bg-accent-soft/40"
             )}
           >
             <span

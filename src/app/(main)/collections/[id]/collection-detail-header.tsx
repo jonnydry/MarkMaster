@@ -58,7 +58,7 @@ export function CollectionDetailHeaderActions({
         </>
       )}
       {isUserCollection && (
-        <Badge variant="outline" className="gap-1.5 border-hairline-soft bg-surface-2/80">
+        <Badge variant="outline" className="gap-1.5 border-hairline-soft bg-surface-2/70">
           {collection.isPublic ? (
             <Globe className="h-3 w-3 text-success" />
           ) : (

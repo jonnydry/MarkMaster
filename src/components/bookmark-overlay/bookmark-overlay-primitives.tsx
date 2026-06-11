@@ -349,7 +349,7 @@ export function BookmarkOverlayPostColumn({
 
 export function BookmarkOverlaySidebar({ children }: { children: ReactNode }) {
   return (
-    <aside className="scrollbar-native min-h-0 overflow-y-auto border-t border-hairline-soft bg-surface-2/48 px-4 py-4 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
+    <aside className="scrollbar-native min-h-0 overflow-y-auto border-t border-hairline-soft bg-surface-2/45 px-4 py-4 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
       {children}
     </aside>
   );
