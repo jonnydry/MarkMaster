@@ -4,6 +4,7 @@ import {
   clampOrbitMapZoom,
   constrainOrbitMapCameraState,
   getOrbitMapFitZoom,
+  getOrbitMapFrameCameraState,
   getOrbitMapGraphBounds,
 } from "./orbit-map-camera";
 
@@ -48,5 +49,25 @@ describe("orbit map camera helpers", () => {
 
     expect(camera.x).toBe(400);
     expect(camera.y).toBe(300);
+  });
+
+  it("frames bounds centered at their fit zoom (cluster fly-to)", () => {
+    const bounds = { minX: 100, maxX: 300, minY: 50, maxY: 250 };
+    const camera = getOrbitMapFrameCameraState(bounds, config);
+
+    expect(camera.zoom).toBe(getOrbitMapFitZoom(bounds, config));
+    // The bounds center (200, 150) lands at the viewport center (400, 300).
+    expect(camera.x + 200 * camera.zoom).toBeCloseTo(400);
+    expect(camera.y + 150 * camera.zoom).toBeCloseTo(300);
+  });
+
+  it("respects a lowered maxFitZoom when framing small clusters", () => {
+    const bounds = { minX: -40, maxX: 40, minY: -40, maxY: 40 };
+    const camera = getOrbitMapFrameCameraState(bounds, {
+      ...config,
+      maxFitZoom: 1.25,
+    });
+
+    expect(camera.zoom).toBe(1.25);
   });
 });

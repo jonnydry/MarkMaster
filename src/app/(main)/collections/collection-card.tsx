@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { CollectionWithCount } from "@/types";
 
+import { HighlightProgress } from "@/components/highlight-progress";
 import { cn } from "@/lib/utils";
 
 const collectionDateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -122,12 +123,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
             </>
           ) : null}
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-[2px] bg-surface-3">
-          <div
-            className="h-full rounded-[2px] bg-primary transition-all duration-700 ease-out"
-            style={{ width: `${scaleWidth}%` }}
-          />
-        </div>
+        <HighlightProgress className="mt-2" percent={scaleWidth} />
       </div>
 
       <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
@@ -223,12 +219,7 @@ export const XFolderCard = React.memo(function XFolderCard({
             </>
           ) : null}
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-[2px] bg-surface-3">
-          <div
-            className="h-full rounded-[2px] bg-note transition-all duration-700 ease-out"
-            style={{ width: `${scaleWidth}%` }}
-          />
-        </div>
+        <HighlightProgress className="mt-2" percent={scaleWidth} tone="note" />
       </div>
 
       <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">

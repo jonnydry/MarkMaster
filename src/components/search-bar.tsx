@@ -77,7 +77,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           className={cn(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass
-              ? "rounded-sm border-0 bg-transparent shadow-none focus:border-transparent focus:shadow-none focus:ring-2 focus:ring-primary/25 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-ring/45 dark:bg-transparent"
+              ? "rounded-sm border-0 bg-transparent shadow-none focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
               : "rounded-sm border-hairline-strong bg-surface-1 shadow-sm focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/25",
             inputClassName
           )}

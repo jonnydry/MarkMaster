@@ -9,6 +9,7 @@ import {
   highlightActiveClass,
   highlightIdleClass,
   highlightInteractiveClass,
+  highlightSearchShellClass,
   highlightSegmentActiveClass,
 } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,8 @@ export function ToolbarSearchField({
     return (
       <div
         className={cn(
-          "min-w-0 flex-1 overflow-hidden rounded-sm border border-hairline-strong bg-background/35",
+          "min-w-0 flex-1 bg-background/35",
+          highlightSearchShellClass,
           maxWidthClassName,
           className
         )}

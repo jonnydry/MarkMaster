@@ -180,7 +180,9 @@ export function SettingsRow({
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
         ) : null}
       </div>
-      <div className="shrink-0 sm:ml-4">{children}</div>
+      {/* Grows to a definite width (container queries in wide controls like
+          the accent picker need one) while small controls keep right-aligned. */}
+      <div className="min-w-0 sm:ml-4 sm:flex sm:flex-1 sm:justify-end">{children}</div>
     </div>
   );
 }

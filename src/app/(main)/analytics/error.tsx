@@ -16,7 +16,9 @@ export default function AnalyticsError({
         <p className="text-sm text-muted-foreground mb-4">
           {error.message || "An unexpected error occurred"}
         </p>
-        <Button onClick={reset}>Try again</Button>
+        <Button variant="highlight" onClick={reset}>
+          Try again
+        </Button>
       </div>
     </div>
   );

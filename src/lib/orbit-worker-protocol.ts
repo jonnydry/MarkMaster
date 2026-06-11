@@ -188,14 +188,11 @@ export interface InitMessage {
 export interface SetGraphMessage {
   type: typeof WorkerMessageType.SET_GRAPH;
   protocolVersion: number;
-  /** Full graph payload. Worker will derive internal node/link data structures. */
-  graph: OrbitGraphPayload;
   /**
-   * Optional persisted node positions (from localStorage or previous LAYOUT_UPDATED).
-   * Keys are node ids; values are world coordinates. Worker should prefer these
-   * over seeded random positions for layout stability across reloads.
+   * Full graph payload. The worker derives node/link data and computes a
+   * deterministic cluster layout — no persisted positions are needed.
    */
-  initialPositions?: Record<string, { x: number; y: number }>;
+  graph: OrbitGraphPayload;
 }
 
 export interface ResizeMessage {

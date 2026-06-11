@@ -49,6 +49,19 @@ const AddTagDialog = dynamic(
   { ssr: false }
 );
 
+const AddNoteDialog = dynamic(
+  () => import("@/components/add-note-dialog").then((m) => m.AddNoteDialog),
+  { ssr: false }
+);
+
+const GridBookmarkOverlay = dynamic(
+  () =>
+    import("@/components/grid-bookmark-overlay").then(
+      (m) => m.GridBookmarkOverlay
+    ),
+  { ssr: false }
+);
+
 const AddToCollectionDialog = dynamic(
   () =>
     import("@/components/add-to-collection-dialog").then(
@@ -111,9 +124,16 @@ export default function OrbitMapPage() {
     handleSyncComplete,
     handleCanvasSelectionChange,
     handleScopeChange,
-    handleLayoutUpdated,
     handleHoverChange,
     handleOpenBookmark,
+    expandedBookmark,
+    handleExpandedBookmarkOpenChange,
+    handleExpandedAddNote,
+    handleReviewInOrbit,
+    handleExpandedDelete,
+    noteDialogOpen,
+    noteTarget,
+    handleNoteDialogOpenChange,
     handleAssign,
     handleNodeDropped,
     openTagDialog,
@@ -283,8 +303,6 @@ export default function OrbitMapPage() {
                 onHoverChange={handleHoverChange}
                 onOpenBookmark={handleOpenBookmark}
                 onNodeDropped={handleNodeDropped}
-                onLayoutUpdated={handleLayoutUpdated}
-                layoutScope={graphScope}
                 focus={focus}
                 className="h-full w-full"
                 filterControlsClassName="left-4 top-[4.5rem]"
@@ -366,6 +384,31 @@ export default function OrbitMapPage() {
         onOpenChange={dialogs.setCreateCollectionOpen}
         onCreateCollection={createCollection}
       />
+
+      {expandedBookmark ? (
+        <GridBookmarkOverlay
+          open
+          onOpenChange={handleExpandedBookmarkOpenChange}
+          bookmark={expandedBookmark}
+          onAddTag={dialogs.openTagForBookmark}
+          onAddToCollection={dialogs.openCollectionForBookmark}
+          onAddNote={handleExpandedAddNote}
+          onReviewInOrbit={handleReviewInOrbit}
+          onDelete={handleExpandedDelete}
+        />
+      ) : null}
+
+      {noteDialogOpen && noteTarget ? (
+        <AddNoteDialog
+          open
+          onOpenChange={handleNoteDialogOpenChange}
+          bookmarkId={noteTarget.id}
+          existingNoteId={noteTarget.notes[0]?.id}
+          existingNote={noteTarget.notes[0]?.content}
+          onSave={actions.handleAddNote}
+          onDelete={actions.handleDeleteNote}
+        />
+      ) : null}
     </div>
   );
 }

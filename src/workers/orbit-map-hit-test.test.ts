@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { findClosestOrbitMapNode } from "./orbit-map-hit-test";
+import {
+  findClosestOrbitMapNode,
+  getOrbitMapHitPadding,
+} from "./orbit-map-hit-test";
 
 describe("findClosestOrbitMapNode", () => {
   it("returns the closest node within the padded hit radius", () => {
@@ -21,5 +24,27 @@ describe("findClosestOrbitMapNode", () => {
         y: 0,
       }, 8)
     ).toBeNull();
+  });
+});
+
+describe("getOrbitMapHitPadding", () => {
+  it("uses the base padding at near zoom where targets are already large", () => {
+    expect(getOrbitMapHitPadding(2)).toBe(10);
+    expect(getOrbitMapHitPadding(1.4)).toBe(10);
+  });
+
+  it("grows the world padding as zoom decreases to keep a constant screen target", () => {
+    // 14 screen px / zoom — padded target stays clickable when zoomed out.
+    expect(getOrbitMapHitPadding(0.5)).toBe(28);
+    expect(getOrbitMapHitPadding(0.25)).toBe(56);
+  });
+
+  it("respects a larger base padding (drop targets)", () => {
+    expect(getOrbitMapHitPadding(2, 14)).toBe(14);
+    expect(getOrbitMapHitPadding(0.5, 14)).toBe(28);
+  });
+
+  it("falls back to base padding for non-positive zoom", () => {
+    expect(getOrbitMapHitPadding(0)).toBe(10);
   });
 });

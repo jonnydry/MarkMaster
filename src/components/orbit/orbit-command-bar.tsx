@@ -26,6 +26,7 @@ import {
   appToolbarSurfaceGroupClassName,
   appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
+import { highlightSearchShellClass } from "@/lib/highlight-chrome";
 import { orbitControlRadius, orbitDataClass } from "@/lib/orbit-route-chrome";
 import {
   type OrbitScanBatchMode,
@@ -162,7 +163,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <OrbitPageIdentity queueTotal={total} />
 
           <div className="min-w-0 flex-1">
-            <div className={cn("overflow-hidden rounded-sm", appToolbarSurfaceShellClassName)}>
+            <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
               <SearchBar
                 ref={searchRef}
                 glass
@@ -270,12 +271,12 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                   />
                 </>
               ) : (
-                <div className="flex items-stretch">
+                <div className="flex items-center gap-1.5">
                   <Button
                     variant="highlight"
                     size="sm"
                     className={cn(
-                      "h-8 gap-1.5 rounded-r-none px-2.5 text-xs",
+                      "h-8 gap-1.5 px-2.5 text-xs",
                       orbitControlRadius()
                     )}
                     disabled={scanBusy || scanTargetCount === 0}
@@ -290,7 +291,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     <span className="sm:hidden">Scan</span>
                   </Button>
                   <OrbitBatchMenu
-                    attached
                     batchMode={batchMode}
                     resolvedBatchProfile={resolvedBatchProfile}
                     deepUnlocked={deepUnlocked}

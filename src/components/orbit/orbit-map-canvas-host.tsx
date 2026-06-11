@@ -5,7 +5,6 @@ import type { OrbitGraphPayload } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
 import { OrbitMapMinimap } from './orbit-map-minimap';
 import { OrbitMapUnsupportedState } from './orbit-map-unsupported-state';
-import { loadOrbitMapPositions } from '@/lib/orbit-map-layout-storage';
 
 // Import protocol types (including shared UI types)
 import {
@@ -36,25 +35,15 @@ interface OrbitMapCanvasHostProps {
     anchorId: string,
     anchorKind: 'tag' | 'collection'
   ) => void;
-  /** Called whenever the worker sends an updated layout (useful for persistence) */
-  onLayoutUpdated?: (positions: Record<string, { x: number; y: number }>) => void;
   className?: string;
   filterControlsClassName?: string;
   zoomControlsClassName?: string;
-  /** Persists layout positions per graph scope (library vs orbit). */
-  layoutScope?: string;
 }
 
 export interface OrbitMapCanvasHandle {
   focusOn: (input: string | { kind: string; id: string } | OrbitMapSelection) => void;
   resetView: () => void;
   animateAssign: (bookmarkId: string, anchorId: string) => Promise<void>;
-  /**
-   * Returns the most recent node positions received from the worker.
-   * These may include mid-simulation (non-stabilized) positions.
-   * Use `onLayoutUpdated` + `initialPositions` for high-quality persisted layouts.
-   */
-  getLatestPositions: () => Record<string, { x: number; y: number }>;
 }
 
 // Re-export shared types so pages can import them from this component (for backward compatibility)
@@ -131,13 +120,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }, []);
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
     const activeFilter = filter ?? internalFilter;
-    const layoutScope = props.layoutScope ?? 'library';
-
-    useEffect(() => {
-      const loaded = loadOrbitMapPositions(layoutScope);
-      stablePositionsRef.current = loaded;
-      latestPositionsRef.current = { ...loaded };
-    }, [layoutScope]);
 
     useEffect(() => {
       if (filter) setInternalFilter(filter);
@@ -147,31 +129,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       workerRef.current?.postMessage(msg);
     }, []);
 
-    // Stores the most recent node positions received from the worker (live, may be mid-simulation).
+    // Most recent node positions from the worker's deterministic layout
+    // (drives the minimap; nothing is persisted).
     const latestPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
-
-    // Stores only high-quality, stabilized layout snapshots.
-    // These are preferred for restoring layout across refreshes.
-    const stablePositionsRef = useRef<Record<string, { x: number; y: number }>>({});
-
-    /**
-     * Returns the best available positions for nodes in the given graph.
-     * Prefers stabilized positions when available, falls back to the most recent live positions.
-     */
-    const getRelevantPositions = (graph: OrbitGraphPayload): Record<string, { x: number; y: number }> => {
-      const positions: Record<string, { x: number; y: number }> = {};
-      const stable = stablePositionsRef.current;
-      const latest = latestPositionsRef.current;
-
-      for (const node of graph.nodes) {
-        if (stable[node.id]) {
-          positions[node.id] = stable[node.id];
-        } else if (latest[node.id]) {
-          positions[node.id] = latest[node.id];
-        }
-      }
-      return positions;
-    };
 
     // Check for OffscreenCanvas support + create worker
     useEffect(() => {
@@ -223,13 +183,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             switch (msg.type) {
               case MainMessageType.READY:
                 if (propsRef.current.graph && propsRef.current.graph.nodes.length > 0) {
-                  // Send graph cleanly, including any known positions for layout stability
-                  const initialPositions = getRelevantPositions(propsRef.current.graph);
                   const graphMessage: SetGraphMessage = {
                     type: WorkerMessageType.SET_GRAPH,
                     protocolVersion: 1,
                     graph: propsRef.current.graph,
-                    ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
                   };
                   workerRef.current?.postMessage(graphMessage);
                   lastGraphKey.current = getOrbitMapGraphKey(propsRef.current.graph);
@@ -301,22 +258,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     };
                   }
 
-                  // Always keep the most recent positions (live updates)
-                  latestPositionsRef.current = {
-                    ...latestPositionsRef.current,
-                    ...updated,
-                  };
-
-                  // Only update the stable snapshot when the worker says the layout has settled
-                  if (msg.stabilized) {
-                    stablePositionsRef.current = {
-                      ...stablePositionsRef.current,
-                      ...updated,
-                    };
-
-                    // Notify parent for persistence (e.g. localStorage)
-                    propsRef.current.onLayoutUpdated?.({ ...stablePositionsRef.current });
-                  }
+                  latestPositionsRef.current = updated;
 
                   // Let the minimap redraw with the fresh positions
                   bumpLayoutVersion();
@@ -398,13 +340,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       const graphChanged = lastGraphKey.current !== graphKey;
 
       if (graphChanged) {
-        // Send full graph, including any known positions for layout stability
-        const initialPositions = getRelevantPositions(graph);
         const graphMessage: SetGraphMessage = {
           type: WorkerMessageType.SET_GRAPH,
           protocolVersion: 1,
           graph,
-          ...(Object.keys(initialPositions).length > 0 && { initialPositions }),
         };
 
         workerRef.current.postMessage(graphMessage);
@@ -799,8 +738,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           });
         });
       },
-
-      getLatestPositions: () => ({ ...latestPositionsRef.current }),
     }), []);
 
     // If we need to fall back, render a small unsupported-browser state.

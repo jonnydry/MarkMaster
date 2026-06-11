@@ -1,27 +1,54 @@
-import { sendJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import type { QueryClient } from "@tanstack/react-query";
 import type { BookmarkWithRelations } from "@/types";
 
+type CollectionSummary = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+export type SaveGemsResult = {
+  collectionId: string;
+  /** false when gems were added to an existing collection with the same name. */
+  created: boolean;
+};
+
+/** Normalize curly/straight apostrophes and case so "This Week’s Gems" matches "This Week's Gems". */
+function normalizeCollectionName(name: string): string {
+  return name.replace(/[’‘]/g, "'").trim().toLowerCase();
+}
+
 /**
- * Create a user collection and add all gems in one request (batch bookmarkIds).
+ * Save gems into a collection with the given name. Reuses an existing user
+ * collection with the same name instead of spawning a duplicate each time,
+ * then adds all gems in one request (batch bookmarkIds).
  */
 export async function saveGemsAsCollection(
   queryClient: QueryClient,
   createCollectionQuick: (name: string) => Promise<string>,
   bookmarks: BookmarkWithRelations[],
   suggestedName: string
-): Promise<string> {
-  const newCollectionId = await createCollectionQuick(suggestedName);
+): Promise<SaveGemsResult> {
+  const target = normalizeCollectionName(suggestedName);
+  const existing = await fetchJson<CollectionSummary[]>("/api/collections");
+  const match = existing.find(
+    (collection) =>
+      collection.type === "user_collection" &&
+      normalizeCollectionName(collection.name) === target
+  );
+
+  const collectionId = match?.id ?? (await createCollectionQuick(suggestedName));
   const bookmarkIds = bookmarks.map((b) => b.id);
 
   if (bookmarkIds.length > 0) {
-    await sendJson(`/api/collections/${newCollectionId}/items`, {
+    await sendJson(`/api/collections/${collectionId}/items`, {
       method: "POST",
       body: { bookmarkIds },
     });
   }
 
   await invalidateCollectionsQuery(queryClient);
-  return newCollectionId;
+  return { collectionId, created: !match };
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Copy,
   Crosshair,
-  ExternalLink,
+  Maximize2,
   Folder,
   FolderOpen,
   LayoutGrid,
@@ -436,7 +436,7 @@ function SelectedClusterBody({
             onClick={() => onOpenBookmark(node.id)}
             disabled={!hasExplicitSelection}
           >
-            <ExternalLink className="size-4" />
+            <Maximize2 className="size-4" />
             Open
           </Button>
         </div>

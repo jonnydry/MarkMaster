@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { HighlightProgress } from "@/components/highlight-progress";
 import { cn } from "@/lib/utils";
 
 type PaginationVariant = "library" | "orbit";
@@ -27,6 +28,7 @@ export function PaginationControls({
   return (
     <div
       className={cn(
+        "group",
         isLibrary
           ? "flex flex-col items-center gap-3 border-t border-border py-4"
           : "flex items-center justify-center gap-2 pt-2",
@@ -89,14 +91,11 @@ export function PaginationControls({
         </button>
       </div>
       {isLibrary ? (
-        <div className="h-1 w-24 overflow-hidden rounded-[2px] bg-muted">
-          <div
-            className="h-full rounded-[2px] bg-primary/40 transition-all duration-300"
-            style={{
-              width: `${((page - 1) / Math.max(totalPages - 1, 1)) * 100}%`,
-            }}
-          />
-        </div>
+        <HighlightProgress
+          className="w-24"
+          percent={((page - 1) / Math.max(totalPages - 1, 1)) * 100}
+          durationClass="duration-300"
+        />
       ) : null}
     </div>
   );

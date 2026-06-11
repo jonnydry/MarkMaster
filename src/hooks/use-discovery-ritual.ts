@@ -95,7 +95,7 @@ export function useDiscoveryRitual({
     setCelebration({ gems: gemsCount, engagement: eng });
     setTimeout(() => setCelebration(null), 3800);
 
-    onSaveAsCollection(batch, "This Week’s Gems");
+    onSaveAsCollection(batch, "This Week's Gems");
   };
 
   return {

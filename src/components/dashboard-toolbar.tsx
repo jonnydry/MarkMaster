@@ -12,7 +12,11 @@ import {
 } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
-import { highlightActiveClass, highlightInteractiveClass } from "@/lib/highlight-chrome";
+import {
+  highlightActiveClass,
+  highlightInteractiveClass,
+  highlightSearchShellClass,
+} from "@/lib/highlight-chrome";
 import type { DbUser } from "@/lib/auth";
 import type { SortField, TagWithCount, ViewMode } from "@/types";
 
@@ -69,7 +73,7 @@ export function DashboardToolbar({
         <div className="shrink-0 md:hidden">{mobileSidebar}</div>
 
         <div className="min-w-0 flex-1">
-          <div className={cn("overflow-hidden rounded-sm", appToolbarSurfaceShellClassName)}>
+          <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
             <SearchBar
               ref={searchInputRef}
               glass

@@ -45,6 +45,12 @@ function writeStoredExpanded(value: boolean) {
   }
 }
 
+// Static store for hydration detection: snapshot differs between server and
+// client, so React re-renders with the stored state right after hydration.
+function subscribeHydrated() {
+  return () => {};
+}
+
 export type SidebarContextValue = {
   expanded: boolean;
   setExpanded: (value: boolean | ((prev: boolean) => boolean)) => void;
@@ -74,11 +80,20 @@ export function useSidebar() {
 }
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const expanded = useSyncExternalStore(
+  const storedExpanded = useSyncExternalStore(
     subscribeStoredExpanded,
     readStoredExpanded,
     () => true
   );
+
+  // The server always renders expanded; the stored (possibly collapsed) state
+  // is applied only after hydration so SSR and the hydration render match.
+  const hydrated = useSyncExternalStore(
+    subscribeHydrated,
+    () => true,
+    () => false
+  );
+  const expanded = hydrated ? storedExpanded : true;
 
   const setExpanded = useCallback(
     (value: boolean | ((prev: boolean) => boolean)) => {

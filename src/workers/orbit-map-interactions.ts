@@ -14,22 +14,25 @@ import {
   type PointerEventMessage,
 } from '@/lib/orbit-worker-protocol';
 
-import { findClosestOrbitMapNode, type OrbitMapHitTestNode } from './orbit-map-hit-test';
+import {
+  findClosestOrbitMapNode,
+  getOrbitMapHitPadding,
+  type OrbitMapHitTestNode,
+} from './orbit-map-hit-test';
 
 // A press only becomes a drag after the cursor travels past this many screen
 // pixels; otherwise pointer-up is treated as a click.
 const DRAG_THRESHOLD_PX = 4;
 
-/** Minimal structural view of a simulation node the state machine needs. */
+/** Minimal structural view of a map node the state machine needs. */
 export interface OrbitMapInteractionNode extends OrbitMapHitTestNode {
   node: { kind: OrbitMapSelection['kind'] };
-  fx?: number;
-  fy?: number;
 }
 
 export interface OrbitMapInteractionDeps<TNode extends OrbitMapInteractionNode> {
   /** True once the scene (app + graph + nodes) is ready for hit-testing. */
   hasScene(): boolean;
+  /** Nodes eligible for hit-testing (visible under the current filter/LOD). */
   getNodeData(): TNode[];
   getNodeById(): Map<string, TNode>;
   getCamera(): { x: number; y: number; zoom: number };
@@ -40,9 +43,8 @@ export interface OrbitMapInteractionDeps<TNode extends OrbitMapInteractionNode> 
   setSelection(selection: OrbitMapSelection | null): void;
   refreshNodeStyles(): void;
   postToMain(msg: MainMessage): void;
-  getSimulation(): { alphaTarget(target: number): unknown } | null;
-  kickSimulation(alpha: number): void;
-  startSimulationLoop(): void;
+  /** Animate a node back to its layout position after an uncommitted drag. */
+  returnNodeTo(nodeId: string, x: number, y: number): void;
   /** Arrival feedback pulse on a hub after a successful drop. */
   pulseNode(nodeId: string): void;
 }
@@ -66,6 +68,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
   let panMoved = false;
   let dragCandidate: { id: string; startX: number; startY: number } | null = null;
   let draggingNodeId: string | null = null;
+  let dragOrigin: { x: number; y: number } | null = null;
   let dropTargetId: string | null = null;
   let hubDropTargets: TNode[] = [];
   let currentHover: { id: string; kind: string } | null = null;
@@ -81,44 +84,45 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     });
   }
 
-  /** Starts dragging a node: pin it to the cursor and reheat the simulation. */
+  /** Starts dragging a node: remember its layout position, pin to cursor. */
   function beginNodeDrag(nodeId: string, worldX: number, worldY: number) {
     const datum = deps.getNodeById().get(nodeId);
-    if (!datum || !deps.getSimulation()) return;
+    if (!datum) return;
 
     draggingNodeId = nodeId;
+    dragOrigin = { x: datum.x ?? 0, y: datum.y ?? 0 };
     dropTargetId = null;
-    datum.fx = worldX;
-    datum.fy = worldY;
-
-    // Keep the simulation warm for the whole drag so connected nodes follow.
-    deps.getSimulation()?.alphaTarget(0.3);
-    deps.kickSimulation(0.3);
+    datum.x = worldX;
+    datum.y = worldY;
+    deps.refreshNodeStyles();
   }
 
   function moveNodeDrag(worldX: number, worldY: number) {
     const datum = draggingNodeId ? deps.getNodeById().get(draggingNodeId) : null;
     if (!datum) return;
 
-    datum.fx = worldX;
-    datum.fy = worldY;
+    datum.x = worldX;
+    datum.y = worldY;
 
     // Drag-to-assign: bookmarks can be dropped onto tag/collection hubs.
     if (datum.node.kind === 'bookmark') {
       const target = findClosestOrbitMapNode(
         hubDropTargets,
         { x: worldX, y: worldY },
-        14
+        getOrbitMapHitPadding(deps.getCamera().zoom, 14)
       );
       dropTargetId = target ? target.id : null;
     }
+    deps.refreshNodeStyles();
   }
 
   /** Ends a node drag; when `commit` is true a hub drop posts NODE_DROPPED. */
   function endNodeDrag(commit: boolean) {
     if (!draggingNodeId) return;
     const datum = deps.getNodeById().get(draggingNodeId);
+    const origin = dragOrigin;
 
+    let committed = false;
     if (commit && dropTargetId && datum?.node.kind === 'bookmark') {
       const target = deps.getNodeById().get(dropTargetId);
       const anchorKind = target?.node.kind;
@@ -133,17 +137,20 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
 
         // Arrival feedback on the hub.
         deps.pulseNode(dropTargetId);
+        committed = true;
       }
     }
 
-    if (datum) {
-      delete datum.fx;
-      delete datum.fy;
+    // Uncommitted drags glide back to their layout slot; committed drops stay
+    // put until the assign animation / graph refetch repositions the node.
+    if (!committed && datum && origin) {
+      deps.returnNodeTo(datum.id, origin.x, origin.y);
     }
+
     draggingNodeId = null;
+    dragOrigin = null;
     dropTargetId = null;
-    deps.getSimulation()?.alphaTarget(0);
-    deps.startSimulationLoop();
+    deps.refreshNodeStyles();
   }
 
   function handlePointerEvent(msg: PointerEventMessage) {
@@ -218,7 +225,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       const closest = findClosestOrbitMapNode(
         nodeData,
         { x: worldX, y: worldY },
-        10
+        getOrbitMapHitPadding(camera.zoom)
       );
       const newHover = closest
         ? { id: closest.id, kind: closest.node.kind }
@@ -254,7 +261,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       const closest = findClosestOrbitMapNode(
         nodeData,
         { x: worldX, y: worldY },
-        10
+        getOrbitMapHitPadding(camera.zoom)
       );
 
       if (closest) {
@@ -306,7 +313,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       const closest = findClosestOrbitMapNode(
         nodeData,
         { x: worldX, y: worldY },
-        10
+        getOrbitMapHitPadding(camera.zoom)
       );
       setCursor(closest ? 'pointer' : 'grab');
     }
@@ -321,6 +328,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     /** Drops drag/press state when the scene is rebuilt under the pointer. */
     resetSceneState() {
       draggingNodeId = null;
+      dragOrigin = null;
       dropTargetId = null;
       dragCandidate = null;
     },
@@ -333,6 +341,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       panMoved = false;
       dragCandidate = null;
       draggingNodeId = null;
+      dragOrigin = null;
       dropTargetId = null;
       hubDropTargets = [];
       currentHover = null;

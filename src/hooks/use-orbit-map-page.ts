@@ -80,14 +80,12 @@ export function useOrbitMapPage() {
     handleScopeChange: applyScopeChange,
   } = url;
 
-  const layout = useOrbitMapLayout(graphScope);
+  const layout = useOrbitMapLayout();
   const {
     stageRef,
     stageSize,
     hoverCard,
-    handleLayoutUpdated,
     handleHoverChange: applyHoverChange,
-    flushPendingLayoutSave,
     resetHover,
   } = layout;
 
@@ -97,6 +95,14 @@ export function useOrbitMapPage() {
 
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [expandedAnchors, setExpandedAnchors] = useState<string[]>([]);
+  // Bookmark shown in the expanded overlay (same modal as the dashboard grid).
+  const [expandedBookmarkId, setExpandedBookmarkId] = useState<string | null>(
+    null
+  );
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteTarget, setNoteTarget] = useState<BookmarkWithRelations | null>(
+    null
+  );
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
 
   const {
@@ -135,8 +141,36 @@ export function useOrbitMapPage() {
     });
   const focusedBookmark = focusedBookmarkData?.bookmarks?.[0] ?? null;
 
+  const { data: expandedBookmarkData } = useQuery({
+    queryKey: ["bookmarks", "orbit-map-expanded", expandedBookmarkId],
+    queryFn: () =>
+      fetchJson<{ bookmarks: BookmarkWithRelations[] }>(
+        `/api/bookmarks?bookmarkId=${encodeURIComponent(expandedBookmarkId!)}&limit=1`
+      ),
+    enabled: Boolean(expandedBookmarkId),
+  });
+
+  const expandedBookmark = useMemo(() => {
+    if (!expandedBookmarkId) return null;
+    const fetched = expandedBookmarkData?.bookmarks?.[0];
+    if (fetched && fetched.id === expandedBookmarkId) return fetched;
+    // Usually the opened bookmark is already selected — reuse the focus
+    // query's data so the overlay appears instantly.
+    if (focusedBookmark?.id === expandedBookmarkId) return focusedBookmark;
+    return null;
+  }, [expandedBookmarkId, expandedBookmarkData, focusedBookmark]);
+
+  const externalDialogBookmarks = useMemo(() => {
+    const bookmarks: BookmarkWithRelations[] = [];
+    if (focusedBookmark) bookmarks.push(focusedBookmark);
+    if (expandedBookmark && expandedBookmark.id !== focusedBookmark?.id) {
+      bookmarks.push(expandedBookmark);
+    }
+    return bookmarks;
+  }, [expandedBookmark, focusedBookmark]);
+
   const dialogs = useBookmarkDialogs({
-    externalBookmarks: focusedBookmark ? [focusedBookmark] : [],
+    externalBookmarks: externalDialogBookmarks,
     onDialogClose: () => {
       void refetch();
     },
@@ -213,11 +247,50 @@ export function useOrbitMapPage() {
 
   const handleCreateCollectionOpen = dialogs.handleCreateCollectionOpen;
 
-  const handleOpenBookmark = useCallback(
+  // Opens the expanded bookmark overlay in place (the same modal the
+  // dashboard uses) instead of navigating away from the graph.
+  const handleOpenBookmark = useCallback((bookmarkId: string) => {
+    setExpandedBookmarkId(bookmarkId);
+  }, []);
+
+  const handleExpandedBookmarkOpenChange = useCallback((open: boolean) => {
+    if (!open) setExpandedBookmarkId(null);
+  }, []);
+
+  const handleExpandedAddNote = useCallback(
     (bookmarkId: string) => {
-      router.push(`/dashboard?bookmark=${encodeURIComponent(bookmarkId)}`);
+      const bookmark =
+        expandedBookmark?.id === bookmarkId
+          ? expandedBookmark
+          : focusedBookmark?.id === bookmarkId
+            ? focusedBookmark
+            : null;
+      if (!bookmark) return;
+      setNoteTarget(bookmark);
+      setNoteDialogOpen(true);
+    },
+    [expandedBookmark, focusedBookmark]
+  );
+
+  const handleNoteDialogOpenChange = useCallback((open: boolean) => {
+    setNoteDialogOpen(open);
+    if (!open) setNoteTarget(null);
+  }, []);
+
+  const handleReviewInOrbit = useCallback(
+    (bookmarkId: string) => {
+      router.push(`/orbit?highlightId=${encodeURIComponent(bookmarkId)}`);
     },
     [router]
+  );
+
+  const handleExpandedDelete = useCallback(
+    async (bookmarkId: string) => {
+      setExpandedBookmarkId(null);
+      await actions.handleDeleteBookmark(bookmarkId);
+      void refetch();
+    },
+    [actions, refetch]
   );
 
   const stats = graph?.stats;
@@ -240,11 +313,10 @@ export function useOrbitMapPage() {
     (next: OrbitGraphScope) => {
       setExpandedAnchors([]);
       applyScopeChange(next, () => {
-        flushPendingLayoutSave();
         resetHover();
       });
     },
-    [applyScopeChange, flushPendingLayoutSave, resetHover]
+    [applyScopeChange, resetHover]
   );
 
   // Clicking a "+N more" overflow node expands its anchor's cluster in place
@@ -366,9 +438,16 @@ export function useOrbitMapPage() {
     handleSelectionChange,
     handleCanvasSelectionChange,
     handleScopeChange,
-    handleLayoutUpdated,
     handleHoverChange,
     handleOpenBookmark,
+    expandedBookmark,
+    handleExpandedBookmarkOpenChange,
+    handleExpandedAddNote,
+    handleReviewInOrbit,
+    handleExpandedDelete,
+    noteDialogOpen,
+    noteTarget,
+    handleNoteDialogOpenChange,
     handleAssign,
     handleNodeDropped,
     openTagDialog,

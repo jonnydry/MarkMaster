@@ -412,35 +412,114 @@ export const BookmarkCard = memo(function BookmarkCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="flex min-w-0 w-full items-center gap-2 sm:w-auto">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap">
-                <span className="font-semibold text-sm text-foreground truncate">
-                  {highlightedAuthorName}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-x-2 gap-y-0.5 overflow-hidden">
+              <span className="font-semibold text-sm text-foreground truncate">
+                {highlightedAuthorName}
+              </span>
+              {bookmark.authorVerified && (
+                <BadgeCheck
+                  className="size-3.5 text-primary shrink-0"
+                  aria-label="Verified account"
+                />
+              )}
+              <span className="text-muted-foreground truncate">
+                @{highlightedUsername}
+              </span>
+              <span className="text-muted-foreground shrink-0">·</span>
+              <span className="text-muted-foreground shrink-0 whitespace-nowrap">
+                {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
+                  addSuffix: true})}
+              </span>
+            </div>
+            <XLogoMark
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              title="Post from X"
+            />
+          </div>
+
+          <div className="mt-2 text-[15px] leading-7 text-foreground whitespace-pre-wrap">
+            {highlightedText}
+          </div>
+
+          {mediaItems && mediaItems.length > 0 && (
+            <BookmarkMediaGallery
+              media={mediaItems}
+              authorUsername={bookmark.authorUsername}
+              variant="feed"
+              bookmarkKey={bookmark.id}
+              priority={priorityMedia}
+              tweetLink={{
+                authorUsername: bookmark.authorUsername,
+                tweetId: bookmark.tweetId}}
+            />
+          )}
+
+          {bookmark.quotedTweet && (
+            <div
+              aria-label="Quoted tweet"
+              className="mt-3 rounded-sm border border-hairline-soft bg-transparent p-3"
+            >
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className="font-medium text-sm text-foreground">
+                  {bookmark.quotedTweet.author?.name}
                 </span>
-                {bookmark.authorVerified && (
-                  <BadgeCheck
-                    className="size-3.5 text-primary shrink-0"
-                    aria-label="Verified account"
-                  />
-                )}
-                <span className="text-muted-foreground truncate">
-                  @{highlightedUsername}
-                </span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground whitespace-nowrap">
-                  {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
-                    addSuffix: true})}
+                <span className="text-xs text-muted-foreground">
+                  @{bookmark.quotedTweet.author?.username}
                 </span>
               </div>
-              <XLogoMark
-                className="h-3.5 w-3.5 shrink-0 text-muted-foreground sm:ml-2"
-                title="Post from X"
-              />
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {bookmark.quotedTweet.text}
+              </p>
             </div>
+          )}
+
+          {bookmark.notes.length > 0 && (
+            <div className="mt-3 border-l-2 border-l-note bg-transparent px-3 py-2.5">
+              <p className="text-xs leading-snug text-muted-foreground">
+                {highlightedNote}
+              </p>
+            </div>
+          )}
+
+          {bookmark.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {bookmark.tags.map(({ tag }) => (
+                <TagPill
+                  key={tag.id}
+                  name={tag.name}
+                  onClick={() => onTagClick?.(tag.id)}
+
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft pt-2.5">
+            {metrics ? (
+              <dl className="flex min-w-0 items-center gap-3 text-muted-foreground">
+                <div className="flex items-center gap-1 text-xs">
+                  <dt className="sr-only">Replies</dt>
+                  <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
+                  <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.reply_count)}</dd>
+                </div>
+                <div className="flex items-center gap-1 text-xs">
+                  <dt className="sr-only">Reposts</dt>
+                  <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
+                  <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.retweet_count)}</dd>
+                </div>
+                <div className="flex items-center gap-1 text-xs">
+                  <dt className="sr-only">Likes</dt>
+                  <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
+                  <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.like_count)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <div className="min-w-0 flex-1" aria-hidden="true" />
+            )}
             <div
               className={cn(
-                "flex self-start shrink-0 items-center gap-1 border-l border-hairline-soft pl-2 opacity-100 transition-opacity sm:self-auto",
+                "flex shrink-0 items-center gap-1 opacity-100 transition-opacity",
                 compactExpanded
                   ? "sm:opacity-100"
                   : "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
@@ -502,83 +581,6 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
             </div>
           </div>
-
-          <div className="mt-2 text-[15px] leading-7 text-foreground whitespace-pre-wrap">
-            {highlightedText}
-          </div>
-
-          {mediaItems && mediaItems.length > 0 && (
-            <BookmarkMediaGallery
-              media={mediaItems}
-              authorUsername={bookmark.authorUsername}
-              variant="feed"
-              bookmarkKey={bookmark.id}
-              priority={priorityMedia}
-              tweetLink={{
-                authorUsername: bookmark.authorUsername,
-                tweetId: bookmark.tweetId}}
-            />
-          )}
-
-          {bookmark.quotedTweet && (
-            <div
-              aria-label="Quoted tweet"
-              className="mt-3 rounded-sm border border-hairline-soft bg-transparent p-3"
-            >
-              <div className="mb-1 flex items-center gap-1.5">
-                <span className="font-medium text-sm text-foreground">
-                  {bookmark.quotedTweet.author?.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  @{bookmark.quotedTweet.author?.username}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground line-clamp-3">
-                {bookmark.quotedTweet.text}
-              </p>
-            </div>
-          )}
-
-          {bookmark.notes.length > 0 && (
-            <div className="mt-3 border-l-2 border-l-note bg-transparent px-3 py-2.5">
-              <p className="text-xs leading-snug text-muted-foreground">
-                {highlightedNote}
-              </p>
-            </div>
-          )}
-
-          {bookmark.tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {bookmark.tags.map(({ tag }) => (
-                <TagPill
-                  key={tag.id}
-                  name={tag.name}
-                  onClick={() => onTagClick?.(tag.id)}
-
-                />
-              ))}
-            </div>
-          )}
-
-          {metrics && (
-            <dl className="mt-3 flex items-center gap-3 border-t border-hairline-soft pt-2.5 text-muted-foreground">
-              <div className="flex items-center gap-1 text-xs">
-                <dt className="sr-only">Replies</dt>
-                <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.reply_count)}</dd>
-              </div>
-              <div className="flex items-center gap-1 text-xs">
-                <dt className="sr-only">Reposts</dt>
-                <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.retweet_count)}</dd>
-              </div>
-              <div className="flex items-center gap-1 text-xs">
-                <dt className="sr-only">Likes</dt>
-                <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-                <dd className={t.monoNative ? t.data : undefined}>{formatCompactCount(metrics.like_count)}</dd>
-              </div>
-            </dl>
-          )}
         </div>
       </div>
     </div>

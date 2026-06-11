@@ -18,10 +18,10 @@ import { CollectionsControlBar } from "./collections-control-bar";
 import { CollectionsOverview } from "./collections-overview";
 import { NoCollectionMatches } from "./collections-no-matches";
 import { CollectionsSection } from "./collections-section";
-import { LazyCollectionsDiscoverySlot } from "./lazy-collections-discovery-slot";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
+import { PageWatermark } from "@/components/page-watermark";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -73,8 +73,9 @@ export default function CollectionsPage() {
   } = page;
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-hidden">
-      <div className="hidden md:block h-full min-h-0 shrink-0 overflow-hidden">
+    <div className="app-shell-bg app-viewport relative flex overflow-hidden">
+      <PageWatermark variant="collections" />
+      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
           collections={collections}
@@ -87,7 +88,7 @@ export default function CollectionsPage() {
         />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="app-main-scroll scrollbar-thin">
           <PageHeader
             sticky
@@ -115,6 +116,7 @@ export default function CollectionsPage() {
                   description="Collection browsing, filtering, and creation shortcuts."
                 />
                 <Button
+                  variant="highlight"
                   size="sm"
                   onClick={handleCreateCollectionOpen}
                   className="h-9 gap-2 px-3 text-sm"
@@ -157,7 +159,11 @@ export default function CollectionsPage() {
                 title="No collections yet"
                 description="Create a collection to start curating your bookmarks."
                 action={
-                  <Button onClick={handleCreateCollectionOpen} className="mt-5 gap-2">
+                  <Button
+                    variant="highlight"
+                    onClick={handleCreateCollectionOpen}
+                    className="mt-5 gap-2"
+                  >
                     <Plus className="h-4 w-4" />
                     Create collection
                   </Button>
@@ -181,8 +187,6 @@ export default function CollectionsPage() {
                   onCreateCollection={handleCreateCollectionOpen}
                   onOpenCollection={handleNavigate}
                 />
-
-                <LazyCollectionsDiscoverySlot tags={tags} />
 
                 <CollectionsControlBar
                   searchQuery={searchQuery}

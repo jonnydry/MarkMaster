@@ -10,13 +10,42 @@ const MINIMAP_WIDTH = 168;
 const MINIMAP_HEIGHT = 112;
 const MINIMAP_PADDING = 8;
 
-const KIND_COLORS: Record<string, string> = {
-  bookmark: "rgba(148,163,184,0.55)",
-  tag: "rgba(52,211,153,0.9)",
-  collection: "rgba(244,114,182,0.9)",
-  core: "rgba(250,204,21,0.95)",
-  overflow: "rgba(249,115,22,0.85)",
-};
+const CORE_COLOR = "#facc15";
+const TAG_FALLBACK_COLOR = "#34d399";
+const USER_COLLECTION_COLOR = "#f472b6";
+const X_FOLDER_COLOR = "#a78bfa";
+
+/**
+ * Hub-level rendering (matches the map's far LOD band): the minimap reads as
+ * a topic overview — one colored dot per hub, sized by bookmark count —
+ * instead of replicating every bookmark as noise.
+ */
+function getHubStyle(
+  node: OrbitGraphPayload["nodes"][number]
+): { color: string; radius: number } | null {
+  switch (node.kind) {
+    case "core":
+      return { color: CORE_COLOR, radius: 2.5 };
+    case "tag":
+      return {
+        color: node.color || TAG_FALLBACK_COLOR,
+        radius: 1.6 + Math.min(2.6, Math.sqrt(Math.max(0, node.count)) * 0.34),
+      };
+    case "collection":
+      return {
+        color:
+          node.variant === "x_folder" ? X_FOLDER_COLOR : USER_COLLECTION_COLOR,
+        radius: 1.6 + Math.min(2.6, Math.sqrt(Math.max(0, node.count)) * 0.34),
+      };
+    case "bookmark":
+    case "overflow":
+      return null;
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
+}
 
 interface MinimapTransform {
   scale: number;
@@ -91,15 +120,24 @@ export function OrbitMapMinimap({
     for (const node of graph.nodes) {
       const position = positions[node.id];
       if (!position) continue;
+      const style = getHubStyle(node);
+      if (!style) continue;
       const x = position.x * scale + offsetX;
       const y = position.y * scale + offsetY;
-      const isHub =
-        node.kind === "tag" || node.kind === "collection" || node.kind === "core";
-      ctx.fillStyle = KIND_COLORS[node.kind] ?? KIND_COLORS.bookmark;
+
+      // Soft halo so big topics read at a glance, then the hub dot itself.
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = style.color;
       ctx.beginPath();
-      ctx.arc(x, y, isHub ? 2 : 1, 0, Math.PI * 2);
+      ctx.arc(x, y, style.radius * 2.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = 0.92;
+      ctx.beginPath();
+      ctx.arc(x, y, style.radius, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
 
     // Viewport rectangle (visible world rect of the main canvas)
     if (camera && viewport && camera.zoom > 0) {

@@ -8,6 +8,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { HighlightProgress } from "@/components/highlight-progress";
 import { buttonVariants } from "@/components/ui/button";
 import { ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import { cn } from "@/lib/utils";
@@ -194,7 +195,13 @@ export function AnalyticsHero({
           />
         </dl>
         {!allTriaged && orbitQueueCount > 0 ? (
-          <Link href={orbitHref} className={cn(buttonVariants({ size: "sm" }), "shrink-0 gap-1")}>
+          <Link
+            href={orbitHref}
+            className={cn(
+              buttonVariants({ variant: "highlight", size: "sm" }),
+              "shrink-0 gap-1"
+            )}
+          >
             Triage now
             <ArrowRight className="size-3.5" aria-hidden />
           </Link>
@@ -206,12 +213,11 @@ export function AnalyticsHero({
           <span>Tagged {triagedPct.toFixed(0)}%</span>
           <span>Untagged {untaggedPct.toFixed(0)}%</span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
-          <div
-            className="h-full rounded-[2px] bg-primary transition-all duration-700 ease-out"
-            style={{ width: `${triagedPct}%` }}
-          />
-        </div>
+        <HighlightProgress
+          className="mt-1.5 w-full"
+          percent={triagedPct}
+          size="md"
+        />
         <p className="mt-2 text-xs text-muted-foreground">
           {syncLabel}
           <span className="text-muted-foreground/50"> · </span>

@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
+import { HighlightProgress } from "@/components/highlight-progress";
 import { analyticsChartSurfaceClass } from "./analytics-primitives";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +94,7 @@ function SectionHeading({
         <span
           className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-sm",
-            "bg-primary/8 text-primary"
+            "border border-primary/15 bg-primary/10 text-primary"
           )}
         >
           {icon}
@@ -245,12 +246,12 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                         </span>
                       </div>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
-                      <div
-                        className="h-full rounded-[2px] bg-primary transition-all duration-500 ease-out"
-                        style={{ width: `${share}%` }}
-                      />
-                    </div>
+                    <HighlightProgress
+                      className="w-full"
+                      percent={share}
+                      size="md"
+                      durationClass="duration-500"
+                    />
                     <div className="flex flex-col items-end leading-tight">
                       <span
                         className={cn(
@@ -475,12 +476,12 @@ export const TagRankCard = React.memo(function TagRankCard({
                   >
                     {t.tag}
                   </span>
-                  <div className="h-1.5 w-full overflow-hidden rounded-[2px] bg-surface-3">
-                    <div
-                      className="h-full rounded-[2px] bg-primary transition-all duration-500 ease-out"
-                      style={{ width: `${share}%` }}
-                    />
-                  </div>
+                  <HighlightProgress
+                    className="w-full"
+                    percent={share}
+                    size="md"
+                    durationClass="duration-500"
+                  />
                   <span
                     className={cn(
                       "text-xs tabular-nums",

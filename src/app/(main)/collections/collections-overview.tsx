@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { HighlightProgress } from "@/components/highlight-progress";
 import { Button } from "@/components/ui/button";
 import {
   bookmarkLabel,
@@ -100,6 +101,7 @@ export function CollectionsOverview({
             </div>
           </div>
           <Button
+            variant="highlight"
             size="sm"
             className="h-9 w-full gap-1.5 sm:w-auto"
             onClick={onCreateCollection}
@@ -152,7 +154,7 @@ export function CollectionsOverview({
         {largestCollection ? (
           <button
             type="button"
-            className="mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="group mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onOpenCollection(largestCollection.id)}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -166,12 +168,12 @@ export function CollectionsOverview({
               </div>
               <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-[2px] bg-surface-3">
-              <div
-                className="h-full rounded-[2px] bg-note transition-all duration-700 ease-out"
-                style={{ width: `${largestWidth}%` }}
-              />
-            </div>
+            <HighlightProgress
+              className="mt-3"
+              percent={largestWidth}
+              tone="note"
+              size="md"
+            />
           </button>
         ) : (
           <div className="mt-4 rounded-sm border border-dashed border-hairline-soft bg-transparent p-3 text-sm text-muted-foreground">

@@ -98,6 +98,25 @@ export function clampOrbitMapZoom(
   );
 }
 
+/**
+ * Camera state that centers `bounds` in the viewport at its fit zoom.
+ * Used for cluster fly-to framing; the caller constrains the result against
+ * the full graph bounds.
+ */
+export function getOrbitMapFrameCameraState(
+  bounds: OrbitMapGraphBounds,
+  config: OrbitMapCameraConfig
+): CameraState {
+  const zoom = getOrbitMapFitZoom(bounds, config);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  return {
+    x: config.viewportWidth / 2 - centerX * zoom,
+    y: config.viewportHeight / 2 - centerY * zoom,
+    zoom,
+  };
+}
+
 export function constrainOrbitMapCameraState(
   nextCamera: CameraState,
   bounds: OrbitMapGraphBounds | null,

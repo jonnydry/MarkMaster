@@ -51,8 +51,17 @@ export function useDashboardPage() {
     suggestedName: string
   ) => {
     try {
-      await saveGemsAsCollection(queryClient, createCollectionQuick, bookmarks, suggestedName);
-      toast.success(`Created "${suggestedName}" with ${bookmarks.length} gems`);
+      const { created } = await saveGemsAsCollection(
+        queryClient,
+        createCollectionQuick,
+        bookmarks,
+        suggestedName
+      );
+      toast.success(
+        created
+          ? `Created "${suggestedName}" with ${bookmarks.length} gems`
+          : `Added ${bookmarks.length} gems to "${suggestedName}"`
+      );
     } catch {
       toast.error("Could not save the gems as a collection");
     }
