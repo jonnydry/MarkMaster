@@ -57,13 +57,11 @@
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Micro text step — smallest sanctioned size (labels, badges, meta). */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-up: fade-in-up 0.45s ease-out both;
-  --animate-slide-in: slide-in 0.3s ease-out both;
-  --animate-scale-in: scale-in 0.2s ease-out both;
 }
 
 :root {
@@ -455,8 +453,7 @@
 }
 
 /* Global Monospace Mode: full 3-tier suite (JetBrains body/data, IBM Plex labels) */
-[data-typography-preset="mono"],
-[data-font-mode="mono"] {
+[data-typography-preset="mono"] {
   --font-sans: var(--font-jetbrains-mono);
   --font-heading: var(--font-jetbrains-mono);
   --font-label: var(--font-ibm-plex-mono);
@@ -469,12 +466,7 @@
 [data-typography-preset="mono"] button,
 [data-typography-preset="mono"] input,
 [data-typography-preset="mono"] textarea,
-[data-typography-preset="mono"] select,
-[data-font-mode="mono"] body,
-[data-font-mode="mono"] button,
-[data-font-mode="mono"] input,
-[data-font-mode="mono"] textarea,
-[data-font-mode="mono"] select {
+[data-typography-preset="mono"] select {
   font-family: var(--font-sans);
 }
 
@@ -491,28 +483,6 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
   }
 }
 
@@ -904,8 +874,7 @@
   }
 
   /* 3-tier Monospace-Native Typography: active under the mono preset */
-  [data-typography-preset="mono"] .text-mono-display,
-  [data-font-mode="mono"] .text-mono-display {
+  [data-typography-preset="mono"] .text-mono-display {
     font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 700;
     letter-spacing: 0;
@@ -913,9 +882,7 @@
   }
 
   [data-typography-preset="mono"] .text-mono-ui,
-  [data-typography-preset="mono"] .text-mono-label,
-  [data-font-mode="mono"] .text-mono-ui,
-  [data-font-mode="mono"] .text-mono-label {
+  [data-typography-preset="mono"] .text-mono-label {
     font-family: var(--font-label), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -924,8 +891,7 @@
     font-size: 0.625rem;
   }
 
-  [data-typography-preset="mono"] .text-mono-data,
-  [data-font-mode="mono"] .text-mono-data {
+  [data-typography-preset="mono"] .text-mono-data {
     font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;
@@ -933,9 +899,7 @@
 
   /* Tier 1 — display headings */
   [data-typography-preset="mono"] .text-heading-display,
-  [data-typography-preset="mono"] h1.heading-font,
-  [data-font-mode="mono"] .text-heading-display,
-  [data-font-mode="mono"] h1.heading-font {
+  [data-typography-preset="mono"] h1.heading-font {
     font-family: var(--font-heading), var(--font-data), ui-monospace, SFMono-Regular, monospace;
     font-weight: 700;
     letter-spacing: 0;
@@ -947,12 +911,7 @@
   [data-typography-preset="mono"] [data-slot="label"],
   [data-typography-preset="mono"] .app-chrome-label,
   [data-typography-preset="mono"] h2.heading-font,
-  [data-typography-preset="mono"] [data-slot="dialog-title"],
-  [data-font-mode="mono"] label,
-  [data-font-mode="mono"] [data-slot="label"],
-  [data-font-mode="mono"] .app-chrome-label,
-  [data-font-mode="mono"] h2.heading-font,
-  [data-font-mode="mono"] [data-slot="dialog-title"] {
+  [data-typography-preset="mono"] [data-slot="dialog-title"] {
     font-family: var(--font-label), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 500;
     letter-spacing: 0.12em;
@@ -960,20 +919,17 @@
     font-variant-numeric: tabular-nums;
   }
 
-  [data-typography-preset="mono"] .app-chrome-label,
-  [data-font-mode="mono"] .app-chrome-label {
+  [data-typography-preset="mono"] .app-chrome-label {
     letter-spacing: 0.14em;
     font-size: 0.625rem;
   }
 
-  [data-typography-preset="mono"] h2.heading-font,
-  [data-font-mode="mono"] h2.heading-font {
+  [data-typography-preset="mono"] h2.heading-font {
     font-size: 0.6875rem;
   }
 
   /* Tier 3 — tabular data */
-  [data-typography-preset="mono"] .tabular-nums,
-  [data-font-mode="mono"] .tabular-nums {
+  [data-typography-preset="mono"] .tabular-nums {
     font-family: var(--font-data), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-feature-settings: "tnum";
     font-variant-numeric: tabular-nums;

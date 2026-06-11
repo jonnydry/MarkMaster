@@ -89,7 +89,7 @@ export interface OrbitCommandBarProps {
 }
 
 const countBadgeClass =
-  "text-[10px] font-medium tabular-nums text-muted-foreground/80";
+  "text-2xs font-medium tabular-nums text-muted-foreground/80";
 
 /**
  * Dashboard-native Orbit toolbar — search strip in the sticky header, compact
@@ -345,7 +345,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         ) : null}
 
         {canSelect ? (
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-xs text-muted-foreground">
             <span className={cn(orbitDataClass(), "normal-case")}>
               {visibleStatusLabel}
             </span>

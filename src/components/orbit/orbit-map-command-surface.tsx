@@ -180,7 +180,7 @@ function ResultKindLabel({
   return (
     <span
       className={cn(
-        "ml-auto text-[10px] uppercase tracking-wider",
+        "ml-auto text-2xs uppercase tracking-wider",
         "text-white/40"
       )}
     >

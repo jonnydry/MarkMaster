@@ -102,7 +102,7 @@ export function DashboardToolbar({
           >
             <span className="hidden sm:inline">{primaryFilterLabel}</span>
             <span className="sm:hidden">{primaryFilterCompactLabel}</span>
-            <span className="tabular-nums text-[10px] font-medium text-muted-foreground">
+            <span className="tabular-nums text-2xs font-medium text-muted-foreground">
               {total.toLocaleString()}
             </span>
           </button>

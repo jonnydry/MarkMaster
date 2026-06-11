@@ -83,11 +83,11 @@ export function SettingsHero({
       </div>
       <dl className="hidden shrink-0 gap-4 text-right sm:flex">
         <div>
-          <dt className="text-[11px] text-muted-foreground">Tags</dt>
+          <dt className="text-xs text-muted-foreground">Tags</dt>
           <dd className="text-sm font-semibold tabular-nums">{tagCount.toLocaleString()}</dd>
         </div>
         <div>
-          <dt className="text-[11px] text-muted-foreground">Collections</dt>
+          <dt className="text-xs text-muted-foreground">Collections</dt>
           <dd className="text-sm font-semibold tabular-nums">
             {collectionCount.toLocaleString()}
           </dd>

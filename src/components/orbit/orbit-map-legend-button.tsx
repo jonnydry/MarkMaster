@@ -67,7 +67,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
             </li>
           </ul>
         </div>
-        <p className={cn("border-t border-hairline-soft pt-2 text-[10px]", orbitMetaMuted())}>
+        <p className={cn("border-t border-hairline-soft pt-2 text-2xs", orbitMetaMuted())}>
           Scroll to zoom · drag to pan · click to focus · Esc to clear
         </p>
       </PopoverContent>

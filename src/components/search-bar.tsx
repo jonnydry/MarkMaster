@@ -59,7 +59,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     const defaultHint = !value && (
       <kbd
         aria-hidden="true"
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-sm border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted-foreground/60 shadow-sm"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-sm border border-hairline-soft bg-surface-2 px-1.5 py-0.5 text-xs text-muted-foreground/60 shadow-sm"
       >
         /
       </kbd>

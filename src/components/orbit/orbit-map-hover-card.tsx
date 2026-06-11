@@ -59,7 +59,7 @@ export function OrbitMapHoverCard({
         {node.title}
       </p>
       {node.recent ? (
-        <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-primary/80">
+        <span className="mt-1.5 inline-flex items-center gap-1 text-2xs text-primary/80">
           <Clock className="size-3" />
           Recent
         </span>

@@ -53,7 +53,7 @@ export function OrbitScanFailureNotice({
             <span
               className={cn(
                 orbital.label,
-                "inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em]",
+                "inline-flex items-center rounded-sm border px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.14em]",
                 presentation.badgeClassName
               )}
             >

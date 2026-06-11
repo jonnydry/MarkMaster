@@ -70,7 +70,7 @@ export function HighlightCard({
         onOrbitReview(bookmark.id);
       }}
       className={cn(
-        "self-start text-[10px] uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none",
+        "self-start text-2xs uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none",
         t.monoNative && t.label
       )}
     >
@@ -167,7 +167,7 @@ export function HighlightCard({
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             className={cn(
-              "truncate text-[10px] font-bold uppercase tracking-[0.08em] text-primary",
+              "truncate text-2xs font-bold uppercase tracking-[0.08em] text-primary",
               t.monoNative && t.label
             )}
           >
@@ -176,8 +176,8 @@ export function HighlightCard({
           {itemLabel ? (
             <span
               className={cn(
-                "rounded px-1.5 py-px text-[9px]",
-                "border border-amber-400/20 bg-amber-400/10 text-[9px] uppercase tracking-wider text-amber-200"
+                "rounded px-1.5 py-px text-2xs",
+                "border border-amber-400/20 bg-amber-400/10 text-2xs uppercase tracking-wider text-amber-200"
               )}
               title={
                 itemLabel.includes("Resurfaced")
@@ -189,7 +189,7 @@ export function HighlightCard({
             </span>
           ) : null}
         </div>
-        <span className={cn(t.data, "text-[10px] font-bold text-muted-foreground/55")}>
+        <span className={cn(t.data, "text-2xs font-bold text-muted-foreground/55")}>
           #{index + 1}
         </span>
       </div>
@@ -207,8 +207,8 @@ export function HighlightCard({
       <div
         className={cn(
           isCarouselLayout
-            ? "mt-1.5 line-clamp-1 text-[10px] text-muted-foreground/65"
-            : "mt-1 text-[10px] text-muted-foreground/70",
+            ? "mt-1.5 line-clamp-1 text-2xs text-muted-foreground/65"
+            : "mt-1 text-2xs text-muted-foreground/70",
           t.monoNative && t.label,
           "normal-case"
         )}
@@ -238,7 +238,7 @@ export function HighlightCard({
           ) : (
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 text-[10px] font-bold text-muted-foreground",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 text-2xs font-bold text-muted-foreground",
                 t.monoNative && t.data
               )}
             >
@@ -247,7 +247,7 @@ export function HighlightCard({
           )}
           <span
             className={cn(
-              "truncate text-[11px] text-muted-foreground",
+              "truncate text-xs text-muted-foreground",
               t.monoNative && t.data,
               "normal-case"
             )}
@@ -257,7 +257,7 @@ export function HighlightCard({
         </div>
         <span
           className={cn(
-            "shrink-0 text-[10px] text-muted-foreground/75",
+            "shrink-0 text-2xs text-muted-foreground/75",
             isCarouselLayout
               ? "normal-case tracking-[0.02em]"
               : "uppercase tracking-[0.08em]",
@@ -271,7 +271,7 @@ export function HighlightCard({
       {isCarouselLayout ? (
         <div
           className={cn(
-            "mt-2 flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70",
+            "mt-2 flex items-center justify-between gap-3 text-2xs uppercase tracking-[0.08em] text-muted-foreground/70",
             t.monoNative && t.label
           )}
           onClick={(e) => e.stopPropagation()}
@@ -284,7 +284,7 @@ export function HighlightCard({
           {reviewButton ? <div className="mt-1">{reviewButton}</div> : null}
           <div
             className={cn(
-              "mt-1.5 flex items-center gap-2 text-[9px] uppercase tracking-[0.08em] text-muted-foreground/70",
+              "mt-1.5 flex items-center gap-2 text-2xs uppercase tracking-[0.08em] text-muted-foreground/70",
               t.monoNative && t.label
             )}
             onClick={(e) => e.stopPropagation()}

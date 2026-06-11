@@ -188,7 +188,7 @@ export function SyncButton({
       {syncStatusError ? (
         <div className="flex items-center gap-1.5 px-0.5" aria-live="polite">
           <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-          <span className="min-w-0 text-[11px] leading-snug text-destructive truncate">
+          <span className="min-w-0 text-xs leading-snug text-destructive truncate">
             Could not load sync status
           </span>
         </div>
@@ -197,7 +197,7 @@ export function SyncButton({
           <div
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusCopy.dotClass}`}
           />
-          <span className="min-w-0 text-[11px] leading-snug text-muted-foreground truncate">
+          <span className="min-w-0 text-xs leading-snug text-muted-foreground truncate">
             {statusCopy.label}
             {bookmarkCount !== undefined ? (
               <span className="text-muted-foreground/60">
@@ -212,11 +212,11 @@ export function SyncButton({
           <div
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-emerald" : "bg-muted-foreground/40"}`}
           />
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {lastSyncAt ? "Up to date" : "Not synced"}
           </span>
           {(lastSyncAt || bookmarkCount !== undefined) && (
-            <span className="text-[11px] text-muted-foreground/60">
+            <span className="text-xs text-muted-foreground/60">
               {[
                 lastSyncAt &&
                   `${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
@@ -230,7 +230,7 @@ export function SyncButton({
         </div>
       )}
       {detail === "full" ? (
-        <div className="mt-1 grid gap-1.5 border-t border-hairline-soft pt-2 text-[11px] leading-snug text-muted-foreground">
+        <div className="mt-1 grid gap-1.5 border-t border-hairline-soft pt-2 text-xs leading-snug text-muted-foreground">
           <p>Fetches newest X bookmarks and updates existing saves.</p>
           <p>Mirrors X bookmark folders into synced collections.</p>
           <p>Pauses safely on rate limits and resumes on the next sync.</p>

@@ -151,7 +151,7 @@ export const OrbitListRow = memo(function OrbitListRow({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div
           className={cn(
-            "flex min-w-0 items-center gap-1.5 truncate text-[10px]",
+            "flex min-w-0 items-center gap-1.5 truncate text-2xs",
             "text-muted-foreground dark:text-white/65"
           )}
         >
@@ -223,7 +223,7 @@ export const OrbitListRow = memo(function OrbitListRow({
             {showSuggestion && suggestion ? (
               <span
                 className={cn(
-                  "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-[11px]",
+                  "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
                   "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
                 )}
                 title={`Grok suggests: ${
@@ -248,7 +248,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-[0.08em]",
+                    "shrink-0 rounded-sm border px-1 py-px text-2xs font-medium uppercase tracking-[0.08em]",
                     suggestion.reuseExisting
                       ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
                       : "border-primary/25 bg-primary/10 text-primary/80"
@@ -260,14 +260,14 @@ export const OrbitListRow = memo(function OrbitListRow({
             ) : null}
             {queueStatus === "applied" ? (
               <span
-                className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400/90"
+                className="inline-flex items-center gap-0.5 text-2xs text-emerald-400/90"
                 aria-label="Suggestion applied"
               >
                 <Check className="size-3" aria-hidden />
                 Applied
               </span>
             ) : queueStatus === "dismissed" ? (
-              <span className="text-[10px] text-muted-foreground dark:text-white/40">Skipped</span>
+              <span className="text-2xs text-muted-foreground dark:text-white/40">Skipped</span>
             ) : null}
           </div>
 

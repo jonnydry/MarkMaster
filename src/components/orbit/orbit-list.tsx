@@ -76,7 +76,7 @@ export function OrbitList({
     return (
       <div className="flex h-40 flex-col items-center justify-center text-center text-primary/50">
         <div className="mb-1 text-[13px]">Queue is clear</div>
-        <div className="text-[11px] text-primary/35">
+        <div className="text-xs text-primary/35">
           All caught up. New bookmarks will appear here.
         </div>
       </div>

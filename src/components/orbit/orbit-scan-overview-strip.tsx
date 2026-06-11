@@ -46,7 +46,7 @@ function OverviewMetric({
       <div
         className={cn(
           orbitLabelClass(),
-          "mt-1 text-[9px]",
+          "mt-1 text-2xs",
           orbitMetaMuted()
         )}
       >
@@ -65,7 +65,7 @@ function SourceBadge({
     <span
       className={cn(
         orbitLabelClass(),
-        "rounded-sm border px-1.5 py-0.5 text-[8px]",
+        "rounded-sm border px-1.5 py-0.5 text-2xs",
         reuseExisting
           ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-500 dark:text-emerald-300"
           : "border-primary/25 bg-primary/10 text-primary/80"
@@ -84,7 +84,7 @@ function TagRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-[11px] text-foreground/85",
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85",
         "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
       )}
     >
@@ -97,7 +97,7 @@ function TagRollupChip({
       <span
         className={cn(
           orbitDataClass(),
-          "shrink-0 text-[10px]",
+          "shrink-0 text-2xs",
           orbitMetaSoft()
         )}
       >
@@ -116,7 +116,7 @@ function CollectionRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-[11px] text-foreground/85",
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85",
         "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
       )}
     >
@@ -124,7 +124,7 @@ function CollectionRollupChip({
       <span
         className={cn(
           orbitDataClass(),
-          "shrink-0 text-[10px]",
+          "shrink-0 text-2xs",
           orbitMetaSoft()
         )}
       >
@@ -161,7 +161,7 @@ function RollupSection({
         <span
           className={cn(
             orbitDataClass(),
-            "surface-inset-strong px-1.5 py-0.5 text-[10px]",
+            "surface-inset-strong px-1.5 py-0.5 text-2xs",
             orbitMetaSoft()
           )}
         >
@@ -220,7 +220,7 @@ function StrategyLines({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 rounded-sm px-2 text-[11px] text-primary/80 hover:bg-primary/5 hover:text-primary"
+          className="h-7 rounded-sm px-2 text-xs text-primary/80 hover:bg-primary/5 hover:text-primary"
           onClick={() => setExpanded((v) => !v)}
         >
           {expanded ? "Show less" : "Show more"}
@@ -282,14 +282,14 @@ export function OrbitScanOverviewStrip({
             <span
               className={cn(
                 orbitDataClass(),
-                "surface-inset-strong px-1.5 py-0.5 text-[10px]",
+                "surface-inset-strong px-1.5 py-0.5 text-2xs",
                 orbitMetaSoft()
               )}
             >
               {payload.model}
             </span>
             {zeroDataRetention ? (
-              <span className="rounded-sm border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-emerald-500 dark:text-emerald-300">
+              <span className="rounded-sm border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-emerald-500 dark:text-emerald-300">
                 ZDR
               </span>
             ) : null}

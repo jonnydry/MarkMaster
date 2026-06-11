@@ -66,7 +66,7 @@ export function OrbitMapScopeMenu({
         <div
           className={cn(
             orbitLabelClass(),
-            "px-2 pb-1 pt-1.5 text-[9px]",
+            "px-2 pb-1 pt-1.5 text-2xs",
             orbitMetaMuted()
           )}
         >
@@ -97,7 +97,7 @@ export function OrbitMapScopeMenu({
                 </span>
                 <span
                   className={cn(
-                    "block text-[10px] leading-4",
+                    "block text-2xs leading-4",
                     orbitMetaMuted()
                   )}
                 >

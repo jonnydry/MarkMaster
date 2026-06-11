@@ -13,7 +13,7 @@ function ReuseBadge({ reuseExisting }: { reuseExisting: boolean }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-sm border px-1 py-px text-[8px] font-medium uppercase tracking-[0.08em]",
+        "shrink-0 rounded-sm border px-1 py-px text-2xs font-medium uppercase tracking-[0.08em]",
         reuseExisting
           ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
           : "border-primary/25 bg-primary/10 text-primary/80"
@@ -39,7 +39,7 @@ function TagChip({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-[11px]",
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
         muted
           ? "border-hairline-soft/60 bg-surface-2/35 text-muted-foreground/70 line-through decoration-muted-foreground/40"
           : "border-hairline-soft bg-surface-2/70 text-foreground"
@@ -76,7 +76,7 @@ function CollectionChip({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-[11px]",
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
         muted
           ? "border-hairline-soft/60 bg-surface-2/35 text-muted-foreground/70 line-through decoration-muted-foreground/40"
           : "border-hairline-soft bg-surface-2/70 text-foreground"
@@ -121,7 +121,7 @@ export function OrbitReviewGrokProposal({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+      <div className="text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
         {declined ? "Grok proposed (not applying)" : "Grok proposed"}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -196,7 +196,7 @@ export function OrbitReviewBatchImpactChips({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+      <div className="text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
         Batch impact
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -231,7 +231,7 @@ export function OrbitReviewQueueProposalChips({
         <TagChip key={name} tag={{ name }} compact />
       ))}
       {tagNames.length > 2 ? (
-        <span className="self-center text-[10px] text-muted-foreground">
+        <span className="self-center text-2xs text-muted-foreground">
           +{tagNames.length - 2} more
         </span>
       ) : null}

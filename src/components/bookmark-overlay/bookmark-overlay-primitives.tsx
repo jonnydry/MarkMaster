@@ -76,7 +76,7 @@ export function BookmarkOverlayMetricsGrid({
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.like_count)}
         </div>
-        <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
           Likes
         </div>
       </div>
@@ -85,7 +85,7 @@ export function BookmarkOverlayMetricsGrid({
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.retweet_count)}
         </div>
-        <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
           Reposts
         </div>
       </div>
@@ -94,7 +94,7 @@ export function BookmarkOverlayMetricsGrid({
         <div className="mt-1 text-sm font-semibold text-foreground">
           {formatCompactCount(metrics.reply_count)}
         </div>
-        <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
           Replies
         </div>
       </div>
@@ -104,7 +104,7 @@ export function BookmarkOverlayMetricsGrid({
 
 export function BookmarkOverlaySectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
       {children}
     </div>
   );

@@ -32,7 +32,7 @@ export function OrbitContextualMenu({
 
   return (
     <OrbitalMenu className="orbital-menu py-1 text-[12.5px]">
-      <div className={cn(orbital.label, "px-3 py-1 text-[10px] text-primary/50")}>
+      <div className={cn(orbital.label, "px-3 py-1 text-2xs text-primary/50")}>
         More
       </div>
 

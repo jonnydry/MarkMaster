@@ -37,7 +37,7 @@ export function SidebarSection({
           aria-controls={contentId}
           className={cn(
             "group flex min-w-0 flex-1 items-center gap-1.5 rounded-sm py-0.5 text-left font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-            t.monoNative ? cn(t.label, t.chromeLabel) : "text-[10px] uppercase tracking-[0.14em]"
+            t.monoNative ? cn(t.label, t.chromeLabel) : "text-2xs uppercase tracking-[0.14em]"
           )}
         >
           <ChevronDown
@@ -51,7 +51,7 @@ export function SidebarSection({
             <span
               className={cn(
                 t.data,
-                "ml-0.5 text-[10px] font-normal normal-case tracking-normal text-muted-foreground/50"
+                "ml-0.5 text-2xs font-normal normal-case tracking-normal text-muted-foreground/50"
               )}
             >
               {count}

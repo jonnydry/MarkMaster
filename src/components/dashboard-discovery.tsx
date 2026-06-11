@@ -333,7 +333,7 @@ export function DashboardDiscovery({
             <Sparkles className="h-4 w-4 shrink-0 text-primary" />
             <span
               className={cn(
-                "truncate text-[10px] font-bold uppercase tracking-[0.08em] text-primary",
+                "truncate text-2xs font-bold uppercase tracking-[0.08em] text-primary",
                 t.monoNative && t.label
               )}
             >
@@ -345,7 +345,7 @@ export function DashboardDiscovery({
           </p>
           <p
             className={cn(
-              "mt-1.5 line-clamp-1 max-w-md text-[10px] text-muted-foreground/65",
+              "mt-1.5 line-clamp-1 max-w-md text-2xs text-muted-foreground/65",
               t.monoNative && t.label
             )}
           >
@@ -360,7 +360,7 @@ export function DashboardDiscovery({
             <Button
               size="sm"
               variant="highlight"
-              className="h-7 gap-1 px-2.5 text-[10px] text-primary"
+              className="h-7 gap-1 px-2.5 text-2xs text-primary"
               onClick={handleReviewInOrbit}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -370,7 +370,7 @@ export function DashboardDiscovery({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1 px-2.5 text-[10px]"
+                className="h-7 gap-1 px-2.5 text-2xs"
                 onClick={handleSaveAsCollection}
               >
                 <Plus className="h-3.5 w-3.5" />

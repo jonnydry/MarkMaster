@@ -207,12 +207,12 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             }}
           />
           <div className="pointer-events-none absolute left-2 top-2">
-            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/85 shadow-sm backdrop-blur-sm">
+            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-white/85 shadow-sm backdrop-blur-sm">
               {getGridMediaLabel(mediaItems)}
             </span>
           </div>
           {mediaCount > 1 || likeLabel ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/65 via-black/20 to-transparent p-2 pt-8 text-[10px] font-medium text-white/80">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/65 via-black/20 to-transparent p-2 pt-8 text-2xs font-medium text-white/80">
               <span>{likeLabel}</span>
               {mediaCount > 1 ? <span>+{mediaCount - 1}</span> : null}
             </div>
@@ -231,7 +231,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             />
           ) : (
             <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-muted-foreground"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-2xs font-semibold text-muted-foreground"
               role="img"
               aria-label={`${bookmark.authorDisplayName} avatar`}
             >
@@ -250,7 +250,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
                 />
               )}
             </div>
-            <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               <span className="truncate">
                 @{highlightedUsername} ·{" "}
                 {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
@@ -264,7 +264,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             </div>
           </div>
           {!hasVisual && likeLabel ? (
-            <span className="shrink-0 text-[10px] font-medium text-muted-foreground/75">
+            <span className="shrink-0 text-2xs font-medium text-muted-foreground/75">
               {likeLabel}
             </span>
           ) : null}
@@ -289,7 +289,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
                   e.stopPropagation();
                   onTagClick?.(primaryTag.id);
                 }}
-                className="inline-flex h-5 max-w-full items-center gap-1 surface-inset-strong px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground"
+                className="inline-flex h-5 max-w-full items-center gap-1 surface-inset-strong px-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground"
                 title={primaryTag.name}
               >
                 <span
@@ -304,12 +304,12 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               </button>
             ) : null}
             {hasCollection ? (
-              <span className="inline-flex h-5 items-center rounded-sm border border-primary/20 bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
+              <span className="inline-flex h-5 items-center rounded-sm border border-primary/20 bg-primary/10 px-1.5 text-2xs font-medium text-primary">
                 In collection
               </span>
             ) : null}
             {hasNote ? (
-              <span className="inline-flex h-5 items-center surface-inset-strong px-1.5 text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex h-5 items-center surface-inset-strong px-1.5 text-2xs font-medium text-muted-foreground">
                 Note
               </span>
             ) : null}

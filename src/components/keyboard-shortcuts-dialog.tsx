@@ -49,7 +49,7 @@ export function KeyboardShortcutsDialog({
         <div className="grid gap-4 px-4 pb-4">
           {groups.map((group) => (
             <section key={group.title}>
-              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h3 className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {group.title}
               </h3>
               <div className="overflow-hidden rounded-sm border border-hairline-soft">
@@ -66,7 +66,7 @@ export function KeyboardShortcutsDialog({
                       {shortcut.keys.map((key) => (
                         <kbd
                           key={key}
-                          className="min-w-6 rounded-sm border border-hairline-strong bg-background/60 px-1.5 py-0.5 text-center text-[11px] font-semibold text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]"
+                          className="min-w-6 rounded-sm border border-hairline-strong bg-background/60 px-1.5 py-0.5 text-center text-xs font-semibold text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]"
                         >
                           {formatShortcutKey(key)}
                         </kbd>

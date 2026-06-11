@@ -82,7 +82,7 @@ export function UserNav({ user }: UserNavProps) {
               >
                 {option.name}
                 {typographyPreset === option.id && (
-                  <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
+                  <span className="ml-auto text-2xs font-medium uppercase tracking-wider text-primary">
                     ON
                   </span>
                 )}
@@ -107,7 +107,7 @@ export function UserNav({ user }: UserNavProps) {
                 />
                 {option.name}
                 {colorTheme === option.id && (
-                  <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-primary">
+                  <span className="ml-auto text-2xs font-medium uppercase tracking-wider text-primary">
                     ON
                   </span>
                 )}

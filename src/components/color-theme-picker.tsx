@@ -44,7 +44,7 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
             />
             <span
               className={cn(
-                "text-[10px] font-medium leading-none",
+                "text-2xs font-medium leading-none",
                 selected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
               )}
             >

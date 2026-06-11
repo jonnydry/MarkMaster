@@ -211,7 +211,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                   >
                     <span
                       className={cn(
-                        "flex w-5 shrink-0 items-center justify-center text-[11px] font-semibold tabular-nums",
+                        "flex w-5 shrink-0 items-center justify-center text-xs font-semibold tabular-nums",
                         "text-muted-foreground"
                       )}
                     >
@@ -237,7 +237,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                         </div>
                         <span
                           className={cn(
-                            "block truncate text-[11px]",
+                            "block truncate text-xs",
                             "text-muted-foreground"
                           )}
                         >
@@ -262,7 +262,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                       </span>
                       <span
                         className={cn(
-                          "text-[10px] tabular-nums",
+                          "text-2xs tabular-nums",
                           "text-muted-foreground"
                         )}
                       >
@@ -618,7 +618,7 @@ export const TimelineCard = React.memo(function TimelineCard({
           {peak ? (
             <p
               className={cn(
-                "mt-2 px-1 text-[11px]",
+                "mt-2 px-1 text-xs",
                 "text-muted-foreground"
               )}
             >

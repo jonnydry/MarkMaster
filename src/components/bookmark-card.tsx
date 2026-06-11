@@ -71,7 +71,7 @@ function TagPill({
         onClick?.();
       }}
       className={
-        "surface-inset px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+        "surface-inset px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
       }
     >
       {name}
@@ -310,7 +310,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {isPerformanceHighlight && (
             <div
               className={
-                "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-[10px] font-semibold uppercase tracking-[0.08em] text-primary"
+                "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-2xs font-semibold uppercase tracking-[0.08em] text-primary"
               }
             >
               Performance highlight • Top engagement unsorted

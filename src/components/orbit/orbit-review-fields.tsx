@@ -108,7 +108,7 @@ export function OrbitReviewTagField({
           parsed.map((label, idx) => (
             <span
               key={`${label}-${idx}`}
-              className="inline-flex items-center gap-1 surface-inset-strong py-0.5 pl-2 pr-1 text-[11px] text-foreground"
+              className="inline-flex items-center gap-1 surface-inset-strong py-0.5 pl-2 pr-1 text-xs text-foreground"
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
@@ -300,7 +300,7 @@ export function OrbitReviewCollectionField({
           </PopoverContent>
         </Popover>
       </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">
+      <p className="text-2xs leading-snug text-muted-foreground">
         Pick an existing folder or type a new name in the field.
       </p>
       <Textarea

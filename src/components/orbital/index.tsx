@@ -21,7 +21,7 @@ export const orbital = {
       : tone === "bronze"
         ? "border-bronze/30 bg-bronze/10 text-bronze"
         : "border-emerald-400/30 bg-emerald-400/10 text-emerald-600",
-  pill: "inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary",
+  pill: "inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary",
   icon: "bg-primary/10 text-primary",
   menu: "rounded-sm border border-hairline-soft bg-[var(--surface-1)] shadow-xl py-1 text-[13px] min-w-[136px]",
   menuItem:
@@ -64,7 +64,7 @@ export function TelemetryStat({
   return (
     <div className={cn("flex flex-col gap-0.5", className)}>
       <div className={cn(t.data, "text-lg font-medium leading-none")}>{value}</div>
-      <div className={cn(t.label, "text-[10px] text-primary/70")}>{label}</div>
+      <div className={cn(t.label, "text-2xs text-primary/70")}>{label}</div>
     </div>
   );
 }
@@ -83,7 +83,7 @@ export function OrbitalBadge({
     <span
       className={cn(
         orbital.badge(tone),
-        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em]",
+        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.08em]",
         t.monoNative && t.label,
         className
       )}

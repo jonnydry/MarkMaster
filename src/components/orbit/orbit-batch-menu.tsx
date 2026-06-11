@@ -75,7 +75,7 @@ export function OrbitBatchMenu({
         disabled={disabled}
         aria-label={`Scan batch size: ${triggerLabel}`}
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1 border px-2 text-[11px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex h-8 shrink-0 items-center gap-1 border px-2 text-xs font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
           attached
             ? cn(
                 highlightActiveClass,
@@ -99,7 +99,7 @@ export function OrbitBatchMenu({
         <div
           className={cn(
             orbitLabelClass(),
-            "px-2 pb-1 pt-1.5 text-[9px]",
+            "px-2 pb-1 pt-1.5 text-2xs",
             orbitMetaMuted()
           )}
         >
@@ -137,7 +137,7 @@ export function OrbitBatchMenu({
                 </span>
                 <span
                   className={cn(
-                    "block text-[10px] leading-4",
+                    "block text-2xs leading-4",
                     orbitMetaMuted()
                   )}
                 >

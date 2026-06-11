@@ -13,7 +13,7 @@ export const MONO_SECTION_LABEL =
   "text-mono-label text-primary/60 tracking-[0.16em] mb-1.5";
 
 export const SANS_LABEL =
-  "text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground";
+  "text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground";
 export const SANS_DATA = "tabular-nums text-foreground";
 export const SANS_SECTION_LABEL =
   "text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5";

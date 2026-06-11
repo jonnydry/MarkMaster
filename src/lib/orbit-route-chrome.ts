@@ -12,13 +12,13 @@ export function orbitShellClass() {
 
 export function orbitLabelClass(extra?: string) {
   return cn(
-    "text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground dark:text-white/55",
+    "text-2xs font-medium uppercase tracking-[0.18em] text-muted-foreground dark:text-white/55",
     extra
   );
 }
 
 export function orbitDataClass(extra?: string) {
-  return cn("font-mono text-[10px] tabular-nums", extra);
+  return cn("font-mono text-2xs tabular-nums", extra);
 }
 
 export function orbitSectionLabelClass(extra?: string) {

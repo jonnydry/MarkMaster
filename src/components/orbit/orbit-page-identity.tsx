@@ -29,7 +29,7 @@ export function OrbitPageIdentity({
         Orbit
       </p>
       {queueLabel ? (
-        <p className="hidden truncate text-[10px] font-medium tabular-nums text-muted-foreground sm:block">
+        <p className="hidden truncate text-2xs font-medium tabular-nums text-muted-foreground sm:block">
           {queueLabel}
         </p>
       ) : null}

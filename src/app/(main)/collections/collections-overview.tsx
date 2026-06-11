@@ -143,7 +143,7 @@ export function CollectionsOverview({
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Largest shelf
             </p>
           </div>

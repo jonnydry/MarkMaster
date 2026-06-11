@@ -337,7 +337,7 @@ export default function OrbitPage() {
                     {hasSelectionOverflow ? (
                       <span
                         className={cn(
-                          "text-[10px]",
+                          "text-2xs",
                           "text-amber-700 dark:text-amber-200/90"
                         )}
                       >

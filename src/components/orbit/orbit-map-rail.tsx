@@ -495,7 +495,7 @@ function SelectedClusterBody({
                 Evidence
               </p>
               {hasMedia && (
-                <span className={cn("text-[10px]", orbitMetaSoft())}>
+                <span className={cn("text-2xs", orbitMetaSoft())}>
                   Media attached
                 </span>
               )}

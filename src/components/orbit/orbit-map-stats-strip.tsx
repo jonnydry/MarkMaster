@@ -55,7 +55,7 @@ function MapMetric({
     <div className="min-w-0">
       <p
         className={cn(
-          "text-[10px] font-medium uppercase tracking-[0.14em]",
+          "text-2xs font-medium uppercase tracking-[0.14em]",
           "text-white/35"
         )}
       >

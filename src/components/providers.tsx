@@ -143,10 +143,7 @@ function applyAppearance({
   const root = document.documentElement;
   root.classList.toggle("dark", theme === "dark");
   root.setAttribute("data-typography-preset", typographyPreset);
-  root.setAttribute(
-    "data-font-mode",
-    typographyPreset === "mono" ? "mono" : "default"
-  );
+  root.removeAttribute("data-font-mode");
 
   if (colorTheme === "horizon") {
     root.removeAttribute("data-color-theme");

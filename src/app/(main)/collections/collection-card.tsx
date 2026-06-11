@@ -93,7 +93,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
           </h3>
           <span
             className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[0.68rem] font-semibold",
+              "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-semibold",
               "border border-hairline-soft bg-transparent text-muted-foreground"
             )}
             title={collection.isPublic ? "Public collection" : "Private collection"}
@@ -135,7 +135,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
           {itemCount.toLocaleString()}
         </p>
         <p className={cn(
-          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em]",
+          "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
           "text-muted-foreground/70"
         )}>
           saved
@@ -203,7 +203,7 @@ export const XFolderCard = React.memo(function XFolderCard({
           <h3 className="truncate text-sm font-semibold text-foreground">
             {collection.name}
           </h3>
-          <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary">
+          <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-2xs font-semibold text-primary">
             X Folder
           </span>
         </div>
@@ -236,7 +236,7 @@ export const XFolderCard = React.memo(function XFolderCard({
           {itemCount.toLocaleString()}
         </p>
         <p className={cn(
-          "mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em]",
+          "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
           "text-muted-foreground/70"
         )}>
           synced

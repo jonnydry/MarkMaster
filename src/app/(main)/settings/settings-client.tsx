@@ -459,7 +459,7 @@ function TypographyPresetPicker({
               </span>
             </div>
 
-            <p className="font-label mt-2 truncate text-[10px] font-medium uppercase text-primary">
+            <p className="font-label mt-2 truncate text-2xs font-medium uppercase text-primary">
               {preset.bodyFace} / {preset.dataFace}
             </p>
           </button>

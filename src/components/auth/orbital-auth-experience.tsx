@@ -223,7 +223,7 @@ export function OrbitalAuthExperience({
                 </span>{" "}
                 Grok suggests tags and collections; you approve every move.
                 Scans run with{" "}
-                <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] text-white/90">
+                <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/90">
                   store: false
                 </code>
                 .

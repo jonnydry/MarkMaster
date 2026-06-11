@@ -343,13 +343,13 @@ export function CommandPalette({
                         <div className="flex items-center gap-2">
                           <span>{item.label}</span>
                           {item.active && (
-                            <span className="rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wider text-primary">
+                            <span className="rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0 text-2xs font-medium uppercase tracking-wider text-primary">
                               Active
                             </span>
                           )}
                         </div>
                         {item.description && (
-                          <div className="text-[10px] text-muted-foreground/70 mt-0.5">
+                          <div className="text-2xs text-muted-foreground/70 mt-0.5">
                             {item.description}
                           </div>
                         )}

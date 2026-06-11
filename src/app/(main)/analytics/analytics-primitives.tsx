@@ -256,7 +256,7 @@ function HeroStat({
 }) {
   return (
     <div>
-      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-lg font-semibold tabular-nums heading-font">{value}</dd>
       {hint ? <dd className="mt-0.5 text-xs text-muted-foreground">{hint}</dd> : null}
     </div>

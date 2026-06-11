@@ -58,7 +58,7 @@ export function ModuleHeader({
               {description}
             </p>
           ) : null}
-          {meta ? <p className="mt-1 text-[10px] text-muted-foreground/70">{meta}</p> : null}
+          {meta ? <p className="mt-1 text-2xs text-muted-foreground/70">{meta}</p> : null}
         </div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}

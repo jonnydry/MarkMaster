@@ -33,7 +33,7 @@ export const TagRow = React.memo(function TagRow({
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{tag.name}</p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {count.toLocaleString()} {count === 1 ? "bookmark" : "bookmarks"}
         </p>
       </div>

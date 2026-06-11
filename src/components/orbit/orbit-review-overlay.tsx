@@ -159,20 +159,20 @@ export function OrbitReviewOverlay({
                     />
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
+                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-primary">
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
                       {title}
                     </span>
-                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                    <span className="font-mono text-2xs tabular-nums text-muted-foreground">
                       {activePositionLabel}
                     </span>
                     {activeOriginal?.confidence ? (
-                      <span className="rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-emerald-500">
+                      <span className="rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.08em] text-emerald-500">
                         {confidenceLabel(activeOriginal.confidence)}
                       </span>
                     ) : null}
                     {activeHasChanges ? (
-                      <span className="text-[10px] text-amber-500">Edited</span>
+                      <span className="text-2xs text-amber-500">Edited</span>
                     ) : null}
                   </div>
                 </div>
@@ -240,10 +240,10 @@ export function OrbitReviewOverlay({
                         <ChevronRight className="size-3.5 shrink-0 text-primary/70" />
                       )}
                       <ListChecks className="size-3.5 shrink-0 text-primary/70" />
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         Batch
                       </span>
-                      <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
+                      <span className="ml-auto font-mono text-2xs tabular-nums text-muted-foreground">
                         {plan.summary.bookmarksWithTags} tagged ·{" "}
                         {plan.summary.bookmarksWithCollections} collected
                       </span>
@@ -255,7 +255,7 @@ export function OrbitReviewOverlay({
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarkCount}
                             </div>
-                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                            <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
                               suggested
                             </div>
                           </div>
@@ -263,7 +263,7 @@ export function OrbitReviewOverlay({
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarksWithTags}
                             </div>
-                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                            <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
                               tagged
                             </div>
                           </div>
@@ -271,7 +271,7 @@ export function OrbitReviewOverlay({
                             <div className="text-sm font-semibold text-foreground">
                               {plan.summary.bookmarksWithCollections}
                             </div>
-                            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                            <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
                               collected
                             </div>
                           </div>
@@ -321,7 +321,7 @@ export function OrbitReviewOverlay({
 
                 {/* Grok suggestion */}
                 <div className="rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/80">
+                  <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-primary/80">
                     <GrokMark className="size-3.5" />
                     Grok suggestion
                   </div>
@@ -359,7 +359,7 @@ export function OrbitReviewOverlay({
                     <div className="space-y-3">
                       {orbitReviewDecisionUsesTags(activeDraft.decision) ? (
                         <div>
-                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                          <div className="mb-1.5 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
                             <Tags className="size-3" />
                             Tags
                           </div>
@@ -375,7 +375,7 @@ export function OrbitReviewOverlay({
                       ) : null}
                       {orbitReviewDecisionUsesCollection(activeDraft.decision) ? (
                         <div>
-                          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                          <div className="mb-1.5 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
                             <FolderInput className="size-3" />
                             Collection
                           </div>
@@ -438,7 +438,7 @@ export function OrbitReviewOverlay({
                 {/* Compact queue */}
                 {effectiveDrafts.length > 1 ? (
                   <div className="mt-4">
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       Queue
                     </div>
                     <div className="scrollbar-native max-h-36 overflow-y-auto">
@@ -471,16 +471,16 @@ export function OrbitReviewOverlay({
                                       bookmark.authorUsername
                                     : "Bookmark"}
                                 </span>
-                                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                <span className="shrink-0 font-mono text-2xs text-muted-foreground">
                                   {index + 1}
                                 </span>
                               </div>
                               <div className="mt-1 flex flex-wrap gap-1">
-                                <span className="surface-inset-strong px-1 py-0.5 text-[9px] text-muted-foreground">
+                                <span className="surface-inset-strong px-1 py-0.5 text-2xs text-muted-foreground">
                                   {getDecisionLabel(draft.decision)}
                                 </span>
                                 {draftHasChanges(draft) ? (
-                                  <span className="text-[9px] text-amber-500">
+                                  <span className="text-2xs text-amber-500">
                                     edited
                                   </span>
                                 ) : null}
@@ -537,7 +537,7 @@ export function OrbitReviewOverlay({
                   </Button>
                 ) : null}
                 <div className="flex items-center justify-between gap-3 pt-1">
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-2xs text-muted-foreground">
                     Create new collections
                   </span>
                   <Switch
