@@ -12,7 +12,7 @@ export function orbitShellClass() {
 
 export function orbitLabelClass(extra?: string) {
   return cn(
-    "text-2xs font-medium uppercase tracking-[0.18em] text-muted-foreground dark:text-white/55",
+    "text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-white/55",
     extra
   );
 }

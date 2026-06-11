@@ -52,7 +52,6 @@
   --color-emerald: var(--emerald);
   --color-success: var(--success);
   --color-bronze: var(--bronze);
-  --color-bronze-muted: var(--bronze-muted);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -107,9 +106,6 @@
   --hairline-soft: rgba(11, 15, 25, 0.08);
   --hairline-strong: rgba(11, 15, 25, 0.14);
   --accent-soft: rgba(37, 99, 235, 0.1);
-  --menu-selection-bg: rgba(37, 99, 235, 0.08);
-  --menu-selection-ring: rgba(37, 99, 235, 0.22);
-  --menu-selection-glow: rgba(37, 99, 235, 0.14);
   --page-shell-depth-top: #ffffff;
   --page-shell-depth-bottom: #edf2fb;
   --page-shell-ambient: rgba(37, 99, 235, 0.08);
@@ -126,7 +122,6 @@
   --markmaster-logo-saturate: 1;
   --markmaster-logo-brightness: 1;
   --bronze: #c9aa6c;
-  --bronze-muted: #a88a4e;
 }
 
 .dark {
@@ -171,9 +166,6 @@
   --hairline-soft: rgba(255, 255, 255, 0.05);
   --hairline-strong: rgba(255, 255, 255, 0.08);
   --accent-soft: rgba(37, 99, 235, 0.12);
-  --menu-selection-bg: rgba(37, 99, 235, 0.08);
-  --menu-selection-ring: rgba(37, 99, 235, 0.24);
-  --menu-selection-glow: rgba(37, 99, 235, 0.18);
   --page-shell-depth-top: #121418;
   --page-shell-depth-bottom: #0f1012;
   --page-shell-ambient: rgba(37, 99, 235, 0.09);
@@ -199,9 +191,6 @@
   --sidebar-accent-foreground: #0f766e;
   --sidebar-ring: #0d9488;
   --accent-soft: rgba(13, 148, 136, 0.1);
-  --menu-selection-bg: rgba(13, 148, 136, 0.08);
-  --menu-selection-ring: rgba(13, 148, 136, 0.22);
-  --menu-selection-glow: rgba(13, 148, 136, 0.14);
   --page-shell-ambient: rgba(13, 148, 136, 0.08);
   --chart-1: #0d9488;
   --chart-2: #14b8a6;
@@ -221,9 +210,6 @@
   --sidebar-accent-foreground: #5eead4;
   --sidebar-ring: #2dd4bf;
   --accent-soft: rgba(45, 212, 191, 0.12);
-  --menu-selection-bg: rgba(45, 212, 191, 0.08);
-  --menu-selection-ring: rgba(45, 212, 191, 0.24);
-  --menu-selection-glow: rgba(45, 212, 191, 0.18);
   --page-shell-ambient: rgba(45, 212, 191, 0.09);
   --chart-1: #2dd4bf;
   --chart-2: #5eead4;
@@ -243,9 +229,6 @@
   --sidebar-accent-foreground: #c2410c;
   --sidebar-ring: #ea580c;
   --accent-soft: rgba(234, 88, 12, 0.1);
-  --menu-selection-bg: rgba(234, 88, 12, 0.08);
-  --menu-selection-ring: rgba(234, 88, 12, 0.22);
-  --menu-selection-glow: rgba(234, 88, 12, 0.14);
   --page-shell-ambient: rgba(234, 88, 12, 0.08);
   --chart-1: #ea580c;
   --chart-2: #f97316;
@@ -265,9 +248,6 @@
   --sidebar-accent-foreground: #fdba74;
   --sidebar-ring: #fb923c;
   --accent-soft: rgba(251, 146, 60, 0.12);
-  --menu-selection-bg: rgba(251, 146, 60, 0.08);
-  --menu-selection-ring: rgba(251, 146, 60, 0.24);
-  --menu-selection-glow: rgba(251, 146, 60, 0.18);
   --page-shell-ambient: rgba(251, 146, 60, 0.09);
   --chart-1: #fb923c;
   --chart-2: #fdba74;
@@ -287,9 +267,6 @@
   --sidebar-accent-foreground: #6d28d9;
   --sidebar-ring: #7c3aed;
   --accent-soft: rgba(124, 58, 237, 0.1);
-  --menu-selection-bg: rgba(124, 58, 237, 0.08);
-  --menu-selection-ring: rgba(124, 58, 237, 0.22);
-  --menu-selection-glow: rgba(124, 58, 237, 0.14);
   --page-shell-ambient: rgba(124, 58, 237, 0.08);
   --chart-1: #7c3aed;
   --chart-2: #8b5cf6;
@@ -309,9 +286,6 @@
   --sidebar-accent-foreground: #c4b5fd;
   --sidebar-ring: #a78bfa;
   --accent-soft: rgba(167, 139, 250, 0.12);
-  --menu-selection-bg: rgba(167, 139, 250, 0.08);
-  --menu-selection-ring: rgba(167, 139, 250, 0.24);
-  --menu-selection-glow: rgba(167, 139, 250, 0.18);
   --page-shell-ambient: rgba(167, 139, 250, 0.09);
   --chart-1: #a78bfa;
   --chart-2: #c4b5fd;
@@ -331,9 +305,6 @@
   --sidebar-accent-foreground: #15803d;
   --sidebar-ring: #16a34a;
   --accent-soft: rgba(22, 163, 74, 0.1);
-  --menu-selection-bg: rgba(22, 163, 74, 0.08);
-  --menu-selection-ring: rgba(22, 163, 74, 0.22);
-  --menu-selection-glow: rgba(22, 163, 74, 0.14);
   --page-shell-ambient: rgba(22, 163, 74, 0.08);
   --chart-1: #16a34a;
   --chart-2: #22c55e;
@@ -353,9 +324,6 @@
   --sidebar-accent-foreground: #86efac;
   --sidebar-ring: #4ade80;
   --accent-soft: rgba(74, 222, 128, 0.12);
-  --menu-selection-bg: rgba(74, 222, 128, 0.08);
-  --menu-selection-ring: rgba(74, 222, 128, 0.24);
-  --menu-selection-glow: rgba(74, 222, 128, 0.18);
   --page-shell-ambient: rgba(74, 222, 128, 0.09);
   --chart-1: #4ade80;
   --chart-2: #86efac;
@@ -375,9 +343,6 @@
   --sidebar-accent-foreground: #be185d;
   --sidebar-ring: #db2777;
   --accent-soft: rgba(219, 39, 119, 0.1);
-  --menu-selection-bg: rgba(219, 39, 119, 0.08);
-  --menu-selection-ring: rgba(219, 39, 119, 0.22);
-  --menu-selection-glow: rgba(219, 39, 119, 0.14);
   --page-shell-ambient: rgba(219, 39, 119, 0.08);
   --chart-1: #db2777;
   --chart-2: #ec4899;
@@ -397,9 +362,6 @@
   --sidebar-accent-foreground: #f9a8d4;
   --sidebar-ring: #f472b6;
   --accent-soft: rgba(244, 114, 182, 0.12);
-  --menu-selection-bg: rgba(244, 114, 182, 0.08);
-  --menu-selection-ring: rgba(244, 114, 182, 0.24);
-  --menu-selection-glow: rgba(244, 114, 182, 0.18);
   --page-shell-ambient: rgba(244, 114, 182, 0.09);
   --chart-1: #f472b6;
   --chart-2: #f9a8d4;

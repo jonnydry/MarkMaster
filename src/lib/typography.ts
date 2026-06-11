@@ -10,7 +10,7 @@ export const MONO_LABEL = "text-mono-label tracking-[0.14em]";
 export const MONO_DATA = "text-mono-data tabular-nums";
 export const MONO_DISPLAY = "text-mono-display";
 export const MONO_SECTION_LABEL =
-  "text-mono-label text-primary/60 tracking-[0.16em] mb-1.5";
+  "text-mono-label text-primary/60 tracking-[0.14em] mb-1.5";
 
 export const SANS_LABEL =
   "text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground";
