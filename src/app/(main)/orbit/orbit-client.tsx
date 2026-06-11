@@ -27,7 +27,7 @@ const OrbitReviewDialog = dynamic(
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
-import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
+import { PageWatermark } from "@/components/page-watermark";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 import { OrbitScanFailureNotice } from "@/components/orbit/orbit-scan-failure-notice";
 import { OrbitList } from "@/components/orbit/orbit-list";
@@ -189,7 +189,7 @@ export default function OrbitPage() {
 
   return (
     <div className={cn(orbitShellClass(), "relative")}>
-      <OrbitPageWatermark />
+      <PageWatermark variant="orbit" />
       <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}

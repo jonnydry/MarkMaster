@@ -32,8 +32,12 @@ export function CollectionsDiscoveryPanel({ tags }: { tags: TagWithCount[] }) {
   );
 
   const { dislikedIds, likedIds, feedbackVersion } = useHighlightFeedbackIds();
+  // refreshVersion/feedbackVersion are intentional invalidation keys:
+  // getDiscoveryShownIds() reads external mutable storage, so the memo must
+  // recompute when either counter bumps even though neither is read inside.
   const excludeIds = useMemo(
     () => [...new Set([...getDiscoveryShownIds(), ...dislikedIds])],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [dislikedIds, refreshVersion, feedbackVersion]
   );
 

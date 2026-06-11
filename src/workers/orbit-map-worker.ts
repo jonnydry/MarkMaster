@@ -36,7 +36,6 @@ import {
   type SetHighlightMessage,
   type WheelMessage,
   type DoubleClickMessage,
-  type CursorChangedMessage,
   type LayoutUpdatedMessage,
   collectTransferables,
 } from '@/lib/orbit-worker-protocol';
@@ -75,6 +74,7 @@ import {
   isFiniteOrbitMapPosition,
 } from './orbit-map-layout';
 import { findClosestOrbitMapNode } from './orbit-map-hit-test';
+import { createOrbitMapInteractions } from './orbit-map-interactions';
 import { createOrbitMapPerfLogger } from './orbit-map-perf';
 import {
   getOrbitMapNodeRadius,
@@ -169,32 +169,56 @@ let currentFilter: GraphFilter = 'all';
 let currentInitialPositions = new Map<string, { x: number; y: number }>();
 let perf = createOrbitMapPerfLogger(false);
 
-// Cursor state for CURSOR_CHANGED messages
-let isPointerDown = false;
-let isPanning = false;
-let panDragLast: { x: number; y: number } | null = null;
-let currentCursor: CursorChangedMessage['cursor'] = 'default';
+// Pointer interaction state machine (hover, selection clicks, panning,
+// node dragging, drag-to-assign) — see orbit-map-interactions.ts.
+const interactions = createOrbitMapInteractions<SimulationNode>({
+  hasScene: () => Boolean(app && currentGraph && nodeData.length > 0),
+  getNodeData: () => nodeData,
+  getNodeById: () => nodeById,
+  getCamera: () => camera,
+  panBy: (dx, dy) => {
+    camera.x += dx;
+    camera.y += dy;
+    constrainCamera();
+    applyCameraTransform();
+    if (app) app.renderer.render(app.stage);
 
-// Drag state (node dragging + drag-to-assign). A pointer-down on a node only
-// becomes a drag after the cursor travels past DRAG_THRESHOLD_PX; otherwise
-// the pointer-up is treated as a click (select / deselect).
-const DRAG_THRESHOLD_PX = 4;
-let dragCandidate: { id: string; startX: number; startY: number } | null = null;
-let draggingNodeId: string | null = null;
-let dropTargetId: string | null = null;
-let panStart: { x: number; y: number } | null = null;
-let panMoved = false;
-let hubDropTargets: SimulationNode[] = [];
-
-function postCursorChange(cursor: CursorChangedMessage['cursor']) {
-  if (currentCursor === cursor) return;
-  currentCursor = cursor;
-  postToMain({
-    type: MainMessageType.CURSOR_CHANGED,
-    protocolVersion: 1,
-    cursor,
-  });
-}
+    // Keep the main thread (minimap, URL sync) in step with drag panning.
+    postToMain({
+      type: MainMessageType.CAMERA_CHANGED,
+      protocolVersion: 1,
+      camera: { ...camera },
+    });
+  },
+  getSelection: () => currentSelection,
+  setSelection: (selection) => {
+    currentSelection = selection;
+    updateNodeStyles();
+    postToMain({
+      type: MainMessageType.SELECTION_CHANGED,
+      protocolVersion: 1,
+      selection,
+    });
+  },
+  refreshNodeStyles: () => updateNodeStyles(),
+  postToMain: (msg) => postToMain(msg),
+  getSimulation: () => simulation,
+  kickSimulation: (alpha) => kickSimulation(alpha),
+  startSimulationLoop: () => startSimulationLoop(),
+  pulseNode: (nodeId) => {
+    const existingPulse = activeAnimations.findIndex(
+      (a) => a.nodeId === nodeId && a.type === 'pulse'
+    );
+    if (existingPulse !== -1) activeAnimations.splice(existingPulse, 1);
+    activeAnimations.push({
+      id: `pulse-${nodeId}-${Date.now()}`,
+      type: 'pulse',
+      nodeId,
+      startTime: Date.now(),
+      duration: 420,
+    });
+  },
+});
 
 // Pixi containers for organization
 let backgroundContainer: Container | null = null; // Screen-space vignette (not camera-transformed)
@@ -242,8 +266,7 @@ let camera = { x: 0, y: 0, zoom: 1 };
 // Simple map from node id to its Pixi Graphics object
 const nodeGraphicsMap = new Map<string, Graphics>();
 
-// Current interaction state (hover / selection) for visual feedback
-let currentHover: { id: string; kind: string } | null = null;
+// Current selection for visual feedback (hover lives in `interactions`)
 let currentSelection: OrbitMapSelection | null = null;
 
 // Live search-match highlight (null = inactive). Non-members are dimmed.
@@ -251,15 +274,6 @@ let highlightedNodeIds: Set<string> | null = null;
 
 // Adjacency map for efficient neighbor highlighting
 const adjacency = new Map<string, Set<string>>();
-
-function isSameOrbitMapHover(
-  a: { id: string; kind: string } | null,
-  b: { id: string; kind: string } | null
-) {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.id === b.id && a.kind === b.kind;
-}
 
 // Label visibility thresholds (based on zoom level)
 const LABEL_ZOOM_THRESHOLD = 0.6;           // Below this, only top-ranked hubs keep their labels.
@@ -368,7 +382,7 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
     case WorkerMessageType.POINTER_DOWN:
     case WorkerMessageType.POINTER_UP:
     case WorkerMessageType.POINTER_LEAVE:
-      handlePointerEvent(msg as PointerEventMessage);
+      interactions.handlePointerEvent(msg as PointerEventMessage);
       break;
 
     case WorkerMessageType.ANIMATE_ASSIGN:
@@ -560,6 +574,7 @@ function handleDestroy() {
     simulation.stop();
     simulation = null;
   }
+  interactions.reset();
   simulationLoopRunning = false;
   activeAnimations.length = 0;
   labelMap.clear();
@@ -839,9 +854,10 @@ function rebuildScene() {
     return datum;
   });
   nodeById = new Map(nodeData.map((datum) => [datum.id, datum]));
-  hubDropTargets = nodeData.filter(
+  const hubDropTargets = nodeData.filter(
     (datum) => datum.kind === 'tag' || datum.kind === 'collection'
   );
+  interactions.setHubDropTargets(hubDropTargets);
 
   // Hub importance ranks: the most-connected hubs keep labels at any zoom.
   const hubCount = (datum: SimulationNode) =>
@@ -885,9 +901,7 @@ function rebuildScene() {
       };
     }
   }
-  draggingNodeId = null;
-  dropTargetId = null;
-  dragCandidate = null;
+  interactions.resetSceneState();
   const warmStart =
     nodeData.length > 0 && positionedCount / nodeData.length >= 0.8;
 
@@ -1121,6 +1135,7 @@ function drawRings(focusContext = getFocusContext()) {
   ringGraphics.clear();
 
   // Candidate hub while a bookmark is being dragged toward it
+  const dropTargetId = interactions.getDropTargetId();
   if (dropTargetId) {
     const target = nodeById.get(dropTargetId);
     if (target) {
@@ -1254,7 +1269,7 @@ function resolveLinkNode(endpoint: string | SimulationNode): SimulationNode | un
 }
 
 function getFocusContext() {
-  const activeId = currentSelection?.id || currentHover?.id || null;
+  const activeId = currentSelection?.id || interactions.getHover()?.id || null;
   return {
     activeId,
     hasSelection: Boolean(currentSelection),
@@ -1573,7 +1588,7 @@ function handleCameraMessage(msg: CameraControlMessage) {
       cameraChanged = true;
 
       // User is actively panning (from pointer drag or other controls like buttons)
-      postCursorChange('grabbing');
+      interactions.setCursor('grabbing');
       break;
     }
 
@@ -1712,274 +1727,6 @@ function handleDoubleClick(msg: DoubleClickMessage) {
       bookmarkId: closest.id,
     });
   }
-}
-
-function handlePointerEvent(msg: PointerEventMessage) {
-  if (!app || !currentGraph || nodeData.length === 0) return;
-
-  // PointerLeaveMessage doesn't carry coordinates, so we handle it separately
-  if (msg.type === WorkerMessageType.POINTER_LEAVE) {
-    endNodeDrag(false);
-    isPointerDown = false;
-    isPanning = false;
-    panDragLast = null;
-    panStart = null;
-    panMoved = false;
-    dragCandidate = null;
-    if (currentHover) {
-      currentHover = null;
-      updateNodeStyles();
-      postToMain({
-        type: MainMessageType.HOVER_CHANGED,
-        protocolVersion: 1,
-        selection: null,
-      });
-    }
-    postCursorChange('default');
-    return;
-  }
-
-  const { type, x, y } = msg;
-
-  // Convert screen → world
-  const worldX = (x - camera.x) / camera.zoom;
-  const worldY = (y - camera.y) / camera.zoom;
-
-  if (type === WorkerMessageType.POINTER_MOVE) {
-    // Active node drag: pin the node to the cursor and track drop targets.
-    if (draggingNodeId && isPointerDown) {
-      moveNodeDrag(worldX, worldY);
-      postCursorChange('grabbing');
-      return;
-    }
-
-    // Promote a pressed node into a drag once past the movement threshold.
-    if (dragCandidate && isPointerDown && !draggingNodeId) {
-      const travelled = Math.hypot(
-        x - dragCandidate.startX,
-        y - dragCandidate.startY
-      );
-      if (travelled > DRAG_THRESHOLD_PX) {
-        beginNodeDrag(dragCandidate.id, worldX, worldY);
-        postCursorChange('grabbing');
-      }
-      return;
-    }
-
-    if (isPanning && isPointerDown && panDragLast) {
-      const dx = x - panDragLast.x;
-      const dy = y - panDragLast.y;
-      panDragLast = { x, y };
-      if (
-        panStart &&
-        Math.hypot(x - panStart.x, y - panStart.y) > DRAG_THRESHOLD_PX
-      ) {
-        panMoved = true;
-      }
-      camera.x += dx;
-      camera.y += dy;
-      constrainCamera();
-      applyCameraTransform();
-      app.renderer.render(app.stage);
-      postCursorChange("grabbing");
-
-      // Keep the main thread (minimap, URL sync) in step with drag panning.
-      postToMain({
-        type: MainMessageType.CAMERA_CHANGED,
-        protocolVersion: 1,
-        camera: { ...camera },
-      });
-      return;
-    }
-
-    const closest = findClosestOrbitMapNode(
-      nodeData,
-      { x: worldX, y: worldY },
-      10
-    );
-    const newHover = closest
-      ? { id: closest.id, kind: closest.node.kind }
-      : null;
-
-    if (!isSameOrbitMapHover(newHover, currentHover)) {
-      currentHover = newHover;
-      updateNodeStyles();
-
-      postToMain({
-        type: MainMessageType.HOVER_CHANGED,
-        protocolVersion: 1,
-        selection: newHover,
-        canvasX: x,
-        canvasY: y,
-      });
-    }
-
-    if (isPointerDown) {
-      postCursorChange("grabbing");
-    } else if (newHover) {
-      postCursorChange("pointer");
-    } else {
-      postCursorChange("grab");
-    }
-    return;
-  }
-
-  if (type === WorkerMessageType.POINTER_DOWN) {
-    isPointerDown = true;
-    panMoved = false;
-
-    const closest = findClosestOrbitMapNode(
-      nodeData,
-      { x: worldX, y: worldY },
-      10
-    );
-
-    if (closest) {
-      // Selection happens on pointer-up so a drag doesn't also select.
-      dragCandidate = { id: closest.id, startX: x, startY: y };
-      isPanning = false;
-      panDragLast = null;
-      panStart = null;
-      postCursorChange("pointer");
-    } else {
-      dragCandidate = null;
-      isPanning = true;
-      panDragLast = { x, y };
-      panStart = { x, y };
-      postCursorChange("grabbing");
-    }
-    return;
-  }
-
-  if (type === WorkerMessageType.POINTER_UP) {
-    const wasDragging = Boolean(draggingNodeId);
-    const clickedNodeId = !wasDragging && dragCandidate ? dragCandidate.id : null;
-    const wasEmptyClick = !wasDragging && !dragCandidate && isPanning && !panMoved;
-    const didPan = isPanning && panMoved;
-
-    if (wasDragging) {
-      endNodeDrag(true);
-    }
-
-    isPointerDown = false;
-    isPanning = false;
-    panDragLast = null;
-    panStart = null;
-    panMoved = false;
-    dragCandidate = null;
-
-    if (clickedNodeId) {
-      const datum = nodeById.get(clickedNodeId);
-      if (datum) {
-        currentSelection = { id: datum.id, kind: datum.node.kind };
-        updateNodeStyles();
-        postToMain({
-          type: MainMessageType.SELECTION_CHANGED,
-          protocolVersion: 1,
-          selection: currentSelection,
-        });
-      }
-    } else if (wasEmptyClick && currentSelection) {
-      currentSelection = null;
-      updateNodeStyles();
-      postToMain({
-        type: MainMessageType.SELECTION_CHANGED,
-        protocolVersion: 1,
-        selection: null,
-      });
-    } else if (didPan) {
-      // Refresh viewport-culled labels for the newly visible area.
-      updateNodeStyles();
-    }
-
-    const closest = findClosestOrbitMapNode(
-      nodeData,
-      { x: worldX, y: worldY },
-      10
-    );
-    postCursorChange(closest ? "pointer" : "grab");
-  }
-}
-
-/* ============================================================
-   NODE DRAGGING + DRAG-TO-ASSIGN
-   ============================================================ */
-
-/** Starts dragging a node: pin it to the cursor and reheat the simulation. */
-function beginNodeDrag(nodeId: string, worldX: number, worldY: number) {
-  const datum = nodeById.get(nodeId);
-  if (!datum || !simulation) return;
-
-  draggingNodeId = nodeId;
-  dropTargetId = null;
-  datum.fx = worldX;
-  datum.fy = worldY;
-
-  // Keep the simulation warm for the whole drag so connected nodes follow.
-  simulation.alphaTarget(0.3);
-  kickSimulation(0.3);
-}
-
-function moveNodeDrag(worldX: number, worldY: number) {
-  const datum = draggingNodeId ? nodeById.get(draggingNodeId) : null;
-  if (!datum) return;
-
-  datum.fx = worldX;
-  datum.fy = worldY;
-
-  // Drag-to-assign: bookmarks can be dropped onto tag/collection hubs.
-  if (datum.node.kind === 'bookmark') {
-    const target = findClosestOrbitMapNode(
-      hubDropTargets,
-      { x: worldX, y: worldY },
-      14
-    );
-    dropTargetId = target ? target.id : null;
-  }
-}
-
-/** Ends a node drag; when `commit` is true a hub drop posts NODE_DROPPED. */
-function endNodeDrag(commit: boolean) {
-  if (!draggingNodeId) return;
-  const datum = nodeById.get(draggingNodeId);
-
-  if (commit && dropTargetId && datum?.node.kind === 'bookmark') {
-    const target = nodeById.get(dropTargetId);
-    if (
-      target &&
-      (target.node.kind === 'tag' || target.node.kind === 'collection')
-    ) {
-      postToMain({
-        type: MainMessageType.NODE_DROPPED,
-        protocolVersion: 1,
-        bookmarkId: draggingNodeId,
-        anchorId: dropTargetId,
-        anchorKind: target.node.kind,
-      });
-
-      // Arrival feedback on the hub.
-      const existingPulse = activeAnimations.findIndex(
-        (a) => a.nodeId === dropTargetId && a.type === 'pulse'
-      );
-      if (existingPulse !== -1) activeAnimations.splice(existingPulse, 1);
-      activeAnimations.push({
-        id: `pulse-${dropTargetId}-${Date.now()}`,
-        type: 'pulse',
-        nodeId: dropTargetId,
-        startTime: Date.now(),
-        duration: 420,
-      });
-    }
-  }
-
-  if (datum) {
-    delete datum.fx;
-    delete datum.fy;
-  }
-  draggingNodeId = null;
-  dropTargetId = null;
-  if (simulation) simulation.alphaTarget(0);
-  startSimulationLoop();
 }
 
 /* ============================================================

@@ -119,6 +119,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     // bumps when fresh node positions arrive.
     const [minimapCamera, setMinimapCamera] = useState<CameraState | null>(null);
     const [layoutVersion, setLayoutVersion] = useState(0);
+    // LAYOUT_UPDATED arrives per simulation tick; coalesce minimap redraws to
+    // one per frame so the simulation doesn't trigger per-message repaints.
+    const minimapRafRef = useRef<number | null>(null);
+    const bumpLayoutVersion = useCallback(() => {
+      if (minimapRafRef.current !== null) return;
+      minimapRafRef.current = requestAnimationFrame(() => {
+        minimapRafRef.current = null;
+        setLayoutVersion((version) => version + 1);
+      });
+    }, []);
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
     const activeFilter = filter ?? internalFilter;
     const layoutScope = props.layoutScope ?? 'library';
@@ -309,7 +319,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                   }
 
                   // Let the minimap redraw with the fresh positions
-                  setLayoutVersion((version) => version + 1);
+                  bumpLayoutVersion();
                 }
                 break;
 
@@ -365,13 +375,17 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         }
         const container = canvas?.parentElement;
         if (container) container.style.cursor = 'default';
+        if (minimapRafRef.current !== null) {
+          cancelAnimationFrame(minimapRafRef.current);
+          minimapRafRef.current = null;
+        }
         if (workerRef.current) {
           workerRef.current.postMessage({ type: WorkerMessageType.DESTROY, protocolVersion: 1 });
           workerRef.current.terminate();
           workerRef.current = null;
         }
       };
-    }, [canvasInstance]);
+    }, [canvasInstance, bumpLayoutVersion]);
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");

@@ -13,7 +13,7 @@ import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
-import { DashboardPageWatermark } from "@/components/dashboard-page-watermark";
+import { PageWatermark } from "@/components/page-watermark";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -154,7 +154,7 @@ function DashboardContent() {
 
   return (
     <div className="app-shell-bg app-viewport relative flex overflow-hidden">
-      <DashboardPageWatermark />
+      <PageWatermark variant="markmaster" />
       <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
         <Sidebar
           tags={tags}
