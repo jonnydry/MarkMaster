@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   Bookmark,
@@ -19,6 +20,7 @@ import { hasFeedPageWatermark } from "@/lib/feed-page-watermark";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTypography } from "@/hooks/use-typography";
+import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
@@ -70,6 +72,10 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useTypography();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const prefetchGraph = useCallback(() => {
+    prefetchOrbitGraph(queryClient);
+  }, [queryClient]);
   const glassSidebar = hasFeedPageWatermark(pathname);
   const { expanded: ctxExpanded, toggle } = useSidebar();
   const expanded = forceExpanded ? true : ctxExpanded;
@@ -150,6 +156,8 @@ export function Sidebar({
               key={href}
               href={href}
               title={label}
+              onMouseEnter={href === "/orbit/map" ? prefetchGraph : undefined}
+              onFocus={href === "/orbit/map" ? prefetchGraph : undefined}
               className={cn(
                 "flex items-center rounded-sm border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                 isActive

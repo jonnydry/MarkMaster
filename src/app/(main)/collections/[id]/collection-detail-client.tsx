@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useRef } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
+import { PaginationControls } from "@/components/pagination-controls";
 import {
   COLLECTION_DETAIL_SHORTCUT_GROUPS,
   useCollectionDetailPage,
@@ -30,6 +32,7 @@ export default function CollectionDetailClient({
 }: {
   collectionId: string;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const page = useCollectionDetailPage(collectionId);
   const {
     collection,
@@ -38,6 +41,12 @@ export default function CollectionDetailClient({
     refetch,
     isNotFound,
     sortedItems,
+    totalItems,
+    totalPages,
+    page: currentPage,
+    handlePageChange,
+    canReorder,
+    prefetchCollectionPage,
     aboveFoldMediaBookmarkId,
     isSyncedFromX,
     isUserCollection,
@@ -82,7 +91,7 @@ export default function CollectionDetailClient({
 
   return (
     <div className="app-shell-bg app-viewport flex flex-col overflow-x-hidden">
-      <div className="app-main-scroll scrollbar-thin">
+      <div ref={scrollRef} className="app-main-scroll scrollbar-thin">
         <PageHeader
           sticky
           titleClassName="text-2xl sm:text-3xl"
@@ -105,7 +114,7 @@ export default function CollectionDetailClient({
             <>
               <CollectionDetailHeaderActions
                 collection={collection}
-                sortedItemCount={sortedItems.length}
+                sortedItemCount={totalItems}
                 isSyncedFromX={isSyncedFromX}
                 isUserCollection={isUserCollection}
                 onCopyAsCollection={handleCopyAsCollection}
@@ -129,8 +138,10 @@ export default function CollectionDetailClient({
           ) : null}
 
           <CollectionDetailBookmarkList
+            scrollRef={scrollRef}
             sortedItems={sortedItems}
             isSyncedFromX={isSyncedFromX}
+            canReorder={canReorder}
             aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
             activeBookmarkId={activeBookmarkId}
             reordering={reordering}
@@ -138,6 +149,13 @@ export default function CollectionDetailClient({
             onRemoveItem={handleRemoveItem}
             onMoveItem={moveItem}
             onGoToDashboard={goToDashboard}
+          />
+
+          <PaginationControls
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onPrefetchPage={prefetchCollectionPage}
           />
         </main>
       </div>

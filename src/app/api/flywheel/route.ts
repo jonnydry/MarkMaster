@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 const MAX_FLYWHEEL_BODY_BYTES = 8 * 1024;
 const flywheelPayloadValueSchema = z.union([
@@ -44,7 +44,6 @@ const flywheelEventSchema = z.object({
 /**
  * Phase 3 Item 12 Slice 1: Minimal ingest for flywheel events.
  * - Authenticated per-user
- * - Uses existing "api:write" rate limit (lightweight writes)
  * - Best-effort: on any error we still 202 so client never sees friction
  * - Payload is flexible JSON for future Slice 2 extensibility (e.g. sources, sizes)
  */
@@ -53,11 +52,6 @@ export async function POST(request: Request) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   try {
@@ -87,6 +81,8 @@ export async function POST(request: Request) {
             : parsed.data.payload,
       },
     });
+
+    await invalidateUserResponseCache(user.id);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

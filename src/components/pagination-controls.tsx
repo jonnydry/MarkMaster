@@ -10,6 +10,7 @@ interface PaginationControlsProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPrefetchPage?: (page: number) => void;
   variant?: PaginationVariant;
   className?: string;
 }
@@ -18,6 +19,7 @@ export function PaginationControls({
   page,
   totalPages,
   onPageChange,
+  onPrefetchPage,
   variant = "library",
   className,
 }: PaginationControlsProps) {
@@ -41,6 +43,8 @@ export function PaginationControls({
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
+          onMouseEnter={() => onPrefetchPage?.(page - 1)}
+          onFocus={() => onPrefetchPage?.(page - 1)}
           disabled={page <= 1}
           aria-label="Previous page"
           className={cn(
@@ -78,6 +82,8 @@ export function PaginationControls({
         <button
           type="button"
           onClick={() => onPageChange(page + 1)}
+          onMouseEnter={() => onPrefetchPage?.(page + 1)}
+          onFocus={() => onPrefetchPage?.(page + 1)}
           disabled={page >= totalPages}
           aria-label="Next page"
           className={cn(

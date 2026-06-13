@@ -1,11 +1,14 @@
 import { prisma } from "./prisma";
 import {
   fetchBookmarks,
-  fetchBookmarkFolders,
   fetchBookmarksByFolder,
   BookmarkData,
   RateLimitError,
 } from "./x-api";
+import {
+  resolveXFoldersForSync,
+  X_FOLDER_COLLECTION_SOURCE,
+} from "./sync-folder-metadata";
 import {
   updateBookmarksInBatches,
   buildBookmarkCreateData,
@@ -14,24 +17,6 @@ import {
   sleep,
 } from "./sync-utils";
 
-/**
- * Controls which sync engine is used.
- *
- * - `true`  (default): Use the new refactored engine (__syncBookmarksRefactored)
- * - `false`: Force the legacy engine (__syncBookmarksLegacy)
- *
- * We have now entered the cutover phase. The refactored engine is the default.
- * To force the legacy engine (emergency rollback), set:
- *   USE_REFACTORED_SYNC=false
- */
-const USE_REFACTORED_SYNC = process.env.USE_REFACTORED_SYNC !== "false";
-
-console.log(
-  `[Sync] Using ${USE_REFACTORED_SYNC ? "REFACTORED" : "LEGACY"} sync engine ` +
-    `(USE_REFACTORED_SYNC=${process.env.USE_REFACTORED_SYNC ?? "undefined"})`
-);
-
-const X_FOLDER_COLLECTION_SOURCE = "x-bookmark-folder";
 const X_FOLDER_COLLECTION_DESCRIPTION = "Synced from your X bookmark folder.";
 
 /** Max pages to fetch per sync run (0 = unlimited). Keep low to limit API spend. */
@@ -49,6 +34,43 @@ export interface SyncResult {
   rateLimitResetsAt?: Date;
   pagesFetched: number;
   resumeToken?: string;
+}
+
+export type SyncProgressSnapshot = Pick<
+  SyncResult,
+  "newBookmarks" | "updatedBookmarks" | "totalFetched" | "hitExisting" | "pagesFetched"
+>;
+
+export type SyncProgressCallback = (
+  snapshot: SyncProgressSnapshot
+) => void | Promise<void>;
+
+async function emitSyncProgress(
+  onProgress: SyncProgressCallback | undefined,
+  result: SyncResult
+) {
+  if (!onProgress) return;
+
+  await onProgress({
+    newBookmarks: result.newBookmarks,
+    updatedBookmarks: result.updatedBookmarks,
+    totalFetched: result.totalFetched,
+    hitExisting: result.hitExisting,
+    pagesFetched: result.pagesFetched,
+  });
+}
+
+/** Stop after the first all-existing page when syncing from the head (not resuming). */
+function shouldStopIncrementalSync(
+  startedWithResumeToken: boolean,
+  pageDataLength: number,
+  newBookmarkCount: number
+) {
+  return (
+    !startedWithResumeToken &&
+    pageDataLength > 0 &&
+    newBookmarkCount === 0
+  );
 }
 
 async function syncFolderCollection(
@@ -151,6 +173,7 @@ async function syncFolderCollection(
 export async function __syncBookmarksLegacy(
   userId: string,
   resumeToken?: string,
+  onProgress?: SyncProgressCallback,
 ): Promise<SyncResult> {
   console.warn(
     '[Sync] WARNING: __syncBookmarksLegacy was called. ' +
@@ -194,6 +217,7 @@ export async function __syncBookmarksLegacy(
 
   let paginationToken: string | undefined = resumeToken;
   let pagesFetched = 0;
+  const startedWithResumeToken = Boolean(resumeToken);
 
   try {
     do {
@@ -253,6 +277,21 @@ export async function __syncBookmarksLegacy(
         );
         result.hitExisting = updateBookmarks.length > 0;
         result.totalFetched += updateBookmarks.length;
+
+        await emitSyncProgress(onProgress, result);
+
+        if (
+          shouldStopIncrementalSync(
+            startedWithResumeToken,
+            pageData.length,
+            newBookmarks.length,
+          )
+        ) {
+          paginationToken = undefined;
+          break;
+        }
+      } else {
+        await emitSyncProgress(onProgress, result);
       }
 
       paginationToken = page.nextToken;
@@ -276,7 +315,7 @@ export async function __syncBookmarksLegacy(
     // Folder-backed collections should refresh once bookmark pagination fully finishes,
     // including after a resumed sync run.
     if (!paginationToken && !result.resumeToken) {
-      const { folders } = await fetchBookmarkFolders(userId, user.xId);
+      const { folders } = await resolveXFoldersForSync(userId, user.xId);
 
       for (const folder of folders) {
         const page = await fetchBookmarksByFolder(userId, user.xId, folder.id);
@@ -377,6 +416,7 @@ export async function __syncBookmarksLegacy(
 export async function __syncBookmarksRefactored(
   userId: string,
   resumeToken?: string,
+  onProgress?: SyncProgressCallback,
 ): Promise<SyncResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -398,6 +438,7 @@ export async function __syncBookmarksRefactored(
 
   let paginationToken: string | undefined = resumeToken;
   let pagesFetched = 0;
+  const startedWithResumeToken = Boolean(resumeToken);
 
   // === TEMPORARY DEBUG LOGGING FOR RESUME INVESTIGATION ===
   // Enable with: DEBUG_RESUME_TEST=1 npm test ...
@@ -505,6 +546,21 @@ export async function __syncBookmarksRefactored(
         );
         result.hitExisting = updateBookmarks.length > 0;
         result.totalFetched += updateBookmarks.length;
+
+        await emitSyncProgress(onProgress, result);
+
+        if (
+          shouldStopIncrementalSync(
+            startedWithResumeToken,
+            pageData.length,
+            newBookmarks.length,
+          )
+        ) {
+          paginationToken = undefined;
+          break;
+        }
+      } else {
+        await emitSyncProgress(onProgress, result);
       }
 
       paginationToken = page.nextToken;
@@ -525,7 +581,7 @@ export async function __syncBookmarksRefactored(
 
     // Folder phase - only on full completion
     if (!paginationToken && !result.resumeToken) {
-      const { folders } = await fetchBookmarkFolders(userId, user.xId);
+      const { folders } = await resolveXFoldersForSync(userId, user.xId);
 
       for (const folder of folders) {
         const page = await fetchBookmarksByFolder(userId, user.xId, folder.id);
@@ -641,31 +697,11 @@ export async function __syncBookmarksRefactored(
 
 /**
  * Main entry point for bookmark sync.
- *
- * The refactored engine is now the default.
- * The legacy engine is only kept for emergency rollback.
  */
 export async function syncBookmarks(
   userId: string,
   resumeToken?: string,
+  onProgress?: SyncProgressCallback,
 ): Promise<SyncResult> {
-  if (USE_REFACTORED_SYNC) {
-    return __syncBookmarksRefactored(userId, resumeToken);
-  } else {
-    console.error(
-      '\n' +
-      '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n' +
-      '!!  ⚠️  EMERGENCY ROLLBACK MODE — LEGACY SYNC ENGINE IS ACTIVE  ⚠️  !!\n' +
-      '!!                                                                  !!\n' +
-      '!!  The refactored sync engine has been disabled via              !!\n' +
-      '!!  USE_REFACTORED_SYNC=false.                                    !!\n' +
-      '!!                                                                  !!\n' +
-      '!!  This is only intended for emergency rollback.                 !!\n' +
-      '!!  Set USE_REFACTORED_SYNC=true (or remove the variable)         !!\n' +
-      '!!  to restore the normal (refactored) sync engine.               !!\n' +
-      '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n'
-    );
-
-    return __syncBookmarksLegacy(userId, resumeToken);
-  }
+  return __syncBookmarksRefactored(userId, resumeToken, onProgress);
 }

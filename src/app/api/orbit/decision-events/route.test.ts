@@ -2,12 +2,6 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getDbUserMock = vi.hoisted(() => vi.fn(async () => ({ id: "user-1" })));
-const checkRateLimitMock = vi.hoisted(() =>
-  vi.fn(async () => ({ success: true }))
-);
-const createRateLimitResponseMock = vi.hoisted(() =>
-  vi.fn(() => Response.json({ error: "rate limited" }, { status: 429 }))
-);
 const recordOrbitDecisionEventsMock = vi.hoisted(() =>
   vi.fn(async () => ({ count: 1 }))
 );
@@ -19,11 +13,6 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth", () => ({
   getDbUser: getDbUserMock,
-}));
-
-vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: checkRateLimitMock,
-  createRateLimitResponse: createRateLimitResponseMock,
 }));
 
 vi.mock("@/lib/orbit-decision-events", () => ({
@@ -46,7 +35,6 @@ describe("/api/orbit/decision-events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getDbUserMock.mockResolvedValue({ id: "user-1" });
-    checkRateLimitMock.mockResolvedValue({ success: true });
     recordOrbitDecisionEventsMock.mockResolvedValue({ count: 1 });
     prismaMock.bookmark.findMany.mockResolvedValue([{ id: "bookmark-1" }]);
   });
@@ -93,7 +81,6 @@ describe("/api/orbit/decision-events", () => {
 
     expect(response.status).toBe(200);
     expect(json).toEqual({ ok: true, count: 1 });
-    expect(checkRateLimitMock).toHaveBeenCalledWith("api:write", "user-1");
     expect(prismaMock.bookmark.findMany).toHaveBeenCalledWith({
       where: {
         userId: "user-1",

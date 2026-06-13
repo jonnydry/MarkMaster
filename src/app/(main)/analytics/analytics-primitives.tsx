@@ -269,8 +269,21 @@ function HeroStat({
   );
 }
 
-export const analyticsChartSurfaceClass =
-  "surface-inset p-3";
+/** Inset well for chart/list regions on the flat analytics layout. */
+export const analyticsInsetSurfaceClass = "surface-inset";
+
+/** Stronger inset for nested regions inside analytics cards. */
+export const analyticsInsetStrongSurfaceClass = "surface-inset-strong";
+
+export const analyticsChartSurfaceClass = cn(analyticsInsetSurfaceClass, "p-3");
+
+export const analyticsChartSurfaceCardClass = cn(analyticsInsetStrongSurfaceClass, "p-3");
+
+export const analyticsListSurfaceClass =
+  "flex flex-col divide-y divide-hairline-soft overflow-hidden surface-inset";
+
+export const analyticsListSurfaceCardClass =
+  "flex flex-col divide-y divide-hairline-soft overflow-hidden surface-inset-strong";
 
 const SOURCE_LABELS: Record<string, string> = {
   highlights: "Highlights",

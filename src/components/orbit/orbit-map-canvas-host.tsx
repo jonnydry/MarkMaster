@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
-import type { OrbitGraphPayload } from '@/types';
+import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
 import { OrbitMapMinimap } from './orbit-map-minimap';
 import { OrbitMapUnsupportedState } from './orbit-map-unsupported-state';
@@ -24,8 +24,9 @@ interface OrbitMapCanvasHostProps {
   filter?: GraphFilter;
   selection?: OrbitMapSelection | null;
   focus?: OrbitMapFocus | null;
-  /** Node ids to highlight (e.g. live search matches); null/undefined clears. */
-  highlightedNodeIds?: string[] | null;
+  /** Lowercased search query; worker builds index and highlights matches. */
+  searchQuery?: string;
+  onSearchResults?: (query: string, results: OrbitGraphNode[]) => void;
   onSelectionChange?: (selection: OrbitMapSelection | null) => void;
   onHoverChange?: (hover: OrbitMapSelection | null, position?: { x: number; y: number }) => void;
   onOpenBookmark?: (bookmarkId: string) => void;
@@ -247,6 +248,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                 }
                 break;
 
+              case MainMessageType.SEARCH_RESULTS:
+                propsRef.current.onSearchResults?.(msg.query ?? '', msg.results ?? []);
+                break;
+
               case MainMessageType.LAYOUT_UPDATED:
                 if (msg.nodeIds && msg.positions) {
                   const updated: Record<string, { x: number; y: number }> = {};
@@ -375,11 +380,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
       workerRef.current.postMessage({
-        type: WorkerMessageType.SET_HIGHLIGHT,
+        type: WorkerMessageType.SET_SEARCH,
         protocolVersion: 1,
-        nodeIds: props.highlightedNodeIds ?? null,
+        query: props.searchQuery ?? '',
       });
-    }, [props.highlightedNodeIds, useFallback, workerGeneration]);
+    }, [props.searchQuery, useFallback, workerGeneration]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback || !props.focus) return;

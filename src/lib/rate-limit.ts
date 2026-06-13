@@ -64,7 +64,7 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
 };
 
 // Development safety net: disable rate limiting when Upstash is not configured
-const isRateLimitingEnabled = !!process.env.UPSTASH_REDIS_REST_URL;
+export const isRateLimitingEnabled = !!process.env.UPSTASH_REDIS_REST_URL;
 
 // Lazy Redis + Ratelimit initialization
 // Only created when Upstash credentials are actually present.
@@ -192,6 +192,16 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   // In development without Upstash configured, always allow requests
   if (!isRateLimitingEnabled) {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        limit: 0,
+        remaining: 0,
+        reset: Date.now(),
+        retryAfter: 60,
+      };
+    }
+
     return {
       success: true,
       limit: 999,
@@ -282,8 +292,18 @@ export async function resetUserRateLimit(
 export async function checkGlobalRateLimit(
   action: "sync" | "orbit"
 ): Promise<RateLimitResult> {
-  // If rate limiting is disabled (no Upstash creds), always allow
+  // If rate limiting is disabled (no Upstash creds), allow in dev only
   if (!isRateLimitingEnabled) {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        limit: 0,
+        remaining: 0,
+        reset: Date.now(),
+        retryAfter: 60,
+      };
+    }
+
     return {
       success: true,
       limit: 999,

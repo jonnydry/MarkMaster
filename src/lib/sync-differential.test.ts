@@ -18,6 +18,7 @@ import { RateLimitError } from "./x-api";
 const mocks = vi.hoisted(() => ({
   fetchBookmarks: vi.fn(),
   fetchBookmarkFolders: vi.fn(),
+  resolveXFoldersForSync: vi.fn(),
   fetchBookmarksByFolder: vi.fn(),
   prisma: {
     user: { findUnique: vi.fn(), update: vi.fn() },
@@ -56,6 +57,11 @@ vi.mock("./x-api", () => {
     RateLimitError,
   };
 });
+
+vi.mock("./sync-folder-metadata", () => ({
+  X_FOLDER_COLLECTION_SOURCE: "x-bookmark-folder",
+  resolveXFoldersForSync: mocks.resolveXFoldersForSync,
+}));
 
 // Import both implementations for differential testing
 
@@ -301,6 +307,12 @@ class SyncTestHarness {
     mocks.fetchBookmarkFolders.mockReset();
     mocks.fetchBookmarkFolders.mockResolvedValueOnce({
       folders: folders.map(f => ({ id: f.id, name: f.name })),
+    });
+
+    mocks.resolveXFoldersForSync.mockReset();
+    mocks.resolveXFoldersForSync.mockResolvedValue({
+      folders: folders.map((f) => ({ id: f.id, name: f.name })),
+      fromCache: false,
     });
 
     // Build a lookup map so fetchBookmarksByFolder can be called multiple times

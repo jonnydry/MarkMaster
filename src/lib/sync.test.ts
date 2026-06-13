@@ -3,7 +3,7 @@ import type { BookmarkData } from "./x-api";
 
 const mocks = vi.hoisted(() => ({
   fetchBookmarks: vi.fn(),
-  fetchBookmarkFolders: vi.fn(),
+  resolveXFoldersForSync: vi.fn(),
   fetchBookmarksByFolder: vi.fn(),
   prisma: {
     user: { findUnique: vi.fn(), update: vi.fn() },
@@ -38,11 +38,15 @@ vi.mock("./x-api", () => {
 
   return {
     fetchBookmarks: mocks.fetchBookmarks,
-    fetchBookmarkFolders: mocks.fetchBookmarkFolders,
     fetchBookmarksByFolder: mocks.fetchBookmarksByFolder,
     RateLimitError,
   };
 });
+
+vi.mock("./sync-folder-metadata", () => ({
+  resolveXFoldersForSync: mocks.resolveXFoldersForSync,
+  X_FOLDER_COLLECTION_SOURCE: "x-bookmark-folder",
+}));
 
 import { syncBookmarks } from "./sync";
 
@@ -82,7 +86,7 @@ describe("syncBookmarks", () => {
     mocks.prisma.collectionItem.deleteMany.mockResolvedValue({ count: 0 });
     mocks.prisma.collection.upsert.mockResolvedValue({ id: "collection-1" });
     mocks.prisma.collectionItem.findMany.mockResolvedValue([]);
-    mocks.fetchBookmarkFolders.mockResolvedValue({ folders: [] });
+    mocks.resolveXFoldersForSync.mockResolvedValue({ folders: [], fromCache: false });
     mocks.fetchBookmarksByFolder.mockResolvedValue({ bookmarks: [] });
   });
 
@@ -113,19 +117,34 @@ describe("syncBookmarks", () => {
     expect(mocks.prisma.bookmark.updateMany).toHaveBeenCalledTimes(25);
     expect(maxActiveUpdates).toBeLessThanOrEqual(10);
   });
+
+  it("stops after one page when every bookmark already exists", async () => {
+    const bookmarks = Array.from({ length: 10 }, (_, index) =>
+      makeBookmarkData(`tweet-${index}`)
+    );
+    mocks.prisma.bookmark.findMany.mockResolvedValue(
+      bookmarks.map((bookmark) => ({ tweetId: bookmark.tweet.id }))
+    );
+    mocks.fetchBookmarks.mockResolvedValueOnce({
+      bookmarks,
+      nextToken: "older-page",
+    });
+
+    const result = await syncBookmarks("user-1");
+
+    expect(mocks.fetchBookmarks).toHaveBeenCalledTimes(1);
+    expect(result.newBookmarks).toBe(0);
+    expect(result.hitExisting).toBe(true);
+    expect(result.updatedBookmarks).toBe(10);
+  });
 });
 
 describe("refactored sync path (smoke test)", () => {
-  it("exercises the refactored implementation without crashing when USE_REFACTORED_SYNC=true", async () => {
-    vi.stubEnv("USE_REFACTORED_SYNC", "true");
+  it("exercises syncBookmarks without crashing", async () => {
+    const { syncBookmarks } = await import("./sync");
 
-    // Dynamic import so the module picks up the new env var
-    const { syncBookmarks: refactoredSync } = await import("./sync");
+    const result = await syncBookmarks("user-1");
 
-    // Basic happy-path call using the existing mock setup
-    const result = await refactoredSync("user-1");
-
-    // We mainly care that it didn't throw and returned a plausible result shape
     expect(result).toHaveProperty("newBookmarks");
     expect(result).toHaveProperty("updatedBookmarks");
     expect(result).toHaveProperty("totalFetched");

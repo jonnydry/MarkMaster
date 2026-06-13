@@ -19,9 +19,19 @@ export function useBookmarkFilters() {
   const [collectionId, setCollectionId] = useState("");
   const [bookmarkId, setBookmarkId] = useState("");
   const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const resetPage = useCallback(() => setPage(1), []);
+  const resetPage = useCallback(() => {
+    setPage(1);
+    setPageCursors({});
+  }, []);
+
+  const preparePageCursor = useCallback((forPage: number, cursor: string) => {
+    setPageCursors((current) =>
+      current[forPage] === cursor ? current : { ...current, [forPage]: cursor }
+    );
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -81,7 +91,7 @@ export function useBookmarkFilters() {
   }, [resetPage]);
 
   const queryString = useMemo(() => {
-    return new URLSearchParams({
+    const params = new URLSearchParams({
       page: page.toString(),
       limit: PAGE_LIMIT,
       search: debouncedSearch,
@@ -94,9 +104,17 @@ export function useBookmarkFilters() {
       ...(dateTo && { dateTo }),
       ...(collectionId && { collectionId }),
       ...(bookmarkId && { bookmarkId }),
-    }).toString();
+    });
+
+    const cursor = page > 1 ? pageCursors[page] : undefined;
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+
+    return params.toString();
   }, [
     page,
+    pageCursors,
     debouncedSearch,
     sortField,
     sortDirection,
@@ -205,6 +223,8 @@ export function useBookmarkFilters() {
       setBookmarkId: setBookmarkIdWrapped,
       page,
       setPage,
+      pageCursors,
+      preparePageCursor,
       toggleTag,
       hasActiveFilters,
       clearFilters,
@@ -233,6 +253,8 @@ export function useBookmarkFilters() {
       bookmarkId,
       setBookmarkIdWrapped,
       page,
+      pageCursors,
+      preparePageCursor,
       toggleTag,
       hasActiveFilters,
       clearFilters,

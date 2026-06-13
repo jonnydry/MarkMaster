@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRef } from "react";
 import {
   Folder,
   Loader2,
@@ -83,6 +84,7 @@ const OrbitBookmarkOverlay = dynamic(
 );
 
 export default function OrbitPage() {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const {
     router,
     actions,
@@ -204,7 +206,7 @@ export default function OrbitPage() {
       </div>
 
       <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="app-main-scroll relative z-[1] scrollbar-thin">
+        <div ref={scrollRef} className="app-main-scroll relative z-[1] scrollbar-thin">
           <PageHeader
             sticky
             chromeless
@@ -494,6 +496,7 @@ export default function OrbitPage() {
                   <div className="flex flex-col gap-3">
                     <div className="min-w-0 flex-1">
                       <OrbitList
+                        scrollRef={scrollRef}
                         bookmarks={bookmarks}
                         selectedId={resolvedActiveBookmarkId}
                         isLoading={isLoading}

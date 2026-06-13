@@ -148,7 +148,12 @@ export interface AnalyticsData {
   orbitHighConfidenceAcceptRate: number;
 }
 
-export type SyncRunStatus = "RUNNING" | "COMPLETED" | "RATE_LIMITED" | "FAILED";
+export type SyncRunStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "RATE_LIMITED"
+  | "FAILED";
 
 export interface SyncRunSummary {
   id: string;

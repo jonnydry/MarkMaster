@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -13,8 +13,15 @@ import {
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { bookmarkLabel } from "@/lib/collections-presentation";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
+import {
+  collectionDetailSchema,
+  shareContentSchema,
+} from "@/lib/api-response-schemas";
 import { copyTextToClipboard } from "@/lib/clipboard";
-import { invalidateCollectionQueries } from "@/lib/query-invalidation";
+import {
+  invalidateCollectionMembershipQueries,
+  invalidateCollectionMetadataQueries,
+} from "@/lib/query-invalidation";
 import type { BookmarkWithRelations } from "@/types";
 import type { ShareContent } from "@/lib/share-content";
 
@@ -53,11 +60,34 @@ export type CollectionDetail = {
   externalSource: string | null;
   externalSourceId: string | null;
   items: CollectionItemRow[];
+  total: number;
+  page: number;
+  totalPages: number;
+  nextCursor?: string;
 };
+
+const COLLECTION_PAGE_LIMIT = 20;
+
+function buildCollectionQueryString(
+  page: number,
+  pageCursors: Record<number, string>
+) {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: COLLECTION_PAGE_LIMIT.toString(),
+  });
+  const cursor = page > 1 ? pageCursors[page] : undefined;
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+  return params.toString();
+}
 
 export function useCollectionDetailPage(collectionId: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState("");
   const [reordering, setReordering] = useState(false);
@@ -66,19 +96,32 @@ export function useCollectionDetailPage(collectionId: string) {
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
 
+  const queryString = useMemo(
+    () => buildCollectionQueryString(page, pageCursors),
+    [page, pageCursors]
+  );
+
+  const preparePageCursor = useCallback((forPage: number, cursor: string) => {
+    setPageCursors((current) =>
+      current[forPage] === cursor ? current : { ...current, [forPage]: cursor }
+    );
+  }, []);
+
   const {
     data: collection,
     isPending,
     isError,
     error,
     refetch,
-  } = useQuery({
-    queryKey: ["collection", collectionId],
+  } = useQuery<CollectionDetail>({
+    queryKey: ["collection", collectionId, queryString],
     queryFn: async () => {
       try {
-        return await fetchJson<CollectionDetail>(
-          `/api/collections/${collectionId}`
-        );
+        return (await fetchJson(
+          `/api/collections/${collectionId}?${queryString}`,
+          undefined,
+          collectionDetailSchema
+        )) as unknown as CollectionDetail;
       } catch (fetchError) {
         if (fetchError instanceof Error && fetchError.message.includes("404")) {
           throw new Error("NOT_FOUND");
@@ -86,6 +129,7 @@ export function useCollectionDetailPage(collectionId: string) {
         throw new Error("LOAD_FAILED");
       }
     },
+    placeholderData: keepPreviousData,
   });
 
   const sortedItems = useMemo(
@@ -111,7 +155,10 @@ export function useCollectionDetailPage(collectionId: string) {
 
   const isSyncedFromX = collection?.type === "x_folder";
   const isUserCollection = collection?.type === "user_collection";
-  const itemCountLabel = bookmarkLabel(sortedItems.length);
+  const totalItems = collection?.total ?? sortedItems.length;
+  const totalPages = collection?.totalPages ?? 1;
+  const canReorder = isUserCollection && totalPages <= 1;
+  const itemCountLabel = bookmarkLabel(totalItems);
   const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
 
   const selectBookmarkByOffset = useCallback(
@@ -174,7 +221,7 @@ export function useCollectionDetailPage(collectionId: string) {
           body: { isPublic: !collection.isPublic },
         }
       );
-      await invalidateCollectionQueries(queryClient, collectionId);
+      await invalidateCollectionMetadataQueries(queryClient, collectionId);
       if (updated.isPublic) {
         toast.success("Collection is now public");
       } else {
@@ -207,7 +254,7 @@ export function useCollectionDetailPage(collectionId: string) {
           method: "DELETE",
           body: { bookmarkId },
         });
-        await invalidateCollectionQueries(queryClient, collectionId);
+        await invalidateCollectionMembershipQueries(queryClient, collectionId);
         toast.success("Removed from collection");
       } catch (removeError) {
         toast.error(
@@ -223,9 +270,10 @@ export function useCollectionDetailPage(collectionId: string) {
   const handleShareOnX = useCallback(async () => {
     if (!collection) return;
     try {
-      const content = await fetchJson<ShareContent>(
+      const content = await fetchJson(
         `/api/collections/${collectionId}/publish`,
-        { method: "POST" }
+        { method: "POST" },
+        shareContentSchema
       );
       setShareContent(content);
       setShareOpen(true);
@@ -251,7 +299,7 @@ export function useCollectionDetailPage(collectionId: string) {
         method: "PATCH",
         body: { name: name.trim() },
       });
-      await invalidateCollectionQueries(queryClient, collectionId);
+      await invalidateCollectionMetadataQueries(queryClient, collectionId);
       setEditingName(false);
       toast.success("Name updated");
     } catch (updateError) {
@@ -263,7 +311,7 @@ export function useCollectionDetailPage(collectionId: string) {
 
   const moveItem = useCallback(
     async (fromIndex: number, direction: -1 | 1) => {
-      if (!collection || reordering) return;
+      if (!collection || reordering || !canReorder) return;
       const toIndex = fromIndex + direction;
       if (toIndex < 0 || toIndex >= sortedItems.length) return;
 
@@ -280,7 +328,7 @@ export function useCollectionDetailPage(collectionId: string) {
           method: "PATCH",
           body: { items: payload },
         });
-        await invalidateCollectionQueries(queryClient, collectionId);
+        await invalidateCollectionMembershipQueries(queryClient, collectionId);
       } catch (reorderError) {
         toast.error(
           reorderError instanceof Error
@@ -291,7 +339,7 @@ export function useCollectionDetailPage(collectionId: string) {
         setReordering(false);
       }
     },
-    [collection, collectionId, queryClient, reordering, sortedItems]
+    [canReorder, collection, collectionId, queryClient, reordering, sortedItems]
   );
 
   const goToCollections = useCallback(() => {
@@ -301,6 +349,56 @@ export function useCollectionDetailPage(collectionId: string) {
   const goToDashboard = useCallback(() => {
     router.push("/dashboard");
   }, [router]);
+
+  const prefetchCollectionPage = useCallback(
+    (targetPage: number) => {
+      if (targetPage < 1 || targetPage > totalPages) return;
+      if (targetPage === page + 1 && collection?.nextCursor) {
+        preparePageCursor(targetPage, collection.nextCursor);
+      }
+      const params = new URLSearchParams(queryString);
+      params.set("page", targetPage.toString());
+      if (targetPage > 1) {
+        const cursor =
+          targetPage === page + 1
+            ? collection?.nextCursor
+            : pageCursors[targetPage];
+        if (!cursor) return;
+        params.set("cursor", cursor);
+      } else {
+        params.delete("cursor");
+      }
+      void queryClient.prefetchQuery({
+        queryKey: ["collection", collectionId, params.toString()],
+        queryFn: () =>
+          fetchJson(
+            `/api/collections/${collectionId}?${params.toString()}`,
+            undefined,
+            collectionDetailSchema
+          ),
+      });
+    },
+    [
+      collection,
+      collectionId,
+      page,
+      pageCursors,
+      preparePageCursor,
+      queryClient,
+      queryString,
+      totalPages,
+    ]
+  );
+
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      if (nextPage > page && collection?.nextCursor) {
+        preparePageCursor(nextPage, collection.nextCursor);
+      }
+      setPage(nextPage);
+    },
+    [collection, page, preparePageCursor]
+  );
 
   const openSelectedBookmark = useCallback(() => {
     const targetId =
@@ -335,6 +433,13 @@ export function useCollectionDetailPage(collectionId: string) {
     refetch,
     isNotFound,
     sortedItems,
+    totalItems,
+    totalPages,
+    page,
+    setPage,
+    handlePageChange,
+    canReorder,
+    prefetchCollectionPage,
     aboveFoldMediaBookmarkId,
     isSyncedFromX,
     isUserCollection,

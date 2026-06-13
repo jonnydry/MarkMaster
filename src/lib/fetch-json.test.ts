@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { z } from "zod";
+
+import { FetchJsonError, fetchJson, sendJson } from "@/lib/fetch-json";
 
 describe("fetchJson", () => {
   afterEach(() => {
@@ -17,6 +19,38 @@ describe("fetchJson", () => {
     await expect(fetchJson<{ ok: boolean }>("/api/test")).resolves.toEqual({
       ok: true,
     });
+  });
+
+  it("validates successful responses when a schema is provided", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const schema = z.object({ ok: z.literal(true) });
+
+    await expect(fetchJson("/api/test", undefined, schema)).resolves.toEqual({
+      ok: true,
+    });
+  });
+
+  it("rejects malformed successful responses when a schema is provided", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: "nope" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const schema = z.object({ ok: z.literal(true) });
+
+    await expect(fetchJson("/api/test", undefined, schema)).rejects.toMatchObject({
+      name: "FetchJsonError",
+      message: "API response did not match expected shape",
+      status: 200,
+    } satisfies Partial<FetchJsonError>);
   });
 
   it("surfaces API error messages from JSON bodies", async () => {
@@ -62,5 +96,24 @@ describe("sendJson", () => {
     expect((init?.headers as Headers).get("Content-Type")).toBe(
       "application/json"
     );
+  });
+
+  it("validates JSON responses when sendJson receives a schema", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    const schema = z.object({ id: z.string() });
+
+    await expect(
+      sendJson("/api/test", {
+        method: "POST",
+        body: { name: "MarkMaster" },
+        schema,
+      })
+    ).resolves.toEqual({ id: "1" });
   });
 });

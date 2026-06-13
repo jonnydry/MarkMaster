@@ -1,0 +1,48 @@
+/* Branded orbital ring motion — shared by auth splash and Orbit routes. */
+@keyframes ring-rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ring-rotate-medium {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ring-rotate-fast {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes nucleus-breath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+@layer utilities {
+  .orbital-ring-slow {
+    animation: ring-rotate-slow 68s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .orbital-ring-medium {
+    animation: ring-rotate-medium 47s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .orbital-ring-fast {
+    animation: ring-rotate-fast 31s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .orbital-nucleus {
+    animation: nucleus-breath 5.8s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orbital-ring-slow,
+    .orbital-ring-medium,
+    .orbital-ring-fast,
+    .orbital-nucleus {
+      animation: none;
+    }
+  }
+}

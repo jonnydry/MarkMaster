@@ -101,8 +101,8 @@ export default function OrbitMapPage() {
     setSearch,
     searchDeferred,
     searchResults,
-    highlightedNodeIds,
     searchInputRef,
+    handleSearchResults,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
     headerDescription,
@@ -298,7 +298,8 @@ export default function OrbitMapPage() {
                 ref={canvasRef}
                 data={graph}
                 selection={selection}
-                highlightedNodeIds={highlightedNodeIds}
+                searchQuery={searchDeferred}
+                onSearchResults={handleSearchResults}
                 onSelectionChange={handleCanvasSelectionChange}
                 onHoverChange={handleHoverChange}
                 onOpenBookmark={handleOpenBookmark}

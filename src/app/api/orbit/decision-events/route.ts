@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import {
   recordOrbitDecisionEvents,
   OrbitDecisionEventOwnershipError,
@@ -13,7 +14,6 @@ import {
   orbitCollectionSuggestionSchema,
   orbitTagSuggestionSchema,
 } from "@/lib/orbit-grok";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import type { OrbitDecisionEventPayload } from "@/types";
 
 const MAX_DECISION_EVENTS_BODY_BYTES = 64 * 1024;
@@ -54,11 +54,6 @@ export async function POST(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await readJsonBody(req, MAX_DECISION_EVENTS_BODY_BYTES);
@@ -103,6 +98,8 @@ export async function POST(req: NextRequest) {
     }
     throw error;
   }
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json({ ok: true, ...result });
 }

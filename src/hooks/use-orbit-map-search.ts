@@ -2,8 +2,7 @@
 
 import {
   useCallback,
-  useDeferredValue,
-  useMemo,
+  useEffect,
   useRef,
   useState,
   type RefObject,
@@ -13,34 +12,43 @@ import type {
   OrbitMapCanvasHandle,
   OrbitMapSelection,
 } from "@/components/orbit/orbit-map-canvas-host";
-import { rankOrbitMapSearchResults } from "@/lib/orbit-map-search";
-import type { OrbitGraphPayload } from "@/types";
+import type { OrbitGraphNode } from "@/types";
 
 interface UseOrbitMapSearchOptions {
-  graph: OrbitGraphPayload | undefined;
   canvasRef: RefObject<OrbitMapCanvasHandle | null>;
   onSelect: (selection: OrbitMapSelection) => void;
 }
 
-/** Graph search box state: deferred query, ranked results, canvas highlight. */
+/** Graph search box state; ranking + canvas highlight run in the map worker. */
 export function useOrbitMapSearch({
-  graph,
   canvasRef,
   onSelect,
 }: UseOrbitMapSearchOptions) {
   const [search, setSearch] = useState("");
-  const searchDeferred = useDeferredValue(search.trim().toLowerCase());
+  const [searchDeferred, setSearchDeferred] = useState("");
+  const [searchResults, setSearchResults] = useState<OrbitGraphNode[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDeferredRef = useRef(searchDeferred);
+  searchDeferredRef.current = searchDeferred;
 
-  const searchResults = useMemo(() => {
-    return graph ? rankOrbitMapSearchResults(graph.nodes, searchDeferred) : [];
-  }, [graph, searchDeferred]);
+  useEffect(() => {
+    const trimmed = search.trim().toLowerCase();
+    const handle = window.setTimeout(() => {
+      setSearchDeferred(trimmed);
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [search]);
 
-  // Live canvas highlight for search matches (capped to keep messages small).
-  const highlightedNodeIds = useMemo(() => {
-    if (!searchDeferred) return null;
-    return searchResults.slice(0, 400).map((node) => node.id);
-  }, [searchDeferred, searchResults]);
+  useEffect(() => {
+    if (!searchDeferred) {
+      setSearchResults([]);
+    }
+  }, [searchDeferred]);
+
+  const handleSearchResults = useCallback((query: string, results: OrbitGraphNode[]) => {
+    if (query !== searchDeferredRef.current) return;
+    setSearchResults(results);
+  }, []);
 
   const handleSearchResultSelect = useCallback(
     (identity: OrbitMapSelection) => {
@@ -55,8 +63,8 @@ export function useOrbitMapSearch({
     setSearch,
     searchDeferred,
     searchResults,
-    highlightedNodeIds,
     searchInputRef,
+    handleSearchResults,
     handleSearchResultSelect,
   };
 }

@@ -27,7 +27,7 @@
  * @see types/index.ts for OrbitGraph* types
  */
 
-import type { OrbitGraphPayload } from "@/types";
+import type { OrbitGraphPayload, OrbitGraphNode } from "@/types";
 
 /* ------------------------------------------------------------------ */
 /* Version & Message Type Constants                                   */
@@ -65,6 +65,8 @@ export const WorkerMessageType = {
   SET_SELECTION: "SET_SELECTION",
   SET_CAMERA: "SET_CAMERA",
   SET_HIGHLIGHT: "SET_HIGHLIGHT",
+  /** Live graph search — worker owns index + canvas highlight. */
+  SET_SEARCH: "SET_SEARCH",
 
   // Imperative commands (exposed via OrbitMapCanvasHandle)
   FOCUS_ON: "FOCUS_ON",
@@ -102,6 +104,9 @@ export const MainMessageType = {
 
   // Side effects requested by worker (e.g. open bookmark on double-click)
   OPEN_BOOKMARK: "OPEN_BOOKMARK",
+
+  /** Ranked dropdown matches for the current search query. */
+  SEARCH_RESULTS: "SEARCH_RESULTS",
 
   // A bookmark node was dragged and dropped onto a tag/collection hub
   NODE_DROPPED: "NODE_DROPPED",
@@ -329,6 +334,13 @@ export interface SetHighlightMessage {
   nodeIds: string[] | null;
 }
 
+export interface SetSearchMessage {
+  type: typeof WorkerMessageType.SET_SEARCH;
+  protocolVersion: number;
+  /** Lowercased, trimmed query from the main thread. Empty clears search. */
+  query: string;
+}
+
 // --- High-level commands (from OrbitMapCanvasHandle and search/rail) ---
 export interface FocusOnMessage {
   type: typeof WorkerMessageType.FOCUS_ON;
@@ -388,6 +400,7 @@ export type WorkerMessage =
   | SetSelectionMessage
   | SetCameraMessage
   | SetHighlightMessage
+  | SetSearchMessage
   | FocusOnMessage
   | ResetViewMessage
   | AnimateAssignMessage
@@ -498,6 +511,14 @@ export interface NodeDroppedMessage {
   anchorKind: "tag" | "collection";
 }
 
+export interface SearchResultsMessage {
+  type: typeof MainMessageType.SEARCH_RESULTS;
+  protocolVersion: number;
+  /** Echo of the query this payload was computed for (stale-guard on main). */
+  query: string;
+  results: OrbitGraphNode[];
+}
+
 /** Union of all messages the worker may send to the main thread. */
 export type MainMessage =
   | ReadyMessage
@@ -509,7 +530,8 @@ export type MainMessage =
   | CursorChangedMessage
   | AnimateAssignCompleteMessage
   | OpenBookmarkMessage
-  | NodeDroppedMessage;
+  | NodeDroppedMessage
+  | SearchResultsMessage;
 
 /* ------------------------------------------------------------------ */
 /* Utility Type Guards (optional but convenient)                      */

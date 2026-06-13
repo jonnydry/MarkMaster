@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchJson } from "@/lib/fetch-json";
+import { performanceHighlightsResponseSchema } from "@/lib/api-response-schemas";
 import type { BookmarkWithRelations } from "@/types";
 
 export type PerformanceHighlightsResponse = {
@@ -99,7 +100,11 @@ export function usePerformanceHighlights(
   return useQuery<PerformanceHighlightsResponse>({
     queryKey: ["performance-highlights", cacheKey],
     queryFn: async () => {
-      const data = await fetchJson<PerformanceHighlightsResponse>(highlightUrl);
+      const data = await fetchJson(
+        highlightUrl,
+        undefined,
+        performanceHighlightsResponseSchema
+      );
 
       let processed = data.bookmarks;
 

@@ -18,6 +18,7 @@ import {
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { fetchJson } from "@/lib/fetch-json";
+import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
@@ -27,6 +28,10 @@ export type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
   total: number;
   totalPages: number;
+  nextCursor?: string;
+  page?: number;
+  personalBoostAuthors?: string[];
+  personalBoostTags?: string[];
 };
 
 const MEDIA_FILTER_LABELS: Record<string, string> = {
@@ -88,7 +93,8 @@ export function useDashboardPage() {
     isFetching,
   } = useQuery<BookmarkResponse>({
     queryKey: ["bookmarks", filters.queryString],
-    queryFn: () => fetchJson(`/api/bookmarks?${filters.queryString}`),
+    queryFn: () =>
+      fetchJson(`/api/bookmarks?${filters.queryString}`, undefined, bookmarkListResponseSchema),
     placeholderData: keepPreviousData,
   });
 
@@ -103,6 +109,53 @@ export function useDashboardPage() {
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
   const total: number = bookmarkData?.total || 0;
   const totalPages: number = bookmarkData?.totalPages || 1;
+
+  const prefetchBookmarkPage = useCallback(
+    (targetPage: number) => {
+      if (targetPage < 1 || targetPage > totalPages) return;
+      if (targetPage === filters.page + 1 && bookmarkData?.nextCursor) {
+        filters.preparePageCursor(targetPage, bookmarkData.nextCursor);
+      }
+      const params = new URLSearchParams(filters.queryString);
+      params.set("page", targetPage.toString());
+      if (targetPage > 1) {
+        const cursor =
+          targetPage === filters.page + 1
+            ? bookmarkData?.nextCursor
+            : filters.pageCursors?.[targetPage];
+        if (!cursor) return;
+        params.set("cursor", cursor);
+      } else {
+        params.delete("cursor");
+      }
+      const qs = params.toString();
+      void queryClient.prefetchQuery({
+        queryKey: ["bookmarks", qs],
+        queryFn: () =>
+          fetchJson(`/api/bookmarks?${qs}`, undefined, bookmarkListResponseSchema),
+        staleTime: 30_000,
+      });
+    },
+    [
+      bookmarkData,
+      filters.page,
+      filters.pageCursors,
+      filters.preparePageCursor,
+      filters.queryString,
+      queryClient,
+      totalPages,
+    ]
+  );
+
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      if (nextPage > filters.page && bookmarkData?.nextCursor) {
+        filters.preparePageCursor(nextPage, bookmarkData.nextCursor);
+      }
+      filters.setPage(nextPage);
+    },
+    [bookmarkData, filters]
+  );
 
   const performanceFocusedId = filters.bookmarkId ? filters.bookmarkId : null;
   const {
@@ -417,6 +470,8 @@ export function useDashboardPage() {
     bookmarks,
     total,
     totalPages,
+    prefetchBookmarkPage,
+    handlePageChange,
     performanceFocusedId,
     setBookmarkId,
     visibleSelectedBookmarkIds,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, memo } from "react";
+import { memo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
@@ -11,22 +11,24 @@ import {
   NotebookPen,
   Maximize2,
   Minimize2,
-  BadgeCheck,
-  Check} from "lucide-react";
+  BadgeCheck} from "lucide-react";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   X_POST_METRIC_ICON_CLASS,
   XPostLikeIcon,
   XPostReplyIcon,
   XPostRepostIcon} from "@/components/brands/x-post-metric-icons";
-import { Button } from "@/components/ui/button";
 import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
+import {
+  BookmarkCardActionButton,
+  BookmarkCardSelectionToggle,
+  BookmarkCardTagPill,
+} from "@/components/bookmark-card-chrome";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
-import { highlightIndicatorActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
-import { createTextHighlighter } from "@/lib/text-highlighter";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { useTypography } from "@/hooks/use-typography";
+import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
 import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
@@ -54,29 +56,6 @@ interface BookmarkCardProps {
   onCompactExpandedChange?: (bookmarkId: string, expanded: boolean) => void;
   /** Opens the shared full bookmark overlay used by the grid view. */
   onOpenExpanded?: (bookmarkId: string) => void;
-}
-
-function TagPill({
-  name,
-  onClick}: {
-  name: string;
-  onClick?: () => void;
-
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-      className={
-        "surface-inset px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
-      }
-    >
-      {name}
-    </button>
-  );
 }
 
 function BookmarkRank({
@@ -110,67 +89,6 @@ function BookmarkRank({
   );
 }
 
-function ActionButton({
-  icon: Icon,
-  label,
-  onClick,
-  shortcut,
-  active}: {
-  icon: React.ElementType;
-  label: string;
-  onClick: () => void;
-  shortcut?: string;
-  active?: boolean;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      aria-label={label}
-      className={cn(
-        "rounded-sm border border-transparent",
-        active
-          ? highlightIndicatorActiveClass
-          : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-      )}
-      title={shortcut ? `${label} (${shortcut})` : label}
-    >
-      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
-    </Button>
-  );
-}
-
-function SelectionToggle({
-  selected,
-  onToggle}: {
-  selected?: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      aria-pressed={selected}
-      aria-label="Select bookmark"
-      className={cn(
-        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2",
-        selected
-          ? highlightIndicatorActiveClass
-          : "border-border bg-background text-transparent hover:border-primary/50"
-      )}
-    >
-      <Check className="w-3.5 h-3.5" />
-    </button>
-  );
-}
-
 export const BookmarkCard = memo(function BookmarkCard({
   bookmark,
   viewMode,
@@ -198,10 +116,12 @@ export const BookmarkCard = memo(function BookmarkCard({
   const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const canExpandCompact = viewMode === "compact" && Boolean(onCompactExpandedChange);
   const isInteractive = selectionMode || Boolean(onSelect) || canExpandCompact;
-  const highlighter = useMemo(
-    () => createTextHighlighter(searchQuery),
-    [searchQuery]
-  );
+  const {
+    highlightedText,
+    highlightedAuthorName,
+    highlightedUsername,
+    highlightedNote,
+  } = useBookmarkHighlighting(bookmark, searchQuery);
   const handleCardActivation = () => {
     if (selectionMode) {
       onSelectionChange?.(bookmark.id, !selected);
@@ -233,23 +153,6 @@ export const BookmarkCard = memo(function BookmarkCard({
       handleCardActivation();
     }
   };
-  const highlightedText = useMemo(
-    () => highlighter.tweet(bookmark.tweetText),
-    [bookmark.tweetText, highlighter]
-  );
-  const highlightedAuthorName = useMemo(
-    () => highlighter.plain(bookmark.authorDisplayName, "author"),
-    [bookmark.authorDisplayName, highlighter]
-  );
-  const highlightedUsername = useMemo(
-    () => highlighter.plain(bookmark.authorUsername, "username"),
-    [bookmark.authorUsername, highlighter]
-  );
-  const firstNoteContent = bookmark.notes[0]?.content;
-  const highlightedNote = useMemo(() => {
-    if (!firstNoteContent) return firstNoteContent;
-    return highlighter.plain(firstNoteContent, "note");
-  }, [firstNoteContent, highlighter]);
 
   if (viewMode === "compact" && !compactExpanded) {
     return (
@@ -278,7 +181,7 @@ export const BookmarkCard = memo(function BookmarkCard({
       >
         <BookmarkRank rank={rank} compact  />
         {selectionMode && (
-          <SelectionToggle
+          <BookmarkCardSelectionToggle
             selected={selected}
             onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
           />
@@ -322,7 +225,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {bookmark.tags.length > 0 && (
             <div className="mt-1.5 flex gap-1">
               {bookmark.tags.map(({ tag }) => (
-                <TagPill
+                <BookmarkCardTagPill
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
@@ -387,7 +290,7 @@ export const BookmarkCard = memo(function BookmarkCard({
       <div className="flex gap-3">
         <BookmarkRank rank={rank}  />
         {selectionMode && (
-          <SelectionToggle
+          <BookmarkCardSelectionToggle
             selected={selected}
             onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
           />
@@ -485,7 +388,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {bookmark.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {bookmark.tags.map(({ tag }) => (
-                <TagPill
+                <BookmarkCardTagPill
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
@@ -526,21 +429,21 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
             >
               {compactExpanded && canExpandCompact && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={Minimize2}
                   label="Collapse compact preview"
                   onClick={() => onCompactExpandedChange?.(bookmark.id, false)}
                 />
               )}
               {onOpenExpanded && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={Maximize2}
                   label="Open expanded view"
                   onClick={() => onOpenExpanded(bookmark.id)}
                 />
               )}
               {onAddTag && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={Tags}
                   label="Add tags"
                   onClick={() => onAddTag(bookmark.id)}
@@ -549,7 +452,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 />
               )}
               {onAddToCollection && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={FolderInput}
                   label="Add to collection"
                   onClick={() => onAddToCollection(bookmark.id)}
@@ -558,7 +461,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 />
               )}
               {onAddNote && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={NotebookPen}
                   label={bookmark.notes.length > 0 ? "Edit note" : "Add note"}
                   onClick={() => onAddNote(bookmark.id)}
@@ -566,14 +469,14 @@ export const BookmarkCard = memo(function BookmarkCard({
                   active={bookmark.notes.length > 0}
                 />
               )}
-              <ActionButton
+              <BookmarkCardActionButton
                 icon={ArrowUpRight}
                 label="Open on X"
                 onClick={() => window.open(tweetUrl, "_blank")}
                 shortcut="O"
               />
               {onDelete && (
-                <ActionButton
+                <BookmarkCardActionButton
                   icon={ArchiveX}
                   label={deleteLabel}
                   onClick={() => onDelete(bookmark.id)}

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/request-body";
 import {
   addCollectionItemSchema,
   deleteCollectionItemSchema,
   reorderCollectionItemsSchema,
 } from "@/lib/validations";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 async function requireCollection(
   collectionId: string,
@@ -30,11 +31,6 @@ export async function POST(
   }
 
   // Rate limit collection item writes
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -47,8 +43,11 @@ export async function POST(
     );
   }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = addCollectionItemSchema.safeParse(body);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
+  }
+  const parsed = addCollectionItemSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -104,8 +103,11 @@ export async function POST(
   });
 
   if (bookmarkIds.length === 1 && result) {
+    await invalidateUserResponseCache(user.id);
     return NextResponse.json(result);
   }
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json({ success: true, addedCount: bookmarkIds.length });
 }
@@ -121,11 +123,6 @@ export async function DELETE(
   }
 
   // Rate limit collection item writes
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -138,8 +135,11 @@ export async function DELETE(
     );
   }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = deleteCollectionItemSchema.safeParse(body);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
+  }
+  const parsed = deleteCollectionItemSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -156,6 +156,8 @@ export async function DELETE(
     },
   });
 
+  await invalidateUserResponseCache(user.id);
+
   return NextResponse.json({ success: true });
 }
 
@@ -170,11 +172,6 @@ export async function PATCH(
   }
 
   // Rate limit collection item writes
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -187,8 +184,11 @@ export async function PATCH(
     );
   }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = reorderCollectionItemsSchema.safeParse(body);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
+  }
+  const parsed = reorderCollectionItemsSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },

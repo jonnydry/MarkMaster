@@ -3,8 +3,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrbitGraphPayload } from "@/types";
 
+const { graphRouteCacheStore } = vi.hoisted(() => ({
+  graphRouteCacheStore: new Map<string, unknown>(),
+}));
+
 vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1" })),
+}));
+
+vi.mock("@/lib/upstash-cache", () => ({
+  getUserCacheVersion: vi.fn(async () => 1),
+  getCachedJson: vi.fn(
+    async (key: string, _ttl: number, loader: () => Promise<unknown>) => {
+      if (graphRouteCacheStore.has(key)) {
+        return graphRouteCacheStore.get(key);
+      }
+      const value = await loader();
+      graphRouteCacheStore.set(key, value);
+      return value;
+    }
+  ),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -25,6 +43,7 @@ vi.mock("@/lib/prisma", () => ({
 describe("/api/orbit/graph", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    graphRouteCacheStore.clear();
   });
 
   it("treats X-folder-only bookmarks as loose while preserving folder edges", async () => {
@@ -208,8 +227,9 @@ describe("/api/orbit/graph", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe(
-      "private, max-age=0, must-revalidate"
+      "private, max-age=30, stale-while-revalidate=60"
     );
+    expect(response.headers.get("ETag")).toMatch(/^W\/"orbit-graph-/);
     expect(payload.nodes).toContainEqual({
       kind: "tag",
       id: "tag-generated-color",
@@ -280,6 +300,25 @@ describe("/api/orbit/graph", () => {
       .map((node) => node.id);
     expect(bookmarkIds).toEqual(["bookmark-base", "bookmark-expanded"]);
     expect(payload.stats.renderedBookmarks).toBe(2);
+  });
+
+  it("returns 304 when If-None-Match matches the current etag", async () => {
+    const { GET } = await import("./route");
+
+    const first = await GET(
+      new NextRequest("http://localhost/api/orbit/graph")
+    );
+    const etag = first.headers.get("ETag");
+    expect(etag).toBeTruthy();
+
+    const second = await GET(
+      new NextRequest("http://localhost/api/orbit/graph", {
+        headers: { "If-None-Match": etag! },
+      })
+    );
+
+    expect(second.status).toBe(304);
+    expect(second.headers.get("ETag")).toBe(etag);
   });
 
   it("rejects invalid graph query parameters", async () => {

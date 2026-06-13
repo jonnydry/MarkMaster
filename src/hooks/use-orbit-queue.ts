@@ -22,6 +22,7 @@ import {
 } from "@/hooks/use-library-data";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { fetchJson } from "@/lib/fetch-json";
+import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
 import type { BookmarkResponse } from "@/lib/orbit-page-types";
 import {
   ORBIT_ALL_PAGE_SIZE,
@@ -64,6 +65,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
   const [page, setPage] = useState(orbitUrlState.page);
+  const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const appliedOrbitUrlStateKeyRef = useRef(orbitUrlState.stateKey);
@@ -87,8 +89,14 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
       params.set("search", deferredSearch);
     }
 
+    const cursor =
+      orbitView === "all" && page > 1 ? pageCursors[page] : undefined;
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+
     return params.toString();
-  }, [deferredSearch, orbitView, page, pageSize, queueSortDirection]);
+  }, [deferredSearch, orbitView, page, pageCursors, pageSize, queueSortDirection]);
 
   const {
     data: orbitData,
@@ -99,7 +107,8 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     isFetching,
   } = useQuery<BookmarkResponse>({
     queryKey: ["bookmarks", "orbit", queryString],
-    queryFn: () => fetchJson(`/api/bookmarks?${queryString}`),
+    queryFn: () =>
+      fetchJson(`/api/bookmarks?${queryString}`, undefined, bookmarkListResponseSchema),
     placeholderData: keepPreviousData,
   });
 
@@ -126,6 +135,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
       setOrbitView(orbitUrlState.view);
       setQueueSortDirection(orbitUrlState.sortDirection);
       setPage(orbitUrlState.page);
+      setPageCursors({});
       setSearch("");
       onUrlStateApplied?.();
     });
@@ -144,6 +154,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     setSearch(value);
     startTransition(() => {
       setPage(1);
+      setPageCursors({});
     });
   }, []);
 
@@ -154,6 +165,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
       startTransition(() => {
         setOrbitView(value);
         setPage(1);
+        setPageCursors({});
       });
     },
     [orbitView]
@@ -166,16 +178,27 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
       startTransition(() => {
         setQueueSortDirection(value);
         setPage(1);
+        setPageCursors({});
       });
     },
     [queueSortDirection]
   );
 
-  const handlePageChange = useCallback((nextPage: number) => {
-    startTransition(() => {
-      setPage(nextPage);
-    });
-  }, []);
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      if (nextPage > page && orbitData?.nextCursor) {
+        setPageCursors((current) => ({
+          ...current,
+          [nextPage]: orbitData.nextCursor!,
+        }));
+      }
+
+      startTransition(() => {
+        setPage(nextPage);
+      });
+    },
+    [orbitData, page]
+  );
 
   const handleSyncComplete = useCallback(() => {
     completeLibrarySync(queryClient, {

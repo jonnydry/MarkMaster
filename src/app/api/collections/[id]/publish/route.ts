@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateShareContent } from "@/lib/share-content";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 function getConfiguredShareOrigin(req: NextRequest) {
   const configuredUrl =
@@ -29,11 +28,6 @@ export async function POST(
   }
 
   // Rate limit collection publish/share operations
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   const collection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
     include: {

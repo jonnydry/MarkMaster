@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { rankOrbitMapSearchResults } from "@/lib/orbit-map-search";
+import {
+  buildOrbitMapSearchIndex,
+  rankOrbitMapSearchResults,
+  searchOrbitMapIndex,
+} from "@/lib/orbit-map-search";
 import type { OrbitGraphNode } from "@/types";
 
 const nodes: OrbitGraphNode[] = [
@@ -52,5 +56,17 @@ describe("rankOrbitMapSearchResults", () => {
 
   it("returns no results for blank searches", () => {
     expect(rankOrbitMapSearchResults(nodes, "   ")).toEqual([]);
+  });
+
+  it("caps highlight and dropdown results via searchOrbitMapIndex", () => {
+    const index = buildOrbitMapSearchIndex(nodes);
+    const { results, highlightNodeIds } = searchOrbitMapIndex(index, "music", {
+      resultLimit: 2,
+      highlightLimit: 3,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(highlightNodeIds).toHaveLength(3);
+    expect(results[0]?.id).toBe("tag-music");
   });
 });

@@ -10,14 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { LibrarySearchPicker } from "@/components/library-search-picker";
 import { buttonVariants } from "@/components/ui/button";
 import { highlightSegmentActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -99,6 +92,35 @@ export function OrbitReviewTagField({
     setCustomDraft("");
   }, [atTagCap, customDraft, included, onTagNamesChange, tagNames]);
 
+  const tagPickerItems = useMemo(
+    () =>
+      existingTags.map((tag) => {
+        const taken = parsed.some(
+          (entry) => draftTagKey(entry) === draftTagKey(tag.name)
+        );
+        return {
+          id: tag.id,
+          searchText: tag.name,
+          disabled: taken || atTagCap,
+          label: (
+            <>
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: tag.color }}
+                aria-hidden
+              />
+              {tag.name}
+            </>
+          ),
+          onSelect: () => {
+            onTagNamesChange(addTagToDraftString(tagNames, tag.name));
+            setLibraryOpen(false);
+          },
+        };
+      }),
+    [atTagCap, existingTags, onTagNamesChange, parsed, tagNames]
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex min-h-8 flex-wrap gap-1.5">
@@ -146,45 +168,14 @@ export function OrbitReviewTagField({
             align="start"
             className="w-72 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
           >
-            <Command className="relative max-h-80 rounded-sm border-0 bg-popover text-popover-foreground [&_[cmdk-input-wrapper]]:border-hairline-soft">
-              <CommandInput
-                placeholder="Search tags…"
-                className="text-popover-foreground placeholder:text-muted-foreground/70"
+            {libraryOpen ? (
+              <LibrarySearchPicker
+              placeholder="Search tags…"
+              emptyLabel="No matching tags."
+              groupHeading="Your library"
+              items={tagPickerItems}
               />
-              <CommandList>
-                <CommandEmpty className="text-muted-foreground">
-                  No matching tags.
-                </CommandEmpty>
-                <CommandGroup heading="Your library">
-                  {existingTags.map((tag) => {
-                    const taken = parsed.some(
-                      (p) => draftTagKey(p) === draftTagKey(tag.name)
-                    );
-                    return (
-                      <CommandItem
-                        key={tag.id}
-                        value={tag.name}
-                        disabled={taken || atTagCap}
-                        className="text-popover-foreground data-[selected=true]:bg-accent-soft"
-                        onSelect={() => {
-                          onTagNamesChange(
-                            addTagToDraftString(tagNames, tag.name)
-                          );
-                          setLibraryOpen(false);
-                        }}
-                      >
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: tag.color }}
-                          aria-hidden
-                        />
-                        {tag.name}
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+            ) : null}
           </PopoverContent>
         </Popover>
         <Input
@@ -228,6 +219,47 @@ export function OrbitReviewCollectionField({
 }: OrbitReviewCollectionFieldProps) {
   const [pickOpen, setPickOpen] = useState(false);
 
+  const collectionPickerItems = useMemo(
+    () =>
+      existingCollections.map((collection) => ({
+        id: collection.id,
+        searchText: `${collection.name} ${collection.description ?? ""}`,
+        label: (
+          <>
+            <Folder className="size-3.5 text-primary/80" />
+            {collection.name}
+          </>
+        ),
+        onSelect: () => {
+          onCollectionNameChange(collection.name);
+          onCollectionDescriptionChange(collection.description ?? "");
+          setPickOpen(false);
+        },
+      })),
+    [
+      existingCollections,
+      onCollectionDescriptionChange,
+      onCollectionNameChange,
+    ]
+  );
+
+  const collectionPickerFooter = useMemo(
+    () => [
+      {
+        id: "__clear__orbit_collection__",
+        searchText: "clear collection move",
+        label: "Clear collection move",
+        className: "text-primary",
+        onSelect: () => {
+          onCollectionNameChange("");
+          onCollectionDescriptionChange("");
+          setPickOpen(false);
+        },
+      },
+    ],
+    [onCollectionDescriptionChange, onCollectionNameChange]
+  );
+
   return (
     <div className="space-y-1.5">
       <div className="flex gap-1.5">
@@ -254,49 +286,15 @@ export function OrbitReviewCollectionField({
             align="end"
             className="w-80 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
           >
-            <Command className="relative max-h-80 rounded-sm border-0 bg-popover text-popover-foreground">
-              <CommandInput
-                placeholder="Search collections…"
-                className="text-popover-foreground placeholder:text-muted-foreground/70"
+            {pickOpen ? (
+              <LibrarySearchPicker
+              placeholder="Search collections…"
+              emptyLabel="No matching collections."
+              groupHeading="Your library"
+              items={collectionPickerItems}
+              footerItems={collectionPickerFooter}
               />
-              <CommandList>
-                <CommandEmpty className="text-muted-foreground">
-                  No matching collections.
-                </CommandEmpty>
-                <CommandGroup heading="Your library">
-                  {existingCollections.map((collection) => (
-                    <CommandItem
-                      key={collection.id}
-                      value={`${collection.name} ${collection.description ?? ""}`}
-                      className="text-popover-foreground data-[selected=true]:bg-accent-soft"
-                      onSelect={() => {
-                        onCollectionNameChange(collection.name);
-                        onCollectionDescriptionChange(
-                          collection.description ?? ""
-                        );
-                        setPickOpen(false);
-                      }}
-                    >
-                      <Folder className="size-3.5 text-primary/80" />
-                      {collection.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-                <CommandGroup>
-                  <CommandItem
-                    value="__clear__orbit_collection__"
-                    className="text-primary data-[selected=true]:bg-accent-soft"
-                    onSelect={() => {
-                      onCollectionNameChange("");
-                      onCollectionDescriptionChange("");
-                      setPickOpen(false);
-                    }}
-                  >
-                    Clear collection move
-                  </CommandItem>
-                </CommandGroup>
-              </CommandList>
-            </Command>
+            ) : null}
           </PopoverContent>
         </Popover>
       </div>

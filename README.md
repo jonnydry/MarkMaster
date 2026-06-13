@@ -96,7 +96,8 @@ npm run env:check
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | PostgreSQL connection string (pooled on Neon) |
+| `DIRECT_URL` | Yes | Direct Postgres URL for Prisma migrations ([Neon: non-pooler host](docs/DATABASE.md)) |
 | `AUTH_SECRET` | Yes | Session signing (`openssl rand -base64 32`) |
 | `AUTH_TWITTER_ID` / `AUTH_TWITTER_SECRET` | Yes | X OAuth 2.0 credentials |
 | `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
@@ -107,6 +108,8 @@ npm run env:check
 See [`.env.example`](.env.example) for the full list and production notes.
 
 ### 3. Database
+
+See **[docs/DATABASE.md](docs/DATABASE.md)** for Neon `DIRECT_URL` setup, production notes, and PostgreSQL enum migration pitfalls.
 
 ```bash
 npm run db:migrate

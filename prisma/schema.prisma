@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -36,6 +37,7 @@ enum CollectionType {
 }
 
 enum SyncRunStatus {
+  PENDING
   RUNNING
   COMPLETED
   RATE_LIMITED
@@ -112,6 +114,7 @@ model Collection {
   items CollectionItem[]
 
   @@unique([userId, externalSource, externalSourceId])
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 model CollectionItem {
@@ -156,7 +159,9 @@ model HiddenBookmark {
 model SyncRun {
   id                String        @id @default(cuid())
   userId            String
-  status            SyncRunStatus @default(RUNNING)
+  status            SyncRunStatus @default(PENDING)
+  /** X pagination token consumed when this run starts (from a prior partial sync). */
+  continuationToken String?
   newBookmarks      Int           @default(0)
   updatedBookmarks  Int           @default(0)
   totalFetched      Int           @default(0)

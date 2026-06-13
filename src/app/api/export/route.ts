@@ -1,36 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { exportQuerySchema } from "@/lib/validations";
-import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import {
+  CSV_EXPORT_HEADER,
+  formatBookmarkCsvRow,
+  formatBookmarkJsonRecord,
+  iterateBookmarkExportBatches,
+} from "@/lib/bookmark-export";
 
-const EXPORT_LIMIT = 10_000;
-
-function escapeCsvField(value: string): string {
-  if (value.includes('"') || value.includes("\n") || value.includes("\r") || value.includes(",")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-function sanitizeCsvField(value: string): string {
-  if (/^[=+\-@\t\r]/.test(value)) {
-    return escapeCsvField(`'${value}`);
-  }
-  return escapeCsvField(value);
+function exportFilename(format: "csv" | "json") {
+  const date = new Date().toISOString().slice(0, 10);
+  return `markmaster-bookmarks-${date}.${format}`;
 }
 
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Rate limit exports (can be expensive)
-  const rateLimitResult = await checkRateLimit("api:read", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   const rawParams = Object.fromEntries(req.nextUrl.searchParams.entries());
@@ -43,55 +29,48 @@ export async function GET(req: NextRequest) {
   }
 
   const { format } = parsed.data;
+  const encoder = new TextEncoder();
 
-  const bookmarks = await prisma.bookmark.findMany({
-    where: { userId: user.id },
-    include: {
-      tags: { include: { tag: true } },
-      notes: { select: { content: true } },
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        if (format === "csv") {
+          controller.enqueue(encoder.encode(CSV_EXPORT_HEADER));
+
+          for await (const batch of iterateBookmarkExportBatches(user.id)) {
+            const rows = batch.map(formatBookmarkCsvRow).join("\n");
+            controller.enqueue(encoder.encode(`${rows}\n`));
+          }
+        } else {
+          controller.enqueue(encoder.encode("[\n"));
+          let first = true;
+
+          for await (const batch of iterateBookmarkExportBatches(user.id)) {
+            for (const bookmark of batch) {
+              const prefix = first ? "" : ",\n";
+              first = false;
+              controller.enqueue(
+                encoder.encode(
+                  `${prefix}${JSON.stringify(formatBookmarkJsonRecord(bookmark), null, 2)}`
+                )
+              );
+            }
+          }
+
+          controller.enqueue(encoder.encode("\n]"));
+        }
+
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
     },
-    orderBy: { bookmarkedAt: "desc" },
-    take: EXPORT_LIMIT,
   });
 
-  if (format === "csv") {
-    const header =
-      "Tweet ID,Author,Username,Text,Likes,Retweets,Replies,Tags,Note,Tweet Date,Bookmarked Date,URL\n";
-    const rows = bookmarks
-      .map((b) => {
-        const metrics = b.publicMetrics as Record<string, number> | null;
-        const tags = b.tags.map((t) => t.tag.name).join("; ");
-        const note = b.notes[0]?.content || "";
-        const text = sanitizeCsvField(b.tweetText);
-        const url = getBookmarkTweetUrl(b) ?? "";
-        return `${escapeCsvField(b.tweetId)},${escapeCsvField(b.authorDisplayName)},${escapeCsvField("@" + b.authorUsername)},${text},${metrics?.like_count || 0},${metrics?.retweet_count || 0},${metrics?.reply_count || 0},${escapeCsvField(tags)},${sanitizeCsvField(note)},${escapeCsvField(b.tweetCreatedAt.toISOString())},${escapeCsvField(b.bookmarkedAt.toISOString())},${escapeCsvField(url)}`;
-      })
-      .join("\n");
-
-    return new NextResponse(header + rows, {
-      headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="markmaster-bookmarks-${new Date().toISOString().slice(0, 10)}.csv"`,
-      },
-    });
-  }
-
-  const data = bookmarks.map((b) => ({
-    tweetId: b.tweetId,
-    author: { name: b.authorDisplayName, username: b.authorUsername },
-    text: b.tweetText,
-    metrics: b.publicMetrics,
-    tags: b.tags.map((t) => t.tag.name),
-    note: b.notes[0]?.content || null,
-    tweetDate: b.tweetCreatedAt,
-    bookmarkedDate: b.bookmarkedAt,
-    url: getBookmarkTweetUrl(b) ?? "",
-  }));
-
-  return new NextResponse(JSON.stringify(data, null, 2), {
+  return new NextResponse(stream, {
     headers: {
-      "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="markmaster-bookmarks-${new Date().toISOString().slice(0, 10)}.json"`,
+      "Content-Type": format === "csv" ? "text/csv" : "application/json",
+      "Content-Disposition": `attachment; filename="${exportFilename(format)}"`,
     },
   });
 }

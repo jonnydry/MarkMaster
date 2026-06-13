@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useFontMode } from "@/components/providers";
 import {
   getTypographyClasses,
@@ -10,5 +11,5 @@ import {
 export function useTypography(): TypographyClasses {
   const { fontMode } = useFontMode();
   const monoNative = resolveMonoNative({ fontMode });
-  return getTypographyClasses(monoNative);
+  return useMemo(() => getTypographyClasses(monoNative), [monoNative]);
 }

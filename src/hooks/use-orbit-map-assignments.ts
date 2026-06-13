@@ -12,7 +12,10 @@ import type { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import type { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { sendJson } from "@/lib/fetch-json";
-import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
+import {
+  invalidateBookmarkCollectionSideEffects,
+  invalidateBookmarkListQueries,
+} from "@/lib/query-invalidation";
 import {
   resolveOrbitMapSelectionNode,
   type buildOrbitMapGraphIndexes,
@@ -128,10 +131,11 @@ export function useOrbitMapAssignments({
                   method: "DELETE",
                   body: { bookmarkIds: [bookmarkId] },
                 }).then(() => {
-                  invalidateCollectionsQuery(queryClient);
-                  void queryClient.invalidateQueries({
-                    queryKey: ["bookmarks"],
-                  });
+                  void invalidateBookmarkListQueries(queryClient);
+                  void invalidateBookmarkCollectionSideEffects(
+                    queryClient,
+                    anchor.id
+                  );
                   void refetch();
                 });
               },

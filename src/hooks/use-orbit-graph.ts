@@ -1,8 +1,10 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
 
-import { fetchJson } from "@/lib/fetch-json";
+import {
+  orbitGraphPayloadSchema,
+} from "@/lib/api-response-schemas";
 import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
 import type { OrbitGraphPayload, OrbitGraphScope } from "@/types";
 
@@ -13,20 +15,98 @@ export function orbitGraphQueryKey(
   return [...ORBIT_GRAPH_QUERY_KEY, scope, expandedAnchors.join(",")] as const;
 }
 
+const orbitGraphEtags = new Map<string, string>();
+
+function orbitGraphRequestKey(
+  scope: OrbitGraphScope,
+  expandedAnchors: string[]
+) {
+  return `${scope}:${expandedAnchors.join(",")}`;
+}
+
 export function useOrbitGraphQuery(
   scope: OrbitGraphScope = "library",
   expandedAnchors: string[] = []
 ) {
-  const expandParam = expandedAnchors.length
-    ? `&expand=${encodeURIComponent(expandedAnchors.join(","))}`
-    : "";
   return useQuery<OrbitGraphPayload>({
     queryKey: orbitGraphQueryKey(scope, expandedAnchors),
-    queryFn: () => fetchJson(`/api/orbit/graph?scope=${scope}${expandParam}`),
+    queryFn: ({ client, queryKey }) =>
+      fetchOrbitGraph(scope, expandedAnchors, {
+        previous: client.getQueryData<OrbitGraphPayload>(queryKey),
+        requestKey: orbitGraphRequestKey(scope, expandedAnchors),
+      }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
+  });
+}
+
+async function fetchOrbitGraph(
+  scope: OrbitGraphScope = "library",
+  expandedAnchors: string[] = [],
+  options?: {
+    previous?: OrbitGraphPayload;
+    requestKey?: string;
+  }
+): Promise<OrbitGraphPayload> {
+  const expandParam = expandedAnchors.length
+    ? `&expand=${encodeURIComponent(expandedAnchors.join(","))}`
+    : "";
+  const requestKey =
+    options?.requestKey ?? orbitGraphRequestKey(scope, expandedAnchors);
+  const ifNoneMatch = orbitGraphEtags.get(requestKey);
+  const res = await fetch(
+    `/api/orbit/graph?scope=${scope}${expandParam}`,
+    {
+      headers: ifNoneMatch ? { "If-None-Match": ifNoneMatch } : undefined,
+    }
+  );
+
+  const etag = res.headers.get("etag");
+  if (etag) {
+    orbitGraphEtags.set(requestKey, etag);
+  }
+
+  if (res.status === 304) {
+    if (options?.previous) return options.previous;
+    throw new Error("Orbit graph not modified but no cached payload is available");
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  const body = contentType.includes("application/json")
+    ? await res.json()
+    : null;
+
+  if (!res.ok) {
+    const message =
+      typeof body === "object" && body && "error" in body
+        ? String(body.error)
+        : `Request failed with status ${res.status}`;
+    throw new Error(message);
+  }
+
+  const parsed = orbitGraphPayloadSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new Error("Orbit graph response did not match expected shape");
+  }
+
+  return parsed.data;
+}
+
+export function prefetchOrbitGraph(
+  queryClient: QueryClient,
+  scope: OrbitGraphScope = "library",
+  expandedAnchors: string[] = []
+) {
+  void queryClient.prefetchQuery({
+    queryKey: orbitGraphQueryKey(scope, expandedAnchors),
+    queryFn: ({ client, queryKey }) =>
+      fetchOrbitGraph(scope, expandedAnchors, {
+        previous: client.getQueryData<OrbitGraphPayload>(queryKey),
+        requestKey: orbitGraphRequestKey(scope, expandedAnchors),
+      }),
+    staleTime: 30_000,
   });
 }

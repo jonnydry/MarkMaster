@@ -1,7 +1,17 @@
 import NextAuth from "next-auth";
 import Twitter from "next-auth/providers/twitter";
 import { prisma } from "./prisma";
-import { encrypt, decrypt } from "./encryption";
+import { decrypt } from "./encryption";
+import {
+  authJwtCallback,
+  authSessionCallback,
+  authSignInCallback,
+  type DbUser,
+  type JwtDbUser,
+  type SessionWithUser,
+} from "./auth-callbacks";
+
+export type { DbUser, JwtDbUser, SessionWithUser };
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -19,181 +29,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ account, profile }) {
-      if (!account || !profile) return false;
-
-      if (!account.access_token) {
-        console.error("[auth] Missing access_token from provider");
-        return false;
-      }
-
-      const xId = account.providerAccountId;
-      const twitterProfile = profile as Record<string, unknown>;
-      const data = twitterProfile.data as
-        | Record<string, string | undefined>
-        | undefined;
-      const username =
-        data?.username ??
-        (twitterProfile.username as string | undefined) ??
-        (profile as { name?: string }).name ??
-        "";
-      const displayName =
-        data?.name ?? (profile as { name?: string }).name ?? username;
-      const profileImageUrl =
-        (data?.profile_image_url as string | undefined) ??
-        (profile as { image?: string | null }).image ??
-        null;
-
-      try {
-        const existingUser = await prisma.user.findUnique({
-          where: { xId },
-          select: { id: true, refreshToken: true },
-        });
-
-        const refreshToken =
-          account.refresh_token
-            ? encrypt(account.refresh_token)
-            : existingUser?.refreshToken;
-
-        if (!refreshToken) {
-          console.error("[auth] Missing refresh_token for new sign-in");
-          return false;
-        }
-
-        const tokenExpiresAt = account.expires_at
-          ? new Date(account.expires_at * 1000)
-          : null;
-
-        if (existingUser) {
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              username,
-              displayName,
-              profileImageUrl,
-              accessToken: encrypt(account.access_token),
-              refreshToken,
-              tokenExpiresAt,
-            },
-          });
-        } else {
-          await prisma.user.create({
-            data: {
-              xId,
-              username,
-              displayName,
-              profileImageUrl,
-              accessToken: encrypt(account.access_token),
-              refreshToken,
-              tokenExpiresAt,
-            },
-          });
-        }
-      } catch (e) {
-        console.error("[auth] signIn prisma upsert failed:", e);
-        return false;
-      }
-
-      return true;
-    },
-
-    /**
-     * We embed the stable DbUser data directly into the JWT token.
-     * This eliminates the per-request Prisma lookup in getDbUser() / session callback.
-     *
-     * - On initial sign-in (account present): load the user once and attach it.
-     * - On explicit session.update() from the client (trigger === 'update'): we can refresh lastSyncAt.
-     */
-    async jwt({ token, account, profile, trigger }) {
-      // First-time sign-in: load full user record once and embed it
-      if (account) {
-        const xId = account.providerAccountId;
-
-        try {
-          const user = await prisma.user.findUnique({
-            where: { xId },
-            select: {
-              id: true,
-              xId: true,
-              username: true,
-              displayName: true,
-              profileImageUrl: true,
-              lastSyncAt: true,
-            },
-          });
-
-          if (user) {
-            (token as unknown as { dbUser?: JwtDbUser }).dbUser = user;
-          }
-        } catch (e) {
-          console.error("[auth] jwt initial load failed:", e);
-        }
-
-        // Also keep the lightweight fields for backwards compatibility
-        token.xId = xId;
-        const twitterProfile = profile as Record<string, unknown>;
-        const data = twitterProfile?.data as Record<string, string> | undefined;
-        token.username = data?.username ?? (profile?.name || "");
-      }
-
-      // Support client-driven refresh (e.g. after a successful sync)
-      const tokenWithDbUser = token as unknown as { dbUser?: JwtDbUser };
-      if (trigger === "update" && tokenWithDbUser.dbUser) {
-        const current = tokenWithDbUser.dbUser;
-        try {
-          const fresh = await prisma.user.findUnique({
-            where: { id: current.id },
-            select: { lastSyncAt: true },
-          });
-          if (fresh) {
-            tokenWithDbUser.dbUser = {
-              ...current,
-              lastSyncAt: fresh.lastSyncAt,
-            };
-          }
-        } catch (e) {
-          console.error("[auth] jwt update trigger failed to refresh lastSyncAt:", e);
-        }
-      }
-
-      return token;
-    },
-
-    /**
-     * Surface the DbUser we stored in the JWT.
-     * No more Prisma call on every request — this is the main performance win.
-     */
-    async session({ session, token }) {
-      const tokenWithDbUser = token as unknown as { dbUser?: JwtDbUser };
-      const dbUserFromToken = tokenWithDbUser.dbUser;
-
-      if (dbUserFromToken) {
-        (session as unknown as SessionWithUser).dbUser = dbUserFromToken;
-      } else if (typeof token.xId === "string" && token.xId.length > 0) {
-        // Fallback for very old JWTs that were issued before this change.
-        // This path will go away once all users have re-logged in.
-        try {
-          const user = await prisma.user.findUnique({
-            where: { xId: token.xId },
-            select: {
-              id: true,
-              xId: true,
-              username: true,
-              displayName: true,
-              profileImageUrl: true,
-              lastSyncAt: true,
-            },
-          });
-          if (user) {
-            (session as unknown as SessionWithUser).dbUser = user;
-          }
-        } catch (e) {
-          console.error("[auth] session fallback prisma lookup failed:", e);
-        }
-      }
-
-      return session;
-    },
+    signIn: authSignInCallback,
+    jwt: authJwtCallback,
+    session: authSessionCallback,
   },
   pages: {
     signIn: "/login",
@@ -301,28 +139,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
 });
-
-export interface DbUser {
-  id: string;
-  xId: string;
-  username: string;
-  displayName: string;
-  profileImageUrl: string | null;
-  lastSyncAt: Date | null;
-}
-
-/**
- * Shape we store inside the JWT token (stable identity).
- * We intentionally keep lastSyncAt here so the UI can show it without DB hits.
- * After a successful sync, clients can call `useSession().update()` to refresh it.
- */
-export type JwtDbUser = DbUser;
-
-export interface SessionWithUser {
-  user: { name?: string; email?: string; image?: string };
-  expires: string;
-  dbUser: DbUser;
-}
 
 /* ============================================================
    SECURE COOKIE HELPERS (Single Source of Truth)

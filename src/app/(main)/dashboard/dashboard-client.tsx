@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import dynamic from "next/dynamic";
 import { DashboardToolbar } from "@/components/dashboard-toolbar";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -74,6 +74,7 @@ const KeyboardShortcutsDialog = dynamic(
 );
 
 function DashboardContent() {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const {
     filters,
     actions,
@@ -116,6 +117,8 @@ function DashboardContent() {
     bookmarks,
     total,
     totalPages,
+    prefetchBookmarkPage,
+    handlePageChange,
     performanceFocusedId,
     setBookmarkId,
     visibleSelectedBookmarkIds,
@@ -177,7 +180,10 @@ function DashboardContent() {
           <ScrollingProgressBar className="relative z-50" />
         ) : null}
 
-        <div className="app-main-scroll relative z-[1] h-full overflow-x-hidden scrollbar-thin">
+        <div
+          ref={scrollRef}
+          className="app-main-scroll relative z-[1] h-full overflow-x-hidden scrollbar-thin"
+        >
           <PageHeader
             sticky
             chromeless
@@ -345,6 +351,7 @@ function DashboardContent() {
               )}
 
               <BookmarkList
+                scrollRef={scrollRef}
                 bookmarks={bookmarks}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
@@ -372,7 +379,8 @@ function DashboardContent() {
               <PaginationControls
                 page={filters.page}
                 totalPages={totalPages}
-                onPageChange={(next) => filters.setPage(next)}
+                onPageChange={handlePageChange}
+                onPrefetchPage={prefetchBookmarkPage}
               />
             </div>
           )}

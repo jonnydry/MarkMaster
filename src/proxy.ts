@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { checkRateLimit, createRateLimitResponse, isRateLimitingEnabled } from "@/lib/rate-limit";
+import { isLightweightApiRequest } from "@/lib/lightweight-api-routes";
 import { getUserIdFromRequest } from "@/lib/auth-edge";
 import { getClientIp } from "@/lib/client-ip";
 
 // === Global Safety Limiter ===
 // Protects the entire system from abuse (e.g. one IP hammering the API)
-const isGlobalRateLimitingEnabled = !!process.env.UPSTASH_REDIS_REST_URL;
+const isGlobalRateLimitingEnabled = isRateLimitingEnabled;
 
 let globalLimiter: Ratelimit | null = null;
 
@@ -37,9 +38,21 @@ export async function proxy(request: NextRequest) {
   // Skip auth and internal status routes
   if (
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/orbit/status")
+    pathname.startsWith("/api/orbit/status") ||
+    pathname.startsWith("/api/internal/sync")
   ) {
     return NextResponse.next();
+  }
+
+  if (process.env.NODE_ENV === "production" && !isRateLimitingEnabled) {
+    console.error("[Proxy] UPSTASH_REDIS_REST_URL is required in production.");
+    return NextResponse.json(
+      {
+        error: "Service Unavailable",
+        message: "Rate limiting is not configured.",
+      },
+      { status: 503 }
+    );
   }
 
   // === Global Safety Limit ===
@@ -73,6 +86,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // === Per-user rate limiting ===
+  // api:read / api:write are enforced here for all authenticated API routes.
+  // Route handlers use checkRateLimit only for specialized buckets (sync, orbit, csp-report).
   const userId = await getUserIdFromRequest(request);
 
   if (!userId) {
@@ -80,6 +95,11 @@ export async function proxy(request: NextRequest) {
   }
 
   const method = request.method;
+
+  if (isLightweightApiRequest(pathname, method)) {
+    return NextResponse.next();
+  }
+
   const action = method === "GET" || method === "HEAD" ? "api:read" : "api:write";
 
   // Wrap per-user rate limiting in try/catch as an extra safety net

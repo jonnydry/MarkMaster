@@ -1,0 +1,80 @@
+@import "./orbital-rings.css";
+
+@keyframes orbit-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .orbit-map-stage {
+    min-height: clamp(280px, calc(100dvh - 14rem), 480px);
+  }
+  @supports not (height: 100dvh) {
+    .orbit-map-stage {
+      min-height: clamp(280px, calc(100vh - 14rem), 480px);
+    }
+  }
+  @media (min-width: 1024px) {
+    .orbit-map-stage {
+      min-height: 0;
+    }
+  }
+
+  .animate-orbit-slide-in-right {
+    animation: orbit-slide-in-right 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-orbit-slide-in-right {
+      animation: none;
+    }
+  }
+
+  /* Floating chrome over the Orbit map canvas. The canvas always paints
+     space-black regardless of theme, so these are intentionally literal. */
+  .map-glass {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .glass-orbital {
+    background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+    border: 1px solid var(--hairline-soft);
+    backdrop-filter: blur(20px);
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 8px 32px -8px color-mix(in srgb, var(--foreground) 8%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  .orbital-slide-in-shadow {
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      -14px 0 40px -16px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  .orbital-menu {
+    box-shadow:
+      inset 0 1px 0 var(--page-shell-highlight),
+      0 10px 30px -10px color-mix(in srgb, var(--foreground) 12%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+
+  .orbital-action-pill {
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .orbital-action-pill:hover {
+    transform: translateY(-0.5px);
+    box-shadow:
+      0 4px 14px -2px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+}

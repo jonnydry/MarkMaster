@@ -1,6 +1,11 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import bundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 // Avoid wrong workspace root when a parent directory also has a lockfile.
 const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +100,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: turbopackRoot,
   },
+  // lucide-react, date-fns, and recharts are optimized by default in Next.js 16.
+  experimental: {
+    optimizePackageImports: ["@tanstack/react-query"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "pbs.twimg.com" },
@@ -111,4 +120,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

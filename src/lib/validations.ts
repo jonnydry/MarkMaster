@@ -158,6 +158,7 @@ export const deleteBookmarkSchema = bookmarkTargetSchema;
 export const bookmarksQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).max(MAX_BOOKMARK_QUERY_PAGE).default(1),
+    cursor: z.string().trim().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().trim().max(MAX_BOOKMARK_QUERY_LENGTH).default(""),
     sortField: z
@@ -237,7 +238,7 @@ export const exportQuerySchema = z.object({
 
 // Orbit Graph query parameters
 export const MAX_ORBIT_GRAPH_NODE_CAP = 4000;
-export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1500;
+export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1000;
 
 export const orbitGraphScopeSchema = z.enum(["library", "orbit"]).default("library");
 
@@ -264,4 +265,17 @@ export const orbitGraphQuerySchema = z.object({
       )
     )
     .optional(),
+});
+
+export const COLLECTION_DETAIL_PAGE_LIMIT = 20;
+
+export const collectionDetailQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(MAX_BOOKMARK_QUERY_PAGE).default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(COLLECTION_DETAIL_PAGE_LIMIT),
+  cursor: z.string().trim().max(512).optional(),
 });

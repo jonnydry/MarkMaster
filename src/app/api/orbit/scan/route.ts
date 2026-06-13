@@ -13,6 +13,8 @@ import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { enrichBookmarksForScan } from "@/lib/orbit-scan-enrichment";
 import { getOrbitNeighborHintsForScan } from "@/lib/orbit-scan-neighbors";
 import { mapOrbitScannedBookmarksForClient } from "@/lib/orbit-scan-bookmarks";
+import { readJsonBody } from "@/lib/request-body";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { computeOrbitScanSignalQuality } from "@/lib/orbit-scan-signal-quality";
 import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
@@ -50,8 +52,11 @@ export async function POST(req: NextRequest) {
     return createRateLimitResponse(globalResult);
   }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = orbitScanRequestSchema.safeParse(body);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
+  }
+  const parsed = orbitScanRequestSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -203,6 +208,8 @@ export async function POST(req: NextRequest) {
       plan: parsed.data.plan,
       createCollections: parsed.data.createCollections,
     });
+
+    await invalidateUserResponseCache(user.id);
 
     return NextResponse.json({ applied });
   } catch (error) {

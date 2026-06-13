@@ -1,5 +1,7 @@
 "use client";
 
+import "@/styles/auth.css";
+
 import { signIn } from "next-auth/react";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { XLogoMark } from "@/components/brands/x-logo-mark";

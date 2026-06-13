@@ -20,6 +20,10 @@ import { useOrbitScanRunners } from "@/hooks/use-orbit-scan-runners";
 import { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
 import { fetchJson } from "@/lib/fetch-json";
+import {
+  orbitScanCandidatesResponseSchema,
+  orbitScanQualityPayloadSchema,
+} from "@/lib/api-response-schemas";
 import type { OrbitScanCandidatesResponse } from "@/lib/orbit-page-types";
 import {
   ORBIT_SCAN_CANDIDATE_POOL_SIZE,
@@ -107,13 +111,18 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
   const { data: scanCandidatesData } = useQuery<OrbitScanCandidatesResponse>({
     queryKey: ["orbit", "scan-candidates", scanCandidatesQueryString],
     queryFn: () =>
-      fetchJson(`/api/orbit/scan-candidates?${scanCandidatesQueryString}`),
+      fetchJson(
+        `/api/orbit/scan-candidates?${scanCandidatesQueryString}`,
+        undefined,
+        orbitScanCandidatesResponseSchema
+      ),
     placeholderData: keepPreviousData,
   });
 
   const { data: scanQuality } = useQuery<OrbitScanQualityPayload>({
     queryKey: ["orbit", "scan-quality"],
-    queryFn: () => fetchJson("/api/orbit/scan-quality"),
+    queryFn: () =>
+      fetchJson("/api/orbit/scan-quality", undefined, orbitScanQualityPayloadSchema),
     staleTime: 60_000,
   });
 

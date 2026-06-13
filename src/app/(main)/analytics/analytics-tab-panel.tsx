@@ -7,23 +7,20 @@ import {
   FlywheelSignalsPanel,
   type AnalyticsTab,
 } from "./analytics-primitives";
+import { TopVoicesCard } from "./top-voices-card";
 import type { AnalyticsData } from "@/types";
 import type { TimeRange } from "./time-range";
 
-const TopVoicesCard = dynamic(
-  () => import("./recharts-charts").then((m) => m.TopVoicesCard),
-  { ssr: false }
-);
 const ContentMixCard = dynamic(
-  () => import("./recharts-charts").then((m) => m.ContentMixCard),
+  () => import("./content-mix-card").then((m) => m.ContentMixCard),
   { ssr: false }
 );
 const TagRankCard = dynamic(
-  () => import("./recharts-charts").then((m) => m.TagRankCard),
+  () => import("./tag-rank-card").then((m) => m.TagRankCard),
   { ssr: false }
 );
 const TimelineCard = dynamic(
-  () => import("./recharts-charts").then((m) => m.TimelineCard),
+  () => import("./timeline-card").then((m) => m.TimelineCard),
   { ssr: false }
 );
 

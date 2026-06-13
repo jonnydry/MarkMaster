@@ -13,7 +13,7 @@ export function completeLibrarySync(
   options?: CompleteLibrarySyncOptions
 ) {
   void invalidateLibraryQueries(queryClient, {
-    refetchType: options?.refetchType ?? "all",
+    refetchType: options?.refetchType ?? "active",
   });
   if (options?.updateSession) {
     void options.updateSession();

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { evaluateOrbitScanQuality } from "@/lib/orbit-scan-quality";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const SCAN_EVENT_TYPES = ["orbit.scan.completed", "orbit.scan.failed"] as const;
 const REVIEW_EVENT_TYPE = "orbit.review.applied";
@@ -12,11 +11,6 @@ export async function GET() {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rateLimitResult = await checkRateLimit("api:read", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   try {

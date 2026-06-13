@@ -27,6 +27,7 @@ import { useOrbitMapLayout } from "@/hooks/use-orbit-map-layout";
 import { useOrbitMapSearch } from "@/hooks/use-orbit-map-search";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
 import { fetchJson } from "@/lib/fetch-json";
+import { bookmarkFocusResponseSchema } from "@/lib/api-response-schemas";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
@@ -133,8 +134,10 @@ export function useOrbitMapPage() {
     useQuery({
       queryKey: ["bookmarks", "orbit-map-focus", selectedBookmarkId],
       queryFn: () =>
-        fetchJson<{ bookmarks: BookmarkWithRelations[] }>(
-          `/api/bookmarks?bookmarkId=${encodeURIComponent(selectedBookmarkId!)}&limit=1`
+        fetchJson(
+          `/api/bookmarks?bookmarkId=${encodeURIComponent(selectedBookmarkId!)}&limit=1`,
+          undefined,
+          bookmarkFocusResponseSchema
         ),
       enabled: Boolean(selectedBookmarkId),
       placeholderData: keepPreviousData,
@@ -144,8 +147,10 @@ export function useOrbitMapPage() {
   const { data: expandedBookmarkData } = useQuery({
     queryKey: ["bookmarks", "orbit-map-expanded", expandedBookmarkId],
     queryFn: () =>
-      fetchJson<{ bookmarks: BookmarkWithRelations[] }>(
-        `/api/bookmarks?bookmarkId=${encodeURIComponent(expandedBookmarkId!)}&limit=1`
+      fetchJson(
+        `/api/bookmarks?bookmarkId=${encodeURIComponent(expandedBookmarkId!)}&limit=1`,
+        undefined,
+        bookmarkFocusResponseSchema
       ),
     enabled: Boolean(expandedBookmarkId),
   });
@@ -191,11 +196,10 @@ export function useOrbitMapPage() {
     setSearch,
     searchDeferred,
     searchResults,
-    highlightedNodeIds,
     searchInputRef,
+    handleSearchResults,
     handleSearchResultSelect,
   } = useOrbitMapSearch({
-    graph,
     canvasRef,
     onSelect: handleSelectionChange,
   });
@@ -414,8 +418,8 @@ export function useOrbitMapPage() {
     setSearch,
     searchDeferred,
     searchResults,
-    highlightedNodeIds,
     searchInputRef,
+    handleSearchResults,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
     headerDescription,

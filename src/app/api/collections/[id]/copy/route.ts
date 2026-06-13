@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 export async function POST(
   _req: NextRequest,
@@ -14,11 +14,6 @@ export async function POST(
   }
 
   // Rate limit collection copy operations
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   const source = await prisma.collection.findUnique({
     where: { id: sourceId, userId: user.id },
     include: {
@@ -86,6 +81,8 @@ export async function POST(
     where: { id: newCollection.id },
     include: { _count: { select: { items: true } } },
   });
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json(result, { status: 201 });
 }

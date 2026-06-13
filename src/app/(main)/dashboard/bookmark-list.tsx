@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type RefObject } from "react";
 import dynamic from "next/dynamic";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
+import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
 
@@ -18,7 +20,11 @@ const GridBookmarkCard = dynamic(
   }
 );
 
+const FEED_ROW_ESTIMATE_PX = 168;
+const COMPACT_ROW_ESTIMATE_PX = 72;
+
 interface BookmarkListProps {
+  scrollRef: RefObject<HTMLElement | null>;
   bookmarks: BookmarkWithRelations[];
   viewMode: ViewMode;
   searchQuery?: string;
@@ -38,6 +44,7 @@ interface BookmarkListProps {
 }
 
 export function BookmarkList({
+  scrollRef,
   bookmarks,
   viewMode,
   searchQuery,
@@ -74,6 +81,21 @@ export function BookmarkList({
     []
   );
 
+  const rowEstimate =
+    viewMode === "compact" ? COMPACT_ROW_ESTIMATE_PX : FEED_ROW_ESTIMATE_PX;
+
+  const virtualizer = useVirtualizer({
+    count: bookmarks.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowEstimate,
+    overscan: 4,
+  });
+
+  const focusedBookmarkId =
+    selectionMode || viewMode === "grid" ? null : activeBookmarkId;
+
+  useVirtualListFocus(virtualizer, bookmarks, focusedBookmarkId);
+
   if (viewMode === "grid") {
     return (
       <div className="columns-1 gap-3 p-3 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
@@ -107,38 +129,56 @@ export function BookmarkList({
 
   return (
     <div className={listContainerClass}>
-      {bookmarks.map((bookmark, i) => (
-        <BookmarkCard
-          key={bookmark.id}
-          bookmark={bookmark}
-          viewMode={viewMode}
-          searchQuery={searchQuery}
-          rank={i + 1}
-          priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
-          selected={
-            selectionMode
-              ? selectedBookmarkIdSet.has(bookmark.id)
-              : activeBookmarkId === bookmark.id
-          }
-          onSelect={onSelect}
-          selectionMode={selectionMode}
-          onSelectionChange={onSelectionChange}
-          onTagClick={onTagClick}
-          onAddTag={onAddTag}
-          onAddToCollection={onAddToCollection}
-          onAddNote={onAddNote}
-          onOpenExpanded={onOpenExpanded}
-          onDelete={(id) => onDelete(id)}
-          className={getStaggerClass(i, "animate-fade-in")}
-          isPerformanceHighlight={performanceHighlightId === bookmark.id}
-          compactExpanded={
-            viewMode === "compact" && expandedCompactBookmarkIds.has(bookmark.id)
-          }
-          onCompactExpandedChange={
-            viewMode === "compact" ? handleCompactExpandedChange : undefined
-          }
-        />
-      ))}
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const bookmark = bookmarks[virtualRow.index];
+          const index = virtualRow.index;
+
+          return (
+            <div
+              key={bookmark.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute top-0 left-0 w-full"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+            >
+              <BookmarkCard
+                bookmark={bookmark}
+                viewMode={viewMode}
+                searchQuery={searchQuery}
+                rank={index + 1}
+                priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
+                selected={
+                  selectionMode
+                    ? selectedBookmarkIdSet.has(bookmark.id)
+                    : activeBookmarkId === bookmark.id
+                }
+                onSelect={onSelect}
+                selectionMode={selectionMode}
+                onSelectionChange={onSelectionChange}
+                onTagClick={onTagClick}
+                onAddTag={onAddTag}
+                onAddToCollection={onAddToCollection}
+                onAddNote={onAddNote}
+                onOpenExpanded={onOpenExpanded}
+                onDelete={(id) => onDelete(id)}
+                className={getStaggerClass(index, "animate-fade-in")}
+                isPerformanceHighlight={performanceHighlightId === bookmark.id}
+                compactExpanded={
+                  viewMode === "compact" &&
+                  expandedCompactBookmarkIds.has(bookmark.id)
+                }
+                onCompactExpandedChange={
+                  viewMode === "compact" ? handleCompactExpandedChange : undefined
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

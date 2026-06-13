@@ -1,13 +1,8 @@
 import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { collectionsResponseSchema } from "@/lib/api-response-schemas";
 import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import type { QueryClient } from "@tanstack/react-query";
 import type { BookmarkWithRelations } from "@/types";
-
-type CollectionSummary = {
-  id: string;
-  name: string;
-  type: string;
-};
 
 export type SaveGemsResult = {
   collectionId: string;
@@ -32,7 +27,11 @@ export async function saveGemsAsCollection(
   suggestedName: string
 ): Promise<SaveGemsResult> {
   const target = normalizeCollectionName(suggestedName);
-  const existing = await fetchJson<CollectionSummary[]>("/api/collections");
+  const existing = await fetchJson(
+    "/api/collections",
+    undefined,
+    collectionsResponseSchema
+  );
   const match = existing.find(
     (collection) =>
       collection.type === "user_collection" &&

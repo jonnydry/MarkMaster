@@ -12,6 +12,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { TypographyFontLoader } from "@/components/typography-font-loader";
 import {
   type ColorThemeId,
   resolveColorTheme,
@@ -269,11 +270,18 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Providers({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/** Theme/typography only — safe for login and other unauthenticated routes. */
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <AppearanceProvider>
+      <TypographyFontLoader />
+      {children}
+    </AppearanceProvider>
+  );
+}
+
+/** React Query — scoped to authenticated (main) routes only. */
+export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -284,9 +292,7 @@ export function Providers({
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppearanceProvider>{children}</AppearanceProvider>
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }
 

@@ -1,12 +1,18 @@
 "use client";
 
+import { type RefObject } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
+import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { OrbitListRow } from "./orbit-list-row";
 
+const ORBIT_ROW_ESTIMATE_PX = 152;
+
 interface OrbitListProps {
+  scrollRef?: RefObject<HTMLElement | null>;
   bookmarks: BookmarkWithRelations[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
@@ -48,6 +54,7 @@ function OrbitListRowSkeleton() {
 }
 
 export function OrbitList({
+  scrollRef,
   bookmarks,
   selectedId,
   onSelect,
@@ -61,6 +68,16 @@ export function OrbitList({
   dismissedBookmarkIds,
   appliedBookmarkIds,
 }: OrbitListProps) {
+  const virtualizer = useVirtualizer({
+    count: bookmarks.length,
+    getScrollElement: () => scrollRef?.current ?? null,
+    estimateSize: () => ORBIT_ROW_ESTIMATE_PX,
+    overscan: 5,
+  });
+
+  const focusedId = selectionMode ? null : selectedId;
+
+  useVirtualListFocus(virtualizer, bookmarks, focusedId);
 
   if (isLoading) {
     return (
@@ -84,22 +101,38 @@ export function OrbitList({
   }
 
   return (
-    <div className={cn("flex flex-col", className)}>
-      {bookmarks.map((bookmark) => (
-        <OrbitListRow
-          key={bookmark.id}
-          bookmark={bookmark}
-          selected={selectedId === bookmark.id}
-          selectionMode={selectionMode}
-          bulkSelected={selectedIds?.has(bookmark.id) ?? false}
-          decision={getDecision?.(bookmark.id) ?? null}
-          dismissedBookmarkIds={dismissedBookmarkIds}
-          appliedBookmarkIds={appliedBookmarkIds}
-          onSelect={onSelect}
-          onToggleSelect={onToggleSelect}
-          onQuickAction={onQuickAction}
-        />
-      ))}
+    <div className={cn("relative w-full", className)}>
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const bookmark = bookmarks[virtualRow.index];
+
+          return (
+            <div
+              key={bookmark.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute top-0 left-0 w-full"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+            >
+              <OrbitListRow
+                bookmark={bookmark}
+                selected={selectedId === bookmark.id}
+                selectionMode={selectionMode}
+                bulkSelected={selectedIds?.has(bookmark.id) ?? false}
+                decision={getDecision?.(bookmark.id) ?? null}
+                dismissedBookmarkIds={dismissedBookmarkIds}
+                appliedBookmarkIds={appliedBookmarkIds}
+                onSelect={onSelect}
+                onToggleSelect={onToggleSelect}
+                onQuickAction={onQuickAction}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

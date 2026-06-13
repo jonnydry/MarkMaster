@@ -506,36 +506,6 @@
   }
 }
 
-/* Orbital ring motion keyframes (used by branded assets) */
-@keyframes ring-rotate-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes ring-rotate-medium {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes ring-rotate-fast {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes nucleus-breath {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.025); }
-}
-
-/* Slide-in from right (for Orbit review panel) */
-@keyframes orbit-slide-in-right {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
 /* === Surface chrome contract — the canonical card/panel recipes. ===
    These six utilities are the only sanctioned surface treatments. Compose
    extras (padding, hover, focus) at the call site; never re-derive the
@@ -663,111 +633,9 @@
   .dashboard-toolbar {
     container-type: inline-size;
   }
-  .orbit-map-stage {
-    min-height: clamp(280px, calc(100dvh - 14rem), 480px);
-  }
-  @supports not (height: 100dvh) {
-    .orbit-map-stage {
-      min-height: clamp(280px, calc(100vh - 14rem), 480px);
-    }
-  }
-  @media (min-width: 1024px) {
-    .orbit-map-stage {
-      min-height: 0;
-    }
-  }
   @media (max-height: 700px) {
     :root {
       --app-header-height: 64px;
-    }
-  }
-  .auth-splash {
-    min-height: 100vh;
-    min-height: 100svh;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-  @media (min-width: 1024px) {
-    .auth-splash {
-      height: 100vh;
-      height: 100dvh;
-      min-height: 100vh;
-      min-height: 100dvh;
-      overflow: hidden;
-    }
-    .auth-splash--with-error {
-      overflow-y: auto;
-    }
-    .auth-splash__header {
-      padding-top: clamp(1rem, 3.6dvh, 2rem);
-    }
-    .auth-splash__main {
-      padding-top: clamp(1rem, 4.4dvh, 2.5rem);
-      padding-bottom: clamp(1rem, 4.4dvh, 3rem);
-    }
-    .auth-splash__footer {
-      padding-bottom: clamp(0.75rem, 2.4dvh, 2rem);
-    }
-    .auth-splash__brand-badge {
-      width: clamp(4.375rem, 9.8dvh, 5.5rem);
-      height: clamp(4.375rem, 9.8dvh, 5.5rem);
-    }
-    .auth-splash__brand-logo {
-      width: clamp(3.375rem, 7.6dvh, 4.25rem);
-      height: clamp(3.375rem, 7.6dvh, 4.25rem);
-    }
-    .auth-splash__wordmark {
-      font-size: clamp(2.65rem, 6dvh, 3.35rem);
-      letter-spacing: 0;
-    }
-    .auth-splash__headline {
-      margin-top: clamp(2.25rem, 8.7dvh, 4.875rem);
-      font-size: clamp(3.35rem, 8.1dvh, 4.55rem);
-      letter-spacing: 0;
-    }
-    .auth-splash__lead {
-      margin-top: clamp(1.125rem, 3.1dvh, 1.75rem);
-      line-height: 1.62;
-    }
-    .auth-splash__cta {
-      margin-top: clamp(1.5rem, 4dvh, 2.25rem);
-      gap: clamp(0.75rem, 1.9dvh, 1rem);
-    }
-    .auth-splash__primary-button {
-      height: clamp(3.25rem, 8.2dvh, 3.875rem);
-    }
-    .auth-splash__aside {
-      padding: clamp(1.25rem, 3.6dvh, 2rem);
-      border-radius: clamp(1.5rem, 4.8dvh, 2.125rem);
-    }
-    .auth-splash__aside-title {
-      margin-top: clamp(0.875rem, 2.4dvh, 1.25rem);
-      font-size: clamp(2rem, 5.45dvh, 2.45rem);
-      letter-spacing: 0;
-    }
-    .auth-splash__aside-copy {
-      margin-top: clamp(0.875rem, 2.4dvh, 1.25rem);
-      line-height: 1.6;
-    }
-    .auth-splash__feature-list {
-      margin-top: clamp(1rem, 2.8dvh, 2rem);
-    }
-    .auth-splash__feature-row {
-      padding-top: clamp(0.625rem, 1.7dvh, 1rem);
-      padding-bottom: clamp(0.625rem, 1.7dvh, 1rem);
-    }
-    .auth-splash__note {
-      margin-top: clamp(1rem, 2.8dvh, 2rem);
-      padding: clamp(0.875rem, 2.2dvh, 1rem);
-      line-height: 1.55;
-    }
-  }
-  @media (min-width: 1024px) and (max-height: 640px) {
-    .auth-splash {
-      height: auto;
-      min-height: 100vh;
-      min-height: 100svh;
-      overflow-y: auto;
     }
   }
   .heading-font {
@@ -918,9 +786,9 @@
     background: color-mix(in srgb, var(--note) 80%, white 20%);
   }
   @media (prefers-reduced-motion: reduce) {
-    .highlight-progress:hover .highlight-progress-shimmer,
-    .group:hover .highlight-progress-shimmer,
-    .group:focus-within .highlight-progress-shimmer {
+    .highlight-progress:hover .highlight-progress-shimmer::after,
+    .group:hover .highlight-progress-shimmer::after,
+    .group:focus-within .highlight-progress-shimmer::after {
       animation: none;
     }
   }
@@ -1046,14 +914,8 @@
     animation: slide-down-fade 0.25s ease-out both;
   }
 
-  /* Orbit slide-in panel (right edge) */
-  .animate-orbit-slide-in-right {
-    animation: orbit-slide-in-right 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .animate-slide-down-fade,
-    .animate-orbit-slide-in-right {
+    .animate-slide-down-fade {
       animation: none;
     }
   }
@@ -1154,78 +1016,6 @@
   @media (prefers-reduced-motion: reduce) {
     .markmaster-logo {
       transition: none;
-    }
-  }
-
-  /* Floating chrome over the Orbit map canvas. The canvas always paints
-     space-black regardless of theme, so these are intentionally literal. */
-  .map-glass {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
-
-  .glass-orbital {
-    background: color-mix(in srgb, var(--surface-1) 72%, transparent);
-    border: 1px solid var(--hairline-soft);
-    backdrop-filter: blur(20px);
-    box-shadow:
-      inset 0 1px 0 var(--page-shell-highlight),
-      0 8px 32px -8px color-mix(in srgb, var(--foreground) 8%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
-  }
-
-  .orbital-slide-in-shadow {
-    box-shadow:
-      inset 0 1px 0 var(--page-shell-highlight),
-      -14px 0 40px -16px color-mix(in srgb, var(--foreground) 10%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
-  }
-
-  .orbital-menu {
-    box-shadow:
-      inset 0 1px 0 var(--page-shell-highlight),
-      0 10px 30px -10px color-mix(in srgb, var(--foreground) 12%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
-  }
-
-  .orbital-action-pill {
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-  .orbital-action-pill:hover {
-    transform: translateY(-0.5px);
-    box-shadow:
-      0 4px 14px -2px color-mix(in srgb, var(--foreground) 10%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
-  }
-
-  .orbital-ring-slow {
-    animation: ring-rotate-slow 68s linear infinite;
-    transform-origin: center;
-    transform-box: fill-box;
-  }
-  .orbital-ring-medium {
-    animation: ring-rotate-medium 47s linear infinite;
-    transform-origin: center;
-    transform-box: fill-box;
-  }
-  .orbital-ring-fast {
-    animation: ring-rotate-fast 31s linear infinite;
-    transform-origin: center;
-    transform-box: fill-box;
-  }
-  .orbital-nucleus {
-    animation: nucleus-breath 5.8s ease-in-out infinite;
-    transform-origin: center;
-    transform-box: fill-box;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .orbital-ring-slow,
-    .orbital-ring-medium,
-    .orbital-ring-fast,
-    .orbital-nucleus {
-      animation: none;
     }
   }
 }

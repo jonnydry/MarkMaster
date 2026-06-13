@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildMediaBreakdown } from "@/lib/analytics";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import { Prisma } from "@prisma/client";
+import type { AnalyticsData } from "@/types";
 
 /**
  * Minimal time filter for flywheel events only (Slice 2).
@@ -30,12 +31,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit analytics (multiple heavy queries)
-  const rateLimitResult = await checkRateLimit("api:read", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
   // Slice 2: parse range (defaults to 90d to match client initial state); used only for flywheel query.
   const rangeParam = req.nextUrl.searchParams.get("range") ?? "90d";
   const allowedRanges = ["30d", "90d", "12m", "all"] as const;
@@ -44,7 +39,10 @@ export async function GET(req: NextRequest) {
       ? (rangeParam as "30d" | "90d" | "12m" | "all")
       : "90d";
   const fwTimeFilter = getFlywheelCreatedAtFilter(range);
+  const cacheVersion = await getUserCacheVersion(user.id);
+  const cacheKey = `cache:analytics:${user.id}:v${cacheVersion}:${range}`;
 
+  const analyticsPayload = await getCachedJson<AnalyticsData>(cacheKey, 120, async () => {
   const [
     authorRows,
     monthRows,
@@ -355,7 +353,7 @@ export async function GET(req: NextRequest) {
       ? orbitHighConfidenceAccepted / orbitHighConfidenceDecisions
       : 0;
 
-  return NextResponse.json({
+  return {
     topAuthors,
     mediaBreakdown: buildMediaBreakdown({
       totalBookmarks,
@@ -384,7 +382,6 @@ export async function GET(req: NextRequest) {
     flywheelDigestSessions: fwCounts["digest.session_start"] ?? 0,
     flywheelDigestCtaToSessionRate: digestCtaToSessionRate,
     flywheelQuickPassShare: quickPassShare,
-    // Phase 3 Item 12 Slice 3: per-source + quick outcome (only populated when signals exist; zero-weight otherwise)
     flywheelTopEntrySources: topEntrySources,
     flywheelQuickKeepCount: quickKeeps,
     flywheelQuickPassKeepRate: quickPassKeepRate,
@@ -396,5 +393,12 @@ export async function GET(req: NextRequest) {
     orbitDecisionAcceptRate,
     orbitDecisionEditRate,
     orbitHighConfidenceAcceptRate,
+  };
+  });
+
+  return NextResponse.json(analyticsPayload, {
+    headers: {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+    },
   });
 }

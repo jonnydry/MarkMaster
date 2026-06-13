@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchJson } from "@/lib/fetch-json";
+import { orbitXaiStatusPayloadSchema } from "@/lib/api-response-schemas";
 import { cn } from "@/lib/utils";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
@@ -21,7 +22,12 @@ export function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
 export function useOrbitStatusQuery(orbitIssue: OrbitScanFailureCode | null) {
   return useQuery({
     queryKey: ["orbit", "xai-status", orbitIssue],
-    queryFn: () => fetchJson<OrbitXaiStatusPayload>(buildOrbitStatusUrl(orbitIssue)),
+    queryFn: () =>
+      fetchJson(
+        buildOrbitStatusUrl(orbitIssue),
+        undefined,
+        orbitXaiStatusPayloadSchema
+      ),
     staleTime: 30_000,
   });
 }

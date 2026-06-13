@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { buildOrbitGraphPayload } from "@/lib/orbit-graph-query";
+import { buildOrbitGraphETag } from "@/lib/orbit-graph-etag";
+import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import {
   orbitGraphQuerySchema,
   DEFAULT_ORBIT_GRAPH_NODE_CAP,
 } from "@/lib/validations";
-import type {
-  OrbitGraphEdge,
-  OrbitGraphNode,
-  OrbitGraphPayload,
-  OrbitGraphStats,
-} from "@/types";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import type { OrbitGraphPayload } from "@/types";
 
-const RECENT_WINDOW_MS = 1000 * 60 * 60 * 24 * 14;
-const TITLE_LENGTH = 140;
-
-function truncateTitle(text: string) {
-  const normalized = text.trim().replace(/\s+/g, " ");
-  if (normalized.length <= TITLE_LENGTH) return normalized;
-  return `${normalized.slice(0, TITLE_LENGTH - 1).trimEnd()}…`;
-}
+const GRAPH_CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+} as const;
 
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
@@ -28,13 +19,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit graph generation (can be expensive for large libraries)
-  const rateLimitResult = await checkRateLimit("api:read", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-
-  // Validate query parameters with Zod
   const queryParams = Object.fromEntries(req.nextUrl.searchParams.entries());
   const parsed = orbitGraphQuerySchema.safeParse(queryParams);
   if (!parsed.success) {
@@ -50,296 +34,47 @@ export async function GET(req: NextRequest) {
   const nodeCap = parsed.data.nodeCap ?? DEFAULT_ORBIT_GRAPH_NODE_CAP;
   const scope = parsed.data.scope ?? "library";
   const expandAnchorIds = parsed.data.expand ?? [];
+  const expandKey = [...expandAnchorIds].sort().join(",");
+  const cacheVersion = await getUserCacheVersion(user.id);
+  const cacheKey = `cache:orbit:graph:${user.id}:v${cacheVersion}:${scope}:${nodeCap}:${expandKey}`;
 
-  const orbitQueueWhere = {
-    tags: { none: {} },
-    collectionItems: {
-      none: { collection: { type: "user_collection" as const } },
-    },
-  };
-
-  const bookmarkWhere = {
-    userId: user.id,
-    ...(scope === "orbit" ? orbitQueueWhere : {}),
-  };
-
-  // Keep these reads sequential. The graph endpoint is loaded alongside tags,
-  // collections, and sync status; fanning out here can exhaust the local Prisma
-  // pool during dev reloads and make the map briefly fail with P2024.
-  const tagsRaw = await prisma.tag.findMany({
-    where: { userId: user.id },
-    select: {
-      id: true,
-      name: true,
-      color: true,
-      _count: { select: { bookmarks: true } },
-    },
-    orderBy: { name: "asc" },
-  });
-  const collectionsRaw = await prisma.collection.findMany({
-    where: { userId: user.id },
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      _count: { select: { items: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-  const totalBookmarks = await prisma.bookmark.count({
-    where: { userId: user.id },
-  });
-  const bookmarkSelect = {
-    id: true,
-    tweetText: true,
-    authorUsername: true,
-    authorDisplayName: true,
-    bookmarkedAt: true,
-    tags: { select: { tagId: true } },
-    collectionItems: {
-      select: {
-        collectionId: true,
-        collection: { select: { type: true } },
-      },
-    },
-  } as const;
-
-  let bookmarksRaw = await prisma.bookmark.findMany({
-    where: bookmarkWhere,
-    select: bookmarkSelect,
-    orderBy: { bookmarkedAt: "desc" },
-    take: nodeCap,
-  });
-
-  // Expanded anchors (from clicking "+N more" overflow nodes) pull in their
-  // member bookmarks even beyond the node cap / scope filter.
-  if (expandAnchorIds.length > 0) {
-    const expandedBookmarks = await prisma.bookmark.findMany({
-      where: {
-        userId: user.id,
-        OR: [
-          { tags: { some: { tagId: { in: expandAnchorIds } } } },
-          {
-            collectionItems: {
-              some: { collectionId: { in: expandAnchorIds } },
-            },
-          },
-        ],
-      },
-      select: bookmarkSelect,
-      orderBy: { bookmarkedAt: "desc" },
-      take: 600,
-    });
-    const seen = new Set(bookmarksRaw.map((bookmark) => bookmark.id));
-    bookmarksRaw = [
-      ...bookmarksRaw,
-      ...expandedBookmarks.filter((bookmark) => !seen.has(bookmark.id)),
-    ];
-  }
-
-  const nodes: OrbitGraphNode[] = [];
-  const edges: OrbitGraphEdge[] = [];
-
-  let looseRendered = 0;
-  const renderedBookmarkIds = new Set<string>();
-  const tagBookmarkCounts = new Map<string, number>();
-  const collectionBookmarkCounts = new Map<string, number>();
-  const now = Date.now();
-
-  for (const bookmark of bookmarksRaw) {
-    renderedBookmarkIds.add(bookmark.id);
-
-    const hasUserCollection = bookmark.collectionItems.some(
-      ({ collection }) => collection.type === "user_collection"
-    );
-    const affiliated = bookmark.tags.length > 0 || hasUserCollection;
-    const bookmarkedAtMs = new Date(bookmark.bookmarkedAt).getTime();
-    const recent = now - bookmarkedAtMs <= RECENT_WINDOW_MS;
-
-    if (!affiliated) {
-      looseRendered += 1;
-    }
-
-    nodes.push({
-      kind: "bookmark",
-      id: bookmark.id,
-      title: truncateTitle(bookmark.tweetText),
-      authorUsername: bookmark.authorUsername,
-      authorDisplayName: bookmark.authorDisplayName,
-      affiliated,
-      recent,
-    });
-
-    for (const { tagId } of bookmark.tags) {
-      edges.push({ kind: "bookmark-tag", bookmarkId: bookmark.id, tagId });
-      tagBookmarkCounts.set(
-        tagId,
-        (tagBookmarkCounts.get(tagId) ?? 0) + 1
-      );
-    }
-
-    for (const { collectionId } of bookmark.collectionItems) {
-      edges.push({
-        kind: "bookmark-collection",
-        bookmarkId: bookmark.id,
-        collectionId,
-      });
-      collectionBookmarkCounts.set(
-        collectionId,
-        (collectionBookmarkCounts.get(collectionId) ?? 0) + 1
-      );
-    }
-
-    if (!affiliated) {
-      edges.push({ kind: "loose", bookmarkId: bookmark.id });
-    }
-  }
-
-  const tagNodeIds = new Set<string>();
-  for (const tag of tagsRaw) {
-    nodes.push({
-      kind: "tag",
-      id: tag.id,
-      name: tag.name,
-      color: tag.color,
-      count: tag._count.bookmarks,
-    });
-    tagNodeIds.add(tag.id);
-
-    const renderedCount = tagBookmarkCounts.get(tag.id) ?? 0;
-    const remaining = tag._count.bookmarks - renderedCount;
-    if (remaining > 0) {
-      const overflowId = `tag-overflow-${tag.id}`;
-      nodes.push({
-        kind: "overflow",
-        id: overflowId,
-        anchorId: tag.id,
-        anchorKind: "tag",
-        remaining,
-      });
-      edges.push({
-        kind: "overflow",
-        overflowId,
-        anchorId: tag.id,
-      });
-    }
-  }
-
-  let userCollectionCount = 0;
-  let xFolderCount = 0;
-  const collectionNodeIds = new Set<string>();
-
-  for (const collection of collectionsRaw) {
-    const variant = collection.type === "x_folder" ? "x_folder" : "user_collection";
-    if (variant === "x_folder") {
-      xFolderCount += 1;
-    } else {
-      userCollectionCount += 1;
-    }
-
-    nodes.push({
-      kind: "collection",
-      id: collection.id,
-      name: collection.name,
-      variant,
-      count: collection._count.items,
-    });
-    collectionNodeIds.add(collection.id);
-
-    const renderedCount = collectionBookmarkCounts.get(collection.id) ?? 0;
-    const remaining = collection._count.items - renderedCount;
-    if (remaining > 0) {
-      const overflowId = `collection-overflow-${collection.id}`;
-      nodes.push({
-        kind: "overflow",
-        id: overflowId,
-        anchorId: collection.id,
-        anchorKind: "collection",
-        remaining,
-      });
-      edges.push({
-        kind: "overflow",
-        overflowId,
-        anchorId: collection.id,
-      });
-    }
-  }
-
-  const totalLooseBookmarks = await prisma.bookmark.count({
-    where: {
+  const payload = await getCachedJson<OrbitGraphPayload>(cacheKey, 60, async () => {
+    const graph = await buildOrbitGraphPayload({
       userId: user.id,
-      ...orbitQueueWhere,
-    },
-  });
-
-  nodes.push({
-    kind: "core",
-    id: "orbit-index",
-    totalBookmarks,
-    looseBookmarks: totalLooseBookmarks,
-  });
-
-  const looseOverflow = totalLooseBookmarks - looseRendered;
-  if (looseOverflow > 0) {
-    const overflowId = "core-overflow";
-    nodes.push({
-      kind: "overflow",
-      id: overflowId,
-      anchorId: "orbit-index",
-      anchorKind: "core",
-      remaining: looseOverflow,
+      scope,
+      nodeCap,
+      expandAnchorIds,
     });
-    edges.push({
-      kind: "overflow",
-      overflowId,
-      anchorId: "orbit-index",
+
+    return {
+      ...graph,
+      generatedAt: new Date().toISOString(),
+    };
+  });
+
+  const etag = buildOrbitGraphETag({
+    cacheVersion,
+    scope,
+    nodeCap,
+    expandKey,
+    generatedAt: payload.generatedAt,
+  });
+
+  const ifNoneMatch = req.headers.get("if-none-match");
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return new NextResponse(null, {
+      status: 304,
+      headers: {
+        ...GRAPH_CACHE_HEADERS,
+        ETag: etag,
+      },
     });
   }
-
-  const filteredEdges = edges.filter((edge) => {
-    switch (edge.kind) {
-      case "bookmark-tag":
-        return (
-          renderedBookmarkIds.has(edge.bookmarkId) && tagNodeIds.has(edge.tagId)
-        );
-      case "bookmark-collection":
-        return (
-          renderedBookmarkIds.has(edge.bookmarkId) &&
-          collectionNodeIds.has(edge.collectionId)
-        );
-      case "loose":
-        return renderedBookmarkIds.has(edge.bookmarkId);
-      case "overflow":
-        return true;
-      default:
-        edge satisfies never;
-        return false;
-    }
-  });
-
-  const stats: OrbitGraphStats = {
-    totalBookmarks,
-    affiliatedBookmarks: totalBookmarks - totalLooseBookmarks,
-    looseBookmarks: totalLooseBookmarks,
-    renderedBookmarks: bookmarksRaw.length,
-    truncatedBookmarks: Math.max(totalBookmarks - bookmarksRaw.length, 0),
-    tagCount: tagsRaw.length,
-    userCollectionCount,
-    xFolderCount,
-  };
-
-  const payload: OrbitGraphPayload = {
-    nodes,
-    edges: filteredEdges,
-    stats,
-    generatedAt: new Date().toISOString(),
-    nodeCap,
-    scope,
-  };
 
   return NextResponse.json(payload, {
     headers: {
-      "Cache-Control": "private, max-age=0, must-revalidate",
+      ...GRAPH_CACHE_HEADERS,
+      ETag: etag,
     },
   });
 }

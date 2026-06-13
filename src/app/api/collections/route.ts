@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
+import { readJsonBody } from "@/lib/request-body";
 import { createCollectionSchema } from "@/lib/validations";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 export async function GET() {
   const user = await getDbUser();
@@ -26,14 +27,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit collection creation/updates
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = createCollectionSchema.safeParse(body);
+  const parsed = createCollectionSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -53,6 +51,8 @@ export async function POST(req: NextRequest) {
       shareSlug: isPublic ? nanoid(10) : null,
     },
   });
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json(collection);
 }

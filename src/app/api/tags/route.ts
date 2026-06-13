@@ -3,8 +3,9 @@ import { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getBalancedTagColor } from "@/lib/tag-colors";
+import { readJsonBody } from "@/lib/request-body";
 import { createTagSchema, deleteTagSchema, patchTagSchema } from "@/lib/validations";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 export async function GET() {
   const user = await getDbUser();
@@ -27,14 +28,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit tag creation/updates
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = createTagSchema.safeParse(body);
+  const parsed = createTagSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -78,6 +76,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  await invalidateUserResponseCache(user.id);
+
   return NextResponse.json(tag);
 }
 
@@ -87,14 +87,11 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit tag deletions / removals
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = deleteTagSchema.safeParse(body);
+  const parsed = deleteTagSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -133,6 +130,8 @@ export async function DELETE(req: NextRequest) {
     }
   }
 
+  await invalidateUserResponseCache(user.id);
+
   return NextResponse.json({ success: true });
 }
 
@@ -142,14 +141,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit tag updates
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = patchTagSchema.safeParse(body);
+  const parsed = patchTagSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -197,6 +193,8 @@ export async function PATCH(req: NextRequest) {
   if (!tag) {
     return NextResponse.json({ error: "Tag not found" }, { status: 404 });
   }
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json(tag);
 }

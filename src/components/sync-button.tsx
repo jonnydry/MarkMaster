@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
@@ -29,6 +29,8 @@ export function SyncButton({
 }: SyncButtonProps) {
   const [syncing, setSyncing] = useState(false);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
+  const initiatedSyncRef = useRef(false);
+  const previousCurrentRunRef = useRef<SyncRunSummary | null | undefined>(undefined);
   const [countdown, setCountdown] = useState<string>("");
 
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
@@ -38,6 +40,22 @@ export function SyncButton({
   const latestRun = syncStatus?.recentRuns[0] ?? null;
   const isRateLimited = rateLimitedUntil !== null;
   const isAnySyncRunning = syncing || Boolean(currentRun) || isRateLimited;
+
+  useEffect(() => {
+    const previousRun = previousCurrentRunRef.current;
+    previousCurrentRunRef.current = currentRun;
+
+    if (!initiatedSyncRef.current || !previousRun || currentRun) {
+      return;
+    }
+
+    initiatedSyncRef.current = false;
+    const run = syncStatus?.recentRuns[0];
+    if (run) {
+      showSyncCompletionToast(run);
+    }
+    onSyncComplete?.();
+  }, [currentRun, onSyncComplete, syncStatus?.recentRuns]);
 
   // Live countdown for rate limit
   useEffect(() => {
@@ -65,32 +83,45 @@ export function SyncButton({
   const handleSync = async () => {
     if (isAnySyncRunning) return;
     setSyncing(true);
+    initiatedSyncRef.current = true;
     onSyncStateChange?.(true);
+    let pollForCompletion = false;
     try {
       const data = await sendJson<{
-        newBookmarks: number;
-        updatedBookmarks: number;
-        hitExisting: boolean;
-        rateLimited: boolean;
+        accepted?: boolean;
+        status?: string;
+        runId?: string;
+        newBookmarks?: number;
+        updatedBookmarks?: number;
+        hitExisting?: boolean;
+        rateLimited?: boolean;
       }>("/api/bookmarks/sync", { method: "POST" });
 
-      if (data.rateLimited) {
-        toast.warning(
-          `Synced ${data.newBookmarks} new bookmarks. Rate limited — try again later.`
-        );
-      } else if (data.hitExisting && data.newBookmarks === 0) {
-        toast.success("Already up to date.");
-      } else if (data.hitExisting) {
-        toast.success(`Synced ${data.newBookmarks} new bookmarks.`);
-      } else {
-        toast.success(
-          `Synced ${data.newBookmarks} new, ${data.updatedBookmarks} updated bookmarks.`
-        );
+      if (
+        data.accepted ||
+        data.status === "RUNNING" ||
+        data.status === "PENDING"
+      ) {
+        pollForCompletion = true;
+        setSyncing(false);
+        onSyncStateChange?.(false);
+        void refetchSyncStatus();
+        return;
       }
 
+      showSyncResultToast(data);
+      initiatedSyncRef.current = false;
       void refetchSyncStatus();
       onSyncComplete?.();
     } catch (error) {
+      if (error instanceof FetchJsonError && error.status === 409) {
+        pollForCompletion = true;
+        setSyncing(false);
+        onSyncStateChange?.(false);
+        void refetchSyncStatus();
+        return;
+      }
+
       if (error instanceof FetchJsonError && error.status === 429) {
         // Try to extract retry time from body or message
         const body = error.body as Record<string, unknown> | null;
@@ -116,8 +147,10 @@ export function SyncButton({
 
       toast.error("Failed to sync bookmarks");
     } finally {
-      setSyncing(false);
-      onSyncStateChange?.(false);
+      if (!pollForCompletion) {
+        setSyncing(false);
+        onSyncStateChange?.(false);
+      }
     }
   };
 
@@ -150,14 +183,16 @@ export function SyncButton({
           title={syncTitle}
           variant="highlight"
           disabled={isRateLimited}
-          className="relative h-10 w-10 p-0 disabled:opacity-70"
+          className="highlight-search-shell relative h-10 w-10 overflow-hidden p-0 disabled:opacity-70"
         >
           <RefreshCw
             className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
             aria-hidden
           />
+          {/* absolute! — .highlight-search-shell > * forces position: relative
+              on children; the status dot must stay corner-pinned. */}
           <span
-            className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${statusDotClass}`}
+            className={`absolute! bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${statusDotClass}`}
             aria-hidden
           />
         </Button>
@@ -173,7 +208,7 @@ export function SyncButton({
         aria-busy={isAnySyncRunning}
         variant="highlight"
         disabled={isRateLimited}
-        className="h-9 w-full gap-2 text-sm disabled:opacity-70"
+        className="highlight-search-shell relative h-9 w-full gap-2 overflow-hidden text-sm disabled:opacity-70"
       >
         <RefreshCw
           className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
@@ -302,4 +337,47 @@ function formatFailedSyncLabel(relative: string, errorMessage: string | null | u
   const shortened =
     detail.length > maxLen ? `${detail.slice(0, maxLen - 1)}…` : detail;
   return `${base} · ${shortened}`;
+}
+
+function showSyncResultToast(data: {
+  newBookmarks?: number;
+  updatedBookmarks?: number;
+  hitExisting?: boolean;
+  rateLimited?: boolean;
+}) {
+  const newBookmarks = data.newBookmarks ?? 0;
+  const updatedBookmarks = data.updatedBookmarks ?? 0;
+
+  if (data.rateLimited) {
+    toast.warning(
+      `Synced ${newBookmarks} new bookmarks. Rate limited — try again later.`
+    );
+    return;
+  }
+
+  if (data.hitExisting && newBookmarks === 0) {
+    toast.success("Already up to date.");
+    return;
+  }
+
+  if (data.hitExisting) {
+    toast.success(`Synced ${newBookmarks} new bookmarks.`);
+    return;
+  }
+
+  toast.success(`Synced ${newBookmarks} new, ${updatedBookmarks} updated bookmarks.`);
+}
+
+function showSyncCompletionToast(run: SyncRunSummary) {
+  if (run.status === "FAILED") {
+    toast.error(run.errorMessage?.trim() || "Sync failed");
+    return;
+  }
+
+  showSyncResultToast({
+    newBookmarks: run.newBookmarks,
+    updatedBookmarks: run.updatedBookmarks,
+    hitExisting: run.hitExisting,
+    rateLimited: run.status === "RATE_LIMITED" || run.rateLimited,
+  });
 }

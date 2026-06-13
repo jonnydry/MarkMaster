@@ -21,6 +21,7 @@ import {
   computeVelocityDelta,
 } from "@/lib/analytics";
 import { fetchJson } from "@/lib/fetch-json";
+import { analyticsDataSchema } from "@/lib/api-response-schemas";
 import { buildOrbitIntentHref } from "@/lib/orbit-navigation";
 import { completeLibrarySync } from "@/lib/library-sync";
 import type { AnalyticsData } from "@/types";
@@ -72,7 +73,10 @@ export function useAnalyticsPage() {
     refetch,
   } = useQuery<AnalyticsData>({
     queryKey: ["analytics", range],
-    queryFn: () => fetchJson(`/api/analytics?range=${range}`),
+    queryFn: () =>
+      fetchJson(`/api/analytics?range=${range}`, undefined, analyticsDataSchema),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 

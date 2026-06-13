@@ -1,22 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, type ReactElement } from "react";
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import {
-  Bookmark,
-  ExternalLink,
-  type LucideIcon,
-  Tag as TagIcon,
-  Users,
-} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { buttonVariants } from "@/components/ui/button";
+
 import { ShareBookmarkRow } from "@/components/share-bookmark-row";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { buttonVariantClassName } from "@/lib/button-variants";
+import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_SHARE_PAGE_SIZE = 50;
@@ -217,7 +211,7 @@ export default async function PublicSharePage({
           </Link>
           <Link
             href="/login"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariantClassName("outline", "sm")}
           >
             Save to your MarkMaster
           </Link>
@@ -228,7 +222,7 @@ export default async function PublicSharePage({
         <section className="mb-8 border-b border-border pb-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="mb-4 flex items-center gap-3">
                 {collection.user.profileImageUrl && (
                   <Image
                     src={collection.user.profileImageUrl}
@@ -256,28 +250,31 @@ export default async function PublicSharePage({
                 </p>
               )}
             </div>
-            <Link href="/login" className={cn(buttonVariants(), "gap-2")}>
+            <Link
+              href="/login"
+              className={buttonVariantClassName(undefined, undefined, "gap-2")}
+            >
               Save to your library
-              <ExternalLink className="size-3.5" />
+              <ExternalLinkIcon className="size-3.5" />
             </Link>
           </div>
 
           <div className="mt-6 grid gap-2 sm:grid-cols-3">
-              <ShareStat
-                icon={Bookmark}
-                label="Bookmarks"
-                value={pagination.totalItems.toLocaleString()}
-              />
             <ShareStat
-              icon={Users}
+              icon={BookmarkIcon}
+              label="Bookmarks"
+              value={pagination.totalItems.toLocaleString()}
+            />
+            <ShareStat
+              icon={UsersIcon}
               label="Authors"
               value={authorCount.toLocaleString()}
             />
-              <ShareStat
-                icon={TagIcon}
-                label="Top tags"
-                value={topTags.length.toLocaleString()}
-              />
+            <ShareStat
+              icon={TagIcon}
+              label="Top tags"
+              value={topTags.length.toLocaleString()}
+            />
           </div>
 
           {topTags.length > 0 ? (
@@ -335,12 +332,12 @@ export default async function PublicSharePage({
         ) : null}
       </main>
 
-      <footer className="border-t border-border py-8 px-6 mt-12">
+      <footer className="mt-12 border-t border-border px-6 py-8">
         <div className={cn(bookmarkFeedColumnClassName, "text-center")}>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="mb-4 text-sm text-muted-foreground">
             Curated with MarkMaster
           </p>
-          <Link href="/login" className={buttonVariants({ size: "sm" })}>
+          <Link href="/login" className={buttonVariantClassName(undefined, "sm")}>
             Start organizing your bookmarks
           </Link>
         </div>
@@ -349,22 +346,24 @@ export default async function PublicSharePage({
   );
 }
 
+type ShareStatIcon = (props: { className?: string }) => ReactElement;
+
 function ShareStat({
   icon: Icon,
   label,
   value,
 }: {
-  icon: LucideIcon;
+  icon: ShareStatIcon;
   label: string;
   value: string;
 }) {
   return (
     <div className="rounded-sm border border-border bg-secondary/50 px-3 py-2.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="size-3.5" aria-hidden />
+        <Icon className="size-3.5" />
         {label}
       </div>
-      <p className="mt-1 heading-font text-lg font-semibold tabular-nums">
+      <p className="heading-font mt-1 text-lg font-semibold tabular-nums">
         {value}
       </p>
     </div>
@@ -392,7 +391,7 @@ function SharePagination({
       {hasPrevious ? (
         <Link
           href={`/share/${slug}?page=${page - 1}`}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          className={buttonVariantClassName("outline", "sm")}
         >
           Previous
         </Link>
@@ -407,7 +406,7 @@ function SharePagination({
       {hasNext ? (
         <Link
           href={`/share/${slug}?page=${page + 1}`}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          className={buttonVariantClassName("outline", "sm")}
         >
           Next
         </Link>
@@ -415,5 +414,79 @@ function SharePagination({
         <span aria-hidden className="h-9 w-20" />
       )}
     </nav>
+  );
+}
+
+function BookmarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function TagIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+      <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
   );
 }

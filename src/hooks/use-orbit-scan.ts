@@ -12,7 +12,7 @@ import {
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
-import { invalidateLibraryQueries } from "@/lib/query-invalidation";
+import { invalidateOrbitApplyQueries } from "@/lib/query-invalidation";
 import type {
   BookmarkWithRelations,
   OrbitApplyResult,
@@ -389,7 +389,7 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateLibraryQueries(queryClient);
+        await invalidateOrbitApplyQueries(queryClient);
 
         setDismissed((current) => {
           const next = new Set(current);
@@ -438,7 +438,7 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateLibraryQueries(queryClient);
+        await invalidateOrbitApplyQueries(queryClient);
 
         setPlan(null);
         setScannedBookmarks([]);
@@ -498,7 +498,7 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateLibraryQueries(queryClient);
+        await invalidateOrbitApplyQueries(queryClient);
 
         setDismissed((current) => {
           const next = new Set(current);
@@ -568,7 +568,7 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateLibraryQueries(queryClient);
+        await invalidateOrbitApplyQueries(queryClient);
 
         setDismissed((current) => {
           const next = new Set(current);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { debugAccessDeniedResponse } from "@/lib/debug-access";
+import { readJsonBody } from "@/lib/request-body";
 import {
   checkRateLimit,
   getRateLimitDescription,
@@ -63,14 +64,24 @@ export async function POST(req: NextRequest) {
   const denied = debugAccessDeniedResponse(user);
   if (denied) return denied;
 
-  const body = await req.json().catch(() => ({}));
-  const action = body.action as DebugRateLimitAction;
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
+  }
 
-  if (!ACTIONS.includes(action)) {
+  const action =
+    typeof body.data === "object" &&
+    body.data !== null &&
+    "action" in body.data &&
+    typeof body.data.action === "string"
+      ? body.data.action
+      : undefined;
+
+  if (!action || !ACTIONS.includes(action as DebugRateLimitAction)) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  const reset = await resetUserRateLimit(action, user.id);
+  const reset = await resetUserRateLimit(action as DebugRateLimitAction, user.id);
   if (!reset.ok) {
     return NextResponse.json(
       { error: reset.message ?? "Reset failed" },

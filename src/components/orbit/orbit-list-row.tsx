@@ -20,6 +20,8 @@ import {
 } from "@/lib/orbit-route-chrome";
 import { OrbitActionPill } from "./orbit-quick-actions";
 
+const EMPTY_ID_SET = new Set<string>();
+
 interface OrbitListRowProps {
   bookmark: BookmarkWithRelations;
   selected?: boolean;
@@ -72,8 +74,8 @@ export const OrbitListRow = memo(function OrbitListRow({
 
   const queueStatus: OrbitRowQueueStatus = getOrbitRowQueueStatus({
     bookmarkId: bookmark.id,
-    dismissedBookmarkIds: dismissedBookmarkIds ?? new Set(),
-    appliedBookmarkIds: appliedBookmarkIds ?? new Set(),
+    dismissedBookmarkIds: dismissedBookmarkIds ?? EMPTY_ID_SET,
+    appliedBookmarkIds: appliedBookmarkIds ?? EMPTY_ID_SET,
     decision,
   });
   const suggestion = getOrbitRowSuggestion(decision);

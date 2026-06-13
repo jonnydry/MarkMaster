@@ -43,15 +43,3 @@ export const highlightProgressFillNoteClass =
 /** Frosted search shell — pairs with .highlight-search-shell in globals.css. */
 export const highlightSearchShellClass =
   "highlight-search-shell relative overflow-hidden rounded-sm border border-hairline-strong transition-[border-color] duration-150";
-
-/** @deprecated Use highlightActiveClass — kept for imports during migration. */
-export const toolbarHighlightActiveClass = highlightActiveClass;
-
-/** @deprecated Use highlightSegmentActiveClass */
-export const toolbarSegmentActiveClass = highlightSegmentActiveClass;
-
-/** @deprecated Use highlightInteractiveClass */
-export const toolbarHighlightHoverClass = highlightInteractiveClass;
-
-/** @deprecated Use highlightIdleClass */
-export const toolbarHighlightIdleClass = highlightIdleClass;

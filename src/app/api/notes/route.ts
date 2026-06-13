@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/request-body";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { createNoteSchema, deleteNoteSchema } from "@/lib/validations";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const user = await getDbUser();
@@ -10,14 +11,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit note writes
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = createNoteSchema.safeParse(body);
+  const parsed = createNoteSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -41,6 +39,8 @@ export async function POST(req: NextRequest) {
     create: { bookmarkId, userId: user.id, content },
   });
 
+  await invalidateUserResponseCache(user.id);
+
   return NextResponse.json(note);
 }
 
@@ -50,14 +50,11 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit note deletes
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = deleteNoteSchema.safeParse(body);
+  const parsed = deleteNoteSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -75,6 +72,8 @@ export async function DELETE(req: NextRequest) {
     }
     throw e;
   }
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json({ success: true });
 }

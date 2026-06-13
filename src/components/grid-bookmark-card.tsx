@@ -1,25 +1,26 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
   ArrowUpRight,
   BadgeCheck,
-  Check,
   FolderInput,
   NotebookPen,
   Tags,
 } from "lucide-react";
 
 import { XLogoMark } from "@/components/brands/x-logo-mark";
-import { Button } from "@/components/ui/button";
+import {
+  BookmarkCardActionButton,
+  BookmarkCardSelectionToggle,
+} from "@/components/bookmark-card-chrome";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
-import { highlightIndicatorActiveClass } from "@/lib/highlight-chrome";
-import { createTextHighlighter } from "@/lib/text-highlighter";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { cn } from "@/lib/utils";
+import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
 import type { BookmarkWithRelations } from "@/types";
 
 interface GridBookmarkCardProps {
@@ -58,34 +59,6 @@ function getGridMediaLabel(mediaItems: BookmarkMediaJson[] | null | undefined): 
   return "Image";
 }
 
-function SelectionToggle({
-  selected,
-  onToggle,
-}: {
-  selected?: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      aria-pressed={selected}
-      aria-label="Select bookmark"
-      className={cn(
-        "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2",
-        selected
-          ? highlightIndicatorActiveClass
-          : "border-border bg-background text-transparent hover:border-primary/50"
-      )}
-    >
-      <Check className="h-3.5 w-3.5" />
-    </button>
-  );
-}
-
 export const GridBookmarkCard = memo(function GridBookmarkCard({
   bookmark,
   searchQuery,
@@ -118,22 +91,11 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   const extraTagCount = Math.max(bookmark.tags.length - 1, 0);
   const likeLabel = metrics?.like_count ? `${formatCompactCount(metrics.like_count)} likes` : null;
   const isInteractive = selectionMode || Boolean(onSelect);
-  const highlighter = useMemo(
-    () => createTextHighlighter(searchQuery),
-    [searchQuery]
-  );
-  const highlightedText = useMemo(
-    () => highlighter.tweet(bookmark.tweetText),
-    [bookmark.tweetText, highlighter]
-  );
-  const highlightedAuthorName = useMemo(
-    () => highlighter.plain(bookmark.authorDisplayName, "author"),
-    [bookmark.authorDisplayName, highlighter]
-  );
-  const highlightedUsername = useMemo(
-    () => highlighter.plain(bookmark.authorUsername, "username"),
-    [bookmark.authorUsername, highlighter]
-  );
+  const {
+    highlightedText,
+    highlightedAuthorName,
+    highlightedUsername,
+  } = useBookmarkHighlighting(bookmark, searchQuery);
 
   const handleCardActivation = () => {
     if (selectionMode) {
@@ -182,7 +144,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
     >
       {selectionMode && (
         <div className="absolute right-2 top-2 z-20">
-          <SelectionToggle
+          <BookmarkCardSelectionToggle
             selected={selected}
             onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
           />
@@ -318,78 +280,35 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
 
         <div className="mt-3 flex items-center gap-1 border-t border-hairline-soft/70 pt-2.5">
           {onAddTag && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddTag(bookmark.id);
-              }}
-              className={cn(
-                "rounded-sm border border-transparent",
-                hasTag
-                  ? highlightIndicatorActiveClass
-                  : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-              )}
-              aria-label={hasTag ? "Edit tags" : "Add tags"}
-              title={hasTag ? "Edit tags" : "Add tags"}
-            >
-              <Tags className="size-3.5" aria-hidden="true" />
-            </Button>
+            <BookmarkCardActionButton
+              icon={Tags}
+              label={hasTag ? "Edit tags" : "Add tags"}
+              onClick={() => onAddTag(bookmark.id)}
+              active={hasTag}
+            />
           )}
           {onAddToCollection && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToCollection(bookmark.id);
-              }}
-              className={cn(
-                "rounded-sm border border-transparent",
-                hasCollection
-                  ? highlightIndicatorActiveClass
-                  : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-              )}
-              aria-label={hasCollection ? "Change collection" : "Add to collection"}
-              title={hasCollection ? "Change collection" : "Add to collection"}
-            >
-              <FolderInput className="size-3.5" aria-hidden="true" />
-            </Button>
+            <BookmarkCardActionButton
+              icon={FolderInput}
+              label={hasCollection ? "Change collection" : "Add to collection"}
+              onClick={() => onAddToCollection(bookmark.id)}
+              active={hasCollection}
+            />
           )}
           {onAddNote && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddNote(bookmark.id);
-              }}
-              className={cn(
-                "rounded-sm border border-transparent",
-                hasNote
-                  ? highlightIndicatorActiveClass
-                  : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-              )}
-              aria-label={hasNote ? "Edit note" : "Add note"}
-              title={hasNote ? "Edit note" : "Add note"}
-            >
-              <NotebookPen className="size-3.5" aria-hidden="true" />
-            </Button>
+            <BookmarkCardActionButton
+              icon={NotebookPen}
+              label={hasNote ? "Edit note" : "Add note"}
+              onClick={() => onAddNote(bookmark.id)}
+              active={hasNote}
+            />
           )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(tweetUrl, "_blank");
-            }}
-            className="ml-auto rounded-sm border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
-            aria-label="Open on X"
-            title="Open on X"
-          >
-            <ArrowUpRight className="size-3.5" aria-hidden="true" />
-          </Button>
+          <BookmarkCardActionButton
+            icon={ArrowUpRight}
+            label="Open on X"
+            onClick={() => window.open(tweetUrl, "_blank")}
+            className="ml-auto"
+          />
         </div>
       </div>
     </div>

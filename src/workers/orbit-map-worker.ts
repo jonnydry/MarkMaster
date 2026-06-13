@@ -35,6 +35,7 @@ import {
   type FocusOnMessage,
   type SetSelectionMessage,
   type SetHighlightMessage,
+  type SetSearchMessage,
   type WheelMessage,
   type DoubleClickMessage,
   type LayoutUpdatedMessage,
@@ -44,6 +45,12 @@ import {
 
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
 import type { GraphFilter, OrbitMapSelection } from '@/lib/orbit-worker-protocol';
+import {
+  buildOrbitMapSearchIndex,
+  searchOrbitMapIndex,
+  type OrbitMapSearchIndexEntry,
+} from '@/lib/orbit-map-search';
+import { buildOrbitMapStructureKey } from '@/lib/orbit-map-structure-key';
 import {
   Container,
   Graphics,
@@ -186,6 +193,9 @@ let currentSelection: OrbitMapSelection | null = null;
 
 // Live search-match highlight (null = inactive). Non-members are dimmed.
 let highlightedNodeIds: Set<string> | null = null;
+let searchIndex: OrbitMapSearchIndexEntry[] = [];
+let activeSearchQuery = '';
+let lastStructureKey = '';
 
 // Adjacency map for efficient neighbor highlighting
 const adjacency = new Map<string, Set<string>>();
@@ -237,6 +247,52 @@ function postCameraChanged() {
     protocolVersion: 1,
     camera: { ...camera },
   });
+}
+
+let cameraRefreshRaf: number | null = null;
+let wheelRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let lastCameraPostAt = 0;
+const CAMERA_POST_MIN_MS = 66;
+
+function postCameraChangedThrottled() {
+  const now = Date.now();
+  if (now - lastCameraPostAt < CAMERA_POST_MIN_MS) return;
+  lastCameraPostAt = now;
+  postCameraChanged();
+}
+
+function cancelScheduledCameraRefresh() {
+  if (cameraRefreshRaf !== null) {
+    cancelAnimationFrame(cameraRefreshRaf);
+    cameraRefreshRaf = null;
+  }
+}
+
+function refreshCameraDuringGesture() {
+  if (!app) return;
+  applyCameraTransform();
+  app.renderer.render(app.stage);
+  postCameraChangedThrottled();
+}
+
+function scheduleCameraRefresh() {
+  if (cameraRefreshRaf !== null) return;
+  cameraRefreshRaf = requestAnimationFrame(() => {
+    cameraRefreshRaf = null;
+    refreshCameraDuringGesture();
+  });
+}
+
+function scheduleGestureEndRefresh() {
+  if (wheelRefreshTimer !== null) {
+    clearTimeout(wheelRefreshTimer);
+  }
+  wheelRefreshTimer = setTimeout(() => {
+    wheelRefreshTimer = null;
+    cancelScheduledCameraRefresh();
+    updateNodeStyles();
+    postCameraChanged();
+  }, 150);
 }
 
 /**
@@ -300,9 +356,7 @@ const interactions = createOrbitMapInteractions<MapNode>({
     camera.x += dx;
     camera.y += dy;
     constrainCamera();
-    updateNodeStyles();
-    // Keep the main thread (minimap, URL sync) in step with drag panning.
-    postCameraChanged();
+    scheduleCameraRefresh();
   },
   getSelection: () => currentSelection,
   setSelection: (selection) => {
@@ -405,6 +459,10 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
       break;
     }
 
+    case WorkerMessageType.SET_SEARCH:
+      handleSetSearch(msg as SetSearchMessage);
+      break;
+
     case WorkerMessageType.RESET_VIEW:
       handleResetView();
       break;
@@ -502,8 +560,54 @@ function handleResize(msg: ResizeMessage) {
 
 function handleSetGraph(msg: SetGraphMessage) {
   currentGraph = msg.graph;
+  searchIndex = buildOrbitMapSearchIndex(msg.graph.nodes);
   buildAdjacencyMap();
-  rebuildScene();
+
+  const structureKey = buildOrbitMapStructureKey(msg.graph);
+  const canUpdateInPlace =
+    structureKey === lastStructureKey && nodeData.length > 0 && isInitialized;
+
+  if (canUpdateInPlace) {
+    updateSceneMetadata();
+  } else {
+    rebuildScene();
+    lastStructureKey = structureKey;
+  }
+
+  applyActiveSearch();
+}
+
+function handleSetSearch(msg: SetSearchMessage) {
+  activeSearchQuery = msg.query.trim().toLowerCase();
+  applyActiveSearch();
+}
+
+function applyActiveSearch() {
+  if (!activeSearchQuery) {
+    highlightedNodeIds = null;
+    updateNodeStyles();
+    postToMain({
+      type: MainMessageType.SEARCH_RESULTS,
+      protocolVersion: 1,
+      query: '',
+      results: [],
+    });
+    return;
+  }
+
+  const { results, highlightNodeIds } = searchOrbitMapIndex(
+    searchIndex,
+    activeSearchQuery
+  );
+  highlightedNodeIds =
+    highlightNodeIds.length > 0 ? new Set(highlightNodeIds) : new Set();
+  updateNodeStyles();
+  postToMain({
+    type: MainMessageType.SEARCH_RESULTS,
+    protocolVersion: 1,
+    query: activeSearchQuery,
+    results,
+  });
 }
 
 function buildAdjacencyMap() {
@@ -560,6 +664,10 @@ function handleDestroy() {
   clusters.clear();
   hitTestNodes = [];
   adjacency.clear();
+  searchIndex = [];
+  activeSearchQuery = '';
+  lastStructureKey = '';
+  highlightedNodeIds = null;
   backgroundContainer = null;
   starfieldContainer = null;
   glowContainer = null;
@@ -665,7 +773,7 @@ function rebuildScene() {
   }
 
   const { nodes, edges } = currentGraph;
-  perf.mark('graph:set', { nodes: nodes.length, edges: edges.length });
+  perf.mark('graph:rebuild', { nodes: nodes.length, edges: edges.length });
 
   nodeData = nodes.map((node) => ({
     id: node.id,
@@ -692,79 +800,10 @@ function rebuildScene() {
   }
 
   nodeById = new Map(nodeData.map((datum) => [datum.id, datum]));
-  const hubDropTargets = nodeData.filter(
-    (datum) => datum.kind === 'tag' || datum.kind === 'collection'
-  );
-  interactions.setHubDropTargets(hubDropTargets);
-
-  // Hub importance ranks: the most-connected hubs win label grid cells.
-  const hubCount = (datum: MapNode) =>
-    datum.node.kind === 'tag' || datum.node.kind === 'collection'
-      ? datum.node.count
-      : 0;
-  [...hubDropTargets]
-    .sort((a, b) => hubCount(b) - hubCount(a))
-    .forEach((datum, rank) => {
-      datum.labelRank = rank;
-    });
-  for (const datum of nodeData) {
-    if (datum.kind === 'core') datum.labelRank = 0;
-  }
-
-  // Tint bookmarks by their dominant tag (fallback: collection) color so
-  // clusters read as colored constellations instead of uniform gray.
-  for (const datum of nodeData) {
-    if (datum.kind !== 'bookmark') continue;
-    const neighbors = adjacency.get(datum.id);
-    if (!neighbors) continue;
-    let accent: number | null = null;
-    let collectionAccent: number | null = null;
-    for (const neighborId of neighbors) {
-      const hub = nodeById.get(neighborId);
-      if (!hub) continue;
-      if (hub.kind === 'tag') {
-        accent = hub.visual.color;
-        break;
-      }
-      if (hub.kind === 'collection' && collectionAccent === null) {
-        collectionAccent = hub.visual.color;
-      }
-    }
-    accent = accent ?? collectionAccent;
-    if (accent !== null) {
-      datum.visual = {
-        ...datum.visual,
-        color: mixOrbitMapColors(datum.visual.color, accent, 0.55),
-        strokeColor: mixOrbitMapColors(datum.visual.strokeColor, accent, 0.4),
-      };
-    }
-  }
+  applyHubLabelRanks();
+  applyBookmarkAccentColors();
   interactions.resetSceneState();
-
-  // Pre-resolve edges for rendering; edges inherit their hub endpoint color.
-  linkData = [];
-  for (const edge of edges) {
-    if (edge.kind === 'loose') continue;
-    const sourceId = 'bookmarkId' in edge ? edge.bookmarkId : edge.overflowId;
-    const targetId =
-      'tagId' in edge
-        ? edge.tagId
-        : 'collectionId' in edge
-          ? edge.collectionId
-          : edge.anchorId;
-    const source = nodeById.get(sourceId);
-    const target = nodeById.get(targetId);
-    if (!source || !target) continue;
-    linkData.push({
-      source,
-      target,
-      kind: edge.kind,
-      color:
-        target.kind === 'tag' || target.kind === 'collection'
-          ? target.visual.color
-          : 0x334155,
-    });
-  }
+  rebuildLinkDataFromGraph();
 
   buildScene();
 
@@ -798,7 +837,7 @@ function rebuildScene() {
     (typeof performance !== 'undefined' ? performance.now() : Date.now()) -
       graphStartedAt
   );
-  perf.mark('graph:first-render', {
+  perf.mark('graph:rebuild:ready', {
     firstRenderMs,
     visibleNodes: nodeData.length,
     visibleEdges: linkData.length,
@@ -842,34 +881,14 @@ function buildScene() {
 
   for (const datum of nodeData) {
     const g = new Graphics();
-    const visualStyle = datum.visual;
-
-    if (visualStyle.isHub) {
-      g.circle(0, 0, datum.radius + 1.5);
-      g.fill({ color: visualStyle.color, alpha: 0.16 });
-      g.stroke({
-        width: visualStyle.strokeWidth,
-        color: visualStyle.strokeColor,
-        alpha: 0.6,
-      });
-      g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
-      g.fill({ color: visualStyle.color, alpha: 1 });
-      g.stroke({ width: 1, color: 0xffffff, alpha: 0.43 });
-    } else {
-      g.circle(0, 0, datum.radius);
-      g.fill({ color: visualStyle.color, alpha: 1 });
-      g.stroke({
-        width: visualStyle.strokeWidth,
-        color: visualStyle.strokeColor,
-        alpha: 0.6,
-      });
-    }
+    drawNodeShape(g, datum);
 
     g.position.set(datum.x, datum.y);
     nodesContainer.addChild(g);
     nodeGraphicsMap.set(datum.id, g);
 
     // Soft glow under hubs, tinted to match.
+    const visualStyle = datum.visual;
     if (visualStyle.isHub && glowTexture) {
       const glow = new Sprite(glowTexture);
       glow.anchor.set(0.5);
@@ -883,6 +902,180 @@ function buildScene() {
       glowSpriteMap.set(datum.id, glow);
     }
   }
+}
+
+function applyHubLabelRanks() {
+  const hubDropTargets = nodeData.filter(
+    (datum) => datum.kind === 'tag' || datum.kind === 'collection'
+  );
+  interactions.setHubDropTargets(hubDropTargets);
+
+  const hubCount = (datum: MapNode) =>
+    datum.node.kind === 'tag' || datum.node.kind === 'collection'
+      ? datum.node.count
+      : 0;
+  [...hubDropTargets]
+    .sort((a, b) => hubCount(b) - hubCount(a))
+    .forEach((datum, rank) => {
+      datum.labelRank = rank;
+    });
+  for (const datum of nodeData) {
+    if (datum.kind === 'core') datum.labelRank = 0;
+  }
+}
+
+function applyBookmarkAccentColors() {
+  for (const datum of nodeData) {
+    if (datum.kind !== 'bookmark') continue;
+    const neighbors = adjacency.get(datum.id);
+    if (!neighbors) continue;
+
+    const baseVisual = getOrbitMapNodeVisualStyle(datum.node);
+    let accent: number | null = null;
+    let collectionAccent: number | null = null;
+    for (const neighborId of neighbors) {
+      const hub = nodeById.get(neighborId);
+      if (!hub) continue;
+      if (hub.kind === 'tag') {
+        accent = hub.visual.color;
+        break;
+      }
+      if (hub.kind === 'collection' && collectionAccent === null) {
+        collectionAccent = hub.visual.color;
+      }
+    }
+    accent = accent ?? collectionAccent;
+    datum.visual =
+      accent !== null
+        ? {
+            ...baseVisual,
+            color: mixOrbitMapColors(baseVisual.color, accent, 0.55),
+            strokeColor: mixOrbitMapColors(baseVisual.strokeColor, accent, 0.4),
+          }
+        : baseVisual;
+  }
+}
+
+function rebuildLinkDataFromGraph() {
+  if (!currentGraph) return;
+  linkData = [];
+  for (const edge of currentGraph.edges) {
+    if (edge.kind === 'loose') continue;
+    const sourceId = 'bookmarkId' in edge ? edge.bookmarkId : edge.overflowId;
+    const targetId =
+      'tagId' in edge
+        ? edge.tagId
+        : 'collectionId' in edge
+          ? edge.collectionId
+          : edge.anchorId;
+    const source = nodeById.get(sourceId);
+    const target = nodeById.get(targetId);
+    if (!source || !target) continue;
+    linkData.push({
+      source,
+      target,
+      kind: edge.kind,
+      color:
+        target.kind === 'tag' || target.kind === 'collection'
+          ? target.visual.color
+          : 0x334155,
+    });
+  }
+}
+
+function drawNodeShape(g: Graphics, datum: MapNode) {
+  g.clear();
+  const visualStyle = datum.visual;
+
+  if (visualStyle.isHub) {
+    g.circle(0, 0, datum.radius + 1.5);
+    g.fill({ color: visualStyle.color, alpha: 0.16 });
+    g.stroke({
+      width: visualStyle.strokeWidth,
+      color: visualStyle.strokeColor,
+      alpha: 0.6,
+    });
+    g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
+    g.fill({ color: visualStyle.color, alpha: 1 });
+    g.stroke({ width: 1, color: 0xffffff, alpha: 0.43 });
+  } else {
+    g.circle(0, 0, datum.radius);
+    g.fill({ color: visualStyle.color, alpha: 1 });
+    g.stroke({
+      width: visualStyle.strokeWidth,
+      color: visualStyle.strokeColor,
+      alpha: 0.6,
+    });
+  }
+}
+
+function redrawNodeGraphics(datum: MapNode) {
+  const g = nodeGraphicsMap.get(datum.id);
+  if (!g) return;
+
+  drawNodeShape(g, datum);
+  g.position.set(datum.x, datum.y);
+
+  const glow = glowSpriteMap.get(datum.id);
+  if (datum.visual.isHub && glowTexture && glow) {
+    glow.tint = datum.visual.color;
+    const glowSize = datum.radius * 6;
+    glow.width = glowSize;
+    glow.height = glowSize;
+    glow.position.set(datum.x, datum.y);
+  }
+}
+
+/**
+ * Preserves layout positions and Pixi objects when only node metadata changed
+ * (titles, counts, colors) but topology stayed the same.
+ */
+function updateSceneMetadata() {
+  if (!app || !currentGraph) return;
+
+  perf.mark('graph:update-metadata', {
+    nodes: currentGraph.nodes.length,
+    edges: currentGraph.edges.length,
+  });
+
+  let hubVisualChanged = false;
+
+  for (const graphNode of currentGraph.nodes) {
+    const datum = nodeById.get(graphNode.id);
+    if (!datum) continue;
+
+    const previousRadius = datum.radius;
+    const previousVisual = datum.visual;
+    datum.node = graphNode;
+    datum.radius = getOrbitMapNodeRadius(graphNode);
+    datum.visual = getOrbitMapNodeVisualStyle(graphNode);
+
+    if (
+      datum.radius !== previousRadius ||
+      datum.visual.color !== previousVisual.color ||
+      datum.visual.strokeColor !== previousVisual.strokeColor ||
+      datum.visual.strokeWidth !== previousVisual.strokeWidth ||
+      datum.visual.isHub !== previousVisual.isHub
+    ) {
+      if (datum.kind === 'tag' || datum.kind === 'collection') {
+        hubVisualChanged = true;
+      }
+      redrawNodeGraphics(datum);
+    }
+  }
+
+  nodeData = currentGraph.nodes.map((node) => nodeById.get(node.id)!);
+  applyHubLabelRanks();
+  applyBookmarkAccentColors();
+  if (hubVisualChanged) {
+    for (const datum of nodeData) {
+      if (datum.kind === 'bookmark') redrawNodeGraphics(datum);
+    }
+  }
+  rebuildLinkDataFromGraph();
+
+  updateNodeStyles();
+  sendLayoutUpdate(true);
 }
 
 /* ============================================================
@@ -1573,8 +1766,8 @@ function handleCameraMessage(msg: CameraControlMessage) {
   }
 
   constrainCamera();
-  updateNodeStyles();
-  postCameraChanged();
+  scheduleCameraRefresh();
+  scheduleGestureEndRefresh();
 }
 
 function handleWheel(msg: WheelMessage) {
@@ -1598,8 +1791,8 @@ function handleWheel(msg: WheelMessage) {
   camera.zoom = newZoom;
   constrainCamera();
 
-  updateNodeStyles();
-  postCameraChanged();
+  scheduleCameraRefresh();
+  scheduleGestureEndRefresh();
 }
 
 function handleResetView() {

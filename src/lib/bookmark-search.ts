@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 const MAX_SEARCH_TERMS = 8;
 
 export function tokenizeBookmarkSearch(input: string): string[] {
@@ -18,4 +20,39 @@ export function tokenizeBookmarkSearch(input: string): string[] {
   }
 
   return terms;
+}
+
+/** Escape `%` / `_` / `\` so user input is literal inside ILIKE patterns. */
+export function escapeIlikePattern(term: string): string {
+  return term.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+/** `%term%` pattern for pg_trgm GIN indexes (tweetText, author*, Note.content). */
+export function bookmarkSearchLikePattern(term: string): string {
+  return `%${escapeIlikePattern(term)}%`;
+}
+
+/**
+ * One search term matched across indexed text columns.
+ * Uses ILIKE so existing gin_trgm_ops indexes on Bookmark/Note apply.
+ */
+export function buildBookmarkSearchTermSql(term: string): Prisma.Sql {
+  const pattern = bookmarkSearchLikePattern(term);
+
+  return Prisma.sql`
+    (
+      b."tweetText" ILIKE ${pattern}
+      OR b."authorUsername" ILIKE ${pattern}
+      OR b."authorDisplayName" ILIKE ${pattern}
+      OR EXISTS (
+        SELECT 1
+        FROM "Note" n
+        WHERE n."bookmarkId" = b."id" AND n."content" ILIKE ${pattern}
+      )
+    )
+  `;
+}
+
+export function buildBookmarkAuthorFilterSql(authorFilter: string): Prisma.Sql {
+  return Prisma.sql`b."authorUsername" ILIKE ${bookmarkSearchLikePattern(authorFilter)}`;
 }

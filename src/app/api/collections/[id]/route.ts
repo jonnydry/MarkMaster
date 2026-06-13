@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
-import { patchCollectionSchema } from "@/lib/validations";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
+import { readJsonBody } from "@/lib/request-body";
+import { collectionDetailQuerySchema, patchCollectionSchema } from "@/lib/validations";
+import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import {
+  buildCollectionItemListNextCursor,
+  buildPrismaCollectionItemKeysetFilter,
+  decodeCollectionItemListCursor,
+} from "@/lib/collection-item-keyset";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -15,20 +22,39 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const parsedQuery = collectionDetailQuerySchema.safeParse(
+    Object.fromEntries(req.nextUrl.searchParams.entries())
+  );
+  if (!parsedQuery.success) {
+    return NextResponse.json(
+      { error: "Invalid query parameters", details: parsedQuery.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  const { page, limit, cursor: rawCursor } = parsedQuery.data;
+
+  const decodedCursor = rawCursor ? decodeCollectionItemListCursor(rawCursor) : null;
+  if (rawCursor && !decodedCursor) {
+    return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+  }
+
+  const useKeyset = Boolean(decodedCursor);
+  const useOffset = !useKeyset && page > 1;
+
   const collection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
-    include: {
-      items: {
-        include: {
-          bookmark: {
-            include: {
-              tags: { include: { tag: true } },
-              notes: { select: { id: true, content: true } },
-            },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      type: true,
+      isPublic: true,
+      shareSlug: true,
+      externalSource: true,
+      externalSourceId: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
@@ -36,7 +62,38 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(collection);
+  const itemWhere = {
+    collectionId: id,
+    ...(decodedCursor
+      ? buildPrismaCollectionItemKeysetFilter(decodedCursor)
+      : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.collectionItem.findMany({
+      where: itemWhere,
+      select: {
+        id: true,
+        sortOrder: true,
+        bookmark: bookmarkListQueryOptions(),
+      },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      ...(useKeyset || !useOffset ? {} : { skip: (page - 1) * limit }),
+      take: limit,
+    }),
+    prisma.collectionItem.count({ where: { collectionId: id } }),
+  ]);
+
+  const nextCursor = buildCollectionItemListNextCursor(items, limit);
+
+  return NextResponse.json({
+    ...collection,
+    items,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit) || 1,
+    nextCursor,
+  });
 }
 
 export async function PATCH(
@@ -49,14 +106,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit collection metadata updates
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
-
-  const body = await req.json().catch(() => ({}));
-  const parsed = patchCollectionSchema.safeParse(body);
+  const parsed = patchCollectionSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -103,6 +157,8 @@ export async function PATCH(
     data: updateData,
   });
 
+  await invalidateUserResponseCache(user.id);
+
   return NextResponse.json(collection);
 }
 
@@ -114,12 +170,6 @@ export async function DELETE(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Rate limit collection deletions (destructive)
-  const rateLimitResult = await checkRateLimit("api:write", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   const collection = await prisma.collection.findUnique({
@@ -141,6 +191,8 @@ export async function DELETE(
   await prisma.collection.delete({
     where: { id, userId: user.id },
   });
+
+  await invalidateUserResponseCache(user.id);
 
   return NextResponse.json({ success: true });
 }

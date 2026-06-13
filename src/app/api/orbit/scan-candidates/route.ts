@@ -3,10 +3,12 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
-import { tokenizeBookmarkSearch } from "@/lib/bookmark-search";
+import {
+  buildBookmarkSearchTermSql,
+  tokenizeBookmarkSearch,
+} from "@/lib/bookmark-search";
 import { ORBIT_SCAN_CANDIDATE_POOL_SIZE } from "@/lib/orbit-config";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import {
   MAX_BOOKMARK_QUERY_LENGTH,
   MAX_BOOKMARK_QUERY_PAGE,
@@ -33,15 +35,30 @@ const scanCandidateInclude = {
   },
 } as const;
 
+function buildScanCandidateBaseSql(userId: string, searchTerms: string[]) {
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`b."userId" = ${userId}`,
+    Prisma.sql`NOT EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")`,
+    Prisma.sql`
+      NOT EXISTS (
+        SELECT 1 FROM "CollectionItem" ci
+        INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+        WHERE ci."bookmarkId" = b."id" AND c."type" = 'user_collection'
+      )
+    `,
+  ];
+
+  for (const term of searchTerms) {
+    conditions.push(buildBookmarkSearchTermSql(term));
+  }
+
+  return Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
+}
+
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rateLimitResult = await checkRateLimit("api:read", user.id);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
   }
 
   const parsed = scanCandidatesQuerySchema.safeParse(
@@ -58,6 +75,36 @@ export async function GET(req: NextRequest) {
   }
 
   const { page, pageSize, limit, search, sortDirection } = parsed.data;
+  const searchTerms = tokenizeBookmarkSearch(search);
+
+  if (searchTerms.length > 0) {
+    const whereSql = buildScanCandidateBaseSql(user.id, searchTerms);
+    const directionSql = Prisma.raw(sortDirection.toUpperCase());
+
+    const pageRows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT b."id"
+      FROM "Bookmark" b
+      ${whereSql}
+      ORDER BY b."bookmarkedAt" ${directionSql}, b."id" ${directionSql}
+      OFFSET ${(page - 1) * pageSize}
+      LIMIT ${limit}
+    `);
+
+    const pageIds = pageRows.map((row) => row.id);
+    const bookmarks =
+      pageIds.length === 0
+        ? []
+        : await prisma.bookmark.findMany({
+            where: { id: { in: pageIds } },
+            include: scanCandidateInclude,
+          });
+
+    const order = new Map(pageIds.map((id, index) => [id, index]));
+    bookmarks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+
+    return NextResponse.json({ bookmarks });
+  }
+
   const relationFilters: Prisma.BookmarkWhereInput[] = [
     { tags: { none: {} } },
     {
@@ -66,17 +113,6 @@ export async function GET(req: NextRequest) {
       },
     },
   ];
-
-  for (const term of tokenizeBookmarkSearch(search)) {
-    relationFilters.push({
-      OR: [
-        { tweetText: { contains: term, mode: "insensitive" } },
-        { authorUsername: { contains: term, mode: "insensitive" } },
-        { authorDisplayName: { contains: term, mode: "insensitive" } },
-        { notes: { some: { content: { contains: term, mode: "insensitive" } } } },
-      ],
-    });
-  }
 
   const where: Prisma.BookmarkWhereInput = {
     userId: user.id,

@@ -4,6 +4,10 @@ export type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
   total: number;
   totalPages: number;
+  nextCursor?: string;
+  page?: number;
+  personalBoostAuthors?: string[];
+  personalBoostTags?: string[];
 };
 
 export type OrbitScanCandidatesResponse = {

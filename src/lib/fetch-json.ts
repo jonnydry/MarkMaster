@@ -1,11 +1,14 @@
+import type { z } from "zod";
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-export type JsonRequestInit<TBody extends JsonValue = JsonValue> = Omit<
-  RequestInit,
-  "body"
-> & {
+export type JsonRequestInit<
+  TBody extends JsonValue = JsonValue,
+  TResponse = unknown,
+> = Omit<RequestInit, "body"> & {
   body?: TBody;
+  schema?: z.ZodType<TResponse>;
 };
 
 export class FetchJsonError extends Error {
@@ -20,7 +23,41 @@ export class FetchJsonError extends Error {
   }
 }
 
-export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
+function parseResponseBody<T>(
+  body: unknown,
+  schema: z.ZodType<T> | undefined,
+  status: number
+): T {
+  if (!schema) {
+    return body as T;
+  }
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    throw new FetchJsonError(
+      "API response did not match expected shape",
+      status,
+      { zodError: parsed.error.flatten(), received: body }
+    );
+  }
+
+  return parsed.data;
+}
+
+export async function fetchJson<T>(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  schema: z.ZodType<T>
+): Promise<T>;
+export async function fetchJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<T>;
+export async function fetchJson<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  schema?: z.ZodType<T>
+): Promise<T> {
   const res = await fetch(input, init);
 
   const contentType = res.headers.get("content-type") || "";
@@ -46,23 +83,29 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit)
     throw new FetchJsonError(message, res.status, body);
   }
 
-  return body as T;
+  return parseResponseBody(body, schema, res.status);
 }
 
-export function sendJson<TResponse, TBody extends JsonValue = JsonValue>(
-  input: RequestInfo | URL,
-  init: JsonRequestInit<TBody> = {}
-) {
-  const { body, headers, ...requestInit } = init;
+export function sendJson<
+  TResponse,
+  TBody extends JsonValue = JsonValue,
+>(input: RequestInfo | URL, init: JsonRequestInit<TBody, TResponse> = {}) {
+  const { body, headers, schema, ...requestInit } = init;
   const requestHeaders = new Headers(headers);
 
   if (body !== undefined && !requestHeaders.has("Content-Type")) {
     requestHeaders.set("Content-Type", "application/json");
   }
 
-  return fetchJson<TResponse>(input, {
+  const request = {
     ...requestInit,
     headers: requestHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  };
+
+  if (schema) {
+    return fetchJson<TResponse>(input, request, schema);
+  }
+
+  return fetchJson<TResponse>(input, request);
 }
