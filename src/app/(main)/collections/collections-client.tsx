@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { FolderOpen, Layers, Plus } from "lucide-react";
 
+import { AppPageShell } from "@/components/app-page-shell";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -73,9 +74,10 @@ export default function CollectionsPage() {
   } = page;
 
   return (
-    <div className="app-shell-bg app-viewport relative flex overflow-hidden">
-      <PageWatermark variant="collections" />
-      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <>
+    <AppPageShell
+      watermark={<PageWatermark variant="collections" />}
+      sidebar={
         <Sidebar
           tags={tags}
           collections={collections}
@@ -86,10 +88,8 @@ export default function CollectionsPage() {
           totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
-      </div>
-
-      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="app-main-scroll scrollbar-thin">
+      }
+    >
           <PageHeader
             sticky
             title="Collections"
@@ -249,14 +249,13 @@ export default function CollectionsPage() {
               </div>
             )}
           </div>
-        </div>
-      </div>
+    </AppPageShell>
 
       <CreateCollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreateCollection={createCollection}
       />
-    </div>
+    </>
   );
 }

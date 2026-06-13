@@ -39,6 +39,11 @@ import {
 } from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
+import {
+  CompactFloatingSearchStrip,
+  CompactSearchTrigger,
+} from "@/components/compact-floating-search";
+import { useCompactFloatingSearch } from "@/hooks/use-compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import type { DbUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -143,6 +148,9 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
   ) {
     const scanBusy = queueIsLoading || scanning;
     const { compact } = usePageHeaderCompact();
+    const { expanded: searchExpanded, toggle: toggleSearch, closeIfEmpty } =
+      useCompactFloatingSearch(compact, search, searchRef);
+    const hasSearchQuery = search.trim().length > 0;
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
     const reviewLabel =
       scanPlanSuggestionCount === 1
@@ -153,10 +161,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     return (
       <div
         className={cn(
-          "orbit-toolbar relative",
+          "orbit-toolbar relative min-w-0",
           compact ? "space-y-1 py-1" : "space-y-1.5 py-1.5",
           appContentGutterClassName
         )}
+        data-compact-search-expanded={compact && searchExpanded ? "" : undefined}
         aria-busy={scanning}
       >
         {scanning ? <ScrollingProgressBar className="absolute inset-x-0 top-0" /> : null}
@@ -178,18 +187,31 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
 
             {!compact ? <OrbitPageIdentity queueTotal={total} /> : null}
 
-            <div className="min-w-0 flex-1">
-              <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
-                <SearchBar
-                  ref={searchRef}
-                  glass
-                  value={search}
-                  onChange={onSearchChange}
-                  placeholder="Search Orbit by author, text, or notes…"
-                  inputClassName={compact ? "h-8" : "h-9"}
-                />
+            {compact ? (
+              <CompactSearchTrigger
+                onToggle={toggleSearch}
+                expanded={searchExpanded}
+                hasQuery={hasSearchQuery}
+              />
+            ) : (
+              <div className="min-w-0 flex-1">
+                <div
+                  className={cn(
+                    highlightSearchShellClass,
+                    appToolbarSurfaceShellClassName
+                  )}
+                >
+                  <SearchBar
+                    ref={searchRef}
+                    glass
+                    value={search}
+                    onChange={onSearchChange}
+                    placeholder="Search Orbit by author, text, or notes…"
+                    inputClassName="h-9"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {user ? (
               <div
@@ -380,6 +402,17 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           </div>
         ) : null}
         </div>
+
+        {compact ? (
+          <CompactFloatingSearchStrip
+            expanded={searchExpanded}
+            search={search}
+            onSearchChange={onSearchChange}
+            searchInputRef={searchRef}
+            placeholder="Search Orbit by author, text, or notes…"
+            onCloseIfEmpty={closeIfEmpty}
+          />
+        ) : null}
 
         {canSelect && !compact ? (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-xs text-muted-foreground">

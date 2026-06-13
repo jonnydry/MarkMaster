@@ -12,6 +12,7 @@ import {
   Tag,
   type LucideIcon,
 } from "lucide-react";
+import { AppPublicPage } from "@/components/app-page-shell";
 import { Button } from "@/components/ui/button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
 
@@ -80,7 +81,7 @@ function DemoTagChip({ label, dotClassName }: { label: string; dotClassName: str
 
 export function LandingExperience() {
   return (
-    <div className="app-min-viewport bg-background text-foreground font-sans selection:bg-primary/30">
+    <AppPublicPage className="bg-background text-foreground font-sans selection:bg-primary/30">
       <header className="sticky top-0 z-50 border-b border-hairline-strong bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-8 sm:px-12">
           <div className="flex items-center gap-3">
@@ -300,6 +301,6 @@ export function LandingExperience() {
           </p>
         </div>
       </footer>
-    </div>
+    </AppPublicPage>
   );
 }

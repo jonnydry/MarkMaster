@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AuthenticatedShell } from "@/components/authenticated-shell";
 import { AuthSessionProvider, QueryProvider } from "@/components/providers";
+import { appFixedViewportClassName } from "@/lib/app-layout";
+import { cn } from "@/lib/utils";
 
 export default async function MainLayout({
   children,
@@ -11,7 +13,7 @@ export default async function MainLayout({
   const session = await auth();
   if (!session) redirect("/login");
   return (
-    <div className="app-fixed-viewport fixed inset-x-0 top-0 overflow-hidden">
+    <div className={cn(appFixedViewportClassName, "flex flex-col")}>
       <QueryProvider>
         <AuthSessionProvider session={session}>
           <AuthenticatedShell>{children}</AuthenticatedShell>

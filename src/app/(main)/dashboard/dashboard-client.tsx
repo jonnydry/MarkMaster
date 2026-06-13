@@ -2,6 +2,7 @@
 
 import { Suspense, useRef } from "react";
 import dynamic from "next/dynamic";
+import { AppPageCenter, AppPageShell } from "@/components/app-page-shell";
 import { DashboardToolbar } from "@/components/dashboard-toolbar";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -156,9 +157,10 @@ function DashboardContent() {
   } = useDashboardPage();
 
   return (
-    <div className="app-shell-bg app-viewport relative flex overflow-hidden">
-      <PageWatermark variant="markmaster" />
-      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <>
+    <AppPageShell
+      watermark={<PageWatermark variant="markmaster" />}
+      sidebar={
         <Sidebar
           tags={tags}
           collections={collections}
@@ -170,20 +172,15 @@ function DashboardContent() {
           onSyncComplete={handleSyncComplete}
           onSyncStateChange={handleSyncStateChange}
         />
-      </div>
-
-      <div
-        className="relative z-[1] flex h-full min-h-0 min-w-0 flex-1 flex-col"
-        aria-busy={syncProgressVisible}
-      >
-        {syncProgressVisible ? (
+      }
+      mainTop={
+        syncProgressVisible ? (
           <ScrollingProgressBar className="relative z-50" />
-        ) : null}
-
-        <div
-          ref={scrollRef}
-          className="app-main-scroll relative z-[1] h-full overflow-x-hidden scrollbar-thin"
-        >
+        ) : null
+      }
+      scrollRef={scrollRef}
+      mainProps={{ "aria-busy": syncProgressVisible }}
+    >
           <PageHeader
             sticky
             chromeless
@@ -385,8 +382,7 @@ function DashboardContent() {
               />
             </div>
           )}
-        </div>
-      </div>
+    </AppPageShell>
 
       {tagDialogOpen ? (
         <AddTagDialog
@@ -472,7 +468,7 @@ function DashboardContent() {
           onFilterChange={handleCommandPaletteFilter}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -480,9 +476,9 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <div className="app-min-viewport flex items-center justify-center">
-          <div role="status" aria-label="Loading" className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
+        <AppPageCenter>
+          <div role="status" aria-label="Loading" className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </AppPageCenter>
       }
     >
       <DashboardContent />

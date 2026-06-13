@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { AppPageShell } from "@/components/app-page-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -44,7 +45,6 @@ import {
   orbitGhostButtonClass,
   orbitLabelClass,
   orbitSelectionBarClass,
-  orbitShellClass,
 } from "@/lib/orbit-route-chrome";
 import {
   appContentGutterClassName,
@@ -197,9 +197,11 @@ export default function OrbitPage() {
   } = interactions;
 
   return (
-    <div className={cn(orbitShellClass(), "relative")}>
-      <PageWatermark variant="orbit" />
-      <div className="relative z-10 hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <>
+    <AppPageShell
+      className="orbit-route-default"
+      watermark={<PageWatermark variant="orbit" />}
+      sidebar={
         <Sidebar
           tags={tags}
           collections={collections}
@@ -210,10 +212,9 @@ export default function OrbitPage() {
           totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
-      </div>
-
-      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">
-        <div ref={scrollRef} className="app-main-scroll relative z-[1] scrollbar-thin">
+      }
+      scrollRef={scrollRef}
+    >
           <PageHeader
             sticky
             chromeless
@@ -604,8 +605,7 @@ export default function OrbitPage() {
               )}
             </section>
           </div>
-        </div>
-      </div>
+    </AppPageShell>
 
       {tagDialogOpen ? (
         <AddTagDialog
@@ -667,6 +667,6 @@ export default function OrbitPage() {
           feedbackById={feedbackById}
         />
       ) : null}
-    </div>
+    </>
   );
 }

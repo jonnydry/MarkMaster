@@ -1,7 +1,9 @@
 "use client";
 
 import type { ComponentProps, ReactNode } from "react";
+import { useRef } from "react";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
+import { useStickyHeaderHeight } from "@/hooks/use-sticky-header-height";
 import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
@@ -39,6 +41,8 @@ export function PageHeader({
 }: PageHeaderProps) {
   const t = useTypography();
   const { compact } = usePageHeaderCompact();
+  const headerRef = useRef<HTMLElement>(null);
+  useStickyHeaderHeight(sticky, headerRef);
   const isCompact = compactable && compact;
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
@@ -52,6 +56,7 @@ export function PageHeader({
 
   return (
     <header
+      ref={headerRef}
       className={mergedHeaderClassName}
       data-page-header-compact={isCompact ? "" : undefined}
       {...props}

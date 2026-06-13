@@ -11,6 +11,11 @@ import {
   appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
+import {
+  CompactFloatingSearchStrip,
+  CompactSearchTrigger,
+} from "@/components/compact-floating-search";
+import { useCompactFloatingSearch } from "@/hooks/use-compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
@@ -70,6 +75,9 @@ export function DashboardToolbar({
   user,
 }: DashboardToolbarProps) {
   const { compact } = usePageHeaderCompact();
+  const { expanded: searchExpanded, toggle: toggleSearch, closeIfEmpty } =
+    useCompactFloatingSearch(compact, search, searchInputRef);
+  const hasSearchQuery = search.trim().length > 0;
 
   const searchField = (
     <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
@@ -183,24 +191,36 @@ export function DashboardToolbar({
 
   if (compact) {
     return (
-      <div className={cn("dashboard-toolbar py-1", appContentGutterClassName)}>
-        <div className="flex min-w-0 flex-col gap-1.5 md:min-w-0 md:flex-row md:items-center md:gap-2">
-          <div className="order-2 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:order-none md:max-w-[38%] md:shrink [&::-webkit-scrollbar]:hidden">
+      <div
+        className={cn("dashboard-toolbar min-w-0 py-1", appContentGutterClassName)}
+        data-compact-search-expanded={searchExpanded ? "" : undefined}
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:max-w-[38%] md:shrink [&::-webkit-scrollbar]:hidden">
             <div className="shrink-0 md:hidden">{mobileSidebar}</div>
             {primaryFilterChip}
             {tagFilterChips}
           </div>
 
-          <div className="order-1 flex min-w-0 flex-1 basis-0 justify-center px-1 md:order-none">
-            <div className="w-full min-w-0 max-w-sm">
-              {searchField}
-            </div>
-          </div>
+          <CompactSearchTrigger
+            onToggle={toggleSearch}
+            expanded={searchExpanded}
+            hasQuery={hasSearchQuery}
+          />
 
-          <div className="order-3 flex min-w-0 shrink-0 items-center justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:order-none [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {toolbarActions}
           </div>
         </div>
+
+        <CompactFloatingSearchStrip
+          expanded={searchExpanded}
+          search={search}
+          onSearchChange={onSearchChange}
+          searchInputRef={searchInputRef}
+          placeholder="Search bookmarks, authors, notes..."
+          onCloseIfEmpty={closeIfEmpty}
+        />
       </div>
     );
   }

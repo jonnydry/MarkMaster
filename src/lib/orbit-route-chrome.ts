@@ -1,3 +1,4 @@
+import { appPageShellClassName } from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
 
 /** Classic void keeps softer corners; default Button uses rounded-sm. */
@@ -7,7 +8,7 @@ export function orbitControlRadius() {
 
 /** Shell wrapper for /orbit routes. Classic mode follows the app light/dark color mode. */
 export function orbitShellClass() {
-  return cn("app-shell-bg app-viewport flex overflow-hidden", "orbit-route-default");
+  return cn(appPageShellClassName, "orbit-route-default");
 }
 
 export function orbitLabelClass(extra?: string) {

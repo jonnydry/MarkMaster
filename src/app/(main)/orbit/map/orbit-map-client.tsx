@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { AppPageShell } from "@/components/app-page-shell";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -9,7 +10,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { orbitShellClass } from "@/lib/orbit-route-chrome";
 import { appContentInsetClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -159,8 +159,11 @@ export default function OrbitMapPage() {
   };
 
   return (
-    <div className={orbitShellClass()}>
-      <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <>
+    <AppPageShell
+      className="orbit-route-default"
+      layout="column"
+      sidebar={
         <Sidebar
           tags={tags}
           collections={collections}
@@ -171,9 +174,8 @@ export default function OrbitMapPage() {
           totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
         />
-      </div>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      }
+    >
         <PageHeader
           title={
             <span className="flex items-center gap-2">
@@ -358,7 +360,7 @@ export default function OrbitMapPage() {
             />
           )}
         </div>
-      </div>
+    </AppPageShell>
 
       <AddTagDialog
         open={dialogs.tagDialogOpen}
@@ -410,6 +412,6 @@ export default function OrbitMapPage() {
           onDelete={actions.handleDeleteNote}
         />
       ) : null}
-    </div>
+    </>
   );
 }

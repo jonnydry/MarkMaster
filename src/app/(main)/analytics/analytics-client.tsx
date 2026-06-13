@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { BarChart3 } from "lucide-react";
 
+import { AppPageShell } from "@/components/app-page-shell";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -60,8 +61,9 @@ export default function AnalyticsPage() {
   } = page;
 
   return (
-    <div className="app-shell-bg app-viewport flex overflow-hidden">
-      <div className="hidden h-full min-h-0 shrink-0 overflow-hidden md:block">
+    <>
+    <AppPageShell
+      sidebar={
         <Sidebar
           tags={tags}
           collections={collections}
@@ -74,10 +76,8 @@ export default function AnalyticsPage() {
           }
           onSyncComplete={handleSyncComplete}
         />
-      </div>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="app-main-scroll scrollbar-thin">
+      }
+    >
           <PageHeader
             sticky
             title="Analytics"
@@ -171,14 +171,13 @@ export default function AnalyticsPage() {
               )}
             </div>
           </div>
-        </div>
-      </div>
+    </AppPageShell>
 
       <CreateCollectionDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreateCollection={createCollection}
       />
-    </div>
+    </>
   );
 }

@@ -76,7 +76,7 @@ export function OrbitalAuthExperience({
 }) {
   return (
     <div
-      className={`auth-splash dark relative isolate flex flex-col bg-[#00040B] text-foreground selection:bg-primary/30 ${
+      className={`auth-splash dark relative isolate flex min-w-0 flex-col bg-[#00040B] text-foreground selection:bg-primary/30 ${
         errorMessage ? "auth-splash--with-error" : ""
       }`}
     >

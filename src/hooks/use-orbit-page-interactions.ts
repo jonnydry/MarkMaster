@@ -13,6 +13,7 @@ import {
 import type { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import type { OrbitScanHandle } from "@/hooks/use-orbit-scan";
+import { requestCompactSearchFocus } from "@/lib/compact-floating-search";
 import { getBookmarkTweetUrl, openBookmarkOnX } from "@/lib/bookmark-url";
 import type { BookmarkWithRelations, CollectionWithCount, TagWithCount } from "@/types";
 import type { OrbitSortDirection, OrbitView } from "@/lib/orbit-navigation";
@@ -328,7 +329,7 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
     actions: {
       next: () => selectOrbitBookmarkByOffset(1),
       previous: () => selectOrbitBookmarkByOffset(-1),
-      search: () => searchInputRef.current?.focus(),
+      search: () => requestCompactSearchFocus(searchInputRef),
       shortcuts: () => setKeyboardShortcutsOpen(true),
       scan: () => {
         if (!scan.scanning && scanTargetIds.length > 0) {

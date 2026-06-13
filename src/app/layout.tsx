@@ -23,7 +23,7 @@ export default async function RootLayout({
       className={`${defaultFontVariables} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full min-w-0 flex-col overflow-x-hidden">
         <Script
           id="markmaster-theme-init"
           src="/theme-init"

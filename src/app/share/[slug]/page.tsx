@@ -11,6 +11,7 @@ import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { buttonVariantClassName } from "@/lib/button-variants";
 import { prisma } from "@/lib/prisma";
+import { AppPublicPage } from "@/components/app-page-shell";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_SHARE_PAGE_SIZE = 50;
@@ -197,7 +198,7 @@ export default async function PublicSharePage({
   const { pagination, topTags, authorCount } = collection;
 
   return (
-    <div className="app-min-viewport bg-background">
+    <AppPublicPage className="bg-background">
       <header className="border-b border-border bg-background/80 backdrop-blur-md">
         <div
           className={cn(
@@ -342,7 +343,7 @@ export default async function PublicSharePage({
           </Link>
         </div>
       </footer>
-    </div>
+    </AppPublicPage>
   );
 }
 

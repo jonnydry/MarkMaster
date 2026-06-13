@@ -4,6 +4,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronUp, FolderOpen, Layers } from "lucide-react";
 import { type RefObject } from "react";
 
+import { AppPageCenter } from "@/components/app-page-shell";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -170,7 +171,7 @@ export function CollectionDetailDescription({
 
 export function CollectionDetailLoadingState() {
   return (
-    <div className="app-shell-bg app-viewport flex items-center justify-center">
+    <AppPageCenter>
       <div className="mx-auto w-full max-w-4xl space-y-4 px-6">
         <div className="h-8 w-48 rounded skeleton-shimmer" />
         <div className="space-y-3">
@@ -188,7 +189,7 @@ export function CollectionDetailLoadingState() {
           ))}
         </div>
       </div>
-    </div>
+    </AppPageCenter>
   );
 }
 
@@ -202,7 +203,7 @@ export function CollectionDetailErrorState({
   onBack: () => void;
 }) {
   return (
-    <div className="app-shell-bg app-viewport flex flex-col items-center justify-center gap-4 overflow-x-hidden px-6">
+    <AppPageCenter className="flex-col gap-4 px-6">
       <div className="max-w-md surface-solid p-6 text-center">
         <p className="text-sm font-medium text-foreground">
           {isNotFound ? "Collection not found" : "Collection could not be loaded"}
@@ -221,6 +222,6 @@ export function CollectionDetailErrorState({
           </Button>
         </div>
       </div>
-    </div>
+    </AppPageCenter>
   );
 }

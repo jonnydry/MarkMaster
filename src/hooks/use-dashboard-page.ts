@@ -20,6 +20,7 @@ import { useSyncStatus } from "@/hooks/use-sync-status";
 import { fetchJson } from "@/lib/fetch-json";
 import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
+import { requestCompactSearchFocus } from "@/lib/compact-floating-search";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import type { ViewMode, BookmarkWithRelations, MediaFilter } from "@/types";
@@ -352,7 +353,7 @@ export function useDashboardPage() {
     bookmarks: selectionMode ? [] : bookmarks,
     onNavigate: setActiveBookmarkId,
     onOpen: handleExpandedBookmarkOpen,
-    onSearch: () => searchInputRef.current?.focus(),
+    onSearch: () => requestCompactSearchFocus(searchInputRef),
     onTag: () => {
       if (!activeBookmarkIdForView) return;
       dialogs.openTagForBookmark(activeBookmarkIdForView);

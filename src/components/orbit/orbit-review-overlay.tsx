@@ -50,6 +50,11 @@ import {
   orbitReviewDecisionUsesCollection,
   orbitReviewDecisionUsesTags,
 } from "@/lib/orbit-review";
+import {
+  appOverlayBackdropClassName,
+  appOverlayDialogGridReviewClassName,
+  appOverlayDialogReviewClassName,
+} from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
 
 export type OrbitReviewOverlayProps = UseOrbitReviewSessionArgs & {
@@ -108,8 +113,8 @@ export function OrbitReviewOverlay({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        overlayClassName="bg-background/35 supports-backdrop-filter:backdrop-blur-xl dark:bg-black/45"
-        className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1180px] overflow-hidden surface-overlay p-0 sm:max-w-[1180px]"
+        overlayClassName={appOverlayBackdropClassName}
+        className={appOverlayDialogReviewClassName}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">
@@ -119,7 +124,7 @@ export function OrbitReviewOverlay({
         {activeBookmark && activeDraft ? (
           <div
             data-orbit-review-overlay
-            className="grid max-h-[calc(100dvh-1.5rem)] min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
+            className={appOverlayDialogGridReviewClassName}
           >
             {/* Full post — same shell as OrbitBookmarkOverlay */}
             <div className="scrollbar-native min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">

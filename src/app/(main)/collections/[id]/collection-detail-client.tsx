@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRef } from "react";
 
+import { AppPageShell } from "@/components/app-page-shell";
 import { PageHeader } from "@/components/page-header";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { PaginationControls } from "@/components/pagination-controls";
@@ -90,8 +91,8 @@ export default function CollectionDetailClient({
   }
 
   return (
-    <div className="app-shell-bg app-viewport flex flex-col overflow-x-hidden">
-      <div ref={scrollRef} className="app-main-scroll scrollbar-thin">
+    <>
+    <AppPageShell scrollRef={scrollRef}>
         <PageHeader
           sticky
           titleClassName="text-2xl sm:text-3xl"
@@ -158,13 +159,13 @@ export default function CollectionDetailClient({
             onPrefetchPage={prefetchCollectionPage}
           />
         </main>
-      </div>
+    </AppPageShell>
 
       <ShareDialog
         open={shareOpen}
         onOpenChange={setShareOpen}
         shareContent={shareContent}
       />
-    </div>
+    </>
   );
 }

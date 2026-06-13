@@ -20,14 +20,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCompactCount, formatPostDate } from "@/lib/format-metrics";
+import {
+  appOverlayBackdropClassName,
+  appOverlayDialogBookmarkClassName,
+  appOverlayDialogGridBookmarkClassName,
+} from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
-export const BOOKMARK_OVERLAY_DIALOG_CLASS =
-  "max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[1120px] overflow-hidden surface-overlay p-0 sm:max-w-[1120px]";
+export const BOOKMARK_OVERLAY_DIALOG_CLASS = appOverlayDialogBookmarkClassName;
 
-export const BOOKMARK_OVERLAY_OVERLAY_CLASS =
-  "bg-background/35 supports-backdrop-filter:backdrop-blur-xl dark:bg-black/45";
+export const BOOKMARK_OVERLAY_OVERLAY_CLASS = appOverlayBackdropClassName;
 
 export function BookmarkOverlayToolButton({
   icon: Icon,
@@ -302,7 +305,7 @@ export function BookmarkOverlayShell({
         {bookmark ? (
           <div
             {...(dataAttributeName ? { [dataAttributeName]: bookmark.id } : {})}
-            className="grid max-h-[calc(100dvh-1.5rem)] min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]"
+            className={appOverlayDialogGridBookmarkClassName}
           >
             {children}
           </div>

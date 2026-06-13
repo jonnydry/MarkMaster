@@ -14,6 +14,7 @@ import {
   formatShortcutKey,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
+import { appOverlayDialogSmClassName } from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
 
 interface KeyboardShortcutsDialogProps {
@@ -31,7 +32,7 @@ export function KeyboardShortcutsDialog({
 }: KeyboardShortcutsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md surface-overlay p-0">
+      <DialogContent className={appOverlayDialogSmClassName}>
         <DialogHeader className="border-b border-hairline-soft px-4 py-4">
           <div className="flex items-center gap-2">
             <span className="flex size-8 items-center justify-center rounded-sm border border-primary/20 bg-primary/10 text-primary">

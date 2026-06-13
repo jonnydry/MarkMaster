@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/sidebar-dynamic";
+import { appFixedViewportClassName } from "@/lib/app-layout";
+import { cn } from "@/lib/utils";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 
 function getFocusableElements(container: HTMLElement | null) {
@@ -109,18 +111,22 @@ export function MobileSidebar(props: MobileSidebarProps) {
       </Button>
 
       <div
-        className={`app-fixed-viewport fixed inset-x-0 top-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden ${
-          open ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={cn(
+          appFixedViewportClassName,
+          "fixed inset-x-0 top-0 z-40 bg-black/50 transition-opacity duration-300 md:hidden",
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       <div
         ref={panelRef}
-        className={`app-fixed-viewport fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border/70 bg-sidebar/95 shadow-xl backdrop-blur-xl transition-transform duration-300 ease-out md:hidden dark:bg-sidebar/80 ${
+        className={cn(
+          appFixedViewportClassName,
+          "fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border/70 bg-sidebar/95 shadow-xl backdrop-blur-xl transition-transform duration-300 ease-out md:hidden dark:bg-sidebar/80",
           open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        )}
         role="dialog"
         aria-modal="true"
         aria-label="Sidebar navigation"

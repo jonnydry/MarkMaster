@@ -47,3 +47,72 @@ Borders, not shadows. Floating surfaces (menus, dialogs, tooltips) use
 The map canvas always paints space-black regardless of theme. Chrome floating over it
 uses `.map-glass` (literal white/black alpha is intentional there — nowhere else).
 Anything outside the canvas must remain theme-aware (light mode exists).
+
+# Viewport layout contract
+
+All page shells, scroll regions, and overlay sizing go through the shared layout system.
+Do not hand-roll `100vh`/`100dvh`, `h-screen`, `calc(100vw - …)`, or ad-hoc flex chains
+for viewport containment.
+
+**Source of truth**
+- Components: `src/components/app-page-shell.tsx`, `src/components/app-route-error.tsx`
+- Class tokens: `src/lib/app-layout.ts`
+- CSS utilities + variables: `src/app/globals.css` (`.app-viewport`, `.app-main-scroll`,
+  `.app-overlay-dialog*`, `--app-overlay-inset`)
+
+## Page shells — pick one
+
+| Surface | Use | Notes |
+|---|---|---|
+| Authenticated app pages | `AppPageShell` | Dashboard, Orbit, Collections, Settings, Analytics |
+| Orbit map | `AppPageShell layout="column"` | Header pinned; map body flexes below |
+| Single-column authenticated | `AppPageShell` (no `sidebar`) | Collection detail |
+| Public / marketing | `AppPublicPage` | Share links, landing — document scroll OK |
+| Loading / error / empty | `AppPageCenter` | Suspense fallbacks, inline states |
+| Route error boundaries | `AppRouteError` | Next.js `error.tsx` files |
+| Auth splash | `.auth-splash` in `src/styles/auth.css` | Login / home when logged out |
+
+`(main)/layout.tsx` already wraps authenticated routes in `appFixedViewportClassName`.
+Pages inside `(main)` should use `AppPageShell`, not another fixed viewport wrapper.
+
+## `AppPageShell` defaults
+
+- `layout="scroll"` (default) — sticky header scrolls with feed content.
+- `layout="column"` — header + flex body; no inner scroll wrapper (Orbit map only).
+- `sidebar`, `watermark`, `mainTop`, `scrollRef`, `mainProps` — compose at the call site.
+- Portals/dialogs render as siblings outside `AppPageShell` (fragment wrapper).
+
+Orbit routes may pass `className="orbit-route-default"`; do not reintroduce
+`orbitShellClass()` page wrappers when `AppPageShell` is already in use.
+
+## Overlays and floating panels
+
+Use tokens from `@/lib/app-layout` — never raw `calc(100dvh - 1.5rem)` / `calc(100vw - …)`:
+
+- `appOverlayDialogBookmarkClassName` + `appOverlayDialogGridBookmarkClassName` — bookmark overlay
+- `appOverlayDialogReviewClassName` + `appOverlayDialogGridReviewClassName` — Orbit review
+- `appOverlayDialogSmClassName` — compact dialogs (keyboard shortcuts)
+- `appOverlayBackdropClassName` — frosted overlay backdrop
+- `appOverlayPanelClassName` — mobile Orbit map rail
+
+Margins are driven by `--app-overlay-inset` and `--app-overlay-inset-wide` in `:root`.
+
+## Resize rules (do not break the chain)
+
+Every flex column that must shrink vertically needs `min-h-0`; every flex child that must
+not overflow horizontally needs `min-w-0`. The shell components already apply these —
+when adding nested layout, preserve the chain rather than overriding with `h-auto` or
+`overflow-visible` on shell ancestors.
+
+- Vertical scroll belongs in `app-main-scroll` (via `AppPageShell`), not on `body`.
+- Horizontal overflow is clipped at `html`, `body`, and page shells — do not re-enable
+  `overflow-x-auto` on outer shells without a deliberate, local reason.
+
+## Sticky header height
+
+`PageHeader` with `sticky` measures its rendered height (including compact toolbars and
+expanded compact search strips) and writes `--app-header-height` on `documentElement`.
+Downstream sticky subbars use `--header-height` — do not hard-code compact toolbar or
+search-strip pixel offsets; keep the search trigger inline in the toolbar row (`min-w-0`
+flex chain) so the header measures correctly on narrow viewports.
+
