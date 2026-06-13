@@ -25,6 +25,7 @@ import {
   orbitScanQualityPayloadSchema,
 } from "@/lib/api-response-schemas";
 import type { OrbitScanCandidatesResponse } from "@/lib/orbit-page-types";
+import { buildOrbitScanCandidatesQueryString } from "@/lib/orbit-queue-params";
 import {
   ORBIT_SCAN_CANDIDATE_POOL_SIZE,
   type OrbitScanBatchMode,
@@ -93,20 +94,18 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     onReviewClose: () => clearReviewUrlParamsRef.current(),
   });
 
-  const scanCandidatesQueryString = useMemo(() => {
-    const params = new URLSearchParams({
-      page: orbitView === "recent" ? "1" : page.toString(),
-      pageSize: pageSize.toString(),
-      limit: ORBIT_SCAN_CANDIDATE_POOL_SIZE.toString(),
-      sortDirection: queueSortDirection,
-    });
-
-    if (deferredSearch) {
-      params.set("search", deferredSearch);
-    }
-
-    return params.toString();
-  }, [deferredSearch, orbitView, page, pageSize, queueSortDirection]);
+  const scanCandidatesQueryString = useMemo(
+    () =>
+      buildOrbitScanCandidatesQueryString({
+        orbitView,
+        page,
+        pageSize,
+        sortDirection: queueSortDirection,
+        search: deferredSearch,
+        candidateLimit: ORBIT_SCAN_CANDIDATE_POOL_SIZE,
+      }),
+    [deferredSearch, orbitView, page, pageSize, queueSortDirection]
+  );
 
   const { data: scanCandidatesData } = useQuery<OrbitScanCandidatesResponse>({
     queryKey: ["orbit", "scan-candidates", scanCandidatesQueryString],

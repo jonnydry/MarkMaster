@@ -10,6 +10,8 @@ import {
   appToolbarSurfaceClassName,
   appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
+import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
+import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
 import {
@@ -67,23 +69,148 @@ export function DashboardToolbar({
   onViewModeChange,
   user,
 }: DashboardToolbarProps) {
+  const { compact } = usePageHeaderCompact();
+
+  const searchField = (
+    <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
+      <SearchBar
+        ref={searchInputRef}
+        glass
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search bookmarks, authors, notes..."
+        inputClassName={compact ? "h-8" : "h-9"}
+      />
+    </div>
+  );
+
+  const primaryFilterChip = (
+    <button
+      type="button"
+      onClick={onResetPrimaryFilter}
+      aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        compact ? "h-7" : "h-8",
+        highlightActiveClass,
+        highlightInteractiveClass
+      )}
+    >
+      <span className="hidden sm:inline">{primaryFilterLabel}</span>
+      <span className="sm:hidden">{primaryFilterCompactLabel}</span>
+      <span className="tabular-nums text-2xs font-medium text-muted-foreground">
+        {total.toLocaleString()}
+      </span>
+    </button>
+  );
+
+  const tagFilterChips = selectedTagEntries.map((tag) => (
+    <button
+      key={tag.id}
+      type="button"
+      onClick={() => onTagToggle(tag.id)}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-sm border px-2.5 text-xs font-semibold",
+        compact ? "h-7" : "h-8",
+        highlightActiveClass,
+        highlightInteractiveClass
+      )}
+    >
+      #{tag.name}
+      <span className="text-primary/60" aria-hidden>
+        ×
+      </span>
+    </button>
+  ));
+
+  const filterChips = (
+    <>
+      {primaryFilterChip}
+      {tagFilterChips}
+    </>
+  );
+
+  const toolbarActions = (
+    <>
+      <div className="relative">
+        <ToolbarIconButton
+          active={showFilters}
+          label={showFilters ? "Hide filters" : "Show filters"}
+          icon={SlidersHorizontal}
+          onClick={onToggleFilters}
+          pressed={showFilters}
+          aria-controls="dashboard-filter-panel"
+          showIndicator={hasActiveFilters}
+          className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+        />
+      </div>
+
+      <ToolbarIconButton
+        label="Keyboard shortcuts"
+        icon={Keyboard}
+        onClick={onOpenKeyboardShortcuts}
+        className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+      />
+
+      <ToolbarIconButton
+        active={selectionMode}
+        label={selectionMode ? "Exit selection mode" : "Enter selection mode"}
+        icon={CheckSquare}
+        onClick={onToggleSelectionMode}
+        pressed={selectionMode}
+        className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+      />
+
+      <SortControls
+        compact
+        sortField={sortField}
+        viewMode={viewMode}
+        onSortFieldChange={onSortFieldChange}
+        onViewModeChange={onViewModeChange}
+      />
+
+      <PageHeaderCompactToggle
+        className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
+      />
+
+      {user ? (
+        <div className={cn("shrink-0", !compact && "sm:hidden")}>
+          <UserNavDynamic user={user} />
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className={cn("dashboard-toolbar py-1", appContentGutterClassName)}>
+        <div className="flex min-w-0 flex-col gap-1.5 md:min-w-0 md:flex-row md:items-center md:gap-2">
+          <div className="order-2 flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:order-none md:max-w-[38%] md:shrink [&::-webkit-scrollbar]:hidden">
+            <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+            {primaryFilterChip}
+            {tagFilterChips}
+          </div>
+
+          <div className="order-1 flex min-w-0 flex-1 basis-0 justify-center px-1 md:order-none">
+            <div className="w-full min-w-0 max-w-sm">
+              {searchField}
+            </div>
+          </div>
+
+          <div className="order-3 flex min-w-0 shrink-0 items-center justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] md:order-none [&::-webkit-scrollbar]:hidden">
+            {toolbarActions}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("dashboard-toolbar py-2", appContentGutterClassName)}>
       <div className="flex items-center gap-2">
         <div className="shrink-0 md:hidden">{mobileSidebar}</div>
 
-        <div className="min-w-0 flex-1">
-          <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
-            <SearchBar
-              ref={searchInputRef}
-              glass
-              value={search}
-              onChange={onSearchChange}
-              placeholder="Search bookmarks, authors, notes..."
-              inputClassName="h-9"
-            />
-          </div>
-        </div>
+        <div className="min-w-0 flex-1">{searchField}</div>
 
         {user ? (
           <div className="hidden shrink-0 sm:block">
@@ -94,86 +221,10 @@ export function DashboardToolbar({
 
       <div className="mt-2 flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={onResetPrimaryFilter}
-            aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
-            className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-              highlightActiveClass,
-              highlightInteractiveClass
-            )}
-          >
-            <span className="hidden sm:inline">{primaryFilterLabel}</span>
-            <span className="sm:hidden">{primaryFilterCompactLabel}</span>
-            <span className="tabular-nums text-2xs font-medium text-muted-foreground">
-              {total.toLocaleString()}
-            </span>
-          </button>
-
-          {selectedTagEntries.map((tag) => (
-            <button
-              key={tag.id}
-              type="button"
-              onClick={() => onTagToggle(tag.id)}
-              className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border px-2.5 text-xs font-semibold",
-                highlightActiveClass,
-                highlightInteractiveClass
-              )}
-            >
-              #{tag.name}
-              <span className="text-primary/60" aria-hidden>
-                ×
-              </span>
-            </button>
-          ))}
+          {filterChips}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          <div className="relative">
-            <ToolbarIconButton
-              active={showFilters}
-              label={showFilters ? "Hide filters" : "Show filters"}
-              icon={SlidersHorizontal}
-              onClick={onToggleFilters}
-              pressed={showFilters}
-              aria-controls="dashboard-filter-panel"
-              showIndicator={hasActiveFilters}
-              className={appToolbarSurfaceClassName}
-            />
-          </div>
-
-          <ToolbarIconButton
-            label="Keyboard shortcuts"
-            icon={Keyboard}
-            onClick={onOpenKeyboardShortcuts}
-            className={appToolbarSurfaceClassName}
-          />
-
-          <ToolbarIconButton
-            active={selectionMode}
-            label={selectionMode ? "Exit selection mode" : "Enter selection mode"}
-            icon={CheckSquare}
-            onClick={onToggleSelectionMode}
-            pressed={selectionMode}
-            className={appToolbarSurfaceClassName}
-          />
-
-          <SortControls
-            compact
-            sortField={sortField}
-            viewMode={viewMode}
-            onSortFieldChange={onSortFieldChange}
-            onViewModeChange={onViewModeChange}
-          />
-
-          {user ? (
-            <div className="shrink-0 sm:hidden">
-              <UserNavDynamic user={user} />
-            </div>
-          ) : null}
-        </div>
+        <div className="flex shrink-0 items-center gap-1.5">{toolbarActions}</div>
       </div>
     </div>
   );

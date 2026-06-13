@@ -137,17 +137,13 @@ describe("syncBookmarks", () => {
     expect(result.hitExisting).toBe(true);
     expect(result.updatedBookmarks).toBe(10);
   });
-});
-
-describe("refactored sync path (smoke test)", () => {
-  it("exercises syncBookmarks without crashing", async () => {
-    const { syncBookmarks } = await import("./sync");
+  it("exercises syncBookmarks without crashing on an empty page", async () => {
+    mocks.fetchBookmarks.mockResolvedValue({ bookmarks: [], nextToken: undefined });
 
     const result = await syncBookmarks("user-1");
 
-    expect(result).toHaveProperty("newBookmarks");
-    expect(result).toHaveProperty("updatedBookmarks");
-    expect(result).toHaveProperty("totalFetched");
-    expect(typeof result.newBookmarks).toBe("number");
+    expect(result.newBookmarks).toBe(0);
+    expect(result.updatedBookmarks).toBe(0);
+    expect(result.totalFetched).toBe(0);
   });
 });

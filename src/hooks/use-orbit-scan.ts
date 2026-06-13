@@ -84,6 +84,8 @@ export interface OrbitScanHandle extends OrbitScanState {
   clearPlan: () => void;
 }
 
+export type OrbitScanApi = OrbitScanHandle;
+
 export function removeSuggestionsFromScanPlan(
   current: OrbitScanResponsePayload | null,
   bookmarkIds: Iterable<string>

@@ -1,39 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 
 import type {
   OrbitMapCanvasHandle,
   OrbitMapSelection,
 } from "@/components/orbit/orbit-map-canvas-host";
-import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
+import { useBookmarkFocusQuery } from "@/hooks/use-bookmark-focus-query";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
-import { useCreateCollection } from "@/hooks/use-create-collection";
-import {
-  useCollectionsQuery,
-  useLibraryStatsQuery,
-  useTagsQuery,
-} from "@/hooks/use-library-data";
 import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
+import { useOrbitLibraryBootstrap } from "@/hooks/use-orbit-library-bootstrap";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { useOrbitMapAssignments } from "@/hooks/use-orbit-map-assignments";
 import { useOrbitMapLayout } from "@/hooks/use-orbit-map-layout";
 import { useOrbitMapSearch } from "@/hooks/use-orbit-map-search";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
-import { fetchJson } from "@/lib/fetch-json";
-import { bookmarkFocusResponseSchema } from "@/lib/api-response-schemas";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
   resolveOrbitMapSelectionNode,
 } from "@/lib/orbit-map-graph-indexes";
-import { completeLibrarySync } from "@/lib/library-sync";
 import type { BookmarkWithRelations, OrbitGraphScope } from "@/types";
 
 export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
@@ -64,11 +53,19 @@ export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
  * (use-orbit-map-assignments) into the single API the page consumes.
  */
 export function useOrbitMapPage() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { data: session, update: updateSession } = useSession();
-  const actions = useBookmarkActions();
-  const { createCollection, createCollectionQuick } = useCreateCollection();
+  const {
+    router,
+    queryClient,
+    dbUser,
+    actions,
+    createCollection,
+    createCollectionQuick,
+    tags,
+    collections,
+    libraryStats,
+    handleSyncComplete: completeLibrarySyncFromBootstrap,
+    goToTagOnDashboard,
+  } = useOrbitLibraryBootstrap();
 
   const url = useOrbitMapUrl();
   const {
@@ -89,10 +86,6 @@ export function useOrbitMapPage() {
     handleHoverChange: applyHoverChange,
     resetHover,
   } = layout;
-
-  const { data: tags = [] } = useTagsQuery();
-  const { data: collections = [] } = useCollectionsQuery();
-  const { data: libraryStats } = useLibraryStatsQuery();
 
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [expandedAnchors, setExpandedAnchors] = useState<string[]>([]);
@@ -131,29 +124,15 @@ export function useOrbitMapPage() {
   }, [assignmentBookmarkIdParam, focusBookmarkIdParam, selection]);
 
   const { data: focusedBookmarkData, isLoading: focusedBookmarkLoading } =
-    useQuery({
-      queryKey: ["bookmarks", "orbit-map-focus", selectedBookmarkId],
-      queryFn: () =>
-        fetchJson(
-          `/api/bookmarks?bookmarkId=${encodeURIComponent(selectedBookmarkId!)}&limit=1`,
-          undefined,
-          bookmarkFocusResponseSchema
-        ),
-      enabled: Boolean(selectedBookmarkId),
-      placeholderData: keepPreviousData,
-    });
+    useBookmarkFocusQuery(selectedBookmarkId, "orbit-map-focus");
+
   const focusedBookmark = focusedBookmarkData?.bookmarks?.[0] ?? null;
 
-  const { data: expandedBookmarkData } = useQuery({
-    queryKey: ["bookmarks", "orbit-map-expanded", expandedBookmarkId],
-    queryFn: () =>
-      fetchJson(
-        `/api/bookmarks?bookmarkId=${encodeURIComponent(expandedBookmarkId!)}&limit=1`,
-        undefined,
-        bookmarkFocusResponseSchema
-      ),
-    enabled: Boolean(expandedBookmarkId),
-  });
+  const { data: expandedBookmarkData } = useBookmarkFocusQuery(
+    expandedBookmarkId,
+    "orbit-map-expanded",
+    { keepPrevious: false }
+  );
 
   const expandedBookmark = useMemo(() => {
     if (!expandedBookmarkId) return null;
@@ -235,18 +214,10 @@ export function useOrbitMapPage() {
     return () => window.clearTimeout(handle);
   }, [focusBookmarkIdParam, graphIndexes]);
 
-  const dbUser = session?.dbUser;
   const lastSyncAtValue = dbUser?.lastSyncAt;
   const lastSyncAt = useMemo(
     () => (lastSyncAtValue ? new Date(lastSyncAtValue) : null),
     [lastSyncAtValue]
-  );
-
-  const goToTagOnDashboard = useCallback(
-    (tagId: string) => {
-      router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
-    },
-    [router]
   );
 
   const handleCreateCollectionOpen = dialogs.handleCreateCollectionOpen;
@@ -307,11 +278,8 @@ export function useOrbitMapPage() {
       : stats?.totalBookmarks === 0 || renderedBookmarkCount === 0);
 
   const handleSyncComplete = useCallback(() => {
-    completeLibrarySync(queryClient, {
-      updateSession: () => updateSession({ refresh: "lastSyncAt" }),
-    });
-    void refetch();
-  }, [queryClient, refetch, updateSession]);
+    completeLibrarySyncFromBootstrap({ refetch: () => void refetch() });
+  }, [completeLibrarySyncFromBootstrap, refetch]);
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
@@ -397,7 +365,6 @@ export function useOrbitMapPage() {
   });
 
   return {
-    session,
     dbUser,
     tags,
     collections,

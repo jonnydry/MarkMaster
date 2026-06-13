@@ -51,7 +51,7 @@ import {
   appFeedHeaderFrostedClassName,
 } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
-import { useOrbitPage } from "@/hooks/use-orbit-page";
+import { useOrbitPage } from "@/hooks/orbit";
 import { cn } from "@/lib/utils";
 
 const AddTagDialog = dynamic(
@@ -85,18 +85,18 @@ const OrbitBookmarkOverlay = dynamic(
 
 export default function OrbitPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { queue, session, interactions, selection } = useOrbitPage();
+  const scan = session.scan;
   const {
     router,
     actions,
     createCollection,
     createCollectionQuick,
-    scan,
     tags,
     collections,
     libraryStats,
     dbUser,
     bookmarks,
-    reviewBookmarks,
     total,
     totalPages,
     page,
@@ -104,34 +104,6 @@ export default function OrbitPage() {
     queueSortDirection,
     search,
     searchInputRef,
-    selectionMode,
-    selectedBookmarkIds,
-    appliedBookmarkIds,
-    tagDialogOpen,
-    setTagDialogOpen,
-    tagTargetIds,
-    setTagTargetIds,
-    collectionDialogOpen,
-    setCollectionDialogOpen,
-    collectionTargetIds,
-    setCollectionTargetIds,
-    dialogTagIds,
-    dialogCollectionIds,
-    createCollectionOpen,
-    setCreateCollectionOpen,
-    keyboardShortcutsOpen,
-    setKeyboardShortcutsOpen,
-    reviewSession,
-    feedbackById,
-    menuForId,
-    setMenuForId,
-    menuPosition,
-    setMenuPosition,
-    setActiveBookmarkId,
-    resolvedActiveBookmarkId,
-    activeBookmark,
-    activeDecision,
-    orbitOverlayOpen,
     isLoading,
     isError,
     error,
@@ -139,6 +111,19 @@ export default function OrbitPage() {
     isFetching,
     isSearchPending,
     queueIsLoading,
+    goToTagOnDashboard,
+    handleSyncComplete,
+    handleOrbitViewChange,
+    handleQueueSortDirectionChange,
+    handleSearchChange,
+    handlePageChange,
+  } = queue;
+  const {
+    reviewBookmarks,
+    appliedBookmarkIds,
+    reviewSession,
+    feedbackById,
+    scanHelperText,
     scanButtonLabel,
     triagedCount,
     passTotal,
@@ -156,16 +141,7 @@ export default function OrbitPage() {
     staleScanPlan,
     hasSelectionOverflow,
     lastScanRequest,
-    orbitMapHref,
-    visibleStatusLabel,
     setScanBatchMode,
-    goToTagOnDashboard,
-    handleCreateCollectionOpen,
-    handleSyncComplete,
-    handleOrbitViewChange,
-    handleQueueSortDirectionChange,
-    handleSearchChange,
-    handlePageChange,
     handleScan,
     handleRetryScan,
     handleRescanCurrentSelection,
@@ -177,6 +153,37 @@ export default function OrbitPage() {
     handleApplyReviewedPlan,
     handleKeepInOrbit,
     handleAcceptSuggestion,
+  } = session;
+  const { mode: selectionMode, ids: selectedBookmarkIds } = selection;
+  const {
+    tagDialogOpen,
+    setTagDialogOpen,
+    tagTargetIds,
+    setTagTargetIds,
+    tagDialogBookmarks,
+    collectionDialogOpen,
+    setCollectionDialogOpen,
+    collectionTargetIds,
+    setCollectionTargetIds,
+    collectionDialogBookmarks,
+    dialogTagIds,
+    dialogCollectionIds,
+    createCollectionOpen,
+    setCreateCollectionOpen,
+    keyboardShortcutsOpen,
+    setKeyboardShortcutsOpen,
+    menuForId,
+    setMenuForId,
+    menuPosition,
+    setMenuPosition,
+    setActiveBookmarkId,
+    resolvedActiveBookmarkId,
+    activeBookmark,
+    activeDecision,
+    orbitOverlayOpen,
+    orbitMapHref,
+    visibleStatusLabel,
+    handleCreateCollectionOpen,
     handleOrbitOverlayDecision,
     handleMenuAction,
     handleBookmarkAddTag,
@@ -187,7 +194,7 @@ export default function OrbitPage() {
     handleBulkAddTag,
     handleBulkAddToCollection,
     handleBulkDelete,
-  } = useOrbitPage();
+  } = interactions;
 
   return (
     <div className={cn(orbitShellClass(), "relative")}>
@@ -210,6 +217,7 @@ export default function OrbitPage() {
           <PageHeader
             sticky
             chromeless
+            compactable
             className={cn(
               "border-b border-hairline-strong",
               appFeedHeaderFrostedClassName

@@ -38,6 +38,8 @@ import {
   type OrbitView,
 } from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
+import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
+import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import type { DbUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -140,6 +142,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     searchRef
   ) {
     const scanBusy = queueIsLoading || scanning;
+    const { compact } = usePageHeaderCompact();
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
     const reviewLabel =
       scanPlanSuggestionCount === 1
@@ -150,47 +153,70 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     return (
       <div
         className={cn(
-          "orbit-toolbar relative space-y-1.5 py-1.5",
+          "orbit-toolbar relative",
+          compact ? "space-y-1 py-1" : "space-y-1.5 py-1.5",
           appContentGutterClassName
         )}
         aria-busy={scanning}
       >
         {scanning ? <ScrollingProgressBar className="absolute inset-x-0 top-0" /> : null}
 
-        <div className="flex items-center gap-1.5">
-          {mobileSidebar ? <div className="shrink-0 md:hidden">{mobileSidebar}</div> : null}
+        <div
+          className={
+            compact
+              ? "flex flex-col gap-1.5 md:flex-row md:items-center md:gap-2"
+              : "contents"
+          }
+        >
+          <div
+            className={cn(
+              "flex items-center gap-1.5",
+              compact && "md:max-w-xs lg:max-w-sm"
+            )}
+          >
+            {mobileSidebar ? <div className="shrink-0 md:hidden">{mobileSidebar}</div> : null}
 
-          <OrbitPageIdentity queueTotal={total} />
+            {!compact ? <OrbitPageIdentity queueTotal={total} /> : null}
 
-          <div className="min-w-0 flex-1">
-            <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
-              <SearchBar
-                ref={searchRef}
-                glass
-                value={search}
-                onChange={onSearchChange}
-                placeholder="Search Orbit by author, text, or notes…"
-                inputClassName="h-9"
-              />
+            <div className="min-w-0 flex-1">
+              <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
+                <SearchBar
+                  ref={searchRef}
+                  glass
+                  value={search}
+                  onChange={onSearchChange}
+                  placeholder="Search Orbit by author, text, or notes…"
+                  inputClassName={compact ? "h-8" : "h-9"}
+                />
+              </div>
             </div>
+
+            {user ? (
+              <div
+                className={cn(
+                  "hidden shrink-0 sm:block",
+                  compact && "md:hidden"
+                )}
+              >
+                <UserNavDynamic user={user} />
+              </div>
+            ) : null}
           </div>
 
-          {user ? (
-            <div className="hidden shrink-0 sm:block">
-              <UserNavDynamic user={user} />
-            </div>
-          ) : null}
-        </div>
-
         {canSelect ? (
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-1.5",
+              !compact && "mt-0"
+            )}
+          >
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <ToolbarSegmentControl
                 value={orbitView}
                 onChange={onChangeView}
                 aria-label="Queue scope"
                 variant="library"
-                size="md"
+                size={compact ? "sm" : "md"}
                 className={appToolbarSurfaceGroupClassName}
                 options={[
                   {
@@ -217,7 +243,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 onChange={onChangeSortDirection}
                 aria-label="Queue sort"
                 variant="library"
-                size="md"
+                size={compact ? "sm" : "md"}
                 className={appToolbarSurfaceGroupClassName}
                 options={[
                   { value: "desc", label: "Newest" },
@@ -233,7 +259,10 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     type="button"
                     variant="highlight"
                     size="sm"
-                    className="h-8 gap-1.5 px-2.5 text-xs"
+                    className={cn(
+                      "gap-1.5 px-2.5 text-xs",
+                      compact ? "h-7" : "h-8"
+                    )}
                     disabled={scanning || applyingBatch}
                     onClick={onReviewPass}
                   >
@@ -276,7 +305,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                     variant="highlight"
                     size="sm"
                     className={cn(
-                      "h-8 gap-1.5 px-2.5 text-xs",
+                      "gap-1.5 px-2.5 text-xs",
+                      compact ? "h-7" : "h-8",
                       orbitControlRadius()
                     )}
                     disabled={scanBusy || scanTargetCount === 0}
@@ -306,7 +336,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 aria-label="Open graph"
                 title="Open graph"
                 className={cn(
-                  "inline-flex size-9 shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+                  "inline-flex shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+                  compact ? "size-8" : "size-9",
                   appToolbarSurfaceClassName
                 )}
               >
@@ -321,7 +352,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 }
                 icon={CheckSquare}
                 onClick={onToggleSelectionMode}
-                className={appToolbarSurfaceClassName}
+                className={cn(appToolbarSurfaceClassName, compact && "size-8")}
               />
 
               <KeyboardShortcutsHelpButton
@@ -330,21 +361,27 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 groups={shortcutGroups}
                 description="Orbit queue navigation and review actions."
                 className={cn(
-                  "size-9 shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
+                  "shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
+                  compact ? "size-8" : "size-9",
                   appToolbarSurfaceClassName
                 )}
               />
 
+              <PageHeaderCompactToggle
+                className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
+              />
+
               {user ? (
-                <div className="shrink-0 sm:hidden">
+                <div className={cn("shrink-0", compact ? "hidden md:block" : "sm:hidden")}>
                   <UserNavDynamic user={user} />
                 </div>
               ) : null}
             </div>
           </div>
         ) : null}
+        </div>
 
-        {canSelect ? (
+        {canSelect && !compact ? (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-xs text-muted-foreground">
             <span className={cn(orbitDataClass(), "normal-case")}>
               {visibleStatusLabel}

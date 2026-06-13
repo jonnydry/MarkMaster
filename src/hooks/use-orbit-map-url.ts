@@ -4,18 +4,14 @@ import { useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
+import {
+  applyOrbitMapSelectionToParams,
+  clearOrbitMapSelectionParams,
+  parseOrbitMapSelectionFromParams,
+} from "@/lib/orbit-map-url-params";
 import type { OrbitGraphScope } from "@/types";
 
-export const MAP_SELECTION_KINDS: ReadonlySet<OrbitMapSelection["kind"]> =
-  new Set(["tag", "collection", "bookmark", "core", "overflow"]);
-
-function clearSelectionParams(params: URLSearchParams) {
-  params.delete("select");
-  params.delete("kind");
-  params.delete("bookmark");
-  params.delete("focus");
-  params.delete("anchor");
-}
+export { MAP_SELECTION_KINDS } from "@/lib/orbit-map-url-params";
 
 export function useOrbitMapUrl() {
   const router = useRouter();
@@ -31,22 +27,15 @@ export function useOrbitMapUrl() {
   const graphScope: OrbitGraphScope =
     scopeParam === "orbit" ? "orbit" : "library";
 
-  const selection = useMemo<OrbitMapSelection | null>(() => {
-    if (
-      selectIdParam &&
-      selectKindParam &&
-      MAP_SELECTION_KINDS.has(selectKindParam as OrbitMapSelection["kind"])
-    ) {
-      return {
-        kind: selectKindParam as OrbitMapSelection["kind"],
-        id: selectIdParam,
-      };
-    }
-    if (focusBookmarkIdParam) {
-      return { kind: "bookmark", id: focusBookmarkIdParam };
-    }
-    return null;
-  }, [focusBookmarkIdParam, selectIdParam, selectKindParam]);
+  const selection = useMemo<OrbitMapSelection | null>(
+    () =>
+      parseOrbitMapSelectionFromParams({
+        selectId: selectIdParam,
+        selectKind: selectKindParam,
+        focusBookmarkId: focusBookmarkIdParam,
+      }),
+    [focusBookmarkIdParam, selectIdParam, selectKindParam]
+  );
 
   const replaceMapUrl = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -63,15 +52,7 @@ export function useOrbitMapUrl() {
   const handleSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
       replaceMapUrl((params) => {
-        if (next) {
-          params.set("select", next.id);
-          params.set("kind", next.kind);
-          if (next.kind === "bookmark") {
-            params.set("bookmark", next.id);
-          }
-        } else {
-          clearSelectionParams(params);
-        }
+        applyOrbitMapSelectionToParams(params, next);
       });
     },
     [replaceMapUrl]
@@ -86,7 +67,7 @@ export function useOrbitMapUrl() {
         } else {
           params.delete("scope");
         }
-        clearSelectionParams(params);
+        clearOrbitMapSelectionParams(params);
       });
     },
     [replaceMapUrl]

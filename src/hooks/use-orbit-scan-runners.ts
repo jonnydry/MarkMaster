@@ -3,20 +3,24 @@
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
-import { sameBookmarkIds } from "@/lib/bookmark-batch-utils";
+import { applyPrimarySuggestion } from "@/lib/orbit-scan-apply";
 import { formatAppliedToast } from "@/lib/orbit-apply-utils";
+import {
+  canRescanCurrentSelection as computeCanRescanCurrentSelection,
+  isStaleScanPlan,
+} from "@/lib/orbit-scan-runners-logic";
+import type { OrbitScanHandle } from "@/hooks/use-orbit-scan";
 import type { OrbitScanRequest } from "@/lib/orbit-page-types";
 import { batchMetadataFromPlan } from "@/lib/orbit-scan-batch-utils";
 import {
   buildOrbitScanRequest,
   type BuildOrbitScanRequestArgs,
 } from "@/lib/orbit-scan-request";
-import type { useOrbitScan } from "@/hooks/use-orbit-scan";
 import type { OrbitScanBatchMode, OrbitScanBatchProfileId } from "@/lib/orbit-config";
 import type { OrbitView } from "@/lib/orbit-navigation";
 import type { OrbitScanBatchMetadata } from "@/types";
 
-type OrbitScanApi = ReturnType<typeof useOrbitScan>;
+type OrbitScanApi = OrbitScanHandle;
 
 type UseOrbitScanRunnersOptions = {
   scan: OrbitScanApi;
@@ -80,20 +84,17 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
     [orbitView, page, queryString, resolvedScanBatchMode]
   );
 
-  const staleScanPlan = Boolean(
-    scan.plan &&
-      scanContextAtLastRun &&
-      scanContextAtLastRun !== currentScanContextKey
-  );
+  const staleScanPlan = isStaleScanPlan({
+    hasPlan: Boolean(scan.plan),
+    scanContextAtLastRun,
+    currentScanContextKey,
+  });
 
-  const canRescanCurrentSelection = Boolean(
-    scan.error &&
-      selectedScanTargetIds.length > 0 &&
-      !(
-        lastScanRequest?.scanningSelection &&
-        sameBookmarkIds(lastScanRequest.targetIds, selectedScanTargetIds)
-      )
-  );
+  const canRescanCurrentSelection = computeCanRescanCurrentSelection({
+    hasScanError: Boolean(scan.error),
+    selectedScanTargetIds,
+    lastScanRequest,
+  });
 
   const clearScanRunState = useCallback(() => {
     setScanContextAtLastRun(null);
@@ -193,24 +194,19 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
 
   const handleAcceptSuggestion = useCallback(
     async (id: string) => {
-      const decision = scan.getDecision(id);
-      if (!decision?.primary) {
-        onOpenBookmarkReview(id);
-        return;
-      }
-      try {
-        const applied = await scan.applySuggestion(id, "primary");
-        if (applied) {
+      await applyPrimarySuggestion({
+        bookmarkId: id,
+        getDecision: scan.getDecision,
+        applySuggestion: scan.applySuggestion,
+        onApplied: (bookmarkId) => {
           setAppliedBookmarkIds((current) => {
             const next = new Set(current);
-            next.add(id);
+            next.add(bookmarkId);
             return next;
           });
-          toast.success(`Applied · ${formatAppliedToast(applied)}`);
-        }
-      } catch {
-        onOpenBookmarkReview(id);
-      }
+        },
+        onOpenReview: onOpenBookmarkReview,
+      });
     },
     [scan, onOpenBookmarkReview, setAppliedBookmarkIds]
   );

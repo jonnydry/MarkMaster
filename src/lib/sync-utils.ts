@@ -188,30 +188,12 @@ export async function getExistingTweetIdsForUserAndTweets(
 ): Promise<Set<string>> {
   if (tweetIds.length === 0) return new Set();
 
-  const DEBUG_RESUME = process.env.DEBUG_RESUME_TEST === '1';
-  if (DEBUG_RESUME) {
-    console.log("[SYNC-UTILS DEBUG] getExistingTweetIdsForUserAndTweets called", {
-      userId,
-      tweetIds,
-    });
-  }
-
   const rows = await prisma.bookmark.findMany({
     where: { userId, tweetId: { in: tweetIds } },
     select: { tweetId: true },
   });
 
-  const result = new Set(rows.map((r) => r.tweetId));
-
-  if (DEBUG_RESUME) {
-    console.log("[SYNC-UTILS DEBUG] getExistingTweetIdsForUserAndTweets result", {
-      userId,
-      asked: tweetIds,
-      returned: Array.from(result),
-    });
-  }
-
-  return result;
+  return new Set(rows.map((r) => r.tweetId));
 }
 
 /**

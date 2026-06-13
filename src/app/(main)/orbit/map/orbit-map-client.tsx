@@ -20,7 +20,7 @@ import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-hel
 import {
   ORBIT_MAP_SHORTCUT_GROUPS,
   useOrbitMapPage,
-} from "@/hooks/use-orbit-map-page";
+} from "@/hooks/orbit";
 import { OrbitMapCommandSurface } from "@/components/orbit/orbit-map-command-surface";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";

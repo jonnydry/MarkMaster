@@ -187,6 +187,7 @@ function DashboardContent() {
           <PageHeader
             sticky
             chromeless
+            compactable
             className={cn(
               "border-b border-hairline-strong",
               appFeedHeaderFrostedClassName

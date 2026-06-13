@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { formatAppliedToast } from "@/lib/orbit-apply-utils";
+import { applyPrimarySuggestion } from "@/lib/orbit-scan-apply";
 import { ORBIT_SHORTCUT_GROUPS } from "@/lib/orbit-client-constants";
 import type { OrbitReviewSession } from "@/lib/orbit-client-constants";
 import {
@@ -12,12 +12,12 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import type { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
-import type { useOrbitScan } from "@/hooks/use-orbit-scan";
+import type { OrbitScanHandle } from "@/hooks/use-orbit-scan";
 import { getBookmarkTweetUrl, openBookmarkOnX } from "@/lib/bookmark-url";
 import type { BookmarkWithRelations, CollectionWithCount, TagWithCount } from "@/types";
 import type { OrbitSortDirection, OrbitView } from "@/lib/orbit-navigation";
 
-type OrbitScanApi = ReturnType<typeof useOrbitScan>;
+type OrbitScanApi = OrbitScanHandle;
 type BookmarkActions = ReturnType<typeof useBookmarkActions>;
 
 type UseOrbitPageInteractionsOptions = {
@@ -90,12 +90,6 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null
   );
-
-  const resetPageUiState = useCallback(() => {
-    setActiveBookmarkId(null);
-    setSelectionMode(false);
-    setSelectedBookmarkIds(new Set());
-  }, [setActiveBookmarkId, setSelectionMode, setSelectedBookmarkIds]);
 
   useEffect(() => {
     if (!menuForId) return;
@@ -216,24 +210,23 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
   const handleBookmarkAddToCollection = dialogs.openCollectionForBookmark;
 
   const handleOrbitOverlayDecision = (id: string, kind: string) => {
-    const decision = scan.getDecision(id);
-    if (kind === "keep-tag" && decision?.primary) {
-      scan
-        .applySuggestion(id, "primary")
-        .then((applied) => {
-          if (applied) {
-            setAppliedBookmarkIds((current) => {
-              const next = new Set(current);
-              next.add(id);
-              return next;
-            });
-            toast.success(`Applied · ${formatAppliedToast(applied)}`);
-          }
-        })
-        .catch(() => {
-          handleOpenBookmarkReview(id);
-        });
-    } else if (kind === "discard") {
+    if (kind === "keep-tag") {
+      void applyPrimarySuggestion({
+        bookmarkId: id,
+        getDecision: scan.getDecision,
+        applySuggestion: scan.applySuggestion,
+        onApplied: (bookmarkId) => {
+          setAppliedBookmarkIds((current) => {
+            const next = new Set(current);
+            next.add(bookmarkId);
+            return next;
+          });
+        },
+        onOpenReview: handleOpenBookmarkReview,
+      });
+      return;
+    }
+    if (kind === "discard") {
       actions.handleDeleteBookmark(id);
     } else if (kind === "dismiss" || kind === "archive") {
       const restored = handleKeepInOrbit(id);
@@ -384,7 +377,6 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
     setMenuForId,
     menuPosition,
     setMenuPosition,
-    resetPageUiState,
     resolvedActiveBookmarkId,
     activeBookmark,
     activeDecision,

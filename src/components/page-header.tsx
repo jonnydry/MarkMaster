@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentProps, ReactNode } from "react";
+import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   sticky?: boolean;
   /** Omit frosted chrome (e.g. when wrapped by a parent that already applies it). */
   chromeless?: boolean;
+  /** Show a compact-header toggle; only affects header chrome and toolbar children. */
+  compactable?: boolean;
 };
 
 export function PageHeader({
@@ -31,9 +34,12 @@ export function PageHeader({
   descriptionClassName,
   sticky = false,
   chromeless = false,
+  compactable = false,
   ...props
 }: PageHeaderProps) {
   const t = useTypography();
+  const { compact } = usePageHeaderCompact();
+  const isCompact = compactable && compact;
   const hasHeaderRow = title || description || leading || actions;
   const mergedHeaderClassName = cn(
     "shrink-0",
@@ -45,10 +51,25 @@ export function PageHeader({
   );
 
   return (
-    <header className={mergedHeaderClassName} {...props}>
-      <div className={cn(appContentGutterClassName, "py-3", bodyClassName)}>
+    <header
+      className={mergedHeaderClassName}
+      data-page-header-compact={isCompact ? "" : undefined}
+      {...props}
+    >
+      <div
+        className={cn(
+          appContentGutterClassName,
+          isCompact ? "py-1.5" : "py-3",
+          bodyClassName
+        )}
+      >
         {hasHeaderRow ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className={cn(
+              "flex flex-col sm:flex-row sm:items-center sm:justify-between",
+              isCompact ? "gap-2" : "gap-3"
+            )}
+          >
             <div className="flex min-w-0 flex-1 items-start gap-3">
               {leading ? <div className="shrink-0">{leading}</div> : null}
               <div className="min-w-0">
@@ -56,7 +77,10 @@ export function PageHeader({
                   <div className="flex min-w-0 items-center gap-2">
                     <h1
                       className={cn(
-                        "truncate text-lg font-bold tracking-tight heading-font sm:text-xl",
+                        "truncate font-bold tracking-tight heading-font",
+                        isCompact
+                          ? "text-base sm:text-lg"
+                          : "text-lg sm:text-xl",
                         titleClassName
                       )}
                     >
