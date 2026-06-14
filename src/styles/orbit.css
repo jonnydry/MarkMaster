@@ -35,11 +35,10 @@
     }
   }
 
-  /* Floating chrome over the Orbit map canvas. The canvas always paints
-     space-black regardless of theme, so these are intentionally literal. */
+  /* Floating chrome over the Orbit map canvas — theme-aware popover shell. */
   .map-glass {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--hairline-soft);
+    background: color-mix(in srgb, var(--popover) 88%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }

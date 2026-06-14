@@ -3,29 +3,30 @@
 import dynamic from "next/dynamic";
 import { AppPageShell } from "@/components/app-page-shell";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { appContentInsetClassName } from "@/lib/app-chrome";
+import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
+import {
+  appContentInsetClassName,
+  appFeedHeaderFrostedClassName,
+} from "@/lib/app-chrome";
+import { orbitMapStageClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
+import { PageWatermark } from "@/components/page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { UserNavDynamic } from "@/components/user-nav-dynamic";
-import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import {
   ORBIT_MAP_SHORTCUT_GROUPS,
   useOrbitMapPage,
 } from "@/hooks/orbit";
-import { OrbitMapCommandSurface } from "@/components/orbit/orbit-map-command-surface";
+import { OrbitMapCommandBar } from "@/components/orbit/orbit-map-command-bar";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
-import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
-import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
 import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
 
 const OrbitMapCanvas = dynamic(
@@ -34,8 +35,13 @@ const OrbitMapCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center rounded-sm border border-hairline-strong dark:border-white/10 bg-background dark:bg-black">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
+      <div
+        className={cn(
+          "flex h-full items-center justify-center",
+          orbitMapStageClass()
+        )}
+      >
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Charting graph…
         </div>
@@ -122,6 +128,8 @@ export default function OrbitMapPage() {
     goToTagOnDashboard,
     handleCreateCollectionOpen,
     handleSyncComplete,
+    handleSyncStateChange,
+    syncProgressVisible,
     handleCanvasSelectionChange,
     handleScopeChange,
     handleHoverChange,
@@ -163,6 +171,13 @@ export default function OrbitMapPage() {
     <AppPageShell
       className="orbit-route-default"
       layout="column"
+      watermark={<PageWatermark variant="orbit" />}
+      mainTop={
+        syncProgressVisible ? (
+          <ScrollingProgressBar className="relative z-50" />
+        ) : null
+      }
+      mainProps={{ "aria-busy": syncProgressVisible }}
       sidebar={
         <Sidebar
           tags={tags}
@@ -173,19 +188,23 @@ export default function OrbitMapPage() {
           lastSyncAt={lastSyncAt}
           totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
+          onSyncStateChange={handleSyncStateChange}
         />
       }
     >
         <PageHeader
-          title={
-            <span className="flex items-center gap-2">
-              <OrbitLogoMark className="size-5" />
-              Graph
-            </span>
-          }
-          description={headerDescription}
-          leading={
-            <div className="md:hidden">
+          sticky
+          chromeless
+          compactable
+          className={cn(
+            "border-b border-hairline-strong",
+            appFeedHeaderFrostedClassName
+          )}
+          bodyClassName="px-0 py-0"
+        >
+          <OrbitMapCommandBar
+            ref={searchInputRef}
+            mobileSidebar={
               <MobileSidebar
                 tags={tags}
                 collections={collections}
@@ -195,35 +214,26 @@ export default function OrbitMapPage() {
                 lastSyncAt={lastSyncAt}
                 totalBookmarks={libraryStats?.libraryBookmarkCount}
                 onSyncComplete={handleSyncComplete}
+                onSyncStateChange={handleSyncStateChange}
               />
-            </div>
-          }
-          actions={
-            <div className="flex items-center gap-2">
-              <KeyboardShortcutsHelpButton
-                open={keyboardShortcutsOpen}
-                onOpenChange={setKeyboardShortcutsOpen}
-                groups={ORBIT_MAP_SHORTCUT_GROUPS}
-                description="Orbit graph search, view, and assignment shortcuts."
-              />
-              <OrbitMapLegendButton />
-              <OrbitMapScopeMenu
-                graphScope={graphScope}
-                isLoading={isLoading}
-                onScopeChange={handleScopeChange}
-              />
-              <Link
-                href="/orbit"
-                aria-label="Back to Orbit queue"
-                className="inline-flex h-9 items-center gap-1.5 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              >
-                <ArrowLeft className="size-4" />
-                <span className="hidden sm:inline">Orbit queue</span>
-              </Link>
-              {dbUser ? <UserNavDynamic user={dbUser} /> : null}
-            </div>
-          }
-        />
+            }
+            user={dbUser ?? undefined}
+            description={headerDescription}
+            graphScope={graphScope}
+            isLoading={isLoading}
+            onScopeChange={handleScopeChange}
+            isFetching={isFetching}
+            hasGraph={Boolean(graph)}
+            search={search}
+            onSearchChange={setSearch}
+            searchQuery={searchDeferred}
+            searchResults={searchResults}
+            onResultSelect={handleSearchResultSelect}
+            keyboardShortcutsOpen={keyboardShortcutsOpen}
+            onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
+            shortcutGroups={ORBIT_MAP_SHORTCUT_GROUPS}
+          />
+        </PageHeader>
 
         <div
           className={cn(
@@ -235,28 +245,18 @@ export default function OrbitMapPage() {
             ref={stageRef}
             className={cn(
               "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
-              "rounded-sm border border-hairline-strong dark:border-white/[0.055] bg-background dark:bg-black"
+              orbitMapStageClass()
             )}
           >
             {isLoading ? (
-              <div
-                className={cn(
-                  "flex h-full w-full items-center justify-center",
-                  "bg-background dark:bg-black"
-                )}
-              >
-                <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-white/60">
+              <div className="flex h-full w-full items-center justify-center bg-background">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
                   Charting graph…
                 </div>
               </div>
             ) : isError ? (
-              <div
-                className={cn(
-                  "flex h-full w-full items-center justify-center p-6",
-                  "bg-background dark:bg-black"
-                )}
-              >
+              <div className="flex h-full w-full items-center justify-center bg-background p-6">
                 <ErrorState
                   layout="stage"
                   title="Graph could not be loaded"
@@ -269,12 +269,7 @@ export default function OrbitMapPage() {
                 />
               </div>
             ) : graphIsEmpty ? (
-              <div
-                className={cn(
-                  "flex h-full w-full flex-col items-center justify-center p-8",
-                  "bg-background dark:bg-black"
-                )}
-              >
+              <div className="flex h-full w-full flex-col items-center justify-center bg-background p-8">
                 <EmptyState
                   layout="stage"
                   title="Nothing to chart yet"
@@ -308,7 +303,7 @@ export default function OrbitMapPage() {
                 onNodeDropped={handleNodeDropped}
                 focus={focus}
                 className="h-full w-full"
-                filterControlsClassName="left-4 top-[4.5rem]"
+                filterControlsClassName="left-4 top-4"
                 zoomControlsClassName="bottom-[calc(30dvh+1.25rem)] right-4 lg:bottom-4"
               />
             ) : null}
@@ -322,17 +317,6 @@ export default function OrbitMapPage() {
                 containerHeight={stageSize.height}
               />
             ) : null}
-
-            <OrbitMapCommandSurface
-              isFetching={isFetching}
-              hasGraph={Boolean(graph)}
-              search={search}
-              searchQuery={searchDeferred}
-              searchResults={searchResults}
-              searchInputRef={searchInputRef}
-              onSearchChange={setSearch}
-              onResultSelect={handleSearchResultSelect}
-            />
 
             {stats && (
               <OrbitMapStatsStrip

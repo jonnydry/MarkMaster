@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import { useTheme } from '@/components/providers';
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
 import { OrbitMapMinimap } from './orbit-map-minimap';
@@ -98,6 +99,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const filter = props.filter;
     const propsRef = useRef(props);
     propsRef.current = props;
+    const { theme } = useTheme();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const canvasTransferRetryRef = useRef(0);
@@ -171,6 +173,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             height: canvas.clientHeight,
             dpr: window.devicePixelRatio || 1,
             debugPerf: getOrbitMapDebugPerfEnabled(),
+            colorMode: theme,
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -332,7 +335,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           workerRef.current = null;
         }
       };
-    }, [canvasInstance, bumpLayoutVersion]);
+    }, [canvasInstance, bumpLayoutVersion, theme]);
+
+    useEffect(() => {
+      if (!workerRef.current || useFallback) return;
+      workerRef.current.postMessage({
+        type: WorkerMessageType.SET_THEME,
+        protocolVersion: 1,
+        colorMode: theme,
+      });
+    }, [theme, useFallback, workerGeneration]);
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");

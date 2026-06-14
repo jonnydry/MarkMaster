@@ -3,6 +3,7 @@ export function hasFeedPageWatermark(pathname: string) {
   return (
     pathname === "/dashboard" ||
     pathname === "/orbit" ||
+    pathname === "/orbit/map" ||
     pathname === "/collections"
   );
 }

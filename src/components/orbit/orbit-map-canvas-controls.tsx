@@ -1,6 +1,12 @@
 "use client";
 
 import { Clock, Filter, Layers, Minus, Plus, RotateCcw } from "lucide-react";
+import {
+  orbitMapControlButtonClass,
+  orbitMapZoomButtonClass,
+  orbitMapZoomDividerClass,
+  orbitMapZoomShellClass,
+} from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import type { GraphFilter } from "@/lib/orbit-worker-protocol";
 
@@ -27,8 +33,8 @@ export function OrbitMapCanvasControls({
   onZoomOut,
   onResetView,
   filterControlsClassName,
-  zoomControlsClassName}: OrbitMapCanvasControlsProps) {
-
+  zoomControlsClassName,
+}: OrbitMapCanvasControlsProps) {
   return (
     <>
       <div
@@ -44,12 +50,7 @@ export function OrbitMapCanvasControls({
             key={key}
             type="button"
             onClick={() => onFilterChange(key)}
-            className={cn(
-              "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
-              activeFilter === key
-                ? "border-white/[0.08] bg-white/[0.13] text-white"
-                : "text-white/50 hover:bg-white/[0.06] hover:text-white"
-            )}
+            className={orbitMapControlButtonClass(activeFilter === key)}
             title={label}
           >
             <Icon className="size-3.5" />
@@ -66,54 +67,30 @@ export function OrbitMapCanvasControls({
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >
-        <div
-          className={cn(
-            "pointer-events-auto inline-flex flex-col overflow-hidden rounded-sm border shadow-none backdrop-blur-xl",
-            "border-white/[0.055] bg-white/[0.035]"
-          )}
-        >
+        <div className={orbitMapZoomShellClass()}>
           <button
             type="button"
             aria-label="Zoom in"
             onClick={onZoomIn}
-            className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-              "text-white/70 hover:bg-white/[0.08] hover:text-white"
-            )}
+            className={orbitMapZoomButtonClass()}
           >
             <Plus className="size-4" />
           </button>
-          <span
-            className={cn(
-              "h-px w-full",
-              "bg-white/[0.08]"
-            )}
-          />
+          <span className={orbitMapZoomDividerClass()} />
           <button
             type="button"
             aria-label="Zoom out"
             onClick={onZoomOut}
-            className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-              "text-white/70 hover:bg-white/[0.08] hover:text-white"
-            )}
+            className={orbitMapZoomButtonClass()}
           >
             <Minus className="size-4" />
           </button>
-          <span
-            className={cn(
-              "h-px w-full",
-              "bg-white/[0.08]"
-            )}
-          />
+          <span className={orbitMapZoomDividerClass()} />
           <button
             type="button"
             aria-label="Reset view"
             onClick={onResetView}
-            className={cn(
-              "inline-flex h-9 w-9 items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-              "text-white/70 hover:bg-white/[0.08] hover:text-white"
-            )}
+            className={orbitMapZoomButtonClass()}
           >
             <RotateCcw className="size-4" />
           </button>

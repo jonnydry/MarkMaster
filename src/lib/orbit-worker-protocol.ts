@@ -73,6 +73,7 @@ export const WorkerMessageType = {
   RESET_VIEW: "RESET_VIEW",
   ANIMATE_ASSIGN: "ANIMATE_ASSIGN",
   FOCUS_PULSE: "FOCUS_PULSE",
+  SET_THEME: "SET_THEME",
 
   // Lifecycle
   DESTROY: "DESTROY",
@@ -188,6 +189,8 @@ export interface InitMessage {
   initialCamera?: CameraState;
   /** Development-only internal timing logs; ignored by production builds. */
   debugPerf?: boolean;
+  /** App color mode — drives canvas background and label contrast. */
+  colorMode?: "light" | "dark";
 }
 
 export interface SetGraphMessage {
@@ -380,6 +383,12 @@ export interface FocusPulseMessage {
   duration?: number;
 }
 
+export interface SetThemeMessage {
+  type: typeof WorkerMessageType.SET_THEME;
+  protocolVersion: number;
+  colorMode: "light" | "dark";
+}
+
 /** Union of all messages the main thread may send to the worker. */
 export type WorkerMessage =
   | InitMessage
@@ -406,7 +415,8 @@ export type WorkerMessage =
   | AnimateAssignMessage
   | RequestLayoutMessage
   | DestroyMessage
-  | FocusPulseMessage;
+  | FocusPulseMessage
+  | SetThemeMessage;
 
 // Grouped unions for handler typing
 export type CameraControlMessage =

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef } from "react";
 
+import { useTheme } from "@/components/providers";
+import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import type { CameraState } from "@/lib/orbit-worker-protocol";
 import type { OrbitGraphPayload } from "@/types";
@@ -75,6 +77,7 @@ export function OrbitMapMinimap({
   onJump,
   className,
 }: OrbitMapMinimapProps) {
+  const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<MinimapTransform | null>(null);
 
@@ -146,7 +149,10 @@ export function OrbitMapMinimap({
       const worldWidth = viewport.width / camera.zoom;
       const worldHeight = viewport.height / camera.zoom;
 
-      ctx.strokeStyle = "rgba(226,232,240,0.85)";
+      ctx.strokeStyle =
+        theme === "dark"
+          ? "rgba(226,232,240,0.85)"
+          : "rgba(15,23,42,0.55)";
       ctx.lineWidth = 1;
       ctx.strokeRect(
         worldLeft * scale + offsetX,
@@ -155,7 +161,7 @@ export function OrbitMapMinimap({
         worldHeight * scale
       );
     }
-  }, [graph, positions, layoutVersion, camera, viewport]);
+  }, [graph, positions, layoutVersion, camera, viewport, theme]);
 
   const jumpToEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const transform = transformRef.current;
@@ -183,7 +189,8 @@ export function OrbitMapMinimap({
         if (event.buttons & 1) jumpToEvent(event);
       }}
       className={cn(
-        "map-glass cursor-pointer rounded-sm",
+        orbitMapFloatingShellClass(),
+        "cursor-pointer",
         className
       )}
       style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}

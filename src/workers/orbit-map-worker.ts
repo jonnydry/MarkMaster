@@ -32,6 +32,7 @@ import {
   type PointerEventMessage,
   type AnimateAssignMessage,
   type FocusPulseMessage,
+  type SetThemeMessage,
   type FocusOnMessage,
   type SetSelectionMessage,
   type SetHighlightMessage,
@@ -50,6 +51,11 @@ import {
   searchOrbitMapIndex,
   type OrbitMapSearchIndexEntry,
 } from '@/lib/orbit-map-search';
+import {
+  getOrbitMapLabelFill,
+  getOrbitMapPalette,
+  type OrbitMapColorMode,
+} from '@/lib/orbit-map-palette';
 import { buildOrbitMapStructureKey } from '@/lib/orbit-map-structure-key';
 import {
   Container,
@@ -204,7 +210,7 @@ const LABEL_ZOOM_THRESHOLD = 0.6;
 const LABEL_BASE_FONT_SIZE = 18;
 const LABEL_MIN_WORLD_SCALE = 0.16;
 const LABEL_MAX_WORLD_SCALE = 2.35;
-const GRAPH_BACKGROUND_COLOR = 0x000000;
+let colorMode: OrbitMapColorMode = 'dark';
 const MIN_CAMERA_ZOOM = 0.12;
 const MAX_CAMERA_ZOOM = 1.85;
 const CAMERA_FRAME_PADDING = 72;
@@ -233,6 +239,10 @@ interface MapAnimation {
 
 const activeAnimations: MapAnimation[] = [];
 let renderLoopRunning = false;
+
+function getPalette() {
+  return getOrbitMapPalette(colorMode);
+}
 
 /** Send a message back to the main thread. */
 function postToMain(msg: MainMessage, transfer: Transferable[] = []) {
@@ -479,6 +489,10 @@ function handleMessage(event: MessageEvent<WorkerMessage>) {
       sendLayoutUpdate(true);
       break;
 
+    case WorkerMessageType.SET_THEME:
+      handleSetTheme(msg as SetThemeMessage);
+      break;
+
     case WorkerMessageType.DESTROY:
       handleDestroy();
       break;
@@ -494,6 +508,9 @@ function handleInit(msg: InitMessage) {
     return;
   }
 
+  colorMode = msg.colorMode ?? 'dark';
+  const palette = getPalette();
+
   try {
     perf = createOrbitMapPerfLogger(Boolean(msg.debugPerf));
     const initStartedAt =
@@ -508,7 +525,7 @@ function handleInit(msg: InitMessage) {
       height: msg.height,
       resolution: msg.dpr,
       antialias: true,
-      backgroundColor: GRAPH_BACKGROUND_COLOR,
+      backgroundColor: palette.background,
       autoDensity: true,
     }).then(() => {
       isInitialized = true;
@@ -524,7 +541,7 @@ function handleInit(msg: InitMessage) {
         style: {
           fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontSize: LABEL_BASE_FONT_SIZE,
-          fill: 0xe2e8f0,
+          fill: palette.labelDefault,
         },
         chars: BitmapFontManager.ASCII,
       });
@@ -556,6 +573,42 @@ function handleResize(msg: ResizeMessage) {
   layoutVignette(msg.width, msg.height);
   constrainCamera();
   updateNodeStyles();
+}
+
+function handleSetTheme(msg: SetThemeMessage) {
+  if (msg.colorMode === colorMode) return;
+  colorMode = msg.colorMode;
+  applyColorMode();
+}
+
+function applyColorMode() {
+  const palette = getPalette();
+  if (app) {
+    app.renderer.background.color = palette.background;
+  }
+  refreshBackgroundAtmosphere();
+  if (currentGraph) {
+    rebuildLinkDataFromGraph();
+  }
+  updateNodeStyles();
+  if (app) {
+    app.renderer.render(app.stage);
+  }
+}
+
+function refreshBackgroundAtmosphere() {
+  if (!app || !backgroundContainer || !starfieldContainer) return;
+
+  if (vignetteSprite) {
+    backgroundContainer.removeChild(vignetteSprite);
+    vignetteSprite.destroy({ texture: true });
+    vignetteSprite = null;
+  }
+
+  vignetteSprite = createOrbitMapVignetteSprite(colorMode);
+  backgroundContainer.addChildAt(vignetteSprite, 0);
+  layoutVignette(app.renderer.width, app.renderer.height);
+  buildOrbitMapStarfield(starfieldContainer, colorMode);
 }
 
 function handleSetGraph(msg: SetGraphMessage) {
@@ -697,11 +750,11 @@ function buildBackground() {
   glowTexture = glowTexture ?? createOrbitMapGlowTexture();
 
   if (!vignetteSprite) {
-    vignetteSprite = createOrbitMapVignetteSprite();
+    vignetteSprite = createOrbitMapVignetteSprite(colorMode);
     backgroundContainer.addChild(vignetteSprite);
   }
   layoutVignette(app.renderer.width, app.renderer.height);
-  buildOrbitMapStarfield(starfieldContainer);
+  buildOrbitMapStarfield(starfieldContainer, colorMode);
 }
 
 /**
@@ -958,6 +1011,7 @@ function applyBookmarkAccentColors() {
 
 function rebuildLinkDataFromGraph() {
   if (!currentGraph) return;
+  const palette = getPalette();
   linkData = [];
   for (const edge of currentGraph.edges) {
     if (edge.kind === 'loose') continue;
@@ -978,7 +1032,7 @@ function rebuildLinkDataFromGraph() {
       color:
         target.kind === 'tag' || target.kind === 'collection'
           ? target.visual.color
-          : 0x334155,
+          : palette.linkFallback,
     });
   }
 }
@@ -986,6 +1040,7 @@ function rebuildLinkDataFromGraph() {
 function drawNodeShape(g: Graphics, datum: MapNode) {
   g.clear();
   const visualStyle = datum.visual;
+  const palette = getPalette();
 
   if (visualStyle.isHub) {
     g.circle(0, 0, datum.radius + 1.5);
@@ -997,7 +1052,7 @@ function drawNodeShape(g: Graphics, datum: MapNode) {
     });
     g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
     g.fill({ color: visualStyle.color, alpha: 1 });
-    g.stroke({ width: 1, color: 0xffffff, alpha: 0.43 });
+    g.stroke({ width: 1, color: palette.hubInnerStroke, alpha: 0.43 });
   } else {
     g.circle(0, 0, datum.radius);
     g.fill({ color: visualStyle.color, alpha: 1 });
@@ -1286,7 +1341,7 @@ function drawLinks(focusContext: FocusContext, bounds: OrbitMapViewBounds | null
         : 1.35
       : 0.85;
     const linkColor = touchesActive
-      ? mixOrbitMapColors(link.color, 0xffffff, 0.45)
+      ? mixOrbitMapColors(link.color, getPalette().linkHighlightMix, 0.45)
       : link.color;
 
     const sx = source.x;
@@ -1430,7 +1485,10 @@ function updateLabels(focusContext: FocusContext) {
       label.text = labelText;
     }
 
-    label.style.fill = isActive ? 0xf8fafc : isNeighbor ? 0xcbd5e1 : 0xe2e8f0;
+    label.style.fill = getOrbitMapLabelFill(
+      getPalette(),
+      isActive ? 'active' : isNeighbor ? 'neighbor' : 'default'
+    );
     label.style.fontWeight = isActive ? '600' : '400';
 
     positionLabel(label, datum, focusContext);

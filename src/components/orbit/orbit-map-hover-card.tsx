@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock } from "lucide-react";
+import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitGraphNode } from "@/types";
 
@@ -17,7 +18,8 @@ export function OrbitMapHoverCard({
   x,
   y,
   containerWidth,
-  containerHeight}: OrbitMapHoverCardProps) {
+  containerHeight,
+}: OrbitMapHoverCardProps) {
   const maxLeft = Math.max(8, containerWidth - 272);
   const maxTop = Math.max(8, containerHeight - 140);
   const preferredLeft = x + 14;
@@ -27,12 +29,13 @@ export function OrbitMapHoverCard({
     <div
       data-orbit-hover-card
       className={cn(
-        "pointer-events-none absolute z-20 w-64 p-3 opacity-95 shadow-none transition-[opacity,transform] duration-150 ease-out will-change-transform",
-        "map-glass rounded-sm"
+        orbitMapFloatingShellClass(),
+        "pointer-events-none absolute z-20 w-64 p-3 opacity-95 transition-[opacity,transform] duration-150 ease-out will-change-transform"
       )}
       style={{
         left: Math.min(Math.max(sideAwareLeft, 8), maxLeft),
-        top: Math.min(Math.max(y + 14, 8), maxTop)}}
+        top: Math.min(Math.max(y + 14, 8), maxTop),
+      }}
     >
       <div className="flex items-center gap-2">
         <span
@@ -41,21 +44,11 @@ export function OrbitMapHoverCard({
             node.affiliated ? "bg-muted-foreground/45" : "bg-primary"
           )}
         />
-        <span
-          className={cn(
-            "truncate text-xs font-semibold",
-            "text-white"
-          )}
-        >
+        <span className="truncate text-xs font-semibold text-foreground">
           @{node.authorUsername}
         </span>
       </div>
-      <p
-        className={cn(
-          "mt-1.5 line-clamp-3 text-xs leading-relaxed",
-          "text-white/75"
-        )}
-      >
+      <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
         {node.title}
       </p>
       {node.recent ? (

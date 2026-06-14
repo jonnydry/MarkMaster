@@ -18,6 +18,7 @@ import { useOrbitMapAssignments } from "@/hooks/use-orbit-map-assignments";
 import { useOrbitMapLayout } from "@/hooks/use-orbit-map-layout";
 import { useOrbitMapSearch } from "@/hooks/use-orbit-map-search";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
+import { useSyncStatus } from "@/hooks/use-sync-status";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
@@ -98,6 +99,8 @@ export function useOrbitMapPage() {
     null
   );
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
+  const { data: syncStatus } = useSyncStatus();
+  const [syncRequestLoading, setSyncRequestLoading] = useState(false);
 
   const {
     data: graph,
@@ -281,6 +284,13 @@ export function useOrbitMapPage() {
     completeLibrarySyncFromBootstrap({ refetch: () => void refetch() });
   }, [completeLibrarySyncFromBootstrap, refetch]);
 
+  const handleSyncStateChange = useCallback((syncing: boolean) => {
+    setSyncRequestLoading(syncing);
+  }, []);
+
+  const syncProgressVisible =
+    syncRequestLoading || Boolean(syncStatus?.currentRun);
+
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
       setExpandedAnchors([]);
@@ -406,6 +416,8 @@ export function useOrbitMapPage() {
     goToTagOnDashboard,
     handleCreateCollectionOpen,
     handleSyncComplete,
+    handleSyncStateChange,
+    syncProgressVisible,
     handleSelectionChange,
     handleCanvasSelectionChange,
     handleScopeChange,

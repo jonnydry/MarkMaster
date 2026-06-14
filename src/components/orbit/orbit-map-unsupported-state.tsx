@@ -14,7 +14,7 @@ export function OrbitMapUnsupportedState() {
       className={cn(
         "flex h-full min-h-[320px] w-full items-center justify-center rounded-sm border p-6",
         orbitHairlineBorder(),
-        "bg-[#070b13]"
+        "bg-background"
       )}
     >
       <div className="max-w-sm text-center">

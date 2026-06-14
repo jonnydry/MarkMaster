@@ -6,6 +6,8 @@
 
 import { Container, Graphics, Sprite, Texture } from "pixi.js";
 
+import type { OrbitMapColorMode } from "@/lib/orbit-map-palette";
+
 /** Renders a radial gradient onto an OffscreenCanvas and wraps it in a Texture. */
 export function createOrbitMapRadialGradientTexture(
   size: number,
@@ -39,12 +41,22 @@ export function createOrbitMapGlowTexture(): Texture {
   ]);
 }
 
-export function createOrbitMapVignetteSprite(): Sprite {
-  const texture = createOrbitMapRadialGradientTexture(256, [
-    [0, "rgba(30,41,59,0.5)"],
-    [0.55, "rgba(15,23,42,0.22)"],
-    [1, "rgba(0,0,0,0)"],
-  ]);
+export function createOrbitMapVignetteSprite(
+  mode: OrbitMapColorMode = "dark"
+): Sprite {
+  const stops =
+    mode === "light"
+      ? ([
+          [0, "rgba(15,23,42,0.05)"],
+          [0.55, "rgba(15,23,42,0.025)"],
+          [1, "rgba(0,0,0,0)"],
+        ] as Array<[number, string]>)
+      : ([
+          [0, "rgba(30,41,59,0.5)"],
+          [0.55, "rgba(15,23,42,0.22)"],
+          [1, "rgba(0,0,0,0)"],
+        ] as Array<[number, string]>);
+  const texture = createOrbitMapRadialGradientTexture(256, stops);
   const sprite = new Sprite(texture);
   sprite.anchor.set(0.5);
   return sprite;
@@ -62,9 +74,12 @@ function createSeededRandom(seed: number) {
   };
 }
 
-/** Fills the container with distant stars (no-op when already built). */
-export function buildOrbitMapStarfield(container: Container) {
-  if (container.children.length > 0) return;
+/** Fills the container with distant stars (rebuilt when color mode changes). */
+export function buildOrbitMapStarfield(
+  container: Container,
+  mode: OrbitMapColorMode = "dark"
+) {
+  container.removeChildren();
   const random = createSeededRandom(0x0c0ffee);
   const stars = new Graphics();
   for (let i = 0; i < 240; i++) {
@@ -74,8 +89,18 @@ export function buildOrbitMapStarfield(container: Container) {
     const blue = random() > 0.7;
     stars.circle(x, y, radius);
     stars.fill({
-      color: blue ? 0x93c5fd : 0xffffff,
-      alpha: 0.05 + random() * 0.14,
+      color:
+        mode === "light"
+          ? blue
+            ? 0x2563eb
+            : 0x64748b
+          : blue
+            ? 0x93c5fd
+            : 0xffffff,
+      alpha:
+        mode === "light"
+          ? 0.03 + random() * 0.08
+          : 0.05 + random() * 0.14,
     });
   }
   container.addChild(stars);
