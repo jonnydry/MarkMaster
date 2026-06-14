@@ -21,6 +21,7 @@ export const syncRunSelect = {
   pagesFetched: true,
   resumeToken: true,
   continuationToken: true,
+  includeFolders: true,
   startedAt: true,
   completedAt: true,
 } as const;
@@ -75,7 +76,10 @@ export async function markStaleActiveSyncRuns(
   });
 }
 
-export async function enqueueSyncRun(userId: string): Promise<EnqueueSyncResult> {
+export async function enqueueSyncRun(
+  userId: string,
+  options: { includeFolders?: boolean } = {}
+): Promise<EnqueueSyncResult> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sync:${userId}`}))`;
 
@@ -117,6 +121,7 @@ export async function enqueueSyncRun(userId: string): Promise<EnqueueSyncResult>
         userId,
         status: "PENDING",
         continuationToken: continuationToken ?? null,
+        includeFolders: options.includeFolders ?? false,
       },
       select: { id: true },
     });
@@ -129,7 +134,13 @@ export async function processSyncRun(runId: string) {
   const claimed = await prisma.$transaction(async (tx) => {
     const run = await tx.syncRun.findUnique({
       where: { id: runId },
-      select: { id: true, userId: true, status: true, continuationToken: true },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        continuationToken: true,
+        includeFolders: true,
+      },
     });
 
     if (!run || run.status !== "PENDING") {
@@ -158,6 +169,7 @@ export async function processSyncRun(runId: string) {
         id: true,
         userId: true,
         continuationToken: true,
+        includeFolders: true,
       },
     });
   });
@@ -169,7 +181,8 @@ export async function processSyncRun(runId: string) {
   await executeSyncRun(
     claimed.id,
     claimed.userId,
-    claimed.continuationToken ?? undefined
+    claimed.continuationToken ?? undefined,
+    claimed.includeFolders
   );
 
   return { processed: true as const, runId: claimed.id };

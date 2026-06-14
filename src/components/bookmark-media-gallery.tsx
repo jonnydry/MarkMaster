@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useCallback, type MouseEvent } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  type MouseEvent,
+  type PointerEvent,
+  type CSSProperties,
+} from "react";
+import { flushSync } from "react-dom";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import {
   type BookmarkMediaJson,
+  getMediaPlaybackUrl,
   getMediaPosterUrl,
   getMediaTileKey,
   isVideoLikeMediaType,
@@ -64,6 +73,17 @@ const LAYOUT: Record<
 
 type TileMode = "poster" | "video" | "external-cta";
 
+function stopGalleryEventBubble(event: MouseEvent | PointerEvent) {
+  event.stopPropagation();
+}
+
+function getTileAspectStyle(item: BookmarkMediaJson): CSSProperties | undefined {
+  if (item.width && item.height && item.height > 0) {
+    return { aspectRatio: `${item.width} / ${item.height}` };
+  }
+  return undefined;
+}
+
 interface MediaTileProps {
   item: BookmarkMediaJson;
   tileKey: string;
@@ -96,26 +116,34 @@ function MediaTile({
   const poster = getMediaPosterUrl(item);
   const isCompact = Boolean(layout.compactTileClass);
   const videoLike = isVideoLikeMediaType(item.type);
+  const playbackUrl = getMediaPlaybackUrl(item);
+  const isGif = item.type === "animated_gif";
+  const aspectStyle = getTileAspectStyle(item);
 
-  if (mode === "video" && item.playback_url) {
+  if (mode === "video" && playbackUrl) {
     return (
       <div
+        data-media-tile={tileKey}
         className={cn(
-          "relative overflow-hidden bg-black",
-          isCompact ? layout.compactTileClass : "w-full",
-          !isCompact && singleInGallery && layout.singleTileClass
+          "relative w-full overflow-hidden bg-black",
+          isCompact ? layout.compactTileClass : "",
+          !isCompact && singleInGallery && layout.singleTileClass,
+          !isCompact && !aspectStyle && !singleInGallery && "aspect-video",
+          !isCompact && !aspectStyle && singleInGallery && "aspect-video"
         )}
+        style={aspectStyle}
       >
         <video
-          key={tileKey}
-          src={item.playback_url}
+          src={playbackUrl}
           controls
           playsInline
+          preload="metadata"
+          loop={isGif}
+          muted={isGif}
           poster={poster}
           className={cn(
-            "h-full w-full",
-            isCompact ? "object-cover" : "object-contain",
-            !isCompact && singleInGallery && layout.singleTileClass
+            "block size-full",
+            isCompact ? "object-cover" : "object-contain"
           )}
           aria-label={`Video from @${authorUsername}`}
         />
@@ -149,48 +177,36 @@ function MediaTile({
     !isCompact && (singleInGallery ? layout.singleTileClass : layout.multiTileClass)
   );
 
-  return (
-    <div
-      className={cn("relative", isCompact && layout.compactTileClass)}
-      onClick={
-        videoLike
-          ? (e) => {
-              e.stopPropagation();
-              onActivate();
-            }
-          : undefined
-      }
-      role={videoLike ? "button" : undefined}
-      tabIndex={videoLike ? 0 : undefined}
-      onKeyDown={
-        videoLike
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onActivate();
-              }
-            }
-          : undefined
-      }
-      aria-label={
-        videoLike
-          ? mode === "poster" && item.playback_url
+  if (videoLike) {
+    return (
+      <button
+        type="button"
+        data-media-tile={tileKey}
+        className={cn(
+          "relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left",
+          isCompact && layout.compactTileClass
+        )}
+        onClick={(e) => {
+          stopGalleryEventBubble(e);
+          onActivate();
+        }}
+        onPointerDown={stopGalleryEventBubble}
+        aria-label={
+          playbackUrl
             ? `Play video from @${authorUsername}`
             : `Open video on X from @${authorUsername}`
-          : undefined
-      }
-    >
-      <Image
-        src={poster}
-        alt={`Media ${index + 1} from @${authorUsername}`}
-        width={item.width || 1200}
-        height={item.height || 900}
-        sizes={layout.imageSizes}
-        className={imageClass}
-        priority={priority && index === 0}
-        onError={() => onImageError(poster)}
-      />
-      {videoLike && (
+        }
+      >
+        <Image
+          src={poster}
+          alt=""
+          width={item.width || 1200}
+          height={item.height || 900}
+          sizes={layout.imageSizes}
+          className={imageClass}
+          priority={priority && index === 0}
+          onError={() => onImageError(poster)}
+        />
         <div
           className={cn(
             "pointer-events-none absolute inset-0 flex items-center justify-center",
@@ -202,7 +218,30 @@ function MediaTile({
             <Play className="size-4 fill-current" />
           </span>
         </div>
-      )}
+        {showCountOverlay != null && showCountOverlay > 0 && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/55 text-base font-semibold text-white"
+          >
+            +{showCountOverlay}
+          </div>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className={cn("relative", isCompact && layout.compactTileClass)}>
+      <Image
+        src={poster}
+        alt={`Media ${index + 1} from @${authorUsername}`}
+        width={item.width || 1200}
+        height={item.height || 900}
+        sizes={layout.imageSizes}
+        className={imageClass}
+        priority={priority && index === 0}
+        onError={() => onImageError(poster)}
+      />
       {showCountOverlay != null && showCountOverlay > 0 && (
         <div
           aria-hidden
@@ -239,13 +278,11 @@ export function BookmarkMediaGallery({
   stopClickPropagation = false,
 }: BookmarkMediaGalleryProps) {
   const layout = LAYOUT[variant];
+  const galleryRef = useRef<HTMLDivElement>(null);
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const [playingKey, setPlayingKey] = useState<string | null>(null);
 
   // Reset transient gallery state when switching to a different bookmark.
-  // Adjusting state during render (rather than in an effect) avoids cascading
-  // re-renders and applies synchronously before paint. See React docs:
-  // "You Might Not Need an Effect" → resetting state when a prop changes.
   const [prevBookmarkKey, setPrevBookmarkKey] = useState(bookmarkKey);
   if (bookmarkKey !== prevBookmarkKey) {
     setPrevBookmarkKey(bookmarkKey);
@@ -261,20 +298,46 @@ export function BookmarkMediaGallery({
     if (tweetLink) openBookmarkOnX(tweetLink);
   }, [tweetLink]);
 
+  const playMountedVideo = useCallback((item: BookmarkMediaJson, key: string) => {
+    const video = galleryRef.current?.querySelector<HTMLVideoElement>(
+      `[data-media-tile="${key}"] video`
+    );
+    if (!video) return;
+    if (item.type === "animated_gif") {
+      video.muted = true;
+      video.loop = true;
+    }
+    const attemptPlay = () => {
+      void video.play().catch(() => {});
+    };
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      attemptPlay();
+      return;
+    }
+    video.addEventListener("loadeddata", attemptPlay, { once: true });
+  }, []);
+
   if (!media.length || !authorUsername) return null;
 
   const visible = media.slice(0, layout.maxTiles);
   const extraCount = media.length - layout.maxTiles;
   const singleInGallery = visible.length === 1;
 
-  const shellProps = stopClickPropagation
+  const isolateClicks = stopClickPropagation || layout.allowInlinePlayback;
+
+  const shellProps = isolateClicks
     ? {
-        onClick: (e: MouseEvent) => e.stopPropagation(),
+        "data-bookmark-media-gallery": true,
+        onClick: stopGalleryEventBubble,
       }
-    : {};
+    : { "data-bookmark-media-gallery": true };
 
   const getMode = (item: BookmarkMediaJson, key: string): TileMode => {
-    if (playingKey === key && layout.allowInlinePlayback && item.playback_url) {
+    if (
+      playingKey === key &&
+      layout.allowInlinePlayback &&
+      getMediaPlaybackUrl(item)
+    ) {
       return "video";
     }
     const poster = getMediaPosterUrl(item);
@@ -292,8 +355,9 @@ export function BookmarkMediaGallery({
     const videoLike = isVideoLikeMediaType(item.type);
     if (!videoLike) return;
 
-    if (layout.allowInlinePlayback && item.playback_url) {
-      setPlayingKey(key);
+    if (layout.allowInlinePlayback && getMediaPlaybackUrl(item)) {
+      flushSync(() => setPlayingKey(key));
+      playMountedVideo(item, key);
       return;
     }
     openOnX();
@@ -301,7 +365,13 @@ export function BookmarkMediaGallery({
 
   return (
     <div
-      className={cn(layout.shellClass, layout.gridClass(visible.length), className)}
+      ref={galleryRef}
+      className={cn(
+        layout.shellClass,
+        layout.gridClass(visible.length),
+        "[content-visibility:visible]",
+        className
+      )}
       {...shellProps}
     >
       {visible.map((item, i) => {

@@ -66,10 +66,10 @@ const securityHeaders = [
   {
     key: "Permissions-Policy",
     value:
-      "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), bluetooth=(), camera=(), " +
-      "display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), gamepad=(), " +
+      "accelerometer=(), ambient-light-sensor=(), battery=(), bluetooth=(), camera=(), " +
+      "display-capture=(), document-domain=(), fullscreen=(self), gamepad=(), " +
       "geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), " +
-      "midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), " +
+      "midi=(), payment=(), picture-in-picture=(self), publickey-credentials-get=(), screen-wake-lock=(), " +
       "serial=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()",
   },
   {

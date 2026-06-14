@@ -144,6 +144,16 @@ export const BookmarkCard = memo(function BookmarkCard({
 
     onSelect?.(bookmark.id);
   };
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isInteractive) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-bookmark-media-gallery]")
+    ) {
+      return;
+    }
+    handleCardActivation();
+  };
   const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isInteractive) return;
     if (event.target !== event.currentTarget) return;
@@ -165,9 +175,8 @@ export const BookmarkCard = memo(function BookmarkCard({
             : ""
         }${className ? ` ${className}` : ""}`}
         data-dashboard-bookmark-id={bookmark.id}
-        role={isInteractive ? "button" : undefined}
         tabIndex={isInteractive ? 0 : undefined}
-        aria-pressed={isInteractive ? selected : undefined}
+        aria-current={isInteractive && selected ? "true" : undefined}
         aria-expanded={canExpandCompact ? false : undefined}
         aria-label={
           isInteractive
@@ -176,7 +185,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
             : undefined
         }
-        onClick={isInteractive ? handleCardActivation : undefined}
+        onClick={isInteractive ? handleCardClick : undefined}
         onKeyDown={handleCardKeyDown}
       >
         <BookmarkRank rank={rank} compact  />
@@ -267,9 +276,8 @@ export const BookmarkCard = memo(function BookmarkCard({
           : ""
       }${className ? ` ${className}` : ""}`}
       data-dashboard-bookmark-id={bookmark.id}
-      role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
-      aria-pressed={isInteractive ? selected : undefined}
+      aria-current={isInteractive && selected ? "true" : undefined}
       aria-expanded={canExpandCompact ? compactExpanded : undefined}
       aria-label={
         isInteractive
@@ -284,7 +292,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
           : undefined
       }
-      onClick={isInteractive ? handleCardActivation : undefined}
+      onClick={isInteractive ? handleCardClick : undefined}
       onKeyDown={handleCardKeyDown}
     >
       <div className="flex gap-3">
@@ -352,6 +360,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               variant="feed"
               bookmarkKey={bookmark.id}
               priority={priorityMedia}
+              stopClickPropagation
               tweetLink={{
                 authorUsername: bookmark.authorUsername,
                 tweetId: bookmark.tweetId}}

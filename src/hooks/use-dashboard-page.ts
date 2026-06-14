@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
@@ -23,7 +24,7 @@ import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { requestCompactSearchFocus } from "@/lib/compact-floating-search";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
-import type { ViewMode, BookmarkWithRelations, MediaFilter } from "@/types";
+import type { BookmarkWithRelations, MediaFilter } from "@/types";
 
 export type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -73,7 +74,7 @@ export function useDashboardPage() {
     }
   };
 
-  const [viewMode, setViewMode] = useState<ViewMode>("feed");
+  const { viewMode, setViewMode } = useBookmarkViewMode();
   const [showFilters, setShowFilters] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
@@ -309,9 +310,12 @@ export function useDashboardPage() {
 
   const handleBookmarkSelect = useCallback(
     (id: string) => {
-      handleExpandedBookmarkOpen(id);
+      setActiveBookmarkId(id);
+      if (viewMode === "grid") {
+        setGridOverlayBookmarkId(id);
+      }
     },
-    [handleExpandedBookmarkOpen]
+    [viewMode]
   );
 
   const handleGridOverlayOpenChange = useCallback((open: boolean) => {

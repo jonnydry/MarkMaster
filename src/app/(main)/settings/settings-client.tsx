@@ -15,6 +15,7 @@ import {
   BrainCircuit,
   KeyRound,
   ShieldCheck,
+  RefreshCw,
   Table2,
   type LucideIcon,
 } from "lucide-react";
@@ -42,11 +43,13 @@ import {
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
 import { completeLibrarySync } from "@/lib/library-sync";
+import { useSyncSettings } from "@/hooks/use-sync-settings";
 import {
   TYPOGRAPHY_PRESETS,
   type TypographyPresetId,
 } from "@/lib/typography-presets";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import {
   OrbitGrokStatusPanel,
   parseOrbitIssue,
@@ -76,11 +79,12 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     title: "Sections",
     shortcuts: [
       { id: "connection", keys: ["1"], label: "Connection" },
-      { id: "orbit-grok", keys: ["2"], label: "Orbit Grok" },
-      { id: "appearance", keys: ["3"], label: "Appearance" },
-      { id: "export", keys: ["4"], label: "Export" },
-      { id: "tags", keys: ["5"], label: "Tags" },
-      { id: "account", keys: ["6"], label: "Account" },
+      { id: "sync", keys: ["2"], label: "Sync" },
+      { id: "orbit-grok", keys: ["3"], label: "Orbit Grok" },
+      { id: "appearance", keys: ["4"], label: "Appearance" },
+      { id: "export", keys: ["5"], label: "Export" },
+      { id: "tags", keys: ["6"], label: "Tags" },
+      { id: "account", keys: ["7"], label: "Account" },
     ],
   },
   {
@@ -119,6 +123,11 @@ export default function SettingsPage() {
   } = useCollectionsQuery();
 
   const orbitStatusQuery = useOrbitStatusQuery(orbitIssue);
+  const {
+    syncXFolders,
+    setSyncXFolders,
+    isUpdating: isUpdatingSyncSettings,
+  } = useSyncSettings();
 
   const goToTagOnDashboard = (tagId: string) => {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
@@ -142,6 +151,7 @@ export default function SettingsPage() {
     shortcutGroups: SETTINGS_SHORTCUT_GROUPS,
     actions: {
       connection: () => scrollToSettingsSection("connection"),
+      sync: () => scrollToSettingsSection("sync"),
       "orbit-grok": () => scrollToSettingsSection("orbit-grok"),
       appearance: () => scrollToSettingsSection("appearance"),
       export: () => scrollToSettingsSection("export"),
@@ -258,23 +268,46 @@ export default function SettingsPage() {
                     id="connection"
                     icon={ShieldCheck}
                     title="Connection"
-                    description="Read-only X access. Sync imports bookmarks and folders — nothing is posted for you."
+                    description="Read-only X access. Sync imports bookmarks — nothing is posted for you."
                   >
-                    <div className="space-y-3">
-                      <ul className="space-y-1.5 text-xs text-muted-foreground">
-                        <li className="flex items-start gap-2">
-                          <KeyRound className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                          Tokens are encrypted before storage.
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <BrainCircuit className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                          Orbit only calls Grok when you scan, then waits for approval.
-                        </li>
-                      </ul>
-                      <SyncButton
-                        lastSyncAt={lastSyncAt}
-                        onSyncComplete={handleSyncComplete}
-                      />
+                    <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      <li className="flex items-start gap-2">
+                        <KeyRound className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                        Tokens are encrypted before storage.
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <BrainCircuit className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                        Orbit only calls Grok when you scan, then waits for approval.
+                      </li>
+                    </ul>
+                  </SettingsSection>
+
+                  <SettingsSection
+                    id="sync"
+                    icon={RefreshCw}
+                    title="Sync"
+                    description="Pull new bookmarks from X. Head sync is fast; optional folder scanning takes longer."
+                  >
+                    <div className="surface-inset px-4">
+                      <SettingsRow
+                        label="Scan X bookmark folders"
+                        description="Mirrors your X folders into synced collections. Adds extra API calls and may make sync take a bit longer."
+                        divider={false}
+                      >
+                        <Switch
+                          checked={syncXFolders}
+                          disabled={isUpdatingSyncSettings}
+                          aria-label="Scan X bookmark folders when syncing"
+                          onCheckedChange={(checked) => setSyncXFolders(checked)}
+                        />
+                      </SettingsRow>
+                      <div className="border-t border-hairline-soft py-3">
+                        <SyncButton
+                          lastSyncAt={lastSyncAt}
+                          onSyncComplete={handleSyncComplete}
+                          detail="full"
+                        />
+                      </div>
                     </div>
                   </SettingsSection>
 

@@ -18,6 +18,8 @@ model User {
   refreshToken    String
   tokenExpiresAt  DateTime?
   lastSyncAt      DateTime?
+  /** When true, bookmark sync also mirrors X bookmark folders into collections. */
+  syncXFolders    Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -171,6 +173,8 @@ model SyncRun {
   errorMessage      String?
   pagesFetched      Int           @default(0)
   resumeToken       String?
+  /** When true, this run reconciles X bookmark folders after the head sync. */
+  includeFolders    Boolean       @default(false)
   startedAt         DateTime      @default(now())
   completedAt       DateTime?
 

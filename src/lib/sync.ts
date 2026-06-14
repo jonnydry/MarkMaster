@@ -45,6 +45,11 @@ export type SyncProgressCallback = (
   snapshot: SyncProgressSnapshot
 ) => void | Promise<void>;
 
+export type SyncBookmarksOptions = {
+  /** Reconcile X bookmark folders into synced collections after the head pass. */
+  includeFolders?: boolean;
+};
+
 async function emitSyncProgress(
   onProgress: SyncProgressCallback | undefined,
   result: SyncResult
@@ -70,6 +75,19 @@ function shouldStopIncrementalSync(
     !startedWithResumeToken &&
     pageDataLength > 0 &&
     newBookmarkCount === 0
+  );
+}
+
+/** Skip rewriting known bookmarks when incremental head sync found nothing new. */
+function shouldSkipExistingBookmarkUpdates(
+  startedWithResumeToken: boolean,
+  pageDataLength: number,
+  newBookmarkCount: number
+) {
+  return shouldStopIncrementalSync(
+    startedWithResumeToken,
+    pageDataLength,
+    newBookmarkCount
   );
 }
 
@@ -168,7 +186,9 @@ export async function syncBookmarks(
   userId: string,
   resumeToken?: string,
   onProgress?: SyncProgressCallback,
+  options: SyncBookmarksOptions = {},
 ): Promise<SyncResult> {
+  const includeFolders = options.includeFolders ?? false;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { xId: true },
@@ -259,12 +279,23 @@ export async function syncBookmarks(
           result.totalFetched += newBookmarks.length;
         }
 
-        result.updatedBookmarks += await updateBookmarksInBatches(
-          userId,
-          updateBookmarks,
+        const skipExistingUpdates = shouldSkipExistingBookmarkUpdates(
+          startedWithResumeToken,
+          pageData.length,
+          newBookmarks.length,
         );
-        result.hitExisting = updateBookmarks.length > 0;
-        result.totalFetched += updateBookmarks.length;
+
+        if (updateBookmarks.length > 0) {
+          result.hitExisting = true;
+
+          if (!skipExistingUpdates) {
+            result.updatedBookmarks += await updateBookmarksInBatches(
+              userId,
+              updateBookmarks,
+            );
+            result.totalFetched += updateBookmarks.length;
+          }
+        }
 
         await emitSyncProgress(onProgress, result);
 
@@ -298,8 +329,8 @@ export async function syncBookmarks(
       }
     } while (paginationToken);
 
-    // Folder phase - only on full completion
-    if (!paginationToken && !result.resumeToken) {
+    // Folder phase — only when opted in and the head pass finished without a resume token.
+    if (includeFolders && !paginationToken && !result.resumeToken) {
       const { folders } = await resolveXFoldersForSync(userId, user.xId);
 
       for (const folder of folders) {

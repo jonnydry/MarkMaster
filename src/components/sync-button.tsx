@@ -31,6 +31,7 @@ export function SyncButton({
   const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
   const initiatedSyncRef = useRef(false);
   const previousCurrentRunRef = useRef<SyncRunSummary | null | undefined>(undefined);
+  const previousNewBookmarksRef = useRef(0);
   const [countdown, setCountdown] = useState<string>("");
 
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
@@ -44,6 +45,16 @@ export function SyncButton({
   useEffect(() => {
     const previousRun = previousCurrentRunRef.current;
     previousCurrentRunRef.current = currentRun;
+
+    if (!currentRun) {
+      previousNewBookmarksRef.current = 0;
+    } else if (
+      currentRun.newBookmarks > previousNewBookmarksRef.current &&
+      onSyncComplete
+    ) {
+      previousNewBookmarksRef.current = currentRun.newBookmarks;
+      onSyncComplete();
+    }
 
     if (!initiatedSyncRef.current || !previousRun || currentRun) {
       return;
@@ -267,7 +278,10 @@ export function SyncButton({
       {detail === "full" ? (
         <div className="mt-1 grid gap-1.5 border-t border-hairline-soft pt-2 text-xs leading-snug text-muted-foreground">
           <p>Fetches newest X bookmarks and updates existing saves.</p>
-          <p>Mirrors X bookmark folders into synced collections.</p>
+          <p>
+            Enable X folder scanning in Settings to mirror bookmark folders into
+            synced collections.
+          </p>
           <p>Pauses safely on rate limits and resumes on the next sync.</p>
         </div>
       ) : null}

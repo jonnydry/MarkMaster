@@ -5,15 +5,21 @@ import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 export async function executeSyncRun(
   runId: string,
   userId: string,
-  resumeToken?: string
+  resumeToken?: string,
+  includeFolders = false
 ) {
   try {
-    const result = await syncBookmarks(userId, resumeToken, async (progress) => {
-      await prisma.syncRun.update({
-        where: { id: runId },
-        data: progress,
-      });
-    });
+    const result = await syncBookmarks(
+      userId,
+      resumeToken,
+      async (progress) => {
+        await prisma.syncRun.update({
+          where: { id: runId },
+          data: progress,
+        });
+      },
+      { includeFolders }
+    );
 
     if (resumeToken) {
       await prisma.syncRun.updateMany({

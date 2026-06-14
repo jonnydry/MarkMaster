@@ -4,7 +4,7 @@ const kickSyncWorkerMock = vi.hoisted(() => vi.fn());
 const enqueueSyncRunMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth", () => ({
-  getDbUser: vi.fn(async () => ({ id: "user-1" })),
+  getDbUser: vi.fn(async () => ({ id: "user-1", syncXFolders: false })),
 }));
 
 vi.mock("@/lib/sync-queue", async (importOriginal) => {
@@ -42,7 +42,9 @@ describe("/api/bookmarks/sync POST", () => {
   it("accepts sync with 202 and dispatches the background worker", async () => {
     const { POST } = await import("./route");
 
-    const response = await POST();
+    const response = await POST(new Request("http://localhost/api/bookmarks/sync", {
+      method: "POST",
+    }));
     const json = await response.json();
 
     expect(response.status).toBe(202);
@@ -51,7 +53,9 @@ describe("/api/bookmarks/sync POST", () => {
       status: "PENDING",
       accepted: true,
     });
-    expect(enqueueSyncRunMock).toHaveBeenCalledWith("user-1");
+    expect(enqueueSyncRunMock).toHaveBeenCalledWith("user-1", {
+      includeFolders: false,
+    });
     expect(kickSyncWorkerMock).toHaveBeenCalledWith("run-1");
   });
 });

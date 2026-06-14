@@ -14,7 +14,7 @@ export function useSyncStatus() {
     queryFn: () =>
       fetchJson("/api/bookmarks/sync", undefined, syncStatusResponseSchema),
     staleTime: 30_000,
-    refetchInterval: (query) => (query.state.data?.currentRun ? 5000 : false),
+    refetchInterval: (query) => (query.state.data?.currentRun ? 2000 : false),
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     retry: 1,

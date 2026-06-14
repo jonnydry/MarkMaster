@@ -1,26 +1,16 @@
 "use client";
 
-import { ArrowDownUp, LayoutList, AlignJustify, Grid3x3 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowDownUp } from "lucide-react";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { ViewModeControls } from "@/components/view-mode-controls";
 import type { SortField, ViewMode } from "@/types";
-import {
-  appToolbarSurfaceClassName,
-  appToolbarSurfaceGroupClassName,
-} from "@/lib/app-chrome";
-import { highlightActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
+import { appToolbarSurfaceClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
-
-const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] = [
-  { value: "feed", label: "Feed", icon: LayoutList },
-  { value: "compact", label: "Compact", icon: AlignJustify },
-  { value: "grid", label: "Grid", icon: Grid3x3 },
-];
 
 interface SortControlsProps {
   sortField: SortField;
@@ -74,42 +64,11 @@ export function SortControls({
           <SelectItem value="authorUsername">Author</SelectItem>
         </SelectContent>
       </Select>
-      <div
-        className={cn(
-          "dashboard-view-mode flex items-center gap-0.5 rounded-sm border p-0.5",
-          appToolbarSurfaceGroupClassName,
-          compact ? "shrink-0" : "flex-1 sm:flex-none"
-        )}
-      >
-        {VIEW_MODES.map(({ value, label, icon: Icon }) => {
-          const selected = viewMode === value;
-          return (
-            <Button
-              key={value}
-              variant="ghost"
-              size="sm"
-              aria-pressed={selected}
-              className={cn(
-                "dashboard-view-button h-8 rounded-sm border border-transparent text-sm",
-                compact ? "size-8 px-0" : "px-2.5",
-                selected
-                  ? cn(highlightActiveClass, "border")
-                  : cn(
-                      highlightIdleClass,
-                      "hover:border-hairline-soft"
-                    )
-              )}
-              title={`${label} view`}
-              onClick={() => onViewModeChange(value)}
-            >
-              <Icon className={cn("size-4 dashboard-view-icon", !compact && "sm:mr-0")} />
-              {!compact ? (
-                <span className="dashboard-view-label hidden lg:inline">{label}</span>
-              ) : null}
-            </Button>
-          );
-        })}
-      </div>
+      <ViewModeControls
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        compact={compact}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
@@ -12,6 +13,10 @@ import {
 } from "@/lib/sync-queue";
 import { getRetryAfterSeconds } from "@/lib/sync-throttle";
 import { prisma } from "@/lib/prisma";
+
+const syncPostBodySchema = z.object({
+  includeFolders: z.boolean().optional(),
+});
 
 function syncCooldownResponse(
   retryUntil: Date,
@@ -81,10 +86,24 @@ export async function GET() {
   return NextResponse.json({ currentRun, recentRuns });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let includeFolders = user.syncXFolders ?? false;
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      const rawBody = await req.json();
+      const parsed = syncPostBodySchema.safeParse(rawBody);
+      if (parsed.success && parsed.data.includeFolders !== undefined) {
+        includeFolders = parsed.data.includeFolders;
+      }
+    } catch {
+      // Malformed JSON — use the saved preference.
+    }
   }
 
   const rateLimitResult = await checkRateLimit("sync", user.id);
@@ -97,7 +116,7 @@ export async function POST() {
     return createRateLimitResponse(globalResult);
   }
 
-  const syncRun = await enqueueSyncRun(user.id);
+  const syncRun = await enqueueSyncRun(user.id, { includeFolders });
 
   if ("conflict" in syncRun) {
     return NextResponse.json(

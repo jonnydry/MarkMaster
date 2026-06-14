@@ -122,6 +122,7 @@ describe("authJwtCallback", () => {
       displayName: "Alice",
       profileImageUrl: null,
       lastSyncAt: null,
+      syncXFolders: false,
     };
 
     prismaMock.user.findUnique.mockResolvedValue(dbUser);
@@ -141,7 +142,10 @@ describe("authJwtCallback", () => {
     const { authJwtCallback } = await import("./auth-callbacks");
     const syncedAt = new Date("2026-06-11T10:00:00.000Z");
 
-    prismaMock.user.findUnique.mockResolvedValue({ lastSyncAt: syncedAt });
+    prismaMock.user.findUnique.mockResolvedValue({
+      lastSyncAt: syncedAt,
+      syncXFolders: true,
+    });
 
     const token = await authJwtCallback({
       token: {
@@ -152,15 +156,17 @@ describe("authJwtCallback", () => {
           displayName: "Alice",
           profileImageUrl: null,
           lastSyncAt: null,
+          syncXFolders: false,
         },
       },
       trigger: "update",
     });
 
     expect(token.dbUser?.lastSyncAt).toEqual(syncedAt);
+    expect(token.dbUser?.syncXFolders).toBe(true);
     expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      select: { lastSyncAt: true },
+      select: { lastSyncAt: true, syncXFolders: true },
     });
   });
 });
@@ -179,6 +185,7 @@ describe("authSessionCallback", () => {
       displayName: "Alice",
       profileImageUrl: null,
       lastSyncAt: null,
+      syncXFolders: false,
     };
 
     const session = await authSessionCallback({
@@ -199,6 +206,7 @@ describe("authSessionCallback", () => {
       displayName: "Legacy",
       profileImageUrl: null,
       lastSyncAt: null,
+      syncXFolders: false,
     };
 
     prismaMock.user.findUnique.mockResolvedValue(dbUser);
@@ -218,6 +226,7 @@ describe("authSessionCallback", () => {
         displayName: true,
         profileImageUrl: true,
         lastSyncAt: true,
+        syncXFolders: true,
       },
     });
   });

@@ -1,12 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { AppPageShell } from "@/components/app-page-shell";
 import { PageHeader } from "@/components/page-header";
+import { ViewModeControls } from "@/components/view-mode-controls";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { PaginationControls } from "@/components/pagination-controls";
+import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
+import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import {
   COLLECTION_DETAIL_SHORTCUT_GROUPS,
   useCollectionDetailPage,
@@ -28,12 +32,23 @@ const ShareDialog = dynamic(
   { ssr: false }
 );
 
+const GridBookmarkOverlay = dynamic(
+  () =>
+    import("@/components/grid-bookmark-overlay").then((m) => m.GridBookmarkOverlay),
+  { ssr: false }
+);
+
 export default function CollectionDetailClient({
   collectionId,
 }: {
   collectionId: string;
 }) {
+  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { viewMode, setViewMode } = useBookmarkViewMode();
+  const [gridOverlayBookmarkId, setGridOverlayBookmarkId] = useState<string | null>(
+    null
+  );
   const page = useCollectionDetailPage(collectionId);
   const {
     collection,
@@ -76,6 +91,46 @@ export default function CollectionDetailClient({
     goToDashboard,
   } = page;
 
+  const bookmarkById = useMemo(
+    () => new Map(sortedItems.map((item) => [item.bookmark.id, item.bookmark])),
+    [sortedItems]
+  );
+
+  const gridOverlayBookmark = gridOverlayBookmarkId
+    ? (bookmarkById.get(gridOverlayBookmarkId) ?? null)
+    : null;
+
+  const handleBookmarkSelect = useCallback(
+    (id: string) => {
+      setActiveBookmarkId(id);
+      if (viewMode === "grid") {
+        setGridOverlayBookmarkId(id);
+      }
+    },
+    [setActiveBookmarkId, viewMode]
+  );
+
+  const handleExpandedBookmarkOpen = useCallback(
+    (id: string) => {
+      setActiveBookmarkId(id);
+      setGridOverlayBookmarkId(id);
+    },
+    [setActiveBookmarkId]
+  );
+
+  const handleGridOverlayOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setGridOverlayBookmarkId(null);
+    }
+  }, []);
+
+  const openBookmarkOnDashboard = useCallback(
+    (id: string) => {
+      router.push(`/dashboard?bookmark=${encodeURIComponent(id)}`);
+    },
+    [router]
+  );
+
   if (isPending) {
     return <CollectionDetailLoadingState />;
   }
@@ -113,6 +168,11 @@ export default function CollectionDetailClient({
           leading={<CollectionDetailBackButton onBack={goToCollections} />}
           actions={
             <>
+              <ViewModeControls
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                compact
+              />
               <CollectionDetailHeaderActions
                 collection={collection}
                 sortedItemCount={totalItems}
@@ -133,31 +193,39 @@ export default function CollectionDetailClient({
           }
         />
 
-        <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-5">
+        <main className="pb-10">
           {collection.description ? (
-            <CollectionDetailDescription description={collection.description} />
+            <div className={bookmarkFeedColumnClassName}>
+              <CollectionDetailDescription description={collection.description} />
+            </div>
           ) : null}
 
           <CollectionDetailBookmarkList
             scrollRef={scrollRef}
             sortedItems={sortedItems}
+            viewMode={viewMode}
             isSyncedFromX={isSyncedFromX}
             canReorder={canReorder}
             aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
             activeBookmarkId={activeBookmarkId}
             reordering={reordering}
-            onSelectBookmark={setActiveBookmarkId}
+            onSelectBookmark={handleBookmarkSelect}
+            onOpenExpanded={handleExpandedBookmarkOpen}
             onRemoveItem={handleRemoveItem}
             onMoveItem={moveItem}
             onGoToDashboard={goToDashboard}
           />
 
-          <PaginationControls
-            page={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            onPrefetchPage={prefetchCollectionPage}
-          />
+          {sortedItems.length > 0 ? (
+            <div className={bookmarkFeedColumnClassName}>
+              <PaginationControls
+                page={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                onPrefetchPage={prefetchCollectionPage}
+              />
+            </div>
+          ) : null}
         </main>
     </AppPageShell>
 
@@ -166,6 +234,25 @@ export default function CollectionDetailClient({
         onOpenChange={setShareOpen}
         shareContent={shareContent}
       />
+
+      {gridOverlayBookmark ? (
+        <GridBookmarkOverlay
+          open
+          onOpenChange={handleGridOverlayOpenChange}
+          bookmark={gridOverlayBookmark}
+          onAddTag={openBookmarkOnDashboard}
+          onAddToCollection={openBookmarkOnDashboard}
+          onAddNote={openBookmarkOnDashboard}
+          onReviewInOrbit={(id) => router.push(`/orbit?highlightId=${id}`)}
+          onDelete={
+            isSyncedFromX
+              ? () => {}
+              : (id) => {
+                  void handleRemoveItem(id);
+                }
+          }
+        />
+      ) : null}
     </>
   );
 }

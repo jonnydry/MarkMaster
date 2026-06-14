@@ -109,7 +109,7 @@ describe("syncBookmarks", () => {
       return { count: 1 };
     });
 
-    const result = await syncBookmarks("user-1");
+    const result = await syncBookmarks("user-1", "resume-token");
 
     expect(result.updatedBookmarks).toBe(25);
     expect(result.totalFetched).toBe(25);
@@ -135,8 +135,27 @@ describe("syncBookmarks", () => {
     expect(mocks.fetchBookmarks).toHaveBeenCalledTimes(1);
     expect(result.newBookmarks).toBe(0);
     expect(result.hitExisting).toBe(true);
-    expect(result.updatedBookmarks).toBe(10);
+    expect(result.updatedBookmarks).toBe(0);
+    expect(mocks.resolveXFoldersForSync).not.toHaveBeenCalled();
   });
+
+  it("reconciles X folders when includeFolders is enabled", async () => {
+    mocks.fetchBookmarks.mockResolvedValue({ bookmarks: [], nextToken: undefined });
+    mocks.resolveXFoldersForSync.mockResolvedValue({
+      folders: [{ id: "folder-1", name: "AI Demos" }],
+      fromCache: true,
+    });
+
+    await syncBookmarks("user-1", undefined, undefined, { includeFolders: true });
+
+    expect(mocks.resolveXFoldersForSync).toHaveBeenCalledWith("user-1", "x-user-1");
+    expect(mocks.fetchBookmarksByFolder).toHaveBeenCalledWith(
+      "user-1",
+      "x-user-1",
+      "folder-1"
+    );
+  });
+
   it("exercises syncBookmarks without crashing on an empty page", async () => {
     mocks.fetchBookmarks.mockResolvedValue({ bookmarks: [], nextToken: undefined });
 

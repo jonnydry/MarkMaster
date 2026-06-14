@@ -37,12 +37,14 @@ describe("processSyncRun", () => {
       userId: "user-1",
       status: "PENDING",
       continuationToken: "token-abc",
+      includeFolders: false,
     });
     tx.syncRun.findFirst.mockResolvedValue(null);
     tx.syncRun.update.mockResolvedValue({
       id: "run-1",
       userId: "user-1",
       continuationToken: "token-abc",
+      includeFolders: false,
     });
 
     const { processSyncRun } = await import("./sync-queue");
@@ -56,12 +58,14 @@ describe("processSyncRun", () => {
         id: true,
         userId: true,
         continuationToken: true,
+        includeFolders: true,
       },
     });
     expect(executeSyncRunMock).toHaveBeenCalledWith(
       "run-1",
       "user-1",
-      "token-abc"
+      "token-abc",
+      false
     );
   });
 

@@ -29,6 +29,11 @@ export function getMediaPosterUrl(item: BookmarkMediaJson): string | undefined {
   return item.preview_image_url || item.url;
 }
 
+/** MP4 URL for inline playback when stored on the bookmark row. */
+export function getMediaPlaybackUrl(item: BookmarkMediaJson): string | undefined {
+  return item.playback_url;
+}
+
 export function getMediaTileKey(item: BookmarkMediaJson, index: number): string {
   return item.playback_url ?? getMediaPosterUrl(item) ?? `${item.type}-${index}`;
 }

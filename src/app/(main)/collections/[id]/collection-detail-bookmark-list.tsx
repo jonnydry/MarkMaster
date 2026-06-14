@@ -1,30 +1,32 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMemo, type RefObject } from "react";
 import { ChevronDown, ChevronUp, FolderOpen, Layers } from "lucide-react";
-import { type RefObject } from "react";
 
+import { BookmarkList } from "@/app/(main)/dashboard/bookmark-list";
 import { AppPageCenter } from "@/components/app-page-shell";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { Button } from "@/components/ui/button";
 import {
   bookmarkCollectionCardCellClassName,
-  bookmarkCollectionRowSyncedClassName,
   bookmarkCollectionRowWithReorderClassName,
   bookmarkFeedMaxWidthClassName,
 } from "@/lib/bookmark-feed-layout";
 import type { CollectionItemRow } from "@/hooks/use-collection-detail-page";
+import type { ViewMode } from "@/types";
 import { cn } from "@/lib/utils";
 
 type CollectionDetailBookmarkListProps = {
   scrollRef: RefObject<HTMLElement | null>;
   sortedItems: CollectionItemRow[];
+  viewMode: ViewMode;
   isSyncedFromX: boolean;
   canReorder: boolean;
   aboveFoldMediaBookmarkId: string | null;
   activeBookmarkId: string | null;
   reordering: boolean;
   onSelectBookmark: (id: string) => void;
+  onOpenExpanded: (id: string) => void;
   onRemoveItem: (bookmarkId: string) => void;
   onMoveItem: (fromIndex: number, direction: -1 | 1) => void;
   onGoToDashboard: () => void;
@@ -33,22 +35,23 @@ type CollectionDetailBookmarkListProps = {
 export function CollectionDetailBookmarkList({
   scrollRef,
   sortedItems,
+  viewMode,
   isSyncedFromX,
   canReorder,
   aboveFoldMediaBookmarkId,
   activeBookmarkId,
   reordering,
   onSelectBookmark,
+  onOpenExpanded,
   onRemoveItem,
   onMoveItem,
   onGoToDashboard,
 }: CollectionDetailBookmarkListProps) {
-  const virtualizer = useVirtualizer({
-    count: sortedItems.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 168,
-    overscan: 4,
-  });
+  const bookmarks = useMemo(
+    () => sortedItems.map((item) => item.bookmark),
+    [sortedItems]
+  );
+  const showReorderControls = canReorder && !isSyncedFromX && viewMode === "feed";
 
   if (sortedItems.length === 0) {
     return (
@@ -76,77 +79,79 @@ export function CollectionDetailBookmarkList({
     );
   }
 
-  const showReorderControls = canReorder && !isSyncedFromX;
-
-  return (
-    <div
-      className="relative w-full"
-      style={{ height: `${virtualizer.getTotalSize()}px` }}
-    >
-      {virtualizer.getVirtualItems().map((virtualRow) => {
-        const item = sortedItems[virtualRow.index];
-        const index = virtualRow.index;
-
-        return (
+  if (showReorderControls) {
+    return (
+      <div className="relative w-full">
+        {sortedItems.map((item, index) => (
           <div
             key={item.id}
-            data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
             className={cn(
-              "group absolute top-0 left-0 flex w-full gap-2 sm:gap-3",
-              isSyncedFromX
-                ? bookmarkCollectionRowSyncedClassName
-                : bookmarkCollectionRowWithReorderClassName
+              "group flex w-full gap-2 sm:gap-3",
+              bookmarkCollectionRowWithReorderClassName
             )}
-            style={{ transform: `translateY(${virtualRow.start}px)` }}
           >
-            {showReorderControls ? (
-              <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 opacity-100 transition-opacity sm:px-1.5 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                  disabled={reordering || index === 0}
-                  onClick={() => onMoveItem(index, -1)}
-                  aria-label="Move bookmark up"
-                >
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                  disabled={reordering || index === sortedItems.length - 1}
-                  onClick={() => onMoveItem(index, 1)}
-                  aria-label="Move bookmark down"
-                >
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </div>
-            ) : null}
-            <div
-              className={
-                isSyncedFromX ? "min-w-0 flex-1" : bookmarkCollectionCardCellClassName
-              }
-            >
+            <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-0.5 opacity-100 transition-opacity sm:px-1.5 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
+                disabled={reordering || index === 0}
+                onClick={() => onMoveItem(index, -1)}
+                aria-label="Move bookmark up"
+              >
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
+                disabled={reordering || index === sortedItems.length - 1}
+                onClick={() => onMoveItem(index, 1)}
+                aria-label="Move bookmark down"
+              >
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+            <div className={bookmarkCollectionCardCellClassName}>
               <BookmarkCard
                 bookmark={item.bookmark}
                 viewMode="feed"
                 priorityMedia={item.bookmark.id === aboveFoldMediaBookmarkId}
                 selected={activeBookmarkId === item.bookmark.id}
                 onSelect={onSelectBookmark}
-                onDelete={
-                  isSyncedFromX ? undefined : () => onRemoveItem(item.bookmark.id)
-                }
-                deleteLabel={isSyncedFromX ? undefined : "Remove from collection"}
+                onOpenExpanded={onOpenExpanded}
+                onDelete={() => onRemoveItem(item.bookmark.id)}
+                deleteLabel="Remove from collection"
               />
             </div>
           </div>
-        );
-      })}
-    </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <BookmarkList
+      scrollRef={scrollRef}
+      bookmarks={bookmarks}
+      viewMode={viewMode}
+      aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+      selectionMode={false}
+      selectedBookmarkIdSet={new Set()}
+      activeBookmarkId={activeBookmarkId}
+      onSelect={onSelectBookmark}
+      onSelectionChange={() => {}}
+      onTagClick={() => {}}
+      onAddTag={() => {}}
+      onAddToCollection={() => {}}
+      onAddNote={() => {}}
+      onOpenExpanded={onOpenExpanded}
+      onDelete={isSyncedFromX ? undefined : (id) => onRemoveItem(id as string)}
+      deleteLabel={isSyncedFromX ? undefined : "Remove from collection"}
+      disableVirtualization
+    />
   );
 }
 

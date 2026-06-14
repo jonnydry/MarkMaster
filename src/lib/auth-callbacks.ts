@@ -11,6 +11,7 @@ export interface DbUser {
   displayName: string;
   profileImageUrl: string | null;
   lastSyncAt: Date | null;
+  syncXFolders: boolean;
 }
 
 export type JwtDbUser = DbUser;
@@ -132,6 +133,7 @@ export async function authJwtCallback({
           displayName: true,
           profileImageUrl: true,
           lastSyncAt: true,
+          syncXFolders: true,
         },
       });
 
@@ -153,12 +155,13 @@ export async function authJwtCallback({
     try {
       const fresh = await prisma.user.findUnique({
         where: { id: current.id },
-        select: { lastSyncAt: true },
+        select: { lastSyncAt: true, syncXFolders: true },
       });
       if (fresh) {
         tokenWithDbUser.dbUser = {
           ...current,
           lastSyncAt: fresh.lastSyncAt,
+          syncXFolders: fresh.syncXFolders,
         };
       }
     } catch (e) {
@@ -199,6 +202,7 @@ export async function authSessionCallback({
           displayName: true,
           profileImageUrl: true,
           lastSyncAt: true,
+          syncXFolders: true,
         },
       });
       if (user) {
