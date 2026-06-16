@@ -20,7 +20,7 @@ import { hasFeedPageWatermark } from "@/lib/feed-page-watermark";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTypography } from "@/hooks/use-typography";
-import { prefetchOrbitGraph } from "@/hooks/orbit";
+import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;

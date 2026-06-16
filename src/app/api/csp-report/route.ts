@@ -36,7 +36,7 @@ const cspReportSchema = z.object({
   "script-sample": z.string().trim().max(240).optional(),
   "status-code": z.number().int().min(0).max(999).optional(),
 });
-export const recentCspViolations: Array<{
+const recentCspViolations: Array<{
   timestamp: string;
   report: CspReport;
 }> = [];
