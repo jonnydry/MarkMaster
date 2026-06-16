@@ -14,6 +14,9 @@ import type { OrbitLearningHint } from "@/lib/orbit-signal-extraction";
 
 const MAX_EVENTS_PER_WRITE = 100;
 const MAX_RECENT_LEARNING_EVENTS = 600;
+/** Bound the learning scan to recent activity — most of the 600 cap
+ * is noise from months-old activity the user no longer cares about. */
+const LEARNING_LOOKBACK_DAYS = 60;
 const POSITIVE_ACTIONS = new Set(["accepted", "edited"]);
 const NEGATIVE_ACTIONS = new Set(["kept", "rejected"]);
 
@@ -278,7 +281,10 @@ export async function getOrbitLearningHintsForScan(args: {
   if (neededKeys.size === 0) return [];
 
   const recentEvents = await prisma.orbitDecisionEvent.findMany({
-    where: { userId: args.userId },
+    where: {
+      userId: args.userId,
+      createdAt: { gte: new Date(Date.now() - LEARNING_LOOKBACK_DAYS * 86_400_000) },
+    },
     orderBy: { createdAt: "desc" },
     take: MAX_RECENT_LEARNING_EVENTS,
     select: {

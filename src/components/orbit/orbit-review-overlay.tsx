@@ -135,6 +135,7 @@ export function OrbitReviewOverlay({
                     alt={`${activeBookmark.authorDisplayName} avatar`}
                     width={44}
                     height={44}
+                    sizes="44px"
                     className="h-11 w-11 shrink-0 rounded-full"
                   />
                 ) : (

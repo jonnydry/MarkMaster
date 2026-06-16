@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
       ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
         ? { personalBoostAuthors, personalBoostTags }
         : {}),
-    });
+    }, { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } });
   }
 
   const slowWhereSql = buildSlowPathWhereSql({
@@ -256,7 +256,7 @@ export async function GET(req: NextRequest) {
     ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
       ? { personalBoostAuthors, personalBoostTags }
       : {}),
-  });
+  }, { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } });
 }
 
 export async function DELETE(req: NextRequest) {

@@ -94,6 +94,8 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     queryFn: () =>
       fetchJson(`/api/bookmarks?${queryString}`, undefined, bookmarkListResponseSchema),
     placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const bookmarks = orbitData?.bookmarks ?? EMPTY_BOOKMARKS;

@@ -417,12 +417,7 @@ export async function syncBookmarks(
   }
 
   // Only update lastSyncAt if we completed without rate-limiting and have no remaining pages
-  if (!result.rateLimited && !result.resumeToken) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { lastSyncAt: new Date() },
-    });
-  } else if (!result.rateLimited && result.resumeToken) {
+  if (!result.rateLimited) {
     await prisma.user.update({
       where: { id: userId },
       data: { lastSyncAt: new Date() },

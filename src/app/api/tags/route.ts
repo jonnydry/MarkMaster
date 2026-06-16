@@ -19,7 +19,9 @@ export async function GET() {
     orderBy: { name: "asc" },
   });
 
-  return NextResponse.json(tags);
+  return NextResponse.json(tags, {
+    headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(req: NextRequest) {

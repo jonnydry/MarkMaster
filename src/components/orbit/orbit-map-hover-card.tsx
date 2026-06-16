@@ -1,5 +1,3 @@
-"use client";
-
 import { Clock } from "lucide-react";
 import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";

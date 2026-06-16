@@ -22,11 +22,30 @@ export async function getUserCacheVersion(userId: string): Promise<number> {
   }
 }
 
-/** Bumps the user's cache generation so prior graph/analytics entries are ignored. */
-export async function invalidateUserResponseCache(userId: string): Promise<void> {
+/** Per-user debounce map: collapses rapid-fire invalidations into one bump. */
+const invalidationTimers = new Map<string, NodeJS.Timeout>();
+const INVALIDATION_DEBOUNCE_MS = 2_000;
+
+/**
+ * Bumps the user's cache generation so prior graph/analytics entries are ignored.
+ * Debounced: a burst of invalidations within INVALIDATION_DEBOUNCE_MS coalesces
+ * into a single Redis write per user, eliminating cache-stampede churn.
+ */
+export function invalidateUserResponseCache(userId: string): void {
+  const existing = invalidationTimers.get(userId);
+  if (existing) clearTimeout(existing);
+
+  const timer = setTimeout(() => {
+    invalidationTimers.delete(userId);
+    void flushInvalidateUserResponseCache(userId);
+  }, INVALIDATION_DEBOUNCE_MS);
+
+  invalidationTimers.set(userId, timer);
+}
+
+async function flushInvalidateUserResponseCache(userId: string): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
-
   try {
     await redis.incr(`cache:ver:${userId}`);
   } catch (error) {
@@ -52,7 +71,7 @@ export async function getCachedJson<T>(
     }
   }
 
-  const value = await compute();
+  const value = await inFlightCompute(key, compute);
 
   if (redis) {
     try {
@@ -63,4 +82,22 @@ export async function getCachedJson<T>(
   }
 
   return value;
+}
+
+/**
+ * Single-flight: when multiple concurrent callers miss the cache for the same
+ * key, only the first actually runs compute(); the rest await the same promise.
+ * Prevents stampedes on a freshly-bumped cache version.
+ */
+const inflight = new Map<string, Promise<unknown>>();
+
+function inFlightCompute<T>(key: string, compute: () => Promise<T>): Promise<T> {
+  const existing = inflight.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+
+  const promise = compute().finally(() => {
+    inflight.delete(key);
+  });
+  inflight.set(key, promise);
+  return promise;
 }

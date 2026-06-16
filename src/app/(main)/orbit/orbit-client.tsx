@@ -22,9 +22,11 @@ import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-const OrbitReviewDialog = dynamic(
+const OrbitReviewOverlay = dynamic(
   () =>
-    import("@/components/orbit/orbit-review-dialog").then((m) => m.OrbitReviewDialog),
+    import("@/components/orbit/orbit-review-overlay").then(
+      (m) => m.OrbitReviewOverlay
+    ),
   { ssr: false }
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
@@ -650,7 +652,7 @@ export default function OrbitPage() {
       ) : null}
 
       {reviewSession.open ? (
-        <OrbitReviewDialog
+        <OrbitReviewOverlay
           open
           onOpenChange={handleReviewOpenChange}
           plan={scan.plan}

@@ -106,12 +106,13 @@ export async function POST(req: Request) {
     }
   }
 
-  const rateLimitResult = await checkRateLimit("sync", user.id);
+  const [rateLimitResult, globalResult] = await Promise.all([
+    checkRateLimit("sync", user.id),
+    checkGlobalRateLimit("sync"),
+  ]);
   if (!rateLimitResult.success) {
     return createRateLimitResponse(rateLimitResult);
   }
-
-  const globalResult = await checkGlobalRateLimit("sync");
   if (!globalResult.success) {
     return createRateLimitResponse(globalResult);
   }

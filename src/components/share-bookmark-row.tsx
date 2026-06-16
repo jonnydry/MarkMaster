@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -46,6 +44,7 @@ export function ShareBookmarkRow({
             alt={`${authorDisplayName} avatar`}
             width={40}
             height={40}
+            sizes="40px"
             className="w-10 h-10 rounded-full shrink-0"
           />
         ) : null}

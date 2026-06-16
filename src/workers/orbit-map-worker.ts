@@ -547,8 +547,6 @@ function handleInit(msg: InitMessage) {
       });
 
       // Rendering is driven on demand (interactions, animations, camera).
-      app!.ticker.add(() => {});
-
       postToMain({ type: MainMessageType.READY, protocolVersion: 1, width: 0, height: 0 });
     }).catch((err) => {
       postToMain({
@@ -1456,12 +1454,11 @@ function updateLabels(focusContext: FocusContext) {
     height,
   });
 
-  // Remove labels that lost their cell (or left the screen).
+  // Pool labels: hide out-of-view winners (don't destroy+recreate on every
+  // pan/zoom tick — that was a multi-allocation-per-frame hot path).
   for (const [nodeId, label] of labelMap) {
     if (!winners.has(nodeId)) {
-      labelsContainer.removeChild(label);
-      label.destroy();
-      labelMap.delete(nodeId);
+      label.visible = false;
     }
   }
 
@@ -1490,6 +1487,7 @@ function updateLabels(focusContext: FocusContext) {
       isActive ? 'active' : isNeighbor ? 'neighbor' : 'default'
     );
     label.style.fontWeight = isActive ? '600' : '400';
+    label.visible = true;
 
     positionLabel(label, datum, focusContext);
   }

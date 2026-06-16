@@ -1,5 +1,3 @@
-"use client";
-
 import type { ComponentProps, ReactNode, RefObject } from "react";
 import {
   appPageCenterClassName,

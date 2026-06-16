@@ -72,8 +72,8 @@ model Bookmark {
   orbitDecisionEvents OrbitDecisionEvent[]
 
   @@unique([userId, tweetId])
-  @@index([userId, bookmarkedAt(sort: Desc)])
-  @@index([userId, tweetCreatedAt(sort: Desc)])
+  @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, tweetCreatedAt(sort: Desc), id(sort: Desc)])
 }
 
 model Tag {

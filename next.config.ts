@@ -101,8 +101,14 @@ const nextConfig: NextConfig = {
     root: turbopackRoot,
   },
   // lucide-react, date-fns, and recharts are optimized by default in Next.js 16.
+  // @base-ui/react and @tanstack/react-query benefit from explicit opt-in.
   experimental: {
-    optimizePackageImports: ["@tanstack/react-query"],
+    optimizePackageImports: [
+      "@tanstack/react-query",
+      "lucide-react",
+      "date-fns",
+      "@base-ui/react",
+    ],
   },
   images: {
     remotePatterns: [
@@ -115,6 +121,24 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/_next/image:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
       },
     ];
   },

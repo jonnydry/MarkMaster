@@ -24,5 +24,7 @@ export async function GET() {
     organizedBookmarkCount: Number(
       organizedRows[0]?.organizedBookmarkCount ?? 0
     ),
+  }, {
+    headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
   });
 }

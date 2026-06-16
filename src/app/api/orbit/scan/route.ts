@@ -40,14 +40,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit Orbit scans (more generous than syncs)
-  const rateLimitResult = await checkRateLimit("orbit", user.id);
+  // Rate limit Orbit scans (more generous than syncs). Run both checks in
+  // parallel — they're independent Redis round-trips.
+  const [rateLimitResult, globalResult] = await Promise.all([
+    checkRateLimit("orbit", user.id),
+    checkGlobalRateLimit("orbit"),
+  ]);
   if (!rateLimitResult.success) {
     return createRateLimitResponse(rateLimitResult);
   }
-
-  // Global safety limit
-  const globalResult = await checkGlobalRateLimit("orbit");
   if (!globalResult.success) {
     return createRateLimitResponse(globalResult);
   }

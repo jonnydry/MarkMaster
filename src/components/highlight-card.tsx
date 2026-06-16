@@ -233,6 +233,7 @@ export function HighlightCard({
               alt={`${bookmark.authorDisplayName} avatar`}
               width={24}
               height={24}
+              sizes="24px"
               className="h-6 w-6 shrink-0 rounded-full border border-background/70"
             />
           ) : (

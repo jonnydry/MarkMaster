@@ -140,5 +140,7 @@ export async function GET(req: NextRequest) {
     ...(personalBoostAuthors.length
       ? { personalBoostAuthors, personalBoostTags: [] }
       : {}),
+  }, {
+    headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
   });
 }

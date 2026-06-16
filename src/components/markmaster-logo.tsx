@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import logo from "@/assets/logo.png";
 
 type MarkMasterLogoProps = {
   className?: string;
@@ -20,7 +19,7 @@ export function MarkMasterLogo({
 }: MarkMasterLogoProps) {
   return (
     <Image
-      src={logo}
+      src="/logo.png"
       alt="MarkMaster"
       width={width}
       height={height}
@@ -30,6 +29,7 @@ export function MarkMasterLogo({
         className
       )}
       priority={priority}
+      sizes={`${width}px`}
     />
   );
 }

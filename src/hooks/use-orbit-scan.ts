@@ -327,7 +327,7 @@ export function useOrbitScan(): OrbitScanHandle {
             mode: "scan",
             bookmarkIds: unique,
             ...(batch
-              ? { batch: JSON.parse(JSON.stringify(batch)) as JsonValue }
+              ? {               batch: structuredClone(batch) as unknown as JsonValue }
               : {}),
           },
         });
@@ -386,7 +386,7 @@ export function useOrbitScan(): OrbitScanHandle {
             body: {
               mode: "apply",
               createCollections: shouldCreateCollectionsForPlan(filteredPlan),
-              plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
+              plan: structuredClone(filteredPlan) as unknown as JsonValue,
             },
           }
         );
@@ -435,7 +435,7 @@ export function useOrbitScan(): OrbitScanHandle {
             body: {
               mode: "apply",
               createCollections: opts?.createCollections ?? true,
-              plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
+              plan: structuredClone(filteredPlan) as unknown as JsonValue,
             },
           }
         );
@@ -495,7 +495,7 @@ export function useOrbitScan(): OrbitScanHandle {
             body: {
               mode: "apply",
               createCollections,
-              plan: JSON.parse(JSON.stringify(filteredPlan)) as JsonValue,
+              plan: structuredClone(filteredPlan) as unknown as JsonValue,
             },
           }
         );
@@ -565,7 +565,7 @@ export function useOrbitScan(): OrbitScanHandle {
             body: {
               mode: "apply",
               createCollections: opts?.createCollections ?? true,
-              plan: JSON.parse(JSON.stringify(reviewedPlan)) as JsonValue,
+              plan: structuredClone(reviewedPlan) as unknown as JsonValue,
             },
           }
         );

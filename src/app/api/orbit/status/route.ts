@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(getOrbitXaiRuntimeStatus({ lastFailureCode }), {
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, max-age=300, stale-while-revalidate=600",
     },
   });
 }
