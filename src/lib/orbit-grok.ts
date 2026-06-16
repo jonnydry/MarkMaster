@@ -19,6 +19,7 @@ import {
   buildOrbitPromptPayload,
   buildOrbitSystemPrompt,
 } from "@/lib/orbit-grok-prompt";
+import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import {
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
@@ -97,6 +98,25 @@ function parseRetryAfterSeconds(value: string | null): number | undefined {
   return undefined;
 }
 
+const SCAN_CACHE_TTL_SECONDS = 5 * 60;
+
+function buildScanCacheKey(args: {
+  userId: string;
+  bookmarks: OrbitBookmarkForScan[];
+  batch?: OrbitScanBatchMetadata;
+}): Promise<string> {
+  const sortedIds = [...args.bookmarks]
+    .map((bookmark) => bookmark.id)
+    .sort()
+    .join(",");
+  const mode = args.batch?.mode ?? "balanced";
+  const profile = args.batch?.profile ?? "balanced";
+  return getUserCacheVersion(args.userId).then(
+    (version) =>
+      `cache:orbit:scan:${args.userId}:v${version}:${sortedIds}:${mode}:${profile}`
+  );
+}
+
 function extractXaiErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object" || !("error" in body)) {
     return fallback;
@@ -112,6 +132,7 @@ function extractXaiErrorMessage(body: unknown, fallback: string): string {
 }
 
 export async function scanOrbitBookmarksWithXai(args: {
+  userId: string;
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
   existingCollections: OrbitCollectionContext[];
@@ -145,6 +166,19 @@ export async function scanOrbitBookmarksWithXai(args: {
     );
   }
 
+  const cacheKey = await buildScanCacheKey(args);
+  return getCachedJson(cacheKey, SCAN_CACHE_TTL_SECONDS, () =>
+    fetchOrbitScanFromXai(args, apiKey)
+  );
+}
+
+async function fetchOrbitScanFromXai(
+  args: Omit<
+    Parameters<typeof scanOrbitBookmarksWithXai>[0],
+    "userId"
+  >,
+  apiKey: string
+): Promise<OrbitScanResponsePayload> {
   const runtimeStatus = getOrbitXaiRuntimeStatus();
   const baseUrl = runtimeStatus.baseUrl;
   const model = runtimeStatus.model;

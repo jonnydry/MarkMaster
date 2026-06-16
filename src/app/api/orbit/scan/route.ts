@@ -183,6 +183,7 @@ export async function POST(req: NextRequest) {
       ]);
 
       const scan = await scanOrbitBookmarksWithXai({
+        userId: user.id,
         bookmarks: bookmarksWithFolderHints,
         existingTags,
         existingCollections,

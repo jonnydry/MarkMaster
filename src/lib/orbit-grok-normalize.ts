@@ -11,7 +11,7 @@ import type {
   OrbitTagContext,
 } from "@/lib/orbit-grok-schemas";
 
-const MAX_TEXT_LENGTH = 1_200;
+const MAX_TEXT_LENGTH = 600;
 const MAX_NOTE_LENGTH = 400;
 const MAX_URLS_PER_BOOKMARK = 3;
 const MAX_X_FOLDER_HINTS_PER_BOOKMARK = 5;

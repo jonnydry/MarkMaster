@@ -95,6 +95,7 @@ describe.skipIf(!LIVE)("scanOrbitBookmarksWithXai (live xAI)", () => {
     ];
 
     const result = await scanOrbitBookmarksWithXai({
+      userId: "live-test-user",
       bookmarks,
       existingTags: [],
       existingCollections: [],
