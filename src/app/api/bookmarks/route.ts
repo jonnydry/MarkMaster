@@ -155,6 +155,7 @@ export async function GET(req: NextRequest) {
   if (!needsSlowPath) {
     const listQuery = bookmarkListQueryOptions({
       includeDetailFields: Boolean(bookmarkId),
+      compact: !bookmarkId,
     });
 
     const [bookmarks, total] = await Promise.all([
@@ -234,7 +235,10 @@ export async function GET(req: NextRequest) {
       ? []
       : await prisma.bookmark.findMany({
           where: { id: { in: pageIds } },
-          ...bookmarkListQueryOptions({ includeDetailFields: Boolean(bookmarkId) }),
+          ...bookmarkListQueryOptions({
+            includeDetailFields: Boolean(bookmarkId),
+            compact: !bookmarkId,
+          }),
         });
 
   const order = new Map(pageIds.map((id, i) => [id, i]));

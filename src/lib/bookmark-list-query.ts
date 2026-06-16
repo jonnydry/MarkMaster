@@ -34,6 +34,28 @@ export const bookmarkListSelect = {
   collectionItems: bookmarkListInclude.collectionItems,
 } as const satisfies Prisma.BookmarkSelect;
 
+/**
+ * Compact bookmark row for feed/grid cards.
+ * Drops `urls` (not rendered in cards) and small unused columns
+ * (`userId`, `authorId`, `syncedAt`) to shrink the JSON payload.
+ */
+export const bookmarkCompactSelect = {
+  id: true,
+  tweetId: true,
+  authorUsername: true,
+  authorDisplayName: true,
+  authorProfileImage: true,
+  authorVerified: true,
+  tweetText: true,
+  publicMetrics: true,
+  media: true,
+  tweetCreatedAt: true,
+  bookmarkedAt: true,
+  tags: bookmarkListInclude.tags,
+  notes: bookmarkListInclude.notes,
+  collectionItems: bookmarkListInclude.collectionItems,
+} as const satisfies Prisma.BookmarkSelect;
+
 /** Include quotedTweet when a single bookmark is requested by id. */
 export const bookmarkDetailSelect = {
   ...bookmarkListSelect,
@@ -41,9 +63,15 @@ export const bookmarkDetailSelect = {
   xMetadata: true,
 } as const satisfies Prisma.BookmarkSelect;
 
-export function bookmarkListQueryOptions(options?: { includeDetailFields?: boolean }) {
+export function bookmarkListQueryOptions(options?: {
+  includeDetailFields?: boolean;
+  compact?: boolean;
+}) {
   if (options?.includeDetailFields) {
     return { select: bookmarkDetailSelect } as const;
+  }
+  if (options?.compact) {
+    return { select: bookmarkCompactSelect } as const;
   }
   return { select: bookmarkListSelect } as const;
 }

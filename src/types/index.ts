@@ -44,7 +44,8 @@ export interface BookmarkWithRelations {
     impression_count?: number;
   } | null;
   media: BookmarkMediaJson[] | null;
-  urls: Array<{
+  /** Not returned by compact list endpoints to reduce JSON payload. */
+  urls?: Array<{
     url: string;
     expanded_url: string;
     display_url: string;

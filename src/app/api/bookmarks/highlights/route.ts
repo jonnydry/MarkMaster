@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
 
 const highlightsQuerySchema = z.object({
   raw: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
@@ -21,14 +22,6 @@ const highlightsQuerySchema = z.object({
         : []
     ),
 });
-
-const bookmarkInclude = {
-  tags: { include: { tag: true } },
-  notes: { select: { id: true, content: true } },
-  collectionItems: {
-    include: { collection: { select: { id: true, name: true } } },
-  },
-} as const;
 
 const performanceScoreSql = Prisma.sql`(
   1.0 * LN(1 + COALESCE((b."publicMetrics"->>'like_count')::int, 0)) +
@@ -125,7 +118,7 @@ export async function GET(req: NextRequest) {
       ? []
       : await prisma.bookmark.findMany({
           where: { id: { in: pageIds } },
-          include: bookmarkInclude,
+          ...bookmarkListQueryOptions({ compact: true }),
         });
 
   const order = new Map(pageIds.map((id, index) => [id, index]));
