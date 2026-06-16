@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import * as v from "valibot";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -8,7 +8,7 @@ export type JsonRequestInit<
   TResponse = unknown,
 > = Omit<RequestInit, "body"> & {
   body?: TBody;
-  schema?: z.ZodType<TResponse>;
+  schema?: v.GenericSchema<unknown, TResponse>;
 };
 
 export class FetchJsonError extends Error {
@@ -25,29 +25,29 @@ export class FetchJsonError extends Error {
 
 function parseResponseBody<T>(
   body: unknown,
-  schema: z.ZodType<T> | undefined,
+  schema: v.GenericSchema<unknown, T> | undefined,
   status: number
 ): T {
   if (!schema) {
     return body as T;
   }
 
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
+  const result = v.safeParse(schema, body);
+  if (!result.success) {
     throw new FetchJsonError(
       "API response did not match expected shape",
       status,
-      { zodError: parsed.error.flatten(), received: body }
+      { valibotIssues: result.issues, received: body }
     );
   }
 
-  return parsed.data;
+  return result.output;
 }
 
 export async function fetchJson<T>(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
-  schema: z.ZodType<T>
+  schema: v.GenericSchema<unknown, T>
 ): Promise<T>;
 export async function fetchJson<T>(
   input: RequestInfo | URL,
@@ -56,7 +56,7 @@ export async function fetchJson<T>(
 export async function fetchJson<T>(
   input: RequestInfo | URL,
   init?: RequestInit,
-  schema?: z.ZodType<T>
+  schema?: v.GenericSchema<unknown, T>
 ): Promise<T> {
   const res = await fetch(input, init);
 

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as v from "valibot";
 
 import type { ShareContent } from "@/lib/share-content";
 import type { BookmarkResponse, OrbitScanCandidatesResponse } from "@/lib/orbit-page-types";
@@ -13,230 +13,221 @@ import type {
   TagWithCount,
 } from "@/types";
 
-const collectionTypeSchema = z.enum(["x_folder", "user_collection"]);
+const collectionTypeSchema = v.picklist(["x_folder", "user_collection"]);
 
-/** Minimal bookmark row shape — passthrough keeps nullable/detail fields without brittle nesting. */
-export const bookmarkWithRelationsSchema = z
-  .object({
-    id: z.string(),
-    tweetId: z.string(),
-    authorUsername: z.string(),
-    tweetText: z.string(),
-    tweetCreatedAt: z.string(),
-    bookmarkedAt: z.string(),
-    tags: z.array(
-      z.object({
-        tag: z.object({
-          id: z.string(),
-          name: z.string(),
-          color: z.string(),
-        }),
-      })
-    ),
-    notes: z.array(z.object({ id: z.string(), content: z.string() })),
-    collectionItems: z.array(
-      z.object({
-        collection: z.object({ id: z.string(), name: z.string() }),
-      })
-    ),
-  })
-  .passthrough();
+/** Minimal bookmark row shape — loose object keeps nullable/detail fields without brittle nesting. */
+export const bookmarkWithRelationsSchema = v.looseObject({
+  id: v.string(),
+  tweetId: v.string(),
+  authorUsername: v.string(),
+  tweetText: v.string(),
+  tweetCreatedAt: v.string(),
+  bookmarkedAt: v.string(),
+  tags: v.array(
+    v.object({
+      tag: v.object({
+        id: v.string(),
+        name: v.string(),
+        color: v.string(),
+      }),
+    })
+  ),
+  notes: v.array(v.object({ id: v.string(), content: v.string() })),
+  collectionItems: v.array(
+    v.object({
+      collection: v.object({ id: v.string(), name: v.string() }),
+    })
+  ),
+});
 
-export const bookmarkListResponseSchema = z.object({
-  bookmarks: z.array(bookmarkWithRelationsSchema),
-  total: z.number(),
-  totalPages: z.number(),
-  nextCursor: z.string().optional(),
-  page: z.number().optional(),
-  personalBoostAuthors: z.array(z.string()).optional(),
-  personalBoostTags: z.array(z.string()).optional(),
-}) as unknown as z.ZodType<BookmarkResponse>;
+export const bookmarkListResponseSchema = v.looseObject({
+  bookmarks: v.array(bookmarkWithRelationsSchema),
+  total: v.number(),
+  totalPages: v.number(),
+  nextCursor: v.optional(v.string()),
+  page: v.optional(v.number()),
+  personalBoostAuthors: v.optional(v.array(v.string())),
+  personalBoostTags: v.optional(v.array(v.string())),
+}) as unknown as v.GenericSchema<unknown, BookmarkResponse>;
 
 export const performanceHighlightsResponseSchema = bookmarkListResponseSchema;
 
-export const tagWithCountSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  color: z.string(),
-  _count: z.object({ bookmarks: z.number() }),
+export const tagWithCountSchema = v.object({
+  id: v.string(),
+  name: v.string(),
+  color: v.string(),
+  _count: v.object({ bookmarks: v.number() }),
 });
 
-export const tagsResponseSchema = z.array(
+export const tagsResponseSchema = v.array(
   tagWithCountSchema
-) as unknown as z.ZodType<TagWithCount[]>;
+) as unknown as v.GenericSchema<unknown, TagWithCount[]>;
 
-export const collectionWithCountSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
+export const collectionWithCountSchema = v.object({
+  id: v.string(),
+  name: v.string(),
+  description: v.nullable(v.string()),
   type: collectionTypeSchema,
-  isPublic: z.boolean(),
-  shareSlug: z.string().nullable(),
-  externalSource: z.string().nullable(),
-  externalSourceId: z.string().nullable(),
-  createdAt: z.string(),
-  _count: z.object({ items: z.number() }),
+  isPublic: v.boolean(),
+  shareSlug: v.nullable(v.string()),
+  externalSource: v.nullable(v.string()),
+  externalSourceId: v.nullable(v.string()),
+  createdAt: v.string(),
+  _count: v.object({ items: v.number() }),
 });
 
-export const collectionsResponseSchema = z.array(
+export const collectionsResponseSchema = v.array(
   collectionWithCountSchema
-) as unknown as z.ZodType<CollectionWithCount[]>;
+) as unknown as v.GenericSchema<unknown, CollectionWithCount[]>;
 
-export const libraryStatsResponseSchema = z.object({
-  libraryBookmarkCount: z.number(),
-  organizedBookmarkCount: z.number(),
+export const libraryStatsResponseSchema = v.object({
+  libraryBookmarkCount: v.number(),
+  organizedBookmarkCount: v.number(),
 });
 
-const syncRunSummarySchema = z.object({
-  id: z.string(),
-  status: z.enum(["PENDING", "RUNNING", "COMPLETED", "RATE_LIMITED", "FAILED"]),
-  newBookmarks: z.number(),
-  updatedBookmarks: z.number(),
-  totalFetched: z.number(),
-  hitExisting: z.boolean(),
-  rateLimited: z.boolean(),
-  rateLimitResetsAt: z.string().nullable(),
-  errorMessage: z.string().nullable(),
-  pagesFetched: z.number(),
-  resumeToken: z.string().nullable(),
-  startedAt: z.string(),
-  completedAt: z.string().nullable(),
+const syncRunSummarySchema = v.object({
+  id: v.string(),
+  status: v.picklist(["PENDING", "RUNNING", "COMPLETED", "RATE_LIMITED", "FAILED"]),
+  newBookmarks: v.number(),
+  updatedBookmarks: v.number(),
+  totalFetched: v.number(),
+  hitExisting: v.boolean(),
+  rateLimited: v.boolean(),
+  rateLimitResetsAt: v.nullable(v.string()),
+  errorMessage: v.nullable(v.string()),
+  pagesFetched: v.number(),
+  resumeToken: v.nullable(v.string()),
+  startedAt: v.string(),
+  completedAt: v.nullable(v.string()),
 });
 
-export const syncStatusResponseSchema = z.object({
-  currentRun: syncRunSummarySchema.nullable(),
-  recentRuns: z.array(syncRunSummarySchema),
-}) as unknown as z.ZodType<SyncStatusResponse>;
+export const syncStatusResponseSchema = v.object({
+  currentRun: v.nullable(syncRunSummarySchema),
+  recentRuns: v.array(syncRunSummarySchema),
+}) as unknown as v.GenericSchema<unknown, SyncStatusResponse>;
 
-export const analyticsDataSchema: z.ZodType<AnalyticsData> = z
-  .object({
-    topAuthors: z.array(
-      z.object({
-        author: z.string(),
-        displayName: z.string().nullable(),
-        profileImage: z.string().nullable(),
-        verified: z.boolean(),
-        count: z.number(),
-      })
-    ),
-    mediaBreakdown: z.array(
-      z.object({ type: z.string(), count: z.number() })
-    ),
-    tagDistribution: z.array(
-      z.object({
-        id: z.string(),
-        tag: z.string(),
-        color: z.string(),
-        count: z.number(),
-      })
-    ),
-    bookmarksByMonth: z.array(
-      z.object({ month: z.string(), count: z.number() })
-    ),
-    bookmarksByDay: z.array(z.object({ day: z.string(), count: z.number() })),
-    totalBookmarks: z.number(),
-    untaggedCount: z.number(),
-    untaggedOldestAt: z.string().nullable(),
-    orbitQueueCount: z.number(),
-    rawHighlightsCount: z.number(),
-    notedCount: z.number(),
-    last30dCount: z.number(),
-    previous30dCount: z.number(),
-  })
-  .passthrough() as unknown as z.ZodType<AnalyticsData>;
-
-export const orbitGraphPayloadSchema: z.ZodType<OrbitGraphPayload> = z.object({
-  nodes: z.array(z.object({ kind: z.string() }).passthrough()),
-  edges: z.array(z.object({ kind: z.string() }).passthrough()),
-  stats: z
-    .object({
-      tagCount: z.number(),
-      userCollectionCount: z.number(),
-      xFolderCount: z.number(),
+export const analyticsDataSchema = v.looseObject({
+  topAuthors: v.array(
+    v.object({
+      author: v.string(),
+      displayName: v.nullable(v.string()),
+      profileImage: v.nullable(v.string()),
+      verified: v.boolean(),
+      count: v.number(),
     })
-    .passthrough(),
-  generatedAt: z.string(),
-  nodeCap: z.number(),
-  scope: z.enum(["library", "orbit"]).optional(),
-}) as unknown as z.ZodType<OrbitGraphPayload>;
+  ),
+  mediaBreakdown: v.array(
+    v.object({ type: v.string(), count: v.number() })
+  ),
+  tagDistribution: v.array(
+    v.object({
+      id: v.string(),
+      tag: v.string(),
+      color: v.string(),
+      count: v.number(),
+    })
+  ),
+  bookmarksByMonth: v.array(
+    v.object({ month: v.string(), count: v.number() })
+  ),
+  bookmarksByDay: v.array(v.object({ day: v.string(), count: v.number() })),
+  totalBookmarks: v.number(),
+  untaggedCount: v.number(),
+  untaggedOldestAt: v.nullable(v.string()),
+  orbitQueueCount: v.number(),
+  rawHighlightsCount: v.number(),
+  notedCount: v.number(),
+  last30dCount: v.number(),
+  previous30dCount: v.number(),
+}) as unknown as v.GenericSchema<unknown, AnalyticsData>;
 
-export const orbitScanCandidatesResponseSchema = z.object({
-  bookmarks: z.array(bookmarkWithRelationsSchema),
-}) as unknown as z.ZodType<OrbitScanCandidatesResponse>;
+export const orbitGraphPayloadSchema = v.looseObject({
+  nodes: v.array(v.looseObject({ kind: v.string() })),
+  edges: v.array(v.looseObject({ kind: v.string() })),
+  stats: v.looseObject({
+    tagCount: v.number(),
+    userCollectionCount: v.number(),
+    xFolderCount: v.number(),
+  }),
+  generatedAt: v.string(),
+  nodeCap: v.number(),
+  scope: v.optional(v.picklist(["library", "orbit"])),
+}) as unknown as v.GenericSchema<unknown, OrbitGraphPayload>;
 
-export const orbitScanQualityPayloadSchema: z.ZodType<OrbitScanQualityPayload> = z
-  .object({
-    recommendedProfile: z.string(),
-    profileReason: z.string(),
-    successfulScanCount: z.number(),
-    recentScanCount: z.number(),
-    largeSuccessfulScanCount: z.number(),
-    usefulSuggestionRate: z.number(),
-    modelAbstainRate: z.number(),
-    failureRate: z.number(),
-    medianDurationMs: z.number(),
-    reviewedSuggestionCount: z.number(),
-    reviewUsefulRate: z.number().nullable(),
-    deep: z.object({
-      unlocked: z.boolean(),
-      reason: z.string(),
-    }),
-  })
-  .passthrough() as unknown as z.ZodType<OrbitScanQualityPayload>;
+export const orbitScanCandidatesResponseSchema = v.object({
+  bookmarks: v.array(bookmarkWithRelationsSchema),
+}) as unknown as v.GenericSchema<unknown, OrbitScanCandidatesResponse>;
 
-export const orbitXaiStatusPayloadSchema: z.ZodType<OrbitXaiStatusPayload> =
-  z.object({
-    state: z.enum(["ready", "misconfigured"]),
-    checkedAt: z.string(),
-    apiKeyConfigured: z.boolean(),
-    model: z.string(),
-    modelSource: z.enum(["default", "environment"]),
-    baseUrl: z.string(),
-    baseUrlSource: z.enum(["default", "environment"]),
-    privacy: z.object({
-      storeDisabled: z.boolean(),
-      zeroDataRetention: z.boolean().nullable(),
-    }),
-    issues: z.array(
-      z.object({
-        code: z.enum(["missing_api_key", "xai_auth", "xai_model"]),
-        title: z.string(),
-        message: z.string(),
-      })
-    ),
-  }) as unknown as z.ZodType<OrbitXaiStatusPayload>;
+export const orbitScanQualityPayloadSchema = v.looseObject({
+  recommendedProfile: v.string(),
+  profileReason: v.string(),
+  successfulScanCount: v.number(),
+  recentScanCount: v.number(),
+  largeSuccessfulScanCount: v.number(),
+  usefulSuggestionRate: v.number(),
+  modelAbstainRate: v.number(),
+  failureRate: v.number(),
+  medianDurationMs: v.number(),
+  reviewedSuggestionCount: v.number(),
+  reviewUsefulRate: v.nullable(v.number()),
+  deep: v.object({
+    unlocked: v.boolean(),
+    reason: v.string(),
+  }),
+}) as unknown as v.GenericSchema<unknown, OrbitScanQualityPayload>;
 
-export const collectionDetailSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  type: z.string(),
-  isPublic: z.boolean(),
-  shareSlug: z.string().nullable(),
-  externalSource: z.string().nullable(),
-  externalSourceId: z.string().nullable(),
-  items: z.array(
-    z.object({
-      id: z.string(),
-      sortOrder: z.number(),
+export const orbitXaiStatusPayloadSchema = v.object({
+  state: v.picklist(["ready", "misconfigured"]),
+  checkedAt: v.string(),
+  apiKeyConfigured: v.boolean(),
+  model: v.string(),
+  modelSource: v.picklist(["default", "environment"]),
+  baseUrl: v.string(),
+  baseUrlSource: v.picklist(["default", "environment"]),
+  privacy: v.object({
+    storeDisabled: v.boolean(),
+    zeroDataRetention: v.nullable(v.boolean()),
+  }),
+  issues: v.array(
+    v.object({
+      code: v.picklist(["missing_api_key", "xai_auth", "xai_model"]),
+      title: v.string(),
+      message: v.string(),
+    })
+  ),
+}) as unknown as v.GenericSchema<unknown, OrbitXaiStatusPayload>;
+
+export const collectionDetailSchema = v.object({
+  id: v.string(),
+  name: v.string(),
+  description: v.nullable(v.string()),
+  type: v.string(),
+  isPublic: v.boolean(),
+  shareSlug: v.nullable(v.string()),
+  externalSource: v.nullable(v.string()),
+  externalSourceId: v.nullable(v.string()),
+  items: v.array(
+    v.object({
+      id: v.string(),
+      sortOrder: v.number(),
       bookmark: bookmarkWithRelationsSchema,
     })
   ),
-  total: z.number(),
-  page: z.number(),
-  totalPages: z.number(),
-  nextCursor: z.string().optional(),
+  total: v.number(),
+  page: v.number(),
+  totalPages: v.number(),
+  nextCursor: v.optional(v.string()),
 });
 
-export const shareContentSchema = z.object({
-  thread: z.array(z.object({ text: z.string() })),
-  summaryTweet: z.string(),
-  shareUrl: z.string(),
-  xIntentUrl: z.string(),
-  collectionName: z.string(),
-  itemCount: z.number(),
-}) as unknown as z.ZodType<ShareContent>;
+export const shareContentSchema = v.object({
+  thread: v.array(v.object({ text: v.string() })),
+  summaryTweet: v.string(),
+  shareUrl: v.string(),
+  xIntentUrl: v.string(),
+  collectionName: v.string(),
+  itemCount: v.number(),
+}) as unknown as v.GenericSchema<unknown, ShareContent>;
 
-export const bookmarkFocusResponseSchema = z.object({
-  bookmarks: z.array(bookmarkWithRelationsSchema),
-}) as unknown as z.ZodType<{ bookmarks: BookmarkWithRelations[] }>;
+export const bookmarkFocusResponseSchema = v.object({
+  bookmarks: v.array(bookmarkWithRelationsSchema),
+}) as unknown as v.GenericSchema<unknown, { bookmarks: BookmarkWithRelations[] }>;

@@ -2,10 +2,9 @@
 
 import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
 
-import {
-  orbitGraphPayloadSchema,
-} from "@/lib/api-response-schemas";
+import { orbitGraphPayloadSchema } from "@/lib/api-response-schemas";
 import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
+import * as v from "valibot";
 import type { OrbitGraphPayload, OrbitGraphScope } from "@/types";
 
 export function orbitGraphQueryKey(
@@ -87,12 +86,12 @@ async function fetchOrbitGraph(
     throw new Error(message);
   }
 
-  const parsed = orbitGraphPayloadSchema.safeParse(body);
+  const parsed = v.safeParse(orbitGraphPayloadSchema, body);
   if (!parsed.success) {
     throw new Error("Orbit graph response did not match expected shape");
   }
 
-  return parsed.data;
+  return parsed.output;
 }
 
 export function prefetchOrbitGraph(

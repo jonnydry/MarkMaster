@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
+import * as v from "valibot";
 
 import { FetchJsonError, fetchJson, sendJson } from "@/lib/fetch-json";
 
@@ -29,7 +29,7 @@ describe("fetchJson", () => {
       })
     );
 
-    const schema = z.object({ ok: z.literal(true) });
+    const schema = v.object({ ok: v.literal(true) });
 
     await expect(fetchJson("/api/test", undefined, schema)).resolves.toEqual({
       ok: true,
@@ -44,7 +44,7 @@ describe("fetchJson", () => {
       })
     );
 
-    const schema = z.object({ ok: z.literal(true) });
+    const schema = v.object({ ok: v.literal(true) });
 
     await expect(fetchJson("/api/test", undefined, schema)).rejects.toMatchObject({
       name: "FetchJsonError",
@@ -106,7 +106,7 @@ describe("sendJson", () => {
       })
     );
 
-    const schema = z.object({ id: z.string() });
+    const schema = v.object({ id: v.string() });
 
     await expect(
       sendJson("/api/test", {

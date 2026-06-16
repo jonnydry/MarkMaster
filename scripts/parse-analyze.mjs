@@ -50,20 +50,24 @@ function flattenGroups(groups, prefix = "") {
   return out;
 }
 
-const topChunks = [...data]
-  .sort((a, b) => b.parsedSize - a.parsedSize)
-  .slice(0, 20);
+const targetChunks = [...data]
+  .filter((chunk) => {
+    const flat = flattenGroups(chunk.groups);
+    return flat.some((g) => g.label.includes("valibot") || g.label.includes("zod"));
+  })
+  .sort((a, b) => b.parsedSize - a.parsedSize);
 
-console.log("Top 20 client chunks by parsed size:\n");
-for (const chunk of topChunks) {
+console.log("Chunks containing valibot or zod:\n");
+for (const chunk of targetChunks) {
   console.log(`--- ${chunk.label} ---`);
   console.log(`  stat: ${(chunk.statSize / 1024).toFixed(1)} KB`);
   console.log(`  parsed: ${(chunk.parsedSize / 1024).toFixed(1)} KB`);
   console.log(`  gzip: ${(chunk.gzipSize / 1024).toFixed(1)} KB`);
 
-  const flat = flattenGroups(chunk.groups).filter((g) => g.parsedSize > 0);
-  flat.sort((a, b) => b.parsedSize - a.parsedSize);
-  for (const g of flat.slice(0, 10)) {
+  const flat = flattenGroups(chunk.groups).filter(
+    (g) => g.label.includes("valibot") || g.label.includes("zod")
+  );
+  for (const g of flat) {
     console.log(`    ${(g.parsedSize / 1024).toFixed(1)} KB - ${g.label}`);
   }
   console.log();
