@@ -86,14 +86,19 @@ export async function GET(
 
   const nextCursor = buildCollectionItemListNextCursor(items, limit);
 
-  return NextResponse.json({
-    ...collection,
-    items,
-    total,
-    page,
-    totalPages: Math.ceil(total / limit) || 1,
-    nextCursor,
-  });
+  return NextResponse.json(
+    {
+      ...collection,
+      items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 1,
+      nextCursor,
+    },
+    {
+      headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
+    }
+  );
 }
 
 export async function PATCH(
