@@ -334,79 +334,6 @@ export async function applyOrbitScanPlan(args: {
     );
   }
 
-  const [existingTags, existingCollections] = await Promise.all([
-    prisma.tag.findMany({
-      where: { userId: args.userId },
-      orderBy: { name: "asc" },
-    }),
-    prisma.collection.findMany({
-      where: {
-        userId: args.userId,
-        type: "user_collection",
-      },
-      orderBy: { updatedAt: "desc" },
-    }),
-  ]);
-
-  const tagMap = new Map(existingTags.map((tag) => [normalizeKey(tag.name), tag]));
-  const collectionMap = new Map(
-    existingCollections.map((collection) => [normalizeKey(collection.name), collection])
-  );
-
-  const tagDefinitions = new Map<string, { name: string; color: string }>();
-  const tagAssignments: Array<{ bookmarkId: string; tagKey: string }> = [];
-  const collectionBuckets = new Map<
-    string,
-    {
-      name: string;
-      description: string;
-      reuseExisting: boolean;
-      bookmarkIds: Set<string>;
-    }
-  >();
-
-  for (const suggestion of args.plan.suggestions) {
-    for (const tag of suggestion.tags) {
-      const tagKey = normalizeKey(tag.name);
-      if (!tagKey) continue;
-
-      if (!tagDefinitions.has(tagKey)) {
-        tagDefinitions.set(tagKey, {
-          name: tagMap.get(tagKey)?.name ?? normalizeWhitespace(tag.name).slice(0, 50),
-          color: tagMap.get(tagKey)?.color ?? normalizeColor(tag.name, tag.color),
-        });
-      }
-
-      tagAssignments.push({ bookmarkId: suggestion.bookmarkId, tagKey });
-    }
-
-    if (!suggestion.collection) continue;
-
-    const collectionKey = normalizeKey(suggestion.collection.name);
-    if (!collectionKey || GENERIC_COLLECTION_NAMES.has(collectionKey)) continue;
-
-    const bucket = collectionBuckets.get(collectionKey);
-    if (bucket) {
-      bucket.bookmarkIds.add(suggestion.bookmarkId);
-      bucket.reuseExisting = bucket.reuseExisting || suggestion.collection.reuseExisting;
-      continue;
-    }
-
-    collectionBuckets.set(collectionKey, {
-      name:
-        collectionMap.get(collectionKey)?.name ??
-        normalizeWhitespace(suggestion.collection.name).slice(0, 100),
-      description:
-        truncateText(
-          collectionMap.get(collectionKey)?.description ??
-            suggestion.collection.description,
-          240
-        ) || "Auto-sorted from Orbit by Grok.",
-      reuseExisting: suggestion.collection.reuseExisting,
-      bookmarkIds: new Set([suggestion.bookmarkId]),
-    });
-  }
-
   const result: OrbitApplyResult = {
     bookmarkCount: bookmarkIds.length,
     createdTags: 0,
@@ -437,14 +364,74 @@ export async function applyOrbitScanPlan(args: {
       }),
     ]);
 
-    tagMap.clear();
-    for (const tag of lockedTags) {
-      tagMap.set(normalizeKey(tag.name), tag);
-    }
+    const tagMap = new Map(lockedTags.map((tag) => [normalizeKey(tag.name), tag]));
+    const collectionMap = new Map(
+      lockedCollections.map((collection) => [
+        normalizeKey(collection.name),
+        collection,
+      ])
+    );
 
-    collectionMap.clear();
-    for (const collection of lockedCollections) {
-      collectionMap.set(normalizeKey(collection.name), collection);
+    // Build the apply plan under the lock so concurrent scans cannot race on
+    // tag/collection existence. Previously this was done outside the lock with
+    // a stale pre-fetch, then rebuilt inside — wasting two round trips.
+    const tagDefinitions = new Map<string, { name: string; color: string }>();
+    const tagAssignments: Array<{ bookmarkId: string; tagKey: string }> = [];
+    const collectionBuckets = new Map<
+      string,
+      {
+        name: string;
+        description: string;
+        reuseExisting: boolean;
+        bookmarkIds: Set<string>;
+      }
+    >();
+
+    for (const suggestion of args.plan.suggestions) {
+      for (const tag of suggestion.tags) {
+        const tagKey = normalizeKey(tag.name);
+        if (!tagKey) continue;
+
+        if (!tagDefinitions.has(tagKey)) {
+          tagDefinitions.set(tagKey, {
+            name:
+              tagMap.get(tagKey)?.name ??
+              normalizeWhitespace(tag.name).slice(0, 50),
+            color:
+              tagMap.get(tagKey)?.color ??
+              normalizeColor(tag.name, tag.color),
+          });
+        }
+
+        tagAssignments.push({ bookmarkId: suggestion.bookmarkId, tagKey });
+      }
+
+      if (!suggestion.collection) continue;
+
+      const collectionKey = normalizeKey(suggestion.collection.name);
+      if (!collectionKey || GENERIC_COLLECTION_NAMES.has(collectionKey)) continue;
+
+      const bucket = collectionBuckets.get(collectionKey);
+      if (bucket) {
+        bucket.bookmarkIds.add(suggestion.bookmarkId);
+        bucket.reuseExisting =
+          bucket.reuseExisting || suggestion.collection.reuseExisting;
+        continue;
+      }
+
+      collectionBuckets.set(collectionKey, {
+        name:
+          collectionMap.get(collectionKey)?.name ??
+          normalizeWhitespace(suggestion.collection.name).slice(0, 100),
+        description:
+          truncateText(
+            collectionMap.get(collectionKey)?.description ??
+              suggestion.collection.description,
+            240
+          ) || "Auto-sorted from Orbit by Grok.",
+        reuseExisting: suggestion.collection.reuseExisting,
+        bookmarkIds: new Set([suggestion.bookmarkId]),
+      });
     }
 
     for (const [tagKey, tagDefinition] of tagDefinitions) {
@@ -516,6 +503,23 @@ export async function applyOrbitScanPlan(args: {
       }
     }
 
+    // One round trip to get the current max sortOrder per existing collection,
+    // instead of N findFirst calls inside the loop.
+    const existingCollectionIds = Array.from(collectionMap.values()).map(
+      (collection) => collection.id
+    );
+    const maxOrders =
+      existingCollectionIds.length === 0
+        ? []
+        : await tx.collectionItem.groupBy({
+            by: ["collectionId"],
+            where: { collectionId: { in: existingCollectionIds } },
+            _max: { sortOrder: true },
+          });
+    const maxSortOrderByCollectionId = new Map(
+      maxOrders.map((row) => [row.collectionId, row._max.sortOrder ?? -1])
+    );
+
     for (const [collectionKey, bucket] of collectionBuckets) {
       let collection = collectionMap.get(collectionKey) ?? null;
 
@@ -545,13 +549,8 @@ export async function applyOrbitScanPlan(args: {
         result.reusedCollections += 1;
       }
 
-      const maxOrder = await tx.collectionItem.findFirst({
-        where: { collectionId: collection.id },
-        orderBy: { sortOrder: "desc" },
-        select: { sortOrder: true },
-      });
-
-      const baseOrder = (maxOrder?.sortOrder ?? -1) + 1;
+      const baseOrder =
+        (maxSortOrderByCollectionId.get(collection.id) ?? -1) + 1;
       const bookmarkIdList = Array.from(bucket.bookmarkIds);
 
       if (bookmarkIdList.length === 0) continue;

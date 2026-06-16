@@ -22,7 +22,7 @@ function createMockTransaction(options?: {
   tagCreate?: ReturnType<typeof vi.fn>;
   collectionCreate?: ReturnType<typeof vi.fn>;
   bookmarkTagCreateMany?: ReturnType<typeof vi.fn>;
-  collectionItemFindFirst?: ReturnType<typeof vi.fn>;
+  collectionItemGroupBy?: ReturnType<typeof vi.fn>;
   collectionItemCreateMany?: ReturnType<typeof vi.fn>;
 }) {
   return {
@@ -42,9 +42,9 @@ function createMockTransaction(options?: {
       create: options?.collectionCreate ?? vi.fn(),
     },
     collectionItem: {
-      findFirst:
-        options?.collectionItemFindFirst ??
-        vi.fn().mockResolvedValue(null),
+      groupBy:
+        options?.collectionItemGroupBy ??
+        vi.fn().mockResolvedValue([]),
       createMany:
         options?.collectionItemCreateMany ??
         vi.fn().mockResolvedValue({ count: 0 }),
@@ -331,7 +331,9 @@ describe("applyOrbitScanPlan", () => {
             updatedAt: new Date(),
           },
         ],
-        collectionItemFindFirst: vi.fn().mockResolvedValue({ sortOrder: 4 }),
+        collectionItemGroupBy: vi
+          .fn()
+          .mockResolvedValue([{ collectionId: "c-existing", _max: { sortOrder: 4 } }]),
         collectionItemCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
       })
     );
