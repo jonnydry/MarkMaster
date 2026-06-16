@@ -75,7 +75,7 @@ export async function GET(
       select: {
         id: true,
         sortOrder: true,
-        bookmark: bookmarkListQueryOptions(),
+        bookmark: bookmarkListQueryOptions({ compact: true }),
       },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
       ...(useKeyset || !useOffset ? {} : { skip: (page - 1) * limit }),
