@@ -36,7 +36,10 @@ export async function GET() {
     ]);
 
     return NextResponse.json(
-      evaluateOrbitScanQuality({ scanEvents, reviewEvents })
+      evaluateOrbitScanQuality({ scanEvents, reviewEvents }),
+      {
+        headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
+      }
     );
   } catch (err) {
     console.warn("[orbit] scan quality query failed:", err);

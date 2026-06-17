@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
-const html = fs.readFileSync(".next/analyze/client.html", "utf8");
+const filename = process.argv[2] || ".next/analyze/client.html";
+const html = fs.readFileSync(filename, "utf8");
 const marker = "window.chartData = ";
 const start = html.indexOf(marker) + marker.length;
 
@@ -50,25 +51,38 @@ function flattenGroups(groups, prefix = "") {
   return out;
 }
 
-const targetChunks = [...data]
-  .filter((chunk) => {
-    const flat = flattenGroups(chunk.groups);
-    return flat.some((g) => g.label.includes("valibot") || g.label.includes("zod"));
-  })
-  .sort((a, b) => b.parsedSize - a.parsedSize);
+const needle = process.argv[3];
+const topN = needle ? 100 : 10;
 
-console.log("Chunks containing valibot or zod:\n");
-for (const chunk of targetChunks) {
+const topChunks = [...data]
+  .filter((chunk) => !needle || flattenGroups(chunk.groups).some((g) => g.label.toLowerCase().includes(needle.toLowerCase())))
+  .sort((a, b) => b.parsedSize - a.parsedSize)
+  .slice(0, topN);
+
+console.log(`Top ${topChunks.length} chunks from ${filename}:\n`);
+for (const chunk of topChunks) {
   console.log(`--- ${chunk.label} ---`);
-  console.log(`  stat: ${(chunk.statSize / 1024).toFixed(1)} KB`);
   console.log(`  parsed: ${(chunk.parsedSize / 1024).toFixed(1)} KB`);
   console.log(`  gzip: ${(chunk.gzipSize / 1024).toFixed(1)} KB`);
 
-  const flat = flattenGroups(chunk.groups).filter(
-    (g) => g.label.includes("valibot") || g.label.includes("zod")
-  );
-  for (const g of flat) {
-    console.log(`    ${(g.parsedSize / 1024).toFixed(1)} KB - ${g.label}`);
+  const flat = flattenGroups(chunk.groups).filter((g) => g.parsedSize > 0);
+  const srcModules = flat.filter((g) => g.label.startsWith("src/"));
+  const nodeModules = flat.filter((g) => g.label.startsWith("node_modules/"));
+
+  const topSrc = srcModules.sort((a, b) => b.parsedSize - a.parsedSize).slice(0, 6);
+  if (topSrc.length) {
+    console.log("  top src:");
+    for (const g of topSrc) {
+      console.log(`    ${(g.parsedSize / 1024).toFixed(1)} KB - ${g.label}`);
+    }
+  }
+
+  const topNode = nodeModules.sort((a, b) => b.parsedSize - a.parsedSize).slice(0, 6);
+  if (topNode.length) {
+    console.log("  top node_modules:");
+    for (const g of topNode) {
+      console.log(`    ${(g.parsedSize / 1024).toFixed(1)} KB - ${g.label}`);
+    }
   }
   console.log();
 }

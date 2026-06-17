@@ -83,7 +83,12 @@ export async function GET() {
     select: syncRunSelect,
   });
 
-  return NextResponse.json({ currentRun, recentRuns });
+  return NextResponse.json(
+    { currentRun, recentRuns },
+    {
+      headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=15" },
+    }
+  );
 }
 
 export async function POST(req: Request) {
