@@ -53,7 +53,7 @@ import {
   appFeedHeaderFrostedClassName,
 } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
-import { useOrbitPage } from "@/hooks/orbit";
+import { useOrbitPage } from "@/hooks/use-orbit-page";
 import { cn } from "@/lib/utils";
 
 const AddTagDialog = dynamic(

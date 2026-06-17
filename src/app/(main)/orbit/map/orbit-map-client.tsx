@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import {
   ORBIT_MAP_SHORTCUT_GROUPS,
   useOrbitMapPage,
-} from "@/hooks/orbit";
+} from "@/hooks/use-orbit-map-page";
 import { OrbitMapCommandBar } from "@/components/orbit/orbit-map-command-bar";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
