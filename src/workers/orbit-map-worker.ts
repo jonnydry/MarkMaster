@@ -13,8 +13,11 @@
  * The main thread only handles React state and forwards DOM events.
  */
 
-import { DOMAdapter, WebWorkerAdapter } from 'pixi.js';
-import { Application } from 'pixi.js';
+import {
+  Application,
+  DOMAdapter,
+  WebWorkerAdapter,
+} from '@/lib/pixi-imports';
 
 // Must be called before any other Pixi imports/usage in the worker
 DOMAdapter.set(WebWorkerAdapter);
@@ -65,7 +68,7 @@ import {
   BitmapFont,
   BitmapFontManager,
   BitmapText,
-} from 'pixi.js';
+} from '@/lib/pixi-imports';
 import {
   clampOrbitMapZoom,
   constrainOrbitMapCameraState,
@@ -527,6 +530,8 @@ function handleInit(msg: InitMessage) {
       antialias: true,
       backgroundColor: palette.background,
       autoDensity: true,
+      // The worker only needs WebGL; skip the WebGPU auto-detect branch.
+      preference: 'webgl',
     }).then(() => {
       isInitialized = true;
       const initMs = Math.round(

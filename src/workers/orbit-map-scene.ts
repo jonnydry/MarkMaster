@@ -4,7 +4,7 @@
  * worker entry point stays focused on orchestration.
  */
 
-import { Container, Graphics, Sprite, Texture } from "pixi.js";
+import { Container, Graphics, Sprite, Texture } from "@/lib/pixi-imports";
 
 import type { OrbitMapColorMode } from "@/lib/orbit-map-palette";
 

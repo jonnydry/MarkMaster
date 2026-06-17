@@ -120,6 +120,17 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "abs.twimg.com" },
     ],
   },
+  webpack(config) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // PixiJS only exposes init side-effect packages in its exports map.
+      // The Orbit worker imports the classes it needs from internal files so
+      // the full `pixi.js` entry (filters, accessibility, assets, WebGPU, etc.)
+      // is not bundled. This alias lets webpack resolve those internal paths.
+      "pixi.js/lib": path.resolve(__dirname, "node_modules/pixi.js/lib"),
+    };
+    return config;
+  },
   async headers() {
     return [
       {
