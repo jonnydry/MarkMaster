@@ -20,26 +20,42 @@ export function useCompactFloatingSearch(
   search: string,
   searchInputRef: Ref<HTMLInputElement>
 ) {
-  const [expanded, setExpanded] = useState(false);
+  const [userToggledOpen, setUserToggledOpen] = useState(false);
+  const [userCollapsed, setUserCollapsed] = useState(false);
   const userCollapsedRef = useRef(false);
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
 
+  // Reset user intent when the feature is toggled off/on (React-recommended
+  // "adjust state when a prop changes" pattern — no effect needed).
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled);
+    setUserCollapsed(false);
+    setUserToggledOpen(false);
+  }
+
+  // Keep ref in sync with state for use in effects that must not depend on
+  // userCollapsed state directly (avoids cascading-render lint error).
   useEffect(() => {
-    if (!enabled) {
-      setExpanded(false);
-      userCollapsedRef.current = false;
-      return;
+    userCollapsedRef.current = userCollapsed;
+  }, [userCollapsed]);
+
+  const hasSearch = Boolean(search.trim());
+  const expanded = enabled && !userCollapsed && (hasSearch || userToggledOpen);
+
+  // Auto-expand when search text appears (syncing with external input).
+  // Uses the ref so the effect does not depend on userCollapsed state.
+  useEffect(() => {
+    if (enabled && hasSearch && !userCollapsedRef.current) {
+      setUserToggledOpen(true);
     }
-    if (search.trim() && !userCollapsedRef.current) {
-      setExpanded(true);
-    }
-  }, [enabled, search]);
+  }, [enabled, hasSearch]);
 
   useEffect(() => {
     if (!enabled) return;
 
     const open = () => {
-      userCollapsedRef.current = false;
-      setExpanded(true);
+      setUserCollapsed(false);
+      setUserToggledOpen(true);
     };
     window.addEventListener(COMPACT_SEARCH_FOCUS_EVENT, open);
     return () => window.removeEventListener(COMPACT_SEARCH_FOCUS_EVENT, open);
@@ -55,27 +71,26 @@ export function useCompactFloatingSearch(
   }, [enabled, expanded, searchInputRef]);
 
   const toggle = useCallback(() => {
-    setExpanded((prev) => {
-      if (prev) {
-        userCollapsedRef.current = true;
-        getSearchInput(searchInputRef)?.blur();
-        return false;
-      }
-      userCollapsedRef.current = false;
-      return true;
-    });
-  }, [searchInputRef]);
+    if (expanded) {
+      setUserCollapsed(true);
+      setUserToggledOpen(false);
+      getSearchInput(searchInputRef)?.blur();
+    } else {
+      setUserCollapsed(false);
+      setUserToggledOpen(true);
+    }
+  }, [expanded, searchInputRef]);
 
   const closeIfEmpty = useCallback(() => {
     if (!search.trim()) {
-      userCollapsedRef.current = true;
-      setExpanded(false);
+      setUserCollapsed(true);
+      setUserToggledOpen(false);
     }
   }, [search]);
 
   return {
     expanded,
-    setExpanded,
+    setExpanded: setUserToggledOpen,
     toggle,
     closeIfEmpty,
   };

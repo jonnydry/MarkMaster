@@ -29,7 +29,10 @@ export function useOrbitMapSearch({
   const [searchResults, setSearchResults] = useState<OrbitGraphNode[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDeferredRef = useRef(searchDeferred);
-  searchDeferredRef.current = searchDeferred;
+
+  useEffect(() => {
+    searchDeferredRef.current = searchDeferred;
+  }, [searchDeferred]);
 
   useEffect(() => {
     const trimmed = search.trim().toLowerCase();
@@ -38,12 +41,6 @@ export function useOrbitMapSearch({
     }, 120);
     return () => window.clearTimeout(handle);
   }, [search]);
-
-  useEffect(() => {
-    if (!searchDeferred) {
-      setSearchResults([]);
-    }
-  }, [searchDeferred]);
 
   const handleSearchResults = useCallback((query: string, results: OrbitGraphNode[]) => {
     if (query !== searchDeferredRef.current) return;
@@ -62,7 +59,7 @@ export function useOrbitMapSearch({
     search,
     setSearch,
     searchDeferred,
-    searchResults,
+    searchResults: searchDeferred ? searchResults : [],
     searchInputRef,
     handleSearchResults,
     handleSearchResultSelect,

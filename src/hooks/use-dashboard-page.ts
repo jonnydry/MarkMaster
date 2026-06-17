@@ -140,6 +140,10 @@ export function useDashboardPage() {
         staleTime: 30_000,
       });
     },
+    // Individual filters.* properties are listed; the parent object is not
+    // stable across renders, so including `filters` would cause unnecessary
+    // re-creations of this callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       bookmarkData,
       filters.page,

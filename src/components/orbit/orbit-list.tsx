@@ -68,6 +68,7 @@ export function OrbitList({
   dismissedBookmarkIds,
   appliedBookmarkIds,
 }: OrbitListProps) {
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
     getScrollElement: () => scrollRef?.current ?? null,

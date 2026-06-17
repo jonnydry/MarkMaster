@@ -77,6 +77,9 @@ function VirtualizedBookmarkRows({
   const rowEstimate =
     viewMode === "compact" ? COMPACT_ROW_ESTIMATE_PX : FEED_ROW_ESTIMATE_PX;
 
+  // TanStack Virtual returns functions that cannot be memoized — React Compiler
+  // skips this component by design. Suppressed until the library addresses it.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
     getScrollElement: () => scrollRef.current,
