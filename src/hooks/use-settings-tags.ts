@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { sendJson } from "@/lib/fetch-json";
 import { invalidateTagsQuery } from "@/lib/query-invalidation";
 import { assignBalancedTagColors } from "@/lib/tag-colors";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useTagsQuery } from "@/hooks/use-library-data";
 
 export function useSettingsTags() {

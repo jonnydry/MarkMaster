@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
 import {

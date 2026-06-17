@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { formatAppliedToast } from "@/lib/orbit-apply-utils";
 import type { OrbitApplyResult, OrbitBookmarkDecision } from "@/types";

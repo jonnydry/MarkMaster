@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { applyPrimarySuggestion } from "@/lib/orbit-scan-apply";
 import { formatAppliedToast } from "@/lib/orbit-apply-utils";

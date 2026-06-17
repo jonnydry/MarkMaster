@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Copy, ExternalLink, Check } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { generateClipboardThread } from "@/lib/share-content";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";

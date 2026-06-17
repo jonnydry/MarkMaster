@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type RefObject } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import type {
   OrbitMapCanvasHandle,

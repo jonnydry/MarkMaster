@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { sendJson, FetchJsonError } from "@/lib/fetch-json";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import type { SyncRunSummary } from "@/types";

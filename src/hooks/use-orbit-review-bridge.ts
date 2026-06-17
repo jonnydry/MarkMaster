@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import {
   buildNoOpApplyResult,
@@ -165,7 +165,7 @@ export function useOrbitReviewBridge(options: UseOrbitReviewBridgeOptions) {
         toast.success("Grok suggestion restored for this bookmark.");
         return true;
       }
-      toast("Kept in Orbit for this pass.");
+      toast.message("Kept in Orbit for this pass.");
       return false;
     },
     [scan]

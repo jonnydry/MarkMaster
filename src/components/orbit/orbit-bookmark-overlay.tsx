@@ -10,7 +10,7 @@ import {
   Sparkles,
   Tags,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";

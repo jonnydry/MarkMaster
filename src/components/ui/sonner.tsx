@@ -1,12 +1,32 @@
 "use client"
 
-import type { CSSProperties } from "react"
+import { useEffect, useState, type CSSProperties } from "react"
+import dynamic from "next/dynamic"
 import { useTheme } from "@/components/providers"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { mountListeners } from "@/lib/toast"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import type { ToasterProps } from "sonner"
+
+const Sonner = dynamic(
+  () => import("sonner").then((mod) => mod.Toaster),
+  { ssr: false }
+)
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const onToastRequested = () => setMounted(true)
+    mountListeners.add(onToastRequested)
+    return () => {
+      mountListeners.delete(onToastRequested)
+    }
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   return (
     <Sonner
