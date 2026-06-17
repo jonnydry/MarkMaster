@@ -2,16 +2,9 @@
 
 import React, { useMemo } from "react";
 import { Layers } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import type { AnalyticsData } from "@/types";
+import { SimpleBarChart } from "@/components/charts/simple-bar-chart";
 
 import {
   analyticsChartSurfaceCardClass,
@@ -31,17 +24,6 @@ const MIX_SERIES: Array<{ key: string; color: string; label: string }> = [
   { key: "Text Only", color: "var(--chart-2)", label: "Text only" },
 ];
 
-const tooltipStyle = {
-  background: "var(--surface-elevated)",
-  border: "1px solid var(--hairline-strong)",
-  borderRadius: "0.6rem",
-  boxShadow: "0 12px 32px -12px rgba(0, 0, 0, 0.22)",
-  color: "var(--foreground)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "12px",
-  padding: "6px 8px",
-};
-
 export const ContentMixCard = React.memo(function ContentMixCard({
   breakdown,
   variant = "card",
@@ -60,19 +42,6 @@ export const ContentMixCard = React.memo(function ContentMixCard({
         pct: total > 0 ? ((byKey.get(s.key) ?? 0) / total) * 100 : 0,
       })).filter((s) => s.count > 0),
     [byKey, total]
-  );
-
-  const chartData = useMemo(
-    () => [
-      segments.reduce<Record<string, number | string>>(
-        (acc, s) => {
-          acc[s.key] = s.pct;
-          return acc;
-        },
-        { name: "mix" }
-      ),
-    ],
-    [segments]
   );
 
   const contentMixLabel = useMemo(() => {
@@ -97,40 +66,7 @@ export const ContentMixCard = React.memo(function ContentMixCard({
       ) : (
         <div className="flex flex-col gap-4">
           <div className={chartSurfaceClass} role="img" aria-label={contentMixLabel}>
-            <ResponsiveContainer width="100%" height={44}>
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-              >
-                <XAxis type="number" hide domain={[0, 100]} />
-                <YAxis type="category" dataKey="name" hide />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  cursor={{ fill: "transparent" }}
-                  formatter={(v, n) => [`${Number(v ?? 0).toFixed(0)}%`, String(n)]}
-                />
-                {segments.map((s, i) => (
-                  <Bar
-                    key={s.key}
-                    dataKey={s.key}
-                    stackId="mix"
-                    fill={s.color}
-                    radius={
-                      i === 0 && segments.length === 1
-                        ? 6
-                        : i === 0
-                          ? [6, 0, 0, 6]
-                          : i === segments.length - 1
-                            ? [0, 6, 6, 0]
-                            : 0
-                    }
-                    isAnimationActive={true}
-                    animationDuration={600}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            <SimpleBarChart segments={segments} height={44} />
           </div>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             {segments.map((s) => (

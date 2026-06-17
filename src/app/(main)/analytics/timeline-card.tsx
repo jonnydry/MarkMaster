@@ -1,20 +1,11 @@
 "use client";
 
-import React, { useId, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Activity } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceDot,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import type { AnalyticsData } from "@/types";
 import { cn } from "@/lib/utils";
+import { SimpleAreaChart } from "@/components/charts/simple-area-chart";
 
 import {
   analyticsChartSurfaceClass,
@@ -28,21 +19,6 @@ import {
   type ChartVariant,
 } from "./analytics-chart-shell";
 
-const tooltipStyle = {
-  background: "var(--surface-elevated)",
-  border: "1px solid var(--hairline-strong)",
-  borderRadius: "0.6rem",
-  boxShadow: "0 12px 32px -12px rgba(0, 0, 0, 0.22)",
-  color: "var(--foreground)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "12px",
-  padding: "6px 8px",
-};
-
-const chartTickStyle = { fontSize: 11, fontFamily: "var(--font-sans)" };
-
-type TimelinePoint = { label: string; count: number; iso: string };
-
 export const TimelineCard = React.memo(function TimelineCard({
   analytics,
   range,
@@ -52,7 +28,6 @@ export const TimelineCard = React.memo(function TimelineCard({
   range: TimeRange;
   variant?: ChartVariant;
 }) {
-  const timelineFillId = `timeline-fill-${useId().replace(/:/g, "")}`;
   const timeline = useMemo(() => buildTimeline(analytics, range), [analytics, range]);
   const peak = useMemo(() => findPeak(timeline.data), [timeline.data]);
   const rangeTotal = useMemo(
@@ -84,72 +59,12 @@ export const TimelineCard = React.memo(function TimelineCard({
         <EmptyBox height={220} />
       ) : (
         <div className={chartSurfaceClass} role="img" aria-label={timelineLabel}>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart
-              data={timeline.data}
-              margin={{ top: 8, right: 12, bottom: 0, left: -8 }}
-            >
-              <defs>
-                <linearGradient id={timelineFillId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.32} />
-                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--hairline-soft)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="label"
-                stroke="var(--muted-foreground)"
-                tick={chartTickStyle}
-                tickLine={false}
-                axisLine={false}
-                minTickGap={timeline.tickGap}
-              />
-              <YAxis
-                stroke="var(--muted-foreground)"
-                tick={chartTickStyle}
-                tickLine={false}
-                axisLine={false}
-                width={32}
-                allowDecimals={false}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                cursor={{ stroke: "var(--hairline-strong)", strokeWidth: 1 }}
-                labelFormatter={(l) => String(l)}
-                formatter={(v) => [Number(v ?? 0).toLocaleString(), "Bookmarks"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="count"
-                stroke="var(--primary)"
-                strokeWidth={2.25}
-                fill={`url(#${timelineFillId})`}
-                dot={false}
-                activeDot={{
-                  r: 4,
-                  strokeWidth: 2,
-                  stroke: "var(--surface-1)",
-                  fill: "var(--primary)",
-                }}
-                animationDuration={600}
-              />
-              {peak ? (
-                <ReferenceDot
-                  x={peak.label}
-                  y={peak.count}
-                  r={5}
-                  fill="var(--note)"
-                  stroke="var(--surface-1)"
-                  strokeWidth={2}
-                  ifOverflow="visible"
-                />
-              ) : null}
-            </AreaChart>
-          </ResponsiveContainer>
+          <SimpleAreaChart
+            data={timeline.data}
+            height={220}
+            maxXLabels={range === "90d" ? 4 : 6}
+            highlightLabel={peak?.label}
+          />
           {peak ? (
             <p className="mt-2 px-1 text-xs text-muted-foreground">
               <span
@@ -168,18 +83,17 @@ export const TimelineCard = React.memo(function TimelineCard({
 function buildTimeline(
   analytics: AnalyticsData,
   range: TimeRange
-): { data: TimelinePoint[]; tickGap: number } {
+): { data: { label: string; count: number }[]; tickGap: number } {
   if (range === "30d" || range === "90d") {
     const days = range === "30d" ? 30 : 90;
     const today = startOfUtcDay(new Date());
     const map = new Map(analytics.bookmarksByDay.map((d) => [d.day, d.count]));
-    const data: TimelinePoint[] = [];
+    const data: { label: string; count: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setUTCDate(d.getUTCDate() - i);
       const iso = d.toISOString().slice(0, 10);
       data.push({
-        iso,
         label: formatDayLabel(d),
         count: map.get(iso) ?? 0,
       });
@@ -196,7 +110,6 @@ function buildTimeline(
 
   return {
     data: sliced.map((m) => ({
-      iso: m.month,
       label: formatMonthLabel(m.month),
       count: m.count,
     })),
@@ -204,7 +117,7 @@ function buildTimeline(
   };
 }
 
-function findPeak(data: TimelinePoint[]) {
+function findPeak(data: { label: string; count: number }[]) {
   if (data.length === 0) return null;
   let peak = data[0];
   for (const d of data) if (d.count > peak.count) peak = d;
