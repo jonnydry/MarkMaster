@@ -120,7 +120,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "abs.twimg.com" },
     ],
   },
-  webpack(config) {
+  webpack(config, { isServer }) {
     config.resolve.alias = {
       ...config.resolve.alias,
       // PixiJS only exposes init side-effect packages in its exports map.
@@ -129,6 +129,34 @@ const nextConfig: NextConfig = {
       // is not bundled. This alias lets webpack resolve those internal paths.
       "pixi.js/lib": path.resolve(__dirname, "node_modules/pixi.js/lib"),
     };
+
+    // The @base-ui popup/floating-ui internals are duplicated across many route
+    // chunks because Dialog/Menu/Select/Tooltip each pull them in. Force them
+    // into one shared client chunk so the browser only downloads them once.
+    if (!isServer) {
+      const existing = config.optimization.splitChunks;
+      const splitChunks =
+        typeof existing === "object" && existing !== null ? existing : {};
+      const cacheGroups =
+        typeof splitChunks.cacheGroups === "object" &&
+        splitChunks.cacheGroups !== null
+          ? splitChunks.cacheGroups
+          : {};
+
+      config.optimization.splitChunks = {
+        ...splitChunks,
+        cacheGroups: {
+          ...cacheGroups,
+          baseUiPopup: {
+            test: /[\\/]node_modules[\\/]@base-ui[\\/]react[\\/]esm[\\/](utils[\\/]popups|floating-ui-react)[\\/]/,
+            name: "base-ui-popup",
+            chunks: "all",
+            priority: 20,
+          },
+        },
+      };
+    }
+
     return config;
   },
   async headers() {
