@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { exportQuerySchema } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import {
   CSV_EXPORT_HEADER,
   formatBookmarkCsvRow,
@@ -29,6 +30,12 @@ export async function GET(req: NextRequest) {
   }
 
   const { format } = parsed.data;
+
+  const rateLimitResult = await checkRateLimit("api:read", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({

@@ -59,7 +59,7 @@ MarkMaster is a bookmark manager built for people who save a lot on X and need t
 | Data | PostgreSQL, Prisma |
 | Auth | Auth.js (NextAuth v5) — X OAuth 2.0 |
 | Client state | TanStack Query |
-| Charts | Recharts |
+| Charts | Custom SVG (recharts removed for bundle size) |
 | Graph | d3-force, Pixi.js (Orbit map) |
 | AI (optional) | xAI Grok via Responses API |
 

@@ -100,7 +100,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: turbopackRoot,
   },
-  // lucide-react, date-fns, and recharts are optimized by default in Next.js 16.
+  // lucide-react and date-fns are optimized by default in Next.js 16.
   // @base-ui/react and @tanstack/react-query benefit from explicit opt-in.
   experimental: {
     optimizePackageImports: [
@@ -127,7 +127,7 @@ const nextConfig: NextConfig = {
       // The Orbit worker imports the classes it needs from internal files so
       // the full `pixi.js` entry (filters, accessibility, assets, WebGPU, etc.)
       // is not bundled. This alias lets webpack resolve those internal paths.
-      "pixi.js/lib": path.resolve(__dirname, "node_modules/pixi.js/lib"),
+      "pixi.js/lib": path.resolve(turbopackRoot, "node_modules/pixi.js/lib"),
     };
 
     // The @base-ui popup/floating-ui internals are duplicated across many route

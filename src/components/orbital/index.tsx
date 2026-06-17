@@ -23,11 +23,11 @@ export const orbital = {
         : "border-emerald-400/30 bg-emerald-400/10 text-emerald-600",
   pill: "inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary",
   icon: "bg-primary/10 text-primary",
-  menu: "rounded-sm border border-hairline-soft bg-[var(--surface-1)] shadow-xl py-1 text-[13px] min-w-[136px]",
+  menu: "rounded-sm surface-overlay py-1 text-[13px] min-w-[136px]",
   menuItem:
     "flex items-center gap-2.5 px-3 py-1.5 text-[var(--foreground)] hover:bg-primary/5 active:bg-primary/10 cursor-pointer transition-colors",
   actionPill:
-    "inline-flex items-center gap-px rounded-sm border border-primary/20 bg-[var(--surface-1)]/95 px-1 py-0.5 shadow-sm backdrop-blur",
+    "inline-flex items-center gap-px rounded-sm border border-primary/20 bg-surface-1/95 px-1 py-0.5 backdrop-blur",
   sectionLabel: orbitalTypography.sectionLabel,
   slideIn:
     "glass-orbital orbital-slide-in-shadow border-l-2 border-primary/40",
