@@ -116,7 +116,7 @@ export function AddTagDialog({
               : "Apply existing tags or create a new one for this bookmark."}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -185,29 +185,29 @@ export function AddTagDialog({
             </div>
           )}
           {(canCreate || existingTags.length === 0) && (
-            <div>
+            <div className="min-w-0 space-y-3">
               <p className={t.sectionLabel}>Create new tag</p>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex gap-1.5">
-                  {colorOptions.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Select color ${c}`}
-                      aria-pressed={color === c}
-                      className={cn(
-                        "h-6 w-6 rounded-full border transition-shadow",
-                        color === c
-                          ? "border-primary/50 ring-2 ring-primary/30"
-                          : "border-hairline-soft"
-                      )}
-                      style={{ backgroundColor: c }}
-                      onClick={() => {
-                        setManualColor(c);
-                      }}
-                    />
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-1.5">
+                {colorOptions.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Select color ${c}`}
+                    aria-pressed={color === c}
+                    className={cn(
+                      "h-6 w-6 shrink-0 rounded-full border transition-shadow",
+                      color === c
+                        ? "border-primary/50 ring-2 ring-primary/30"
+                        : "border-hairline-soft"
+                    )}
+                    style={{ backgroundColor: c }}
+                    onClick={() => {
+                      setManualColor(c);
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-end">
                 <Button
                   onClick={handleAdd}
                   disabled={!canCreate || addingNew}

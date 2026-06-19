@@ -115,7 +115,10 @@ export const BookmarkCard = memo(function BookmarkCard({
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
   const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const canExpandCompact = viewMode === "compact" && Boolean(onCompactExpandedChange);
-  const isInteractive = selectionMode || Boolean(onSelect) || canExpandCompact;
+  const canPostAreaExpand =
+    viewMode !== "compact" && Boolean(onOpenExpanded) && !selectionMode;
+  const isInteractive =
+    selectionMode || canExpandCompact || Boolean(onSelect) || canPostAreaExpand;
   const {
     highlightedText,
     highlightedAuthorName,
@@ -142,16 +145,30 @@ export const BookmarkCard = memo(function BookmarkCard({
       return;
     }
 
+    if (canPostAreaExpand) {
+      onOpenExpanded?.(bookmark.id);
+      return;
+    }
+
     onSelect?.(bookmark.id);
+  };
+  const shouldIgnorePostActivation = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+
+    return Boolean(
+      target.closest("[data-bookmark-media-gallery]") ||
+        target.closest("[data-bookmark-card-actions]")
+    );
   };
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isInteractive) return;
-    if (
-      event.target instanceof Element &&
-      event.target.closest("[data-bookmark-media-gallery]")
-    ) {
-      return;
-    }
+    if (canPostAreaExpand) return;
+    if (shouldIgnorePostActivation(event.target)) return;
+    handleCardActivation();
+  };
+  const handlePostAreaClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!canPostAreaExpand) return;
+    if (shouldIgnorePostActivation(event.target)) return;
     handleCardActivation();
   };
   const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -263,7 +280,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   return (
     <div
       className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
-        isInteractive ? "cursor-pointer" : ""
+        isInteractive && !canPostAreaExpand ? "cursor-pointer" : ""
       } ${
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
@@ -288,12 +305,14 @@ export const BookmarkCard = memo(function BookmarkCard({
                     ? "Open expanded bookmark from"
                     : "Collapse bookmark from"
                   : "Expand bookmark from"
-                : "Bookmark from"
+                : canPostAreaExpand
+                  ? "Open expanded bookmark from"
+                  : "Bookmark from"
             } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
           : undefined
       }
-      onClick={isInteractive ? handleCardClick : undefined}
-      onKeyDown={handleCardKeyDown}
+      onClick={isInteractive && !canPostAreaExpand ? handleCardClick : undefined}
+      onKeyDown={isInteractive ? handleCardKeyDown : undefined}
     >
       <div className="flex gap-3">
         <BookmarkRank rank={rank}  />
@@ -303,6 +322,13 @@ export const BookmarkCard = memo(function BookmarkCard({
             onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
           />
         )}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 gap-3",
+            canPostAreaExpand && "cursor-pointer"
+          )}
+          onClick={canPostAreaExpand ? handlePostAreaClick : undefined}
+        >
         {bookmark.authorProfileImage ? (
           <Image
             src={bookmark.authorProfileImage}
@@ -408,7 +434,10 @@ export const BookmarkCard = memo(function BookmarkCard({
             </div>
           )}
 
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft pt-2.5">
+          <div
+            data-bookmark-card-actions
+            className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft pt-2.5"
+          >
             {metrics ? (
               <dl className="flex min-w-0 items-center gap-3 text-muted-foreground">
                 <div className="flex items-center gap-1 text-xs">
@@ -494,6 +523,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               )}
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
