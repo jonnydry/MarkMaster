@@ -951,6 +951,19 @@
     .animate-slide-down-fade {
       animation: none;
     }
+    /* tw-animate-css enter/exit animations (dialogs, popovers, menus, etc.)
+       ship no reduced-motion rules of their own — guard them centrally. */
+    .animate-in,
+    .animate-out {
+      animation: none !important;
+    }
+    /* Tailwind motion utilities used for loaders and status indicators. */
+    .animate-spin,
+    .animate-pulse,
+    .animate-bounce,
+    .animate-ping {
+      animation: none !important;
+    }
   }
 
   .font-label {

@@ -42,7 +42,7 @@ export function OrbitScanFailureNotice({
       <div className="flex min-w-0 gap-3">
         <div
           className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border",
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm border",
             "border-hairline-soft bg-surface-2/70 dark:border-white/12 dark:bg-black/15"
           )}
         >
@@ -106,7 +106,7 @@ export function OrbitScanFailureNotice({
           <Button
             type="button"
             size="sm"
-            className="h-9 rounded-sm bg-foreground text-background hover:bg-foreground/90"
+            className="h-9 rounded-sm bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={scanning || selectionTargetCount === 0}
             onClick={onRescanCurrentSelection}
           >

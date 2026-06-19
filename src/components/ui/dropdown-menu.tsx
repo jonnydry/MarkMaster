@@ -227,7 +227,7 @@ function DropdownMenuSeparator({
   return (
     <MenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn("-mx-1 my-1 h-px bg-hairline-soft", className)}
       {...props}
     />
   )
@@ -241,7 +241,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
+        "ml-auto text-xs tracking-wider text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
         className
       )}
       {...props}

@@ -72,13 +72,10 @@ export function OrbitMapGraphSearch({
           ref={searchInputRef}
           glass
           value={search}
-          onChange={hasGraph ? onSearchChange : () => {}}
+          onChange={onSearchChange}
+          disabled={!hasGraph}
           placeholder={placeholder}
-          inputClassName={cn(
-            "h-9",
-            inputClassName,
-            !hasGraph && "cursor-not-allowed opacity-60"
-          )}
+          inputClassName={cn("h-9", inputClassName)}
         />
         {isFetching ? (
           <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">

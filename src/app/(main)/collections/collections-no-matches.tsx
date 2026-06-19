@@ -8,7 +8,7 @@ type NoCollectionMatchesProps = {
 
 export function NoCollectionMatches({ onClear }: NoCollectionMatchesProps) {
   return (
-    <div className="rounded-sm border border-dashed border-hairline-soft bg-surface-1/55 px-6 py-10 text-center">
+    <div className="surface-veil border-dashed px-6 py-10 text-center">
       <Search className="mx-auto h-8 w-8 text-muted-foreground/60" aria-hidden="true" />
       <h2 className="mt-3 text-sm font-semibold text-foreground">
         No matching collections

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 import { AppPageCenter } from "@/components/app-page-shell";
 
 type AppRouteErrorProps = {
@@ -17,13 +18,12 @@ export function AppRouteError({
 }: AppRouteErrorProps) {
   return (
     <AppPageCenter className="bg-background">
-      <div className="max-w-md text-center">
-        <h2 className="mb-2 text-xl font-semibold">{title}</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          {error.message || "An unexpected error occurred"}
-        </p>
-        <Button onClick={reset}>Try again</Button>
-      </div>
+      <ErrorState
+        layout="page"
+        title={title}
+        description={error.message || "An unexpected error occurred"}
+        action={<Button onClick={reset}>Try again</Button>}
+      />
     </AppPageCenter>
   );
 }

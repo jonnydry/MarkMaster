@@ -7,23 +7,17 @@ export function orbitMapStageClass(extra?: string) {
 
 /** Floating panel over the map canvas (search, stats, minimap frame). */
 export function orbitMapFloatingShellClass(extra?: string) {
-  return cn(
-    "rounded-sm border border-hairline-soft bg-popover/90 text-foreground shadow-sm backdrop-blur-xl",
-    extra
-  );
+  return cn("map-glass rounded-sm text-foreground", extra);
 }
 
 /** Dropdown / menu anchored to map floating controls. */
 export function orbitMapFloatingMenuClass(extra?: string) {
-  return cn(
-    "rounded-sm border border-hairline-soft bg-popover/95 text-foreground shadow-sm backdrop-blur-xl",
-    extra
-  );
+  return cn("map-glass rounded-sm text-foreground", extra);
 }
 
 export function orbitMapControlButtonClass(active: boolean) {
   return cn(
-    "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl",
+    "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
     active
       ? "border-hairline-soft bg-accent-soft text-foreground"
       : "text-muted-foreground hover:bg-accent-soft/60 hover:text-foreground"
@@ -32,7 +26,7 @@ export function orbitMapControlButtonClass(active: boolean) {
 
 export function orbitMapZoomShellClass() {
   return cn(
-    "pointer-events-auto inline-flex flex-col overflow-hidden rounded-sm border border-hairline-soft bg-popover/90 shadow-sm backdrop-blur-xl"
+    "pointer-events-auto inline-flex flex-col overflow-hidden map-glass rounded-sm"
   );
 }
 

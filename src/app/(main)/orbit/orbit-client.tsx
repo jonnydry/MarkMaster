@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   Folder,
   Loader2,
@@ -194,6 +194,30 @@ export default function OrbitPage() {
     handleBulkAddToCollection,
     handleBulkDelete,
   } = interactions;
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuForId) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuForId(null);
+        setMenuPosition(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuForId(null);
+        setMenuPosition(null);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuForId, setMenuForId, setMenuPosition]);
 
   return (
     <>
@@ -566,6 +590,7 @@ export default function OrbitPage() {
 
                 {menuForId && menuPosition && (
                   <div
+                    ref={menuRef}
                     className="fixed z-50"
                     style={{
                       left: `${menuPosition.x}px`,

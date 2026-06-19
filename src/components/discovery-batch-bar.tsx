@@ -1,7 +1,8 @@
 "use client";
 
-import { Plus, RotateCcw, Sparkles } from "lucide-react";
+import { Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DiscoveryCelebration } from "@/components/discovery-celebration";
 import { cn } from "@/lib/utils";
 
 export interface DiscoveryBatchBarProps {
@@ -38,25 +39,11 @@ export function DiscoveryBatchBar({
   return (
     <div className={cn("space-y-3", className)}>
       {celebration ? (
-        <div className="rounded-sm border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 text-sm">
-          <div className="flex items-center gap-2 text-emerald-200">
-            <Sparkles className="h-4 w-4" />
-            <span>
-              Ritual reinforced — nurtured{" "}
-              <span className="font-medium tabular-nums">{celebration.gems}</span> gems
-              {celebration.engagement > 0 && (
-                <>
-                  {" "}
-                  · ~
-                  <span className="font-medium tabular-nums">
-                    {celebration.engagement.toLocaleString()}
-                  </span>{" "}
-                  engagement impact
-                </>
-              )}
-            </span>
-          </div>
-        </div>
+        <DiscoveryCelebration
+          celebration={celebration}
+          prefix="Ritual reinforced —"
+          className="px-4 py-3"
+        />
       ) : null}
 
       <div className="surface-veil p-4">

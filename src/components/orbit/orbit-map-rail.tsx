@@ -103,7 +103,7 @@ export function OrbitMapRail({
       className={cn(
         isOverlay
           ? cn(
-              "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 shadow-lg backdrop-blur-2xl [scrollbar-width:thin]",
+              "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 animate-orbit-slide-in-right backdrop-blur-2xl [scrollbar-width:thin]",
               appOverlayPanelClassName,
               orbitHairlineBorder(),
               "bg-surface-1/90"

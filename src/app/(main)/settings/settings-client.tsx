@@ -257,7 +257,7 @@ export default function SettingsPage() {
                       <a
                         key={id}
                         href={`#${id}`}
-                        className="inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
+                        className="inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         {label}
                       </a>

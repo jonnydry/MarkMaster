@@ -8,6 +8,8 @@ type MarkMasterLogoProps = {
   priority?: boolean;
   /** Disable the drop-shadow glow (keeps theme tint) — for watermark scale. */
   glow?: boolean;
+  /** Render as decorative (empty alt) — use when an adjacent wordmark carries the name. */
+  decorative?: boolean;
 };
 
 export function MarkMasterLogo({
@@ -16,11 +18,12 @@ export function MarkMasterLogo({
   height = 28,
   priority = false,
   glow = true,
+  decorative = false,
 }: MarkMasterLogoProps) {
   return (
     <Image
       src="/logo.png"
-      alt="MarkMaster"
+      alt={decorative ? "" : "MarkMaster"}
       width={width}
       height={height}
       className={cn(

@@ -14,6 +14,7 @@ import {
 import type { CollectionWithCount } from "@/types";
 
 import { HighlightProgress } from "@/components/highlight-progress";
+import { highlightSurfaceActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 const collectionDateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -39,7 +40,7 @@ function itemLabel(count: number) {
 }
 
 const compactCardClassName =
-  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden surface-card px-3.5 py-3 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 [content-visibility:auto] [contain-intrinsic-size:88px]";
+  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden surface-card px-3.5 py-3 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 [content-visibility:auto] [contain-intrinsic-size:88px]";
 
 function getScaleWidth(itemCount: number, maxItems: number) {
   if (itemCount <= 0 || maxItems <= 0) return 0;
@@ -74,7 +75,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
       data-collection-id={collection.id}
       className={cn(
         compactCardClassName,
-        selected && "border-primary/55 ring-2 ring-primary/30"
+        selected && highlightSurfaceActiveClass
       )}
       role="button"
       tabIndex={0}
@@ -181,7 +182,7 @@ export const XFolderCard = React.memo(function XFolderCard({
       data-collection-id={collection.id}
       className={cn(
         compactCardClassName,
-        selected && "border-primary/55 ring-2 ring-primary/30"
+        selected && highlightSurfaceActiveClass
       )}
       role="button"
       tabIndex={0}

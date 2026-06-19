@@ -69,7 +69,7 @@ export function orbitMapLinkClass() {
 }
 
 export function orbitSelectionBarClass() {
-  return "rounded-sm border border-hairline-soft bg-surface-1/95 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))]";
+  return "rounded-sm border border-hairline-soft bg-surface-1/95 backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))]";
 }
 
 /** Clamp floating menu position within the viewport. */

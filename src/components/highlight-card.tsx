@@ -70,7 +70,7 @@ export function HighlightCard({
         onOrbitReview(bookmark.id);
       }}
       className={cn(
-        "self-start text-2xs uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none",
+        "self-start rounded-sm border border-transparent text-2xs uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         t.monoNative && t.label
       )}
     >
@@ -89,7 +89,7 @@ export function HighlightCard({
             removeLikedHighlightId(bookmark.id);
             setFeedbackTick((n) => n + 1);
           }}
-          className="ml-1 underline hover:no-underline"
+          className="ml-1 rounded-sm border border-transparent underline hover:no-underline focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           undo
         </button>
@@ -104,7 +104,7 @@ export function HighlightCard({
             removeDislikedHighlightId(bookmark.id);
             setFeedbackTick((n) => n + 1);
           }}
-          className="ml-1 underline hover:no-underline"
+          className="ml-1 rounded-sm border border-transparent underline hover:no-underline focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           undo
         </button>
@@ -119,7 +119,7 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Boosted for future Highlights & Digests");
           }}
-          className="text-emerald-300 hover:text-emerald-200 hover:underline focus-visible:outline-none"
+          className="text-emerald-300 hover:text-emerald-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Good
         </button>
@@ -132,7 +132,7 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Deprioritized in future Highlights");
           }}
-          className="text-amber-300 hover:text-amber-200 hover:underline focus-visible:outline-none"
+          className="text-amber-300 hover:text-amber-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Not relevant
         </button>
@@ -154,7 +154,7 @@ export function HighlightCard({
         }
       }}
       className={cn(
-        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 cursor-pointer",
+        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 cursor-pointer",
         isCarouselLayout ? "min-h-[10rem] p-3.5" : "min-h-[8.5rem] p-3",
         active
           ? "border-primary/45 bg-accent-soft/60 hover:bg-accent-soft/70"
@@ -176,7 +176,7 @@ export function HighlightCard({
           {itemLabel ? (
             <span
               className={cn(
-                "rounded px-1.5 py-px text-2xs",
+                "rounded-sm px-1.5 py-px",
                 "border border-amber-400/20 bg-amber-400/10 text-2xs uppercase tracking-wider text-amber-200"
               )}
               title={
@@ -222,7 +222,7 @@ export function HighlightCard({
         className={cn(
           "flex items-center justify-between gap-3",
           isCarouselLayout
-            ? "mt-3 border-t border-hairline-soft/70 pt-2.5"
+            ? "mt-3 border-t border-hairline-soft pt-2.5"
             : "mt-auto items-end pt-3"
         )}
       >

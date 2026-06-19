@@ -31,30 +31,54 @@ export function OrbitContextualMenu({
   };
 
   return (
-    <OrbitalMenu className="orbital-menu py-1 text-[12.5px]">
+    <OrbitalMenu className="py-1 text-[12.5px]" role="menu" aria-label="Row actions">
       <div className={cn(orbital.label, "px-3 py-1 text-2xs text-primary/50")}>
         More
       </div>
 
-      <div onClick={() => handleAction("open-x")} className={orbital.menuItem}>
+      <button
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        onClick={() => handleAction("open-x")}
+        className={cn(
+          orbital.menuItem,
+          "w-full focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+        )}
+      >
         <ExternalLink className="size-3.5 text-primary/70" />
-        <span className="flex-1">Open on X</span>
-      </div>
+        <span className="flex-1 text-left">Open on X</span>
+      </button>
 
-      <div onClick={() => handleAction("copy-link")} className={orbital.menuItem}>
+      <button
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        onClick={() => handleAction("copy-link")}
+        className={cn(
+          orbital.menuItem,
+          "w-full focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+        )}
+      >
         <Link2 className="size-3.5 text-primary/70" />
-        <span className="flex-1">Copy link</span>
-      </div>
+        <span className="flex-1 text-left">Copy link</span>
+      </button>
 
-      <div className="my-1 mx-2 h-px bg-hairline-soft" />
+      <div role="separator" className="my-1 mx-2 h-px bg-hairline-soft" />
 
-      <div
+      <button
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
         onClick={() => handleAction("discard")}
-        className={cn(orbital.menuItem, "text-primary/70")}
+        className={cn(
+          orbital.menuItem,
+          "w-full text-primary/70 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-destructive/45"
+        )}
       >
         <X className="size-3.5" />
-        <span className="flex-1">Discard</span>
-      </div>
+        <span className="flex-1 text-left">Discard</span>
+      </button>
     </OrbitalMenu>
   );
 }

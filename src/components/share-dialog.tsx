@@ -14,6 +14,7 @@ import { toast } from "@/lib/toast";
 import { generateClipboardThread } from "@/lib/share-content";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
+import { useTypography } from "@/hooks/use-typography";
 import type { ShareContent } from "@/lib/share-content";
 
 interface ShareDialogProps {
@@ -29,6 +30,7 @@ export function ShareDialog({
 }: ShareDialogProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const t = useTypography();
 
   const copyToClipboard = useCallback(async (text: string, field: string) => {
     const copied = await copyTextToClipboard(text);
@@ -58,9 +60,9 @@ export function ShareDialog({
         <div className="space-y-5" aria-live="polite">
           {/* Share link */}
           <div>
-            <h3 className="text-sm font-medium mb-2">Public Link</h3>
+            <h3 className={cn(t.sectionLabel, "mb-2")}>Public Link</h3>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-sm truncate">
+              <code className="flex-1 surface-inset px-3 py-2 text-xs truncate">
                 {shareContent.shareUrl}
               </code>
               <Button
@@ -82,12 +84,12 @@ export function ShareDialog({
 
           {/* Summary tweet */}
           <div>
-            <h3 className="text-sm font-medium mb-2">
+            <h3 className={cn(t.sectionLabel, "mb-2")}>
               {isSmallCollection
                 ? "Post to X (Single Tweet)"
                 : "Post to X (Summary + Link)"}
             </h3>
-            <div className="bg-muted rounded-sm p-3 text-sm whitespace-pre-wrap mb-2">
+            <div className="surface-inset p-3 text-sm whitespace-pre-wrap mb-2">
               {shareContent.summaryTweet}
             </div>
             <div className="flex items-center gap-2">
@@ -124,7 +126,7 @@ export function ShareDialog({
           {/* Thread for small collections */}
           {isSmallCollection && shareContent.thread.length > 1 && (
             <div>
-              <h3 className="text-sm font-medium mb-2">
+              <h3 className={cn(t.sectionLabel, "mb-2")}>
                 Full Thread ({shareContent.thread.length} tweets)
               </h3>
               <p className="text-xs text-muted-foreground mb-2">
@@ -134,7 +136,7 @@ export function ShareDialog({
                 {shareContent.thread.map((tweet, i) => (
                   <div
                     key={i}
-                    className="bg-muted rounded-sm p-3 text-sm whitespace-pre-wrap"
+                    className="surface-inset p-3 text-sm whitespace-pre-wrap"
                   >
                     <span className="text-xs text-muted-foreground block mb-1">
                       Tweet {i + 1}
@@ -166,7 +168,7 @@ export function ShareDialog({
 
           {/* Info for large collections */}
           {!isSmallCollection && (
-            <div className="bg-muted/50 rounded-sm p-3 text-xs text-muted-foreground">
+            <div className="surface-inset p-3 text-xs text-muted-foreground">
               This collection has {shareContent.itemCount} bookmarks. For better
               readability on X, we recommend sharing the public link with a summary
               tweet. The full collection is always viewable at the link above.

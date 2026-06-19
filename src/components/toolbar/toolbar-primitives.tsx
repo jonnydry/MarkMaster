@@ -172,6 +172,7 @@ interface ToolbarIconButtonProps {
   active?: boolean;
   pressed?: boolean;
   onClick: () => void;
+  disabled?: boolean;
   "aria-controls"?: string;
   showIndicator?: boolean;
   className?: string;
@@ -183,6 +184,7 @@ export function ToolbarIconButton({
   active,
   pressed,
   onClick,
+  disabled,
   "aria-controls": ariaControls,
   showIndicator,
   className,
@@ -193,12 +195,13 @@ export function ToolbarIconButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={isActive}
       aria-expanded={pressed}
       aria-label={label}
       aria-controls={ariaControls}
       className={cn(
-        "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
         isActive
           ? highlightActiveClass
           : cn(

@@ -56,7 +56,7 @@ export function CollectionsOverview({
 
   return (
     <section className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
-      <div className="relative overflow-hidden surface-card p-4 shadow-sm sm:p-5">
+      <div className="relative overflow-hidden surface-card p-4 sm:p-5">
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
@@ -68,7 +68,7 @@ export function CollectionsOverview({
                 aria-busy={isLibraryStatsLoading}
               >
                 {isLibraryStatsLoading || libraryBookmarkCount === undefined ? (
-                  <span className="inline-block h-8 w-28 rounded skeleton-shimmer sm:h-9 sm:w-32" />
+                  <span className="inline-block h-8 w-28 rounded-sm skeleton-shimmer sm:h-9 sm:w-32" />
                 ) : (
                   bookmarkLabel(libraryBookmarkCount)
                 )}
@@ -78,7 +78,7 @@ export function CollectionsOverview({
                 aria-busy={isLibraryStatsLoading}
               >
                 {isLibraryStatsLoading ? (
-                  <span className="inline-block h-4 w-56 rounded skeleton-shimmer" />
+                  <span className="inline-block h-4 w-56 rounded-sm skeleton-shimmer" />
                 ) : (
                   <>
                     {organizedBookmarkCount.toLocaleString()}{" "}
@@ -139,13 +139,13 @@ export function CollectionsOverview({
         </div>
       </div>
 
-      <div className="surface-card p-4 shadow-sm sm:p-5">
+      <div className="surface-card p-4 sm:p-5">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-note/10 text-note">
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Largest shelf
             </p>
           </div>
@@ -154,7 +154,7 @@ export function CollectionsOverview({
         {largestCollection ? (
           <button
             type="button"
-            className="group mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="group mt-4 w-full rounded-sm border border-hairline-soft bg-transparent p-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/40 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onOpenCollection(largestCollection.id)}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -204,7 +204,7 @@ function CollectionMetric({
   }[tone];
 
   return (
-    <div className="rounded-sm border border-hairline-soft bg-transparent px-3 py-2.5">
+    <div className="surface-inset-strong px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <span
           className={`flex h-7 w-7 items-center justify-center rounded-sm ${toneClassName}`}

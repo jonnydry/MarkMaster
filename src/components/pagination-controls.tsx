@@ -32,7 +32,7 @@ export function PaginationControls({
       className={cn(
         "group",
         isLibrary
-          ? "flex flex-col items-center gap-3 border-t border-border py-4"
+          ? "flex flex-col items-center gap-3 border-t border-hairline-soft py-4"
           : "flex items-center justify-center gap-2 pt-2",
         className
       )}
@@ -48,10 +48,10 @@ export function PaginationControls({
           disabled={page <= 1}
           aria-label="Previous page"
           className={cn(
-            "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
+            "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
+              ? "bg-transparent hover:border-primary/30 hover:bg-accent-soft"
+              : "bg-surface-1 hover:bg-surface-2 hover:border-primary/30"
           )}
         >
           <ChevronLeft className="size-4" aria-hidden />
@@ -62,6 +62,7 @@ export function PaginationControls({
             isLibrary ? "text-sm" : "text-xs"
           )}
           aria-live="polite"
+          aria-current={isLibrary ? "page" : undefined}
         >
           {isLibrary ? (
             <>
@@ -87,10 +88,10 @@ export function PaginationControls({
           disabled={page >= totalPages}
           aria-label="Next page"
           className={cn(
-            "inline-flex h-8 w-8 items-center justify-center border border-hairline-soft text-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
+            "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "rounded-sm bg-transparent hover:border-primary/30 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-              : "rounded-sm bg-surface-1 shadow-sm hover:bg-surface-2"
+              ? "bg-transparent hover:border-primary/30 hover:bg-accent-soft"
+              : "bg-surface-1 hover:bg-surface-2 hover:border-primary/30"
           )}
         >
           <ChevronRight className="size-4" aria-hidden />

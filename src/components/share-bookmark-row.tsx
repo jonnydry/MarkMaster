@@ -36,7 +36,7 @@ export function ShareBookmarkRow({
       : tweetCreatedAt;
 
   return (
-    <div className="py-4 border-b border-border last:border-0">
+    <div className="py-4 border-b border-hairline-soft last:border-0">
       <div className="flex gap-3">
         {authorProfileImage ? (
           <Image
@@ -74,7 +74,7 @@ export function ShareBookmarkRow({
               {tags.map(({ tag }) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-secondary text-xs font-medium text-muted-foreground"
+                  className="inline-flex items-center gap-1.5 surface-inset px-2 py-0.5 text-xs font-medium text-muted-foreground"
                 >
                   <span
                     className="h-2 w-2 rounded-full"

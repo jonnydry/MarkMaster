@@ -34,7 +34,7 @@ export function UserNav({ user }: UserNavProps) {
         className={cn(
           "outline-none inline-flex items-center gap-1.5 rounded-full p-0.5 transition-colors",
           "hover:bg-secondary/80 dark:hover:bg-secondary/60",
-          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
       >
         <Avatar size="xl" className="shrink-0">
@@ -58,20 +58,20 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuItem
           onClick={() => window.open(`https://x.com/${user.username}`, "_blank")}
         >
-          <User className="w-4 h-4 mr-2" />
+          <User />
           View X Profile
         </DropdownMenuItem>
         <DropdownMenuItem onClick={toggleTheme}>
           {theme === "dark" ? (
-            <Sun className="w-4 h-4 mr-2" />
+            <Sun />
           ) : (
-            <Moon className="w-4 h-4 mr-2" />
+            <Moon />
           )}
           {theme === "dark" ? "Light Mode" : "Dark Mode"}
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Type className="w-4 h-4 mr-2" />
+            <Type />
             Typography
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
@@ -92,7 +92,7 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuSub>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Palette className="w-4 h-4 mr-2" />
+            <Palette />
             Accent Color
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
@@ -118,15 +118,15 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuItem
           onClick={() => window.open("/api/export?format=json")}
         >
-          <Download className="w-4 h-4 mr-2" />
+          <Download />
           Export Bookmarks
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="text-destructive"
+          variant="destructive"
         >
-          <LogOut className="w-4 h-4 mr-2" />
+          <LogOut />
           Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>

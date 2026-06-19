@@ -12,6 +12,7 @@ import { appFeedHeaderFrostedClassName } from "@/lib/app-chrome";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { PageWatermark } from "@/components/page-watermark";
@@ -239,7 +240,10 @@ function DashboardContent() {
                 />
 
                 {(isFetching || filters.isSearchPending) && !isLoading && (
-                  <p className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5">
+                  <p
+                    role="status"
+                    className="animate-slide-down-fade px-4 pb-1.5 text-xs text-muted-foreground sm:px-5"
+                  >
                     Updating results...
                   </p>
                 )}
@@ -274,18 +278,20 @@ function DashboardContent() {
                 )}
               </PageHeader>
 
-          <DashboardDiscovery
-            feedReady={feedReady}
-            activeBookmarkId={activeBookmarkIdForView}
-            onSelectBookmark={setActiveBookmarkId}
-            onFocusForTriage={focusPerformanceHighlight}
-            onSaveAsCollection={handleSaveGemsAsCollection}
-          />
+          {!isError && (
+            <DashboardDiscovery
+              feedReady={feedReady}
+              activeBookmarkId={activeBookmarkIdForView}
+              onSelectBookmark={setActiveBookmarkId}
+              onFocusForTriage={focusPerformanceHighlight}
+              onSaveAsCollection={handleSaveGemsAsCollection}
+            />
+          )}
 
           {isLoading ? (
             <DashboardSkeleton viewMode={viewMode} />
           ) : isError ? (
-            <div className={cn(bookmarkFeedColumnClassName, "flex h-64 items-center justify-center px-6")}>
+            <div className={cn(bookmarkFeedColumnClassName, "flex h-72 items-center justify-center px-6")}>
               <ErrorState
                 title="Bookmarks could not be loaded"
                 description={error instanceof Error ? error.message : "Please try again."}
@@ -326,8 +332,8 @@ function DashboardContent() {
           ) : (
             <>
               {performanceFocusedId && (
-                <div className={cn("pb-2", bookmarkFeedColumnClassName)}>
-                  <div className="flex flex-wrap items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm">
+                <div className={cn("animate-slide-down-fade pb-2", bookmarkFeedColumnClassName)}>
+                  <div className={cn("flex flex-wrap items-center gap-2 rounded-sm border px-3 py-1.5 text-sm", highlightActiveClass)}>
                     <span className="text-2xs font-bold uppercase tracking-[0.08em] text-primary">
                       Performance Highlight
                     </span>
@@ -340,7 +346,7 @@ function DashboardContent() {
                         setBookmarkId("");
                         setActiveBookmarkId(null);
                       }}
-                      className="ml-auto rounded-sm px-2 py-0.5 text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/45"
+                      className="ml-auto rounded-sm border border-transparent px-2 py-0.5 text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                     >
                       Exit focus
                     </button>

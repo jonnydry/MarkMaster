@@ -22,7 +22,7 @@ import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
 import {
   BookmarkCardActionButton,
   BookmarkCardSelectionToggle,
-  BookmarkCardTagPill,
+  BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
@@ -245,7 +245,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {bookmark.tags.length > 0 && (
             <div className="mt-1.5 flex gap-1">
               {bookmark.tags.map(({ tag }) => (
-                <BookmarkCardTagPill
+                <BookmarkTagChip
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}
@@ -273,7 +273,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
+      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/40 ${
         isInteractive ? "cursor-pointer" : ""
       } ${
         selected || isPerformanceHighlight
@@ -412,7 +412,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           {bookmark.tags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {bookmark.tags.map(({ tag }) => (
-                <BookmarkCardTagPill
+                <BookmarkTagChip
                   key={tag.id}
                   name={tag.name}
                   onClick={() => onTagClick?.(tag.id)}

@@ -17,7 +17,7 @@ export function CollectionsSection({
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           <Icon className="h-3.5 w-3.5" aria-hidden="true" />
           {title}
         </h2>

@@ -64,9 +64,9 @@ export function SelectionToolbar({
           Add to Collection
         </Button>
         <Button
-          variant="outline"
+          variant="destructive"
           size="sm"
-          className="h-8 gap-1.5 px-3 text-sm text-destructive hover:text-destructive"
+          className="h-8 gap-1.5 px-3 text-sm"
           disabled={selectedCount === 0}
           onClick={() => void onHide()}
         >

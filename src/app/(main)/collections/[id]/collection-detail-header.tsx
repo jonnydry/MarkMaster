@@ -48,8 +48,8 @@ export function CollectionDetailHeaderActions({
           </Badge>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
+            size="lg"
+            className="gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
             onClick={onCopyAsCollection}
           >
             <Copy className="size-4" />
@@ -71,8 +71,8 @@ export function CollectionDetailHeaderActions({
         <>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 border-hairline-soft bg-transparent px-3 text-sm"
+            size="lg"
+            className="border-hairline-soft bg-transparent px-3 text-sm"
             onClick={onTogglePublic}
           >
             {collection.isPublic ? "Make Private" : "Make Public"}
@@ -81,8 +81,8 @@ export function CollectionDetailHeaderActions({
             <>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
+                size="lg"
+                className="gap-1.5 border-hairline-soft bg-transparent px-3 text-sm"
                 onClick={onCopyShareLink}
               >
                 <Copy className="size-4" />
@@ -92,7 +92,7 @@ export function CollectionDetailHeaderActions({
                 href={`/share/${collection.shareSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-accent-soft"
+                className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                 aria-label="Open public collection page"
                 title="Open public collection page"
               >
@@ -103,8 +103,8 @@ export function CollectionDetailHeaderActions({
           {sortedItemCount > 0 && collection.isPublic && collection.shareSlug && (
             <Button
               variant="default"
-              size="sm"
-              className="h-9 gap-1.5 px-3 text-sm"
+              size="lg"
+              className="gap-1.5 px-3 text-sm"
               onClick={onShareOnX}
             >
               <Share2 className="size-4" />
@@ -157,7 +157,7 @@ export function CollectionDetailTitle({
             onCancelEditingName();
           }
         }}
-        className="w-full border-b border-primary bg-transparent pb-1 text-2xl font-bold tracking-tight heading-font outline-none sm:text-3xl"
+        className="w-full border-b border-primary bg-transparent pb-1 text-2xl font-bold tracking-tight heading-font outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:text-3xl"
       />
     );
   }
@@ -174,7 +174,7 @@ export function CollectionDetailTitle({
       ) : (
         <button
           type="button"
-          className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2"
+          className="max-w-full truncate rounded-sm text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
           onClick={onStartEditingName}
           aria-label={`Edit collection name ${collection.name}`}
         >

@@ -15,10 +15,12 @@ import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   BookmarkCardActionButton,
   BookmarkCardSelectionToggle,
+  BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { formatCompactCount } from "@/lib/format-metrics";
+import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
 import type { BookmarkWithRelations } from "@/types";
@@ -119,11 +121,11 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   return (
     <div
       className={cn(
-        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden surface-card text-left [content-visibility:auto] [contain-intrinsic-size:auto_280px] transition-[border-color,background-color,box-shadow,transform] duration-200 hover:border-primary/30 hover:bg-surface-1",
+        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden surface-card text-left [content-visibility:auto] [contain-intrinsic-size:auto_280px] transition-[border-color,background-color] duration-200 hover:border-primary/30 hover:bg-accent-soft/40",
         isInteractive && "cursor-pointer",
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
-            ? "border-primary/70 shadow-sm ring-2 ring-primary/40"
+            ? "border-primary/70 ring-2 ring-primary/35"
             : "border-primary/45 ring-1 ring-primary/35"
           : "",
         className
@@ -169,7 +171,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             }}
           />
           <div className="pointer-events-none absolute left-2 top-2">
-            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-white/85 shadow-sm backdrop-blur-sm">
+            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-white/85 backdrop-blur-sm">
               {getGridMediaLabel(mediaItems)}
             </span>
           </div>
@@ -246,28 +248,17 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
         {(primaryTag || hasCollection || hasNote) && (
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {primaryTag ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTagClick?.(primaryTag.id);
-                }}
-                className="inline-flex h-5 max-w-full items-center gap-1 surface-inset-strong px-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground"
-                title={primaryTag.name}
-              >
-                <span
-                  aria-hidden
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: primaryTag.color }}
-                />
-                <span className="truncate">{primaryTag.name}</span>
-                {extraTagCount > 0 ? (
-                  <span className="text-muted-foreground/65">+{extraTagCount}</span>
-                ) : null}
-              </button>
+              <BookmarkTagChip
+                name={primaryTag.name}
+                color={primaryTag.color}
+                extraCount={extraTagCount || undefined}
+                density="strong"
+                uppercase={false}
+                onClick={() => onTagClick?.(primaryTag.id)}
+              />
             ) : null}
             {hasCollection ? (
-              <span className="inline-flex h-5 items-center rounded-sm border border-primary/20 bg-primary/10 px-1.5 text-2xs font-medium text-primary">
+              <span className={cn("inline-flex h-5 items-center px-1.5 text-2xs font-medium", highlightActiveClass)}>
                 In collection
               </span>
             ) : null}
@@ -279,7 +270,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-1 border-t border-hairline-soft/70 pt-2.5">
+        <div className="mt-3 flex items-center gap-1 border-t border-hairline-soft pt-2.5">
           {onAddTag && (
             <BookmarkCardActionButton
               icon={Tags}

@@ -35,18 +35,18 @@ function OrbitListRowSkeleton() {
         orbitHairlineBorder()
       )}
     >
-      <div className="mt-1 h-10 w-[3px] shrink-0 rounded-full skeleton-shimmer" />
+      <div className="mt-1 h-10 w-[3px] shrink-0 rounded-[2px] skeleton-shimmer" />
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-2.5 w-40 rounded skeleton-shimmer" />
-        <div className="h-3.5 w-full rounded skeleton-shimmer" />
-        <div className="h-3.5 w-full rounded skeleton-shimmer" />
-        <div className="h-3.5 w-4/5 rounded skeleton-shimmer" />
+        <div className="h-2.5 w-40 rounded-sm skeleton-shimmer" />
+        <div className="h-3.5 w-full rounded-sm skeleton-shimmer" />
+        <div className="h-3.5 w-full rounded-sm skeleton-shimmer" />
+        <div className="h-3.5 w-4/5 rounded-sm skeleton-shimmer" />
         <div className="flex justify-end pt-0.5">
           <div className="h-20 w-20 shrink-0 rounded-sm skeleton-shimmer" />
         </div>
         <div className="flex items-center justify-between gap-2 pt-0.5">
-          <div className="h-4 w-16 rounded skeleton-shimmer" />
-          <div className="h-7 w-16 rounded-full skeleton-shimmer" />
+          <div className="h-4 w-16 rounded-sm skeleton-shimmer" />
+          <div className="h-7 w-16 rounded-sm skeleton-shimmer" />
         </div>
       </div>
     </div>
@@ -91,14 +91,7 @@ export function OrbitList({
   }
 
   if (bookmarks.length === 0) {
-    return (
-      <div className="flex h-40 flex-col items-center justify-center text-center text-primary/50">
-        <div className="mb-1 text-[13px]">Queue is clear</div>
-        <div className="text-xs text-primary/35">
-          All caught up. New bookmarks will appear here.
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

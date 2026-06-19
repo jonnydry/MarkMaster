@@ -195,9 +195,9 @@ export function AddTagDialog({
                     aria-label={`Select color ${c}`}
                     aria-pressed={color === c}
                     className={cn(
-                      "h-6 w-6 shrink-0 rounded-full border transition-shadow",
+                      "h-6 w-6 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                       color === c
-                        ? "border-primary/50 ring-2 ring-primary/30"
+                        ? "border-primary/50 ring-2 ring-ring/45"
                         : "border-hairline-soft"
                     )}
                     style={{ backgroundColor: c }}

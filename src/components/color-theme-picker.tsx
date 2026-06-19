@@ -32,7 +32,7 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
               title={theme.description}
               onClick={() => onChange(theme.id)}
               className={cn(
-                "group flex min-w-0 flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors",
+                "group flex min-w-0 flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 selected
                   ? highlightSurfaceActiveClass
                   : "border-hairline-soft bg-surface-2/45 hover:border-primary/20 hover:bg-accent-soft/40"
@@ -40,7 +40,7 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
             >
               <span
                 className={cn(
-                  "h-5 w-5 rounded-full border shadow-sm",
+                  "h-5 w-5 rounded-full border",
                   selected ? "border-primary/50 ring-2 ring-primary/30" : "border-hairline-soft"
                 )}
                 style={{ backgroundColor: theme.swatch }}

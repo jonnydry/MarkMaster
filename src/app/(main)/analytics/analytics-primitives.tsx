@@ -87,12 +87,13 @@ export function AnalyticsTabs({
         return (
           <button
             key={id}
+            id={`analytics-tab-${id}`}
             type="button"
             role="tab"
             aria-selected={active}
             onClick={() => onTabChange(id)}
             className={cn(
-              "shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              "shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               active
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -153,7 +154,7 @@ export function AnalyticsHero({
     trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
   const deltaTone =
     trend === "up"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-success"
       : trend === "down"
         ? "text-destructive"
         : "text-muted-foreground";
@@ -240,7 +241,7 @@ export function AnalyticsHero({
           {orbitQueueCount > 0 ? (
             <>
               <span className="text-muted-foreground/50"> · </span>
-              <Link href={orbitHref} className="font-medium text-foreground hover:text-primary">
+              <Link href={orbitHref} className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline">
                 Review Orbit
               </Link>
             </>
@@ -323,9 +324,12 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
     cta + digestCta + good + notRel + quick + deep + sessions + quickKeeps + orbitTotal;
   if (totalSignals === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
+      <div
+        role="status"
+        className="surface-inset flex items-center justify-center border-dashed py-16 text-sm text-muted-foreground"
+      >
         No flywheel activity in this range yet.
-      </p>
+      </div>
     );
   }
 
@@ -423,7 +427,7 @@ function SignalRow({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-base font-semibold tabular-nums">{value.toLocaleString()}</dd>
+      <dd className="mt-0.5 text-base font-semibold tabular-nums heading-font">{value.toLocaleString()}</dd>
     </div>
   );
 }

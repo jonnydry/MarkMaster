@@ -4,6 +4,9 @@ import { Image, Video, Link, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilterChip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
+import { cn } from "@/lib/utils";
+import { useTypography } from "@/hooks/use-typography";
 import type { MediaFilter, TagWithCount } from "@/types";
 
 interface FilterPanelProps {
@@ -45,14 +48,15 @@ export function FilterPanel({
   onClearAll,
   hasActiveFilters,
 }: FilterPanelProps) {
+  const t = useTypography();
   return (
     <div
       role="region"
       aria-label="Filters"
-      className="space-y-3 border-b border-hairline-soft bg-background/45 px-5 py-3 backdrop-blur-xl"
+      className={cn("space-y-3 border-b border-hairline-soft px-5 py-3", appChromeFrostedClassName)}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className={cn(t.sectionLabel, "mb-0")}>
           Filters
         </h3>
         {hasActiveFilters && (
@@ -60,7 +64,7 @@ export function FilterPanel({
             variant="ghost"
             size="sm"
             onClick={onClearAll}
-            className="h-6 gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="w-3 h-3" /> Clear all
           </Button>
@@ -69,7 +73,7 @@ export function FilterPanel({
 
       <div className="space-y-3">
         <div>
-          <label htmlFor="filter-media" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="filter-media" className={cn("mb-1 block", t.label)}>
             Content type
           </label>
           <div id="filter-media" className="flex flex-wrap gap-1.5">
@@ -87,7 +91,7 @@ export function FilterPanel({
         </div>
 
         <div>
-          <label htmlFor="filter-author" className="mb-1 block text-xs text-muted-foreground">
+          <label htmlFor="filter-author" className={cn("mb-1 block", t.label)}>
             Author
           </label>
           <Input
@@ -101,7 +105,7 @@ export function FilterPanel({
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label htmlFor="filter-date-from" className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-date-from" className={cn("mb-1 block", t.label)}>
               From
             </label>
             <Input
@@ -113,7 +117,7 @@ export function FilterPanel({
             />
           </div>
           <div>
-            <label htmlFor="filter-date-to" className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-date-to" className={cn("mb-1 block", t.label)}>
               To
             </label>
             <Input
@@ -128,10 +132,13 @@ export function FilterPanel({
 
         {tags.length > 0 && (
           <div>
-            <label htmlFor="filter-tags" className="mb-1 block text-xs text-muted-foreground">
+            <label htmlFor="filter-tags" className={cn("mb-1 block", t.label)}>
               Tags
             </label>
-            <div id="filter-tags" className="flex flex-wrap gap-1.5">
+            <div
+              id="filter-tags"
+              className="flex max-h-[min(18rem,40vh)] flex-wrap gap-1.5 overflow-y-auto surface-inset p-2 scrollbar-thin"
+            >
               {tags.map((tag) => (
                 <FilterChip
                   key={tag.id}

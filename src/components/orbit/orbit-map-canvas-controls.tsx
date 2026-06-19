@@ -44,6 +44,7 @@ export function OrbitMapCanvasControls({
         )}
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
       >
         {FILTERS.map(({ key, label, icon: Icon }) => (
           <button
@@ -51,6 +52,8 @@ export function OrbitMapCanvasControls({
             type="button"
             onClick={() => onFilterChange(key)}
             className={orbitMapControlButtonClass(activeFilter === key)}
+            aria-pressed={activeFilter === key}
+            aria-label={label}
             title={label}
           >
             <Icon className="size-3.5" />
@@ -66,6 +69,7 @@ export function OrbitMapCanvasControls({
         )}
         onMouseDown={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
       >
         <div className={orbitMapZoomShellClass()}>
           <button

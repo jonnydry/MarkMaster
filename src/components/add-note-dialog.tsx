@@ -40,6 +40,7 @@ function NoteForm({
   const [content, setContent] = useState(existingNote || "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const busy = saving || deleting;
 
   const handleSave = async () => {
@@ -54,9 +55,6 @@ function NoteForm({
 
   const handleDelete = async () => {
     if (!existingNoteId || !onDelete) return;
-
-    const confirmed = window.confirm("Delete this note?");
-    if (!confirmed) return;
 
     setDeleting(true);
     try {
@@ -78,20 +76,45 @@ function NoteForm({
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         {existingNoteId && onDelete ? (
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={busy}
-            className="justify-center gap-1.5 sm:justify-start"
-          >
-            {deleting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
+          confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={busy}
+                className="gap-1.5"
+              >
+                {deleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Confirm delete
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => setConfirmDelete(true)}
+              disabled={busy}
+              className="justify-center gap-1.5 sm:justify-start"
+            >
               <Trash2 className="h-3.5 w-3.5" />
-            )}
-            Delete note
-          </Button>
+              Delete note
+            </Button>
+          )
         ) : (
           <span aria-hidden="true" />
         )}

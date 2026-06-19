@@ -212,7 +212,7 @@ export function SyncButton({
   }
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-1.5 border border-sidebar-border bg-transparent p-2">
+    <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-sm border border-sidebar-border bg-transparent p-2">
       <Button
         type="button"
         onClick={handleSync}

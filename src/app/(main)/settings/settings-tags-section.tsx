@@ -16,7 +16,7 @@ type SettingsTagsSectionProps = ReturnType<typeof useSettingsTags> & {
 
 function TagListSkeleton() {
   return (
-    <div className="space-y-0 rounded-sm border border-hairline-soft">
+    <div className="space-y-0 surface-inset">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
@@ -26,7 +26,7 @@ function TagListSkeleton() {
           )}
         >
           <div className="size-3.5 rounded-full skeleton-shimmer" />
-          <div className="h-3 w-24 flex-1 rounded skeleton-shimmer" />
+          <div className="h-3 w-24 flex-1 rounded-sm skeleton-shimmer" />
         </div>
       ))}
     </div>
@@ -101,7 +101,7 @@ export function SettingsTagsSection({
           </p>
         </div>
       ) : filteredTags.length === 0 ? (
-        <div className="rounded-sm border border-hairline-soft px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-sm border border-dashed border-hairline-soft px-4 py-6 text-center text-sm text-muted-foreground">
           No tags match &ldquo;{tagSearch.trim()}&rdquo;
         </div>
       ) : (

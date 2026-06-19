@@ -22,10 +22,10 @@ const ColorSwatch = React.memo(function ColorSwatch({
       aria-label={`Select color ${color}`}
       aria-pressed={selected}
       className={cn(
-        "size-6 rounded-full border transition-transform",
+        "size-6 rounded-full border transition-transform motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         selected
-          ? "scale-105 border-foreground ring-2 ring-foreground/30 ring-offset-2 ring-offset-surface-2"
-          : "border-black/10 hover:scale-105"
+          ? "scale-105 border-foreground ring-2 ring-ring/45"
+          : "border-hairline-soft hover:scale-105"
       )}
       style={{ backgroundColor: color }}
       onClick={onClick}
@@ -85,7 +85,7 @@ export const TagEditRow = React.memo(function TagEditRow({
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       className={cn(
-        "flex flex-col gap-3 bg-accent-soft/40 px-4 py-4 sm:flex-row sm:items-center",
+        "animate-slide-down-fade flex flex-col gap-3 bg-accent-soft/40 px-4 py-4 sm:flex-row sm:items-center",
         index > 0 && "border-t border-hairline-soft"
       )}
     >

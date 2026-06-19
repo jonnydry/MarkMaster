@@ -302,7 +302,7 @@ export function OrbitReviewOverlay({
                       type="button"
                       size="icon-sm"
                       variant="outline"
-                      className="h-8 w-8 border-hairline-soft"
+                      className="h-8 w-8 border-hairline-strong"
                       onClick={() => moveActiveDraft(-1)}
                       disabled={session.activeDraftIndex <= 0}
                       aria-label="Previous item"
@@ -313,7 +313,7 @@ export function OrbitReviewOverlay({
                       type="button"
                       size="icon-sm"
                       variant="outline"
-                      className="h-8 w-8 border-hairline-soft"
+                      className="h-8 w-8 border-hairline-strong"
                       onClick={() => moveActiveDraft(1)}
                       disabled={
                         session.activeDraftIndex >= effectiveDrafts.length - 1

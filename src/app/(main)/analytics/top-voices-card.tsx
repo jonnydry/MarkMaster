@@ -87,7 +87,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                   <Link
                     href={`/dashboard?author=${encodeURIComponent(a.author)}`}
                     className={cn(
-                      "group grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,2fr)_auto_auto] items-center gap-3 px-3 py-2.5 transition-colors",
+                      "group grid grid-cols-[auto_minmax(0,1.6fr)_minmax(0,2fr)_auto_auto] items-center gap-3 rounded-sm px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                       "hover:bg-surface-1"
                     )}
                   >

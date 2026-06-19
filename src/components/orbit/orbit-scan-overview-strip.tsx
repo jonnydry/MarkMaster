@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, FolderOpen, Tags } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ChevronDown, FolderOpen, Tags } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import type { OrbitScanResponsePayload } from "@/types";
 
 import {
   orbitDataClass,
-  orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
   orbitMetaSoft,
@@ -230,15 +229,29 @@ function StrategyLines({
   );
 }
 
-function defaultOverviewOpen(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(min-width: 640px)").matches;
+function subscribeWide(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mql = window.matchMedia("(min-width: 640px)");
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+
+function getWideSnapshot() {
+  return (
+    typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches
+  );
 }
 
 export function OrbitScanOverviewStrip({
   payload,
   className}: OrbitScanOverviewStripProps) {
-  const [open, setOpen] = useState(defaultOverviewOpen);
+  const prefersWide = useSyncExternalStore(
+    subscribeWide,
+    getWideSnapshot,
+    () => false
+  );
+  const [userToggle, setUserToggle] = useState<boolean | null>(null);
+  const open = userToggle ?? prefersWide;
 
   const modelLine = useMemo(() => {
     const z = payload.privacy.zeroDataRetention;
@@ -254,24 +267,23 @@ export function OrbitScanOverviewStrip({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-sm border",
-        orbitHairlineBorder(),
-        "bg-surface-2/70 dark:bg-white/[0.035]",
+        "surface-inset-strong overflow-hidden",
         className
       )}
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setUserToggle(!open)}
         className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-3 px-3 py-3 text-left transition-colors hover:bg-primary/5 sm:px-4"
         aria-expanded={open}
       >
         <span className="mt-0.5 flex size-7 items-center justify-center rounded-sm border border-primary/20 bg-primary/10 text-primary">
-          {open ? (
-            <ChevronDown className="size-4 shrink-0" />
-          ) : (
-            <ChevronRight className="size-4 shrink-0" />
-          )}
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 transition-transform motion-reduce:transition-none",
+              open ? "rotate-0" : "-rotate-90"
+            )}
+          />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">

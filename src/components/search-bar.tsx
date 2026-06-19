@@ -3,6 +3,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
@@ -14,6 +15,7 @@ interface SearchBarProps {
   /** Transparent field: use inside a frosted wrapper so there is only one visual surface. */
   glass?: boolean;
   hint?: React.ReactNode;
+  disabled?: boolean;
 }
 
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
@@ -26,6 +28,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
       inputClassName = "",
       glass = false,
       hint,
+      disabled,
     },
     forwardedRef
   ) {
@@ -57,12 +60,12 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     }, []);
 
     const defaultHint = !value && (
-      <kbd
+      <Kbd
         aria-hidden="true"
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 surface-inset-strong px-1.5 py-0.5 text-xs text-muted-foreground/60 shadow-sm"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60"
       >
         /
-      </kbd>
+      </Kbd>
     );
 
     return (
@@ -74,6 +77,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
+          disabled={disabled}
           className={cn(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass
@@ -86,7 +90,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           <button
             type="button"
             onClick={() => onChange("")}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-sm border border-transparent text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             aria-label="Clear search"
           >
             <X className="w-4 h-4" />

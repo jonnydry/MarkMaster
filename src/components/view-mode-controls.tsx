@@ -30,7 +30,7 @@ export function ViewModeControls({
   return (
     <div
       className={cn(
-        "dashboard-view-mode flex items-center gap-0.5 rounded-sm border p-0.5",
+        "dashboard-view-mode flex items-center gap-0.5 rounded-sm p-0.5",
         appToolbarSurfaceGroupClassName,
         compact ? "shrink-0" : "flex-1 sm:flex-none",
         className
@@ -54,7 +54,7 @@ export function ViewModeControls({
             title={`${label} view`}
             onClick={() => onViewModeChange(value)}
           >
-            <Icon className={cn("size-4 dashboard-view-icon", !compact && "sm:mr-0")} />
+            <Icon className="size-4 dashboard-view-icon" />
             {!compact ? (
               <span className="dashboard-view-label hidden lg:inline">{label}</span>
             ) : null}

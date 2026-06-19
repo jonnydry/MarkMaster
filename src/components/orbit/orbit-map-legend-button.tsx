@@ -4,7 +4,6 @@ import { Info } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted,
   orbitMetaSoft} from "@/lib/orbit-route-chrome";
@@ -21,8 +20,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
       <PopoverTrigger
         aria-label="Graph legend"
         className={cn(
-          "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-          orbitHairlineBorder(),
+          "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
           className
         )}
       >

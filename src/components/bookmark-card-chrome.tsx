@@ -71,12 +71,24 @@ export function BookmarkCardActionButton({
   );
 }
 
-export function BookmarkCardTagPill({
+export function BookmarkTagChip({
   name,
+  color,
+  extraCount,
+  density = "inset",
+  uppercase = true,
   onClick,
+  className,
+  title,
 }: {
   name: string;
+  color?: string;
+  extraCount?: number;
+  density?: "inset" | "strong";
+  uppercase?: boolean;
   onClick?: () => void;
+  className?: string;
+  title?: string;
 }) {
   return (
     <button
@@ -85,9 +97,25 @@ export function BookmarkCardTagPill({
         e.stopPropagation();
         onClick?.();
       }}
-      className="surface-inset px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-primary/45 hover:bg-accent-soft hover:text-foreground"
+      title={title ?? name}
+      className={cn(
+        "inline-flex h-5 max-w-full items-center gap-1 px-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        density === "strong" ? "surface-inset-strong" : "surface-inset",
+        uppercase ? "uppercase tracking-[0.08em]" : "normal-case",
+        className
+      )}
     >
-      {name}
+      {color ? (
+        <span
+          aria-hidden
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+      ) : null}
+      <span className="truncate">{name}</span>
+      {extraCount ? (
+        <span className="text-muted-foreground/65">+{extraCount}</span>
+      ) : null}
     </button>
   );
 }

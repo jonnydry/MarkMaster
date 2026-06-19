@@ -32,7 +32,7 @@ export function SettingsNav({ className }: { className?: string }) {
           className={cn(
             "block rounded-sm px-2.5 py-1.5 text-sm text-muted-foreground transition-colors",
             "hover:bg-accent-soft/70 hover:text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
           )}
         >
           {label}
@@ -122,7 +122,7 @@ export function SettingsSection({
   return (
     <section
       id={id}
-      className={cn("scroll-mt-24 border-b border-hairline-soft pb-8 last:border-b-0 last:pb-0", className)}
+      className={cn("scroll-mt-[calc(var(--header-height)+1.5rem)] border-b border-hairline-soft pb-8 last:border-b-0 last:pb-0", className)}
     >
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -187,9 +187,6 @@ export function SettingsRow({
     </div>
   );
 }
-
-export const settingsSurfaceClass =
-  "surface-inset";
 
 export function SettingsSegment<T extends string>({
   value,

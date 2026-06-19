@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { Search, Image, Video, Link, FileText, Palette, Type } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { useColorTheme, useFontMode } from "@/components/providers";
 import { COLOR_THEMES } from "@/lib/color-themes";
@@ -234,7 +235,7 @@ export function CommandPalette({
         onKeyDown={handleKeyDown}
         showCloseButton={false}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-hairline-soft">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <Input
             value={query}
@@ -249,9 +250,9 @@ export function CommandPalette({
               resolvedFocusedIndex >= 0 ? `cmd-item-${resolvedFocusedIndex}` : undefined
             }
           />
-          <kbd className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+          <Kbd className="shrink-0">
             ESC
-          </kbd>
+          </Kbd>
         </div>
 
         <div
@@ -293,7 +294,7 @@ export function CommandPalette({
                 )}
                 {(showTagsHeading || showSearchTagsHeading) && (
                   <p className={cn(
-                    "px-2 py-1.5 mt-2 border-t border-border text-xs font-semibold uppercase tracking-wider",
+                    "px-2 py-1.5 mt-2 border-t border-hairline-soft text-xs font-semibold uppercase tracking-wider",
                     t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Tags
@@ -303,6 +304,7 @@ export function CommandPalette({
                   id={`cmd-item-${i}`}
                   role="option"
                   aria-selected={isFocused}
+                  tabIndex={-1}
                   onClick={() => {
                     if (item.kind === "media") {
                       handleFilterSelect({ mediaFilter: item.value });
@@ -330,7 +332,7 @@ export function CommandPalette({
                         style={{ backgroundColor: item.color }}
                       />
                       <span className="flex-1 text-left">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">{item.count}</span>
+                      <span className={cn(t.data, "text-xs text-muted-foreground")}>{item.count}</span>
                     </>
                   ) : (
                     <>

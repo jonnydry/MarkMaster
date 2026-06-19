@@ -11,6 +11,7 @@ import {
 } from "@/components/highlight-scroll-strip";
 import { HighlightCard } from "@/components/highlight-card";
 import { ModuleHeader } from "@/components/module-header";
+import { DiscoveryCelebration } from "@/components/discovery-celebration";
 import { Button } from "@/components/ui/button";
 import {
   useDashboardDiscovery,
@@ -77,41 +78,6 @@ function DiscoveryFeedHeader({
         </p>
       </div>
       {actions}
-    </div>
-  );
-}
-
-function DiscoveryCelebration({
-  celebration,
-  className,
-}: {
-  celebration: { gems: number; engagement: number };
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-sm border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-sm",
-        className
-      )}
-    >
-      <div className="flex items-center gap-2 text-emerald-200">
-        <Sparkles className="h-4 w-4 shrink-0" />
-        <span>
-          Nurtured{" "}
-          <span className="font-medium tabular-nums">{celebration.gems}</span> gems
-          {celebration.engagement > 0 && (
-            <>
-              {" "}
-              · ~
-              <span className="font-medium tabular-nums">
-                {celebration.engagement.toLocaleString()}
-              </span>{" "}
-              engagement
-            </>
-          )}
-        </span>
-      </div>
     </div>
   );
 }
@@ -256,11 +222,11 @@ export function DashboardDiscovery({
         aria-busy
         aria-label="Loading Discovery"
       >
-        <div className="h-4 w-28 rounded skeleton-shimmer" />
+        <div className="h-4 w-28 rounded-sm skeleton-shimmer" />
         <div
           className={cn(
-            "h-20 skeleton-shimmer",
-            !isFeedIntegrated && "rounded-sm border border-hairline-soft"
+            "h-20 rounded-sm skeleton-shimmer",
+            !isFeedIntegrated && "border border-hairline-soft"
           )}
         />
       </div>
@@ -325,8 +291,8 @@ export function DashboardDiscovery({
       >
         <div
           className={cn(
-            "relative flex h-full min-h-[10rem] flex-col items-center justify-center rounded-sm border bg-surface-1/55 p-3.5 text-center",
-            "border-primary/20 hover:border-primary/30"
+            "surface-veil border-primary/20 hover:border-primary/30",
+            "relative flex h-full min-h-[10rem] flex-col items-center justify-center p-3.5 text-center"
           )}
         >
           <div className="flex max-w-full items-center justify-center gap-2">
@@ -356,7 +322,7 @@ export function DashboardDiscovery({
               : ""}
             {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
           </p>
-          <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft/70 pt-2.5">
+          <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft pt-2.5">
             <Button
               size="sm"
               variant="highlight"
@@ -419,7 +385,7 @@ export function DashboardDiscovery({
     >
       <div
         className={cn(
-          "overflow-hidden rounded-sm border border-hairline-strong pb-4 shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]",
+          "overflow-hidden rounded-sm border border-hairline-strong pb-4",
           appChromeFrostedClassName
         )}
       >

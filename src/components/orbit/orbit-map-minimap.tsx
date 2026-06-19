@@ -180,6 +180,7 @@ export function OrbitMapMinimap({
     <canvas
       ref={canvasRef}
       role="button"
+      tabIndex={0}
       aria-label="Graph minimap — click to move the view"
       onPointerDown={(event) => {
         event.stopPropagation();
@@ -188,9 +189,15 @@ export function OrbitMapMinimap({
       onPointerMove={(event) => {
         if (event.buttons & 1) jumpToEvent(event);
       }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onJump(0, 0);
+        }
+      }}
       className={cn(
         orbitMapFloatingShellClass(),
-        "cursor-pointer",
+        "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         className
       )}
       style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}

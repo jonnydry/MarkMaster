@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 import {
@@ -45,7 +46,12 @@ export function AnalyticsTabPanel({
         className="mt-6"
       />
 
-      <div role="tabpanel" aria-label={activeTab} className="min-h-[12rem]">
+      <div
+        key={activeTab}
+        role="tabpanel"
+        aria-labelledby={`analytics-tab-${activeTab}`}
+        className="animate-fade-in min-h-[12rem]"
+      >
         {activeTab === "overview" ? (
           <TopVoicesCard
             authors={analytics.topAuthors}
@@ -55,14 +61,27 @@ export function AnalyticsTabPanel({
         ) : null}
 
         {activeTab === "composition" ? (
-          <div className="grid gap-0 xl:grid-cols-2 xl:gap-8">
-            <ContentMixCard breakdown={analytics.mediaBreakdown} variant="flat" />
-            <TagRankCard tags={analytics.tagDistribution} variant="flat" />
-          </div>
+          <Suspense
+            fallback={
+              <div className="grid gap-0 xl:grid-cols-2 xl:gap-8">
+                <div className="h-64 surface-inset skeleton-shimmer" />
+                <div className="h-64 surface-inset skeleton-shimmer" />
+              </div>
+            }
+          >
+            <div className="grid gap-0 xl:grid-cols-2 xl:gap-8">
+              <ContentMixCard breakdown={analytics.mediaBreakdown} variant="flat" />
+              <TagRankCard tags={analytics.tagDistribution} variant="flat" />
+            </div>
+          </Suspense>
         ) : null}
 
         {activeTab === "activity" ? (
-          <TimelineCard analytics={analytics} range={range} variant="flat" />
+          <Suspense
+            fallback={<div className="h-64 surface-inset skeleton-shimmer" />}
+          >
+            <TimelineCard analytics={analytics} range={range} variant="flat" />
+          </Suspense>
         ) : null}
 
         {activeTab === "signals" ? (

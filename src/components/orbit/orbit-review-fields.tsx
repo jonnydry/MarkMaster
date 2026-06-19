@@ -166,7 +166,7 @@ export function OrbitReviewTagField({
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="w-72 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
+            className="w-72 border border-hairline-strong bg-popover p-0 text-popover-foreground"
           >
             {libraryOpen ? (
               <LibrarySearchPicker
@@ -284,7 +284,7 @@ export function OrbitReviewCollectionField({
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-80 border border-hairline-strong bg-popover p-0 text-popover-foreground shadow-2xl"
+            className="w-80 border border-hairline-strong bg-popover p-0 text-popover-foreground"
           >
             {pickOpen ? (
               <LibrarySearchPicker
@@ -336,7 +336,7 @@ export function OrbitReviewDecisionControl({
             role="radio"
             aria-checked={active}
             className={cn(
-              "inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-2 text-xs font-medium",
+              "inline-flex h-8 items-center justify-center gap-1.5 rounded-sm px-2 text-xs font-medium focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               active ? highlightSegmentActiveClass : highlightIdleClass
             )}
             onClick={() => onChange(option)}

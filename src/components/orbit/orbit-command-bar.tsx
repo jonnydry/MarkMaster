@@ -300,25 +300,16 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                   <ToolbarIconButton
                     label="Apply strong matches"
                     icon={BadgeCheck}
-                    onClick={() => {
-                      if (scanning || applyingBatch || !canApplyStrongMatches) return;
-                      onApplyStrongMatches();
-                    }}
-                    className={cn(
-                      "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 dark:text-emerald-100",
-                      (scanning || applyingBatch || !canApplyStrongMatches) &&
-                        "opacity-50"
-                    )}
+                    disabled={scanning || applyingBatch || !canApplyStrongMatches}
+                    onClick={onApplyStrongMatches}
+                    className="border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 dark:text-emerald-100"
                   />
 
                   <ToolbarIconButton
                     label={scanButtonLabel}
                     icon={RefreshCw}
-                    onClick={() => {
-                      if (scanBusy || scanTargetCount === 0) return;
-                      onScan();
-                    }}
-                    className={scanBusy || scanTargetCount === 0 ? "opacity-50" : undefined}
+                    disabled={scanBusy || scanTargetCount === 0}
+                    onClick={onScan}
                   />
                 </>
               ) : (

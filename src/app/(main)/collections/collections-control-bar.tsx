@@ -47,7 +47,7 @@ export function CollectionsControlBar({
 
   return (
     <section className="flex flex-col gap-3 border-y border-hairline-soft py-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/20 lg:max-w-md">
+      <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/45 lg:max-w-md">
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <input
           ref={searchInputRef}
@@ -60,7 +60,7 @@ export function CollectionsControlBar({
         {searchQuery ? (
           <button
             type="button"
-            className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="rounded-sm border border-transparent p-1 text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onSearchChange("")}
             aria-label="Clear search"
           >

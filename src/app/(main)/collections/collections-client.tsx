@@ -132,8 +132,8 @@ export default function CollectionsPage() {
           <div className="p-4 sm:p-5">
             {isLoading ? (
               <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-8">
-                <div className="h-10 w-64 rounded skeleton-shimmer" />
-                <div className="grid gap-3 xl:grid-cols-2">
+                <div className="h-10 w-64 rounded-sm skeleton-shimmer" />
+                <div className="grid gap-2 xl:grid-cols-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
@@ -170,7 +170,7 @@ export default function CollectionsPage() {
                 }
               />
             ) : (
-              <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+              <div className="mx-auto flex w-full max-w-6xl animate-fade-in flex-col gap-5">
                 <CollectionsOverview
                   libraryBookmarkCount={libraryStats?.libraryBookmarkCount}
                   organizedBookmarkCount={

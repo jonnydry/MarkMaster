@@ -82,7 +82,8 @@ export function PageHeader({
                   <div className="flex min-w-0 items-center gap-2">
                     <h1
                       className={cn(
-                        "truncate font-bold tracking-tight heading-font",
+                        t.display,
+                        "truncate font-bold tracking-tight",
                         isCompact
                           ? "text-base sm:text-lg"
                           : "text-lg sm:text-xl",
@@ -97,7 +98,6 @@ export function PageHeader({
                   <p
                     className={cn(
                       "mt-1 text-xs text-muted-foreground sm:text-sm",
-                      t.monoNative ? t.label : undefined,
                       bookmarkFeedMaxWidthClassName,
                       descriptionClassName
                     )}

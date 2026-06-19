@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DASHBOARD_SHORTCUT_GROUPS,
   formatShortcutKey,
@@ -16,6 +17,7 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import { appOverlayDialogSmClassName } from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
+import { useTypography } from "@/hooks/use-typography";
 
 interface KeyboardShortcutsDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ export function KeyboardShortcutsDialog({
   groups = DASHBOARD_SHORTCUT_GROUPS,
   description = "Navigation and quick actions for this view.",
 }: KeyboardShortcutsDialogProps) {
+  const t = useTypography();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={appOverlayDialogSmClassName}>
@@ -50,7 +53,7 @@ export function KeyboardShortcutsDialog({
         <div className="grid gap-4 px-4 pb-4">
           {groups.map((group) => (
             <section key={group.title}>
-              <h3 className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <h3 className={cn(t.label, "mb-2")}>
                 {group.title}
               </h3>
               <div className="overflow-hidden rounded-sm border border-hairline-soft">
@@ -65,12 +68,9 @@ export function KeyboardShortcutsDialog({
                     <span className="text-foreground">{shortcut.label}</span>
                     <span className="flex shrink-0 items-center gap-1">
                       {shortcut.keys.map((key) => (
-                        <kbd
-                          key={key}
-                          className="min-w-6 rounded-sm border border-hairline-strong bg-background/60 px-1.5 py-0.5 text-center text-xs font-semibold text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]"
-                        >
+                        <Kbd key={key}>
                           {formatShortcutKey(key)}
-                        </kbd>
+                        </Kbd>
                       ))}
                     </span>
                   </div>

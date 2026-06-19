@@ -13,7 +13,7 @@ interface SimpleBarChartProps {
   height?: number;
 }
 
-const RADIUS = 6;
+const RADIUS = 2;
 
 export function SimpleBarChart({ segments, height = 44 }: SimpleBarChartProps) {
   const totalPct = segments.reduce((sum, s) => sum + s.pct, 0);

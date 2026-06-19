@@ -27,7 +27,7 @@ export const TagRow = React.memo(function TagRow({
       )}
     >
       <span
-        className="size-3.5 shrink-0 rounded-full ring-2 ring-black/5 ring-offset-1 ring-offset-surface-2"
+        className="size-3.5 shrink-0 rounded-full ring-1 ring-hairline-soft ring-offset-1 ring-offset-surface-2"
         style={{ backgroundColor: tag.color }}
         aria-hidden
       />

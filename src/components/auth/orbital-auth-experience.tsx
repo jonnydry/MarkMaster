@@ -153,7 +153,7 @@ export function OrbitalAuthExperience({
                 <Button
                   size="lg"
                   onClick={handleSignIn}
-                  className="auth-splash__primary-button group h-[58px] rounded-sm border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
+                  className="auth-splash__primary-button group h-[58px] rounded-sm border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
                 >
                   <XLogoMark
                     className="mr-2.5 size-[22px] text-primary-foreground"
@@ -161,7 +161,7 @@ export function OrbitalAuthExperience({
                   />
                   Sign in with X
                   <ArrowRight
-                    className="ml-2 size-[18px] opacity-85 transition-transform group-hover:translate-x-1"
+                    className="ml-2 size-[18px] opacity-85 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
                     aria-hidden="true"
                   />
                 </Button>

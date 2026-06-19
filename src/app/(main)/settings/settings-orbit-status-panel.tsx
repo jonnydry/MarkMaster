@@ -47,7 +47,7 @@ export function OrbitGrokStatusPanel({
     return (
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-10 rounded skeleton-shimmer" />
+          <div key={i} className="h-10 rounded-sm skeleton-shimmer" />
         ))}
       </dl>
     );
@@ -81,7 +81,7 @@ export function OrbitGrokStatusPanel({
       {status.issues.length > 0 ? (
         <div className="rounded-sm border border-amber-500/25 bg-amber-500/10 px-3 py-2.5">
           <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-800 dark:text-amber-100" />
             <div className="space-y-2">
               {status.issues.map((issue) => (
                 <div key={issue.code}>
@@ -122,7 +122,7 @@ export function OrbitGrokStatusPanel({
         </Button>
         <Link
           href="/orbit"
-          className="inline-flex h-8 items-center rounded-sm px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex h-8 items-center rounded-sm border border-transparent px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         >
           Open Orbit queue
         </Link>
@@ -141,7 +141,7 @@ function OrbitStatusRow({
   highlight?: boolean;
 }) {
   return (
-    <div className={cn(highlight && "text-amber-700 dark:text-amber-200")}>
+    <div className={cn(highlight && "text-amber-800 dark:text-amber-100")}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
     </div>

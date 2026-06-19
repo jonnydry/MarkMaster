@@ -30,7 +30,7 @@ export const orbital = {
     "inline-flex items-center gap-px rounded-sm border border-primary/20 bg-surface-1/95 px-1 py-0.5 backdrop-blur",
   sectionLabel: orbitalTypography.sectionLabel,
   slideIn:
-    "glass-orbital orbital-slide-in-shadow border-l-2 border-primary/40",
+    "glass-orbital border-l-2 border-primary/40",
 };
 
 export function OrbitalCard({
@@ -208,7 +208,7 @@ export function OrbitalMenu({
   [key: string]: unknown;
 }) {
   return (
-    <div className={cn(orbital.menu, "orbital-menu", className)} {...props}>
+    <div className={cn(orbital.menu, className)} {...props}>
       {children}
     </div>
   );

@@ -48,7 +48,7 @@ export function ErrorState({
   return (
     <div className={cn(layoutShell[layout], className)} role="alert">
       {showIcon ? (
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-sm border border-destructive/15 bg-destructive/10 text-destructive">
           <AlertTriangle className="h-5 w-5" aria-hidden="true" />
         </div>
       ) : null}

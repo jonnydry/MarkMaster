@@ -49,7 +49,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                 <Link
                   href={`/dashboard?tag=${encodeURIComponent(t.id)}`}
                   className={cn(
-                    "group grid grid-cols-[auto_minmax(0,1fr)_minmax(96px,38%)_auto_auto] items-center gap-3 px-3 py-2.5 transition-colors",
+                    "group grid grid-cols-[auto_minmax(0,1fr)_minmax(96px,38%)_auto_auto] items-center gap-3 rounded-sm px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
                     "hover:bg-surface-1"
                   )}
                 >

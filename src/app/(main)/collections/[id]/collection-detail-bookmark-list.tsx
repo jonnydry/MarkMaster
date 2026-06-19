@@ -7,6 +7,8 @@ import { BookmarkList } from "@/app/(main)/dashboard/bookmark-list";
 import { AppPageCenter } from "@/components/app-page-shell";
 import { BookmarkCard } from "@/components/bookmark-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   bookmarkCollectionCardCellClassName,
   bookmarkCollectionRowWithReorderClassName,
@@ -55,26 +57,20 @@ export function CollectionDetailBookmarkList({
 
   if (sortedItems.length === 0) {
     return (
-      <div className="py-20 text-center">
-        <div className="mx-auto max-w-md surface-card px-6 py-8">
-          {isSyncedFromX ? (
-            <FolderOpen className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
-          ) : (
-            <Layers className="mx-auto mb-4 h-10 w-10 text-muted-foreground/50" />
-          )}
-          <p className="text-muted-foreground">
-            No bookmarks in this collection yet.
-            <br />
-            Add bookmarks from the dashboard.
-          </p>
-          {!isSyncedFromX && (
-            <div className="mt-4 flex justify-center">
+      <div className="py-20">
+        <EmptyState
+          layout="panel"
+          icon={isSyncedFromX ? FolderOpen : Layers}
+          title="No bookmarks in this collection yet"
+          description="Add bookmarks from the dashboard."
+          action={
+            !isSyncedFromX ? (
               <Button variant="outline" size="sm" onClick={onGoToDashboard}>
                 Go to dashboard
               </Button>
-            </div>
-          )}
-        </div>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
@@ -208,25 +204,26 @@ export function CollectionDetailErrorState({
   onBack: () => void;
 }) {
   return (
-    <AppPageCenter className="flex-col gap-4 px-6">
-      <div className="max-w-md surface-solid p-6 text-center">
-        <p className="text-sm font-medium text-foreground">
-          {isNotFound ? "Collection not found" : "Collection could not be loaded"}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {isNotFound
+    <AppPageCenter className="px-6">
+      <ErrorState
+        layout="page"
+        title={isNotFound ? "Collection not found" : "Collection could not be loaded"}
+        description={
+          isNotFound
             ? "This collection does not exist or has been deleted."
-            : "It may have been deleted or you may not have access."}
-        </p>
-        <div className="mt-3 flex items-center justify-center gap-2">
-          <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
-          </Button>
-          <Button size="sm" variant="outline" onClick={onBack}>
-            Back to collections
-          </Button>
-        </div>
-      </div>
+            : "It may have been deleted or you may not have access."
+        }
+        action={
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+            <Button size="sm" variant="outline" onClick={onBack}>
+              Back to collections
+            </Button>
+          </div>
+        }
+      />
     </AppPageCenter>
   );
 }

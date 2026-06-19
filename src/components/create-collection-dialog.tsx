@@ -66,6 +66,7 @@ export function CreateCollectionDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Collection name"
+              maxLength={80}
               onKeyDown={(e) =>
                 e.key === "Enter" && void handleCreate()
               }
@@ -79,6 +80,7 @@ export function CreateCollectionDialog({
               placeholder="What's this collection about?"
               className="resize-none"
               rows={3}
+              maxLength={280}
             />
           </div>
           <div className="flex items-center justify-between">

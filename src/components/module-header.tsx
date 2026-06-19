@@ -36,7 +36,7 @@ export function ModuleHeader({
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <div
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary",
             iconClassName
           )}
         >
@@ -49,7 +49,7 @@ export function ModuleHeader({
             {eyebrow}
           </p>
           {title ? (
-            <h2 className="mt-1 heading-font text-lg font-semibold tracking-tight text-foreground">
+            <h2 className={cn(t.display, "mt-1 text-lg font-semibold tracking-tight text-foreground")}>
               {title}
             </h2>
           ) : null}

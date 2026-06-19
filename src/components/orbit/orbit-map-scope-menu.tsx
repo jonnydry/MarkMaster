@@ -4,7 +4,6 @@ import { Check, ChevronDown } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  orbitHairlineBorder,
   orbitLabelClass,
   orbitMetaMuted} from "@/lib/orbit-route-chrome";
 import {
@@ -51,8 +50,7 @@ export function OrbitMapScopeMenu({
         disabled={isLoading}
         aria-label={`Graph view: ${activeOption.label}`}
         className={cn(
-          "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
-          orbitHairlineBorder(),
+          "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
           className
         )}
       >
@@ -82,7 +80,7 @@ export function OrbitMapScopeMenu({
               onClick={() => onScopeChange(option.scope)}
               disabled={isLoading}
               className={cn(
-                "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors disabled:pointer-events-none disabled:opacity-50",
+                "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
                 active
                   ? highlightSegmentActiveClass
                   : cn("text-foreground", highlightIdleClass)

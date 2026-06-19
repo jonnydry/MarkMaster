@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useTypography } from "@/hooks/use-typography";
 
 export type LibrarySearchPickerItem = {
   id: string;
@@ -35,6 +36,7 @@ export function LibrarySearchPicker({
   const [query, setQuery] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const normalizedQuery = query.trim().toLowerCase();
+  const t = useTypography();
 
   const filteredItems = useMemo(() => {
     if (!normalizedQuery) return items;
@@ -121,6 +123,9 @@ export function LibrarySearchPicker({
         key={item.id}
         id={`library-picker-item-${item.id}`}
         type="button"
+        role="option"
+        aria-selected={selected}
+        tabIndex={-1}
         disabled={item.disabled}
         className={cn(
           "flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden select-none",
@@ -162,12 +167,24 @@ export function LibrarySearchPicker({
             placeholder={placeholder}
             className="h-8 border-hairline-soft bg-surface-1 pl-8 text-popover-foreground placeholder:text-muted-foreground/70"
             autoFocus
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="library-picker-list"
+            aria-activedescendant={
+              resolvedFocusedIndex >= 0
+                ? `library-picker-item-${selectableItems[resolvedFocusedIndex]?.id}`
+                : undefined
+            }
           />
         </div>
       </div>
-      <div className="max-h-64 overflow-y-auto p-1 scrollbar-thin">
+      <div
+        id="library-picker-list"
+        role="listbox"
+        className="max-h-64 overflow-y-auto p-1 scrollbar-thin"
+      >
         {groupHeading ? (
-          <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+          <p className={cn(t.sectionLabel, "px-2 py-1.5 mb-0")}>
             {groupHeading}
           </p>
         ) : null}

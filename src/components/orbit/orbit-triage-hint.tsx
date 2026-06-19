@@ -6,7 +6,7 @@ import { Sparkles, X } from "lucide-react";
 import {
   dismissOrbitTriageHint,
   isOrbitTriageHintDismissed} from "@/lib/orbit-triage-hint";
-import { orbitHairlineBorder, orbitMetaMuted } from "@/lib/orbit-route-chrome";
+import { orbitMetaMuted } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
 const TRIAGE_HINT_CHANGE_EVENT = "markmaster-orbit-triage-hint-change";
@@ -37,9 +37,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-sm border px-3 py-2 text-xs leading-relaxed",
-        orbitHairlineBorder(),
-        "border-hairline-soft bg-surface-2/45 dark:border-white/10 dark:bg-white/[0.03]",
+        "animate-slide-down-fade flex items-center gap-2 surface-inset px-3 py-2 text-xs leading-relaxed",
         orbitMetaMuted(),
         className
       )}
@@ -60,8 +58,8 @@ export function OrbitTriageHint({ className }: { className?: string }) {
           window.dispatchEvent(new Event(TRIAGE_HINT_CHANGE_EVENT));
         }}
         className={cn(
-          "shrink-0 rounded p-0.5",
-          "text-muted-foreground hover:text-foreground dark:text-white/40 dark:hover:text-white/70"
+          "shrink-0 rounded-sm border border-transparent p-0.5",
+          "text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 dark:text-white/40 dark:hover:text-white/70"
         )}
         aria-label="Dismiss triage tips"
       >
