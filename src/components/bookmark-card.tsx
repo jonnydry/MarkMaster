@@ -162,12 +162,6 @@ export const BookmarkCard = memo(function BookmarkCard({
   };
   const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isInteractive) return;
-    if (canPostAreaExpand) return;
-    if (shouldIgnorePostActivation(event.target)) return;
-    handleCardActivation();
-  };
-  const handlePostAreaClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!canPostAreaExpand) return;
     if (shouldIgnorePostActivation(event.target)) return;
     handleCardActivation();
   };
@@ -280,7 +274,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   return (
     <div
       className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/35 ${
-        isInteractive && !canPostAreaExpand ? "cursor-pointer" : ""
+        isInteractive ? "cursor-pointer" : ""
       } ${
         selected || isPerformanceHighlight
           ? isPerformanceHighlight
@@ -311,7 +305,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
           : undefined
       }
-      onClick={isInteractive && !canPostAreaExpand ? handleCardClick : undefined}
+      onClick={isInteractive ? handleCardClick : undefined}
       onKeyDown={isInteractive ? handleCardKeyDown : undefined}
     >
       <div className="flex gap-3">
@@ -322,13 +316,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             onToggle={() => onSelectionChange?.(bookmark.id, !selected)}
           />
         )}
-        <div
-          className={cn(
-            "flex min-w-0 flex-1 gap-3",
-            canPostAreaExpand && "cursor-pointer"
-          )}
-          onClick={canPostAreaExpand ? handlePostAreaClick : undefined}
-        >
+        <div className="flex min-w-0 flex-1 gap-3">
         {bookmark.authorProfileImage ? (
           <Image
             src={bookmark.authorProfileImage}
