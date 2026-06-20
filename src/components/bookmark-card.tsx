@@ -26,6 +26,7 @@ import {
 } from "@/components/bookmark-card-chrome";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
+import { FEED_POST_TEXT } from "@/lib/typography";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { useTypography } from "@/hooks/use-typography";
 import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
@@ -364,7 +365,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             />
           </div>
 
-          <div className="mt-2 text-[15px] leading-7 text-foreground whitespace-pre-wrap">
+          <div className={cn("mt-2", FEED_POST_TEXT)}>
             {highlightedText}
           </div>
 

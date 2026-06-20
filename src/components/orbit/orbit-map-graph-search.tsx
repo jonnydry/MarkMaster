@@ -88,7 +88,7 @@ export function OrbitMapGraphSearch({
         <div
           className={cn(
             orbitMapFloatingMenuClass(),
-            "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 overflow-auto"
+            "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 animate-in fade-in-0 zoom-in-95 overflow-auto"
           )}
         >
           <ul className="py-1">
@@ -111,7 +111,7 @@ export function OrbitMapGraphSearch({
         <div
           className={cn(
             orbitMapFloatingMenuClass(),
-            "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 p-3 text-sm text-muted-foreground"
+            "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 animate-in fade-in-0 zoom-in-95 p-3 text-sm text-muted-foreground"
           )}
         >
           {`No results for "${searchQuery}"`}
@@ -132,7 +132,7 @@ function SearchResultButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground/85 transition-colors hover:bg-accent-soft hover:text-foreground"
+      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-foreground/85 transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
     >
       {node.kind === "tag" && (
         <>

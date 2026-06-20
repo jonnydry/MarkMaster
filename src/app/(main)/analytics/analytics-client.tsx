@@ -106,8 +106,11 @@ export default function AnalyticsPage() {
                   groups={ANALYTICS_SHORTCUT_GROUPS}
                   description="Analytics tab, range, and Orbit triage shortcuts."
                 />
-                {!showAnalyticsSkeleton && analytics && analytics.totalBookmarks > 0 ? (
-                  <AnalyticsRangeSegment value={range} onChange={setRange} />
+                {analytics && analytics.totalBookmarks > 0 ? (
+                  <AnalyticsRangeSegment
+                    value={range}
+                    onChange={showAnalyticsSkeleton ? () => {} : setRange}
+                  />
                 ) : null}
                 {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
               </div>

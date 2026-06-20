@@ -156,7 +156,7 @@ export function Sidebar({
               onMouseEnter={href === "/orbit/map" ? prefetchGraph : undefined}
               onFocus={href === "/orbit/map" ? prefetchGraph : undefined}
               className={cn(
-                "flex items-center rounded-sm border border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+                "flex items-center rounded-sm border border-transparent transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 isActive
                   ? "menu-selection-active font-semibold"
                   : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground",
@@ -194,7 +194,7 @@ export function Sidebar({
                           type="button"
                           onClick={() => onTagToggle(tag.id)}
                           aria-pressed={isSelected}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isSelected
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
@@ -264,7 +264,7 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
@@ -316,7 +316,7 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
-                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
+                          className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
                               : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"

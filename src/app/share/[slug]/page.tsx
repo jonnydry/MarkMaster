@@ -12,6 +12,7 @@ import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { buttonVariantClassName } from "@/lib/button-variants";
 import { prisma } from "@/lib/prisma";
 import { AppPublicPage } from "@/components/app-page-shell";
+import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_SHARE_PAGE_SIZE = 50;
@@ -199,7 +200,7 @@ export default async function PublicSharePage({
 
   return (
     <AppPublicPage className="bg-background">
-      <header className="border-b border-border bg-background/80 backdrop-blur-md">
+      <header className={cn("border-b border-hairline-soft", appChromeFrostedClassName)}>
         <div
           className={cn(
             bookmarkFeedColumnClassName,
@@ -359,7 +360,7 @@ function ShareStat({
   value: string;
 }) {
   return (
-    <div className="rounded-sm border border-border bg-secondary/50 px-3 py-2.5">
+    <div className="surface-inset-strong px-3 py-2.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="size-3.5" />
         {label}

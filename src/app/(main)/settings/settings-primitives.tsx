@@ -1,11 +1,15 @@
 "use client";
 
+import { createContext, useContext, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { StatusBadge } from "@/components/ui/chip";
+import { StatRow } from "@/components/ui/stat-row";
 import { ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
+import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
+import { useScrollspy } from "@/hooks/use-scrollspy";
 import type { DbUser } from "@/lib/auth";
 import type { OrbitXaiStatusPayload } from "@/types";
 
@@ -19,25 +23,111 @@ export const SETTINGS_SECTIONS = [
   { id: "account", label: "Account" },
 ] as const;
 
-export function SettingsNav({ className }: { className?: string }) {
+const SETTINGS_SECTION_IDS = SETTINGS_SECTIONS.map((s) => s.id);
+
+const SettingsActiveSectionContext = createContext<string>(
+  SETTINGS_SECTION_IDS[0]
+);
+
+/** Single scrollspy instance shared by desktop and mobile settings nav. */
+export function SettingsScrollspyProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const activeId = useScrollspy(SETTINGS_SECTION_IDS, { scrollMarginPx: 24 });
+  return (
+    <SettingsActiveSectionContext.Provider value={activeId}>
+      {children}
+    </SettingsActiveSectionContext.Provider>
+  );
+}
+
+function useSettingsActiveSection() {
+  return useContext(SettingsActiveSectionContext);
+}
+
+export function SettingsNav({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  /** When provided, clicks smooth-scroll instead of native anchor jump. */
+  onNavigate?: (sectionId: string) => void;
+}) {
+  const activeId = useSettingsActiveSection();
   return (
     <nav
       aria-label="Settings sections"
       className={cn("space-y-0.5", className)}
     >
-      {SETTINGS_SECTIONS.map(({ id, label }) => (
-        <a
-          key={id}
-          href={`#${id}`}
-          className={cn(
-            "block rounded-sm px-2.5 py-1.5 text-sm text-muted-foreground transition-colors",
-            "hover:bg-accent-soft/70 hover:text-foreground",
-            "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
-          )}
-        >
-          {label}
-        </a>
-      ))}
+      {SETTINGS_SECTIONS.map(({ id, label }) => {
+        const active = id === activeId;
+        return (
+          <a
+            key={id}
+            href={`#${id}`}
+            aria-current={active ? "true" : undefined}
+            onClick={
+              onNavigate
+                ? (event) => {
+                    event.preventDefault();
+                    onNavigate(id);
+                  }
+                : undefined
+            }
+            className={cn(
+              "block rounded-sm px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+              active
+                ? cn(highlightActiveClass, "text-foreground font-medium")
+                : "text-muted-foreground hover:bg-accent-soft/70 hover:text-foreground"
+            )}
+          >
+            {label}
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function SettingsMobileNav({
+  onNavigate,
+}: {
+  onNavigate?: (sectionId: string) => void;
+}) {
+  const activeId = useSettingsActiveSection();
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="mb-6 flex gap-1 overflow-x-auto pb-0.5 scrollbar-none lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {SETTINGS_SECTIONS.map(({ id, label }) => {
+        const active = id === activeId;
+        return (
+          <a
+            key={id}
+            href={`#${id}`}
+            aria-current={active ? "true" : undefined}
+            onClick={
+              onNavigate
+                ? (event) => {
+                    event.preventDefault();
+                    onNavigate(id);
+                  }
+                : undefined
+            }
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center rounded-sm border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+              active
+                ? "border-primary/30 bg-primary/10 text-foreground"
+                : "border-hairline-soft text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+            )}
+          >
+            {label}
+          </a>
+        );
+      })}
     </nav>
   );
 }
@@ -83,16 +173,8 @@ export function SettingsHero({
         </p>
       </div>
       <dl className="hidden shrink-0 gap-4 text-right sm:flex">
-        <div>
-          <dt className="text-xs text-muted-foreground">Tags</dt>
-          <dd className="text-sm font-semibold tabular-nums">{tagCount.toLocaleString()}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-muted-foreground">Collections</dt>
-          <dd className="text-sm font-semibold tabular-nums">
-            {collectionCount.toLocaleString()}
-          </dd>
-        </div>
+        <StatRow size="sm" headingFont={false} label="Tags" value={tagCount.toLocaleString()} />
+        <StatRow size="sm" headingFont={false} label="Collections" value={collectionCount.toLocaleString()} />
       </dl>
     </section>
   );

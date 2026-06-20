@@ -365,7 +365,7 @@ export function CommandPalette({
 
           {allItems.length === 0 && normalizedQuery !== "" && (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No tags match <span className="font-medium text-foreground">{query}</span>.
+              No tags match <span className="font-medium text-foreground">{query}</span>
             </div>
           )}
         </div>

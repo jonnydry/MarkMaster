@@ -1014,7 +1014,9 @@
   [data-typography-preset="mono"] [data-slot="label"],
   [data-typography-preset="mono"] .app-chrome-label,
   [data-typography-preset="mono"] h2.heading-font,
-  [data-typography-preset="mono"] [data-slot="dialog-title"] {
+  [data-typography-preset="mono"] [data-slot="dialog-title"],
+  [data-typography-preset="mono"] [data-slot="dropdown-menu-label"],
+  [data-typography-preset="mono"] [data-slot="select-label"] {
     font-family: var(--font-label), var(--font-mono), ui-monospace, SFMono-Regular, monospace;
     font-weight: 500;
     letter-spacing: 0.12em;

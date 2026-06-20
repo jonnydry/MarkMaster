@@ -38,6 +38,16 @@ export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     ],
   },
   {
+    title: "Canvas (focus the map first)",
+    shortcuts: [
+      { id: "pan", keys: ["←", "→", "↑", "↓"], label: "Pan the graph" },
+      { id: "zoom-in", keys: ["+"], label: "Zoom in" },
+      { id: "zoom-out", keys: ["-"], label: "Zoom out" },
+      { id: "reset-view", keys: ["0"], label: "Reset view" },
+      { id: "clear-sel", keys: ["Esc"], label: "Clear selection" },
+    ],
+  },
+  {
     title: "Selected Bookmark",
     shortcuts: [
       { id: "assign", keys: ["A"], label: "Assign selected tag or collection" },

@@ -62,7 +62,9 @@ function DiscoveryFeedHeader({
       title={hint}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        <Compass className="h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden />
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
+          <Compass className="size-3" aria-hidden />
+        </span>
         <p className={cn(t.sectionLabel, "truncate text-muted-foreground")}>
           <span className="text-primary/70">Discovery</span>
           {meta ? (

@@ -74,7 +74,7 @@ export function ShareDialog({
                 }
               >
                 {copiedField === "link" ? (
-                  <Check className="w-4 h-4 text-success" />
+                  <Check className="w-4 h-4 text-success animate-in fade-in-0 zoom-in-75" />
                 ) : (
                   <Copy className="w-4 h-4" />
                 )}
@@ -114,7 +114,7 @@ export function ShareDialog({
                 }
               >
                 {copiedField === "summary" ? (
-                  <Check className="w-3.5 h-3.5 text-success" />
+                  <Check className="w-3.5 h-3.5 text-success animate-in fade-in-0 zoom-in-75" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
@@ -157,7 +157,7 @@ export function ShareDialog({
                 }
               >
                 {copiedField === "thread" ? (
-                  <Check className="w-3.5 h-3.5 text-success" />
+                  <Check className="w-3.5 h-3.5 text-success animate-in fade-in-0 zoom-in-75" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}

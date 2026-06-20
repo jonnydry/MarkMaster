@@ -4,7 +4,6 @@ import { Check, ChevronDown, Lock } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  orbitControlRadius,
   orbitLabelClass,
   orbitMetaMuted} from "@/lib/orbit-route-chrome";
 import {
@@ -12,9 +11,7 @@ import {
   type OrbitScanBatchMode,
   type OrbitScanBatchProfileId} from "@/lib/orbit-config";
 import {
-  highlightActiveClass,
   highlightIdleClass,
-  highlightInteractiveClass,
   highlightSegmentActiveClass,
 } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -46,8 +43,6 @@ export interface OrbitBatchMenuProps {
   deepLockedReason: string;
   disabled?: boolean;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
-  /** Visually attach to the left CTA (no left rounding / shared border). */
-  attached?: boolean;
 }
 
 /**
@@ -62,7 +57,7 @@ export function OrbitBatchMenu({
   deepLockedReason,
   disabled = false,
   onBatchModeChange,
-  attached = false}: OrbitBatchMenuProps) {
+}: OrbitBatchMenuProps) {
 
   const triggerLabel =
     batchMode === "auto"
@@ -75,15 +70,7 @@ export function OrbitBatchMenu({
         disabled={disabled}
         aria-label={`Scan batch size: ${triggerLabel}`}
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1 border px-2 text-xs font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
-          attached
-            ? cn(
-                highlightActiveClass,
-                highlightInteractiveClass,
-                "rounded-l-none border-l-0 text-primary"
-              )
-            : "border-hairline-strong bg-background/35 text-foreground hover:border-primary/30 hover:bg-accent-soft",
-          orbitControlRadius() ?? "rounded-sm"
+          "inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-hairline-strong bg-background/35 px-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-50"
         )}
         title={`Batch size — ${triggerLabel}`}
       >

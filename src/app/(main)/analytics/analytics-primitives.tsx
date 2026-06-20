@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { HighlightProgress } from "@/components/highlight-progress";
 import { buttonVariants } from "@/components/ui/button";
+import { StatRow } from "@/components/ui/stat-row";
 import { ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import { cn } from "@/lib/utils";
 import type { AnalyticsData } from "@/types";
@@ -173,13 +174,13 @@ export function AnalyticsHero({
     <section className="border-b border-hairline-soft pb-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-          <HeroStat label="Bookmarks" value={totalBookmarks.toLocaleString()} />
-          <HeroStat
+          <StatRow label="Bookmarks" value={totalBookmarks.toLocaleString()} />
+          <StatRow
             label="In Orbit"
             value={orbitQueueCount.toLocaleString()}
             hint={allTriaged ? "All tagged" : `${untaggedCount.toLocaleString()} untagged`}
           />
-          <HeroStat
+          <StatRow
             label="Last 30 days"
             value={last30d.toLocaleString()}
             hint={
@@ -189,7 +190,7 @@ export function AnalyticsHero({
               </span>
             }
           />
-          <HeroStat
+          <StatRow
             label="Annotated"
             value={`${annotationPct.toFixed(0)}%`}
             hint={`${notedCount.toLocaleString()} with notes`}
@@ -249,24 +250,6 @@ export function AnalyticsHero({
         </p>
       </div>
     </section>
-  );
-}
-
-function HeroStat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums heading-font">{value}</dd>
-      {hint ? <dd className="mt-0.5 text-xs text-muted-foreground">{hint}</dd> : null}
-    </div>
   );
 }
 
@@ -339,17 +322,17 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
         Product telemetry for Orbit rituals and digest flows in the selected time range.
       </p>
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SignalRow label="Highlights → Orbit" value={cta} />
-        <SignalRow label="Digest review together" value={digestCta} />
-        <SignalRow label="Good feedback" value={good} />
-        <SignalRow label="Not relevant feedback" value={notRel} />
-        <SignalRow label="Quick Pass toggles" value={quick} />
-        <SignalRow label="Deep Review toggles" value={deep} />
-        <SignalRow label="Digest sessions" value={sessions} />
-        <SignalRow label="Orbit accepted" value={orbitAccepted} />
-        <SignalRow label="Orbit edited" value={orbitEdited} />
-        <SignalRow label="Orbit kept" value={orbitKept} />
-        <SignalRow label="Orbit rejected" value={orbitRejected} />
+        <StatRow size="base" label="Highlights → Orbit" value={cta.toLocaleString()} />
+        <StatRow size="base" label="Digest review together" value={digestCta.toLocaleString()} />
+        <StatRow size="base" label="Good feedback" value={good.toLocaleString()} />
+        <StatRow size="base" label="Not relevant feedback" value={notRel.toLocaleString()} />
+        <StatRow size="base" label="Quick Pass toggles" value={quick.toLocaleString()} />
+        <StatRow size="base" label="Deep Review toggles" value={deep.toLocaleString()} />
+        <StatRow size="base" label="Digest sessions" value={sessions.toLocaleString()} />
+        <StatRow size="base" label="Orbit accepted" value={orbitAccepted.toLocaleString()} />
+        <StatRow size="base" label="Orbit edited" value={orbitEdited.toLocaleString()} />
+        <StatRow size="base" label="Orbit kept" value={orbitKept.toLocaleString()} />
+        <StatRow size="base" label="Orbit rejected" value={orbitRejected.toLocaleString()} />
       </dl>
       {(digestCta > 0 ||
         quick + deep > 0 ||
@@ -419,15 +402,6 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SignalRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-base font-semibold tabular-nums heading-font">{value.toLocaleString()}</dd>
     </div>
   );
 }

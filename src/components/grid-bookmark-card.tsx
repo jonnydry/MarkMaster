@@ -21,6 +21,7 @@ import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { highlightActiveClass } from "@/lib/highlight-chrome";
+import { GRID_POST_TEXT_MEDIA, GRID_POST_TEXT_ONLY } from "@/lib/typography";
 import { cn } from "@/lib/utils";
 import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
 import type { BookmarkWithRelations } from "@/types";
@@ -236,10 +237,8 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
         </div>
         <p
           className={cn(
-            "mt-2 whitespace-pre-wrap text-foreground",
-            hasVisual
-              ? "line-clamp-3 text-sm leading-5"
-              : "line-clamp-6 text-[15px] font-medium leading-6"
+            "mt-2 line-clamp-3",
+            hasVisual ? GRID_POST_TEXT_MEDIA : cn(GRID_POST_TEXT_ONLY, "line-clamp-6"),
           )}
         >
           {highlightedText}

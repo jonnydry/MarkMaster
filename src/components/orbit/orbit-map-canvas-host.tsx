@@ -672,6 +672,64 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       });
     };
 
+    const handleCanvasKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+      // Arrow keys pan, +/- zoom, 0 resets, Escape clears selection.
+      // WASD is intentionally omitted to avoid clashing with the global
+      // A (assign) / S shortcuts that are active while the canvas is focused.
+      const key = event.key;
+      const isPan =
+        key === 'ArrowUp' ||
+        key === 'ArrowDown' ||
+        key === 'ArrowLeft' ||
+        key === 'ArrowRight';
+      const isZoomIn = key === '+' || key === '=';
+      const isZoomOut = key === '-' || key === '_';
+      const isReset = key === '0';
+      const isEscape = key === 'Escape';
+
+      if (!isPan && !isZoomIn && !isZoomOut && !isReset && !isEscape) return;
+      // Don't interfere with modifier combos (e.g. Cmd+/- for browser zoom).
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent.stopImmediatePropagation();
+
+      if (isEscape) {
+        props.onSelectionChange?.(null);
+        return;
+      }
+      if (isReset) {
+        handleResetView();
+        return;
+      }
+      if (isZoomIn) {
+        handleZoomIn();
+        return;
+      }
+      if (isZoomOut) {
+        handleZoomOut();
+        return;
+      }
+
+      // Pan via SET_CAMERA, offset from the current camera.
+      const camera = minimapCamera;
+      const viewport = viewportSize;
+      if (!camera || !viewport) return;
+      const stepX = Math.max(40, viewport.width * 0.2);
+      const stepY = Math.max(40, viewport.height * 0.2);
+      let { x, y } = camera;
+      if (key === 'ArrowRight') x -= stepX;
+      else if (key === 'ArrowLeft') x += stepX;
+      else if (key === 'ArrowDown') y -= stepY;
+      else if (key === 'ArrowUp') y += stepY;
+      postToWorker({
+        type: WorkerMessageType.SET_CAMERA,
+        protocolVersion: 1,
+        camera: { x, y, zoom: camera.zoom },
+      });
+    };
+
     const handleMinimapJump = (worldX: number, worldY: number) => {
       if (!viewportSize) return;
       const zoom = minimapCamera?.zoom ?? 1;
@@ -764,9 +822,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
     return (
       <div
-        className={props.className}
+        className={`${props.className ?? ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-inset`}
         role="application"
-        aria-label="Orbit graph map"
+        aria-label="Orbit graph map — use arrow keys to pan, plus and minus to zoom, 0 to reset, Escape to clear selection"
+        tabIndex={0}
+        onKeyDown={handleCanvasKeyDown}
         style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
       >
         <canvas

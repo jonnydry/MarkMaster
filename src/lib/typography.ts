@@ -61,3 +61,8 @@ export const orbitalTypography = {
 export const MONO_BODY_STRONG =
   "font-[family-name:var(--font-ibm-plex-mono)] text-[13px] font-medium tracking-normal normal-case";
 export const SANS_BODY_STRONG = "text-[15px] font-medium";
+
+/** Post-text presets for bookmark cards — one source of truth across view modes. */
+export const FEED_POST_TEXT = "text-[15px] leading-7 text-foreground whitespace-pre-wrap";
+export const GRID_POST_TEXT_MEDIA = "text-sm leading-5 text-foreground";
+export const GRID_POST_TEXT_ONLY = "text-[15px] font-medium leading-6 text-foreground";

@@ -318,7 +318,7 @@ export function OrbitScanOverviewStrip({
       </button>
 
       {open ? (
-        <div className="border-t border-hairline-soft">
+        <div className="animate-in fade-in-0 slide-in-from-top-2 border-t border-hairline-soft">
           <div className="grid grid-cols-3 divide-x divide-hairline-soft bg-surface-1/35">
             <OverviewMetric
               value={summary.bookmarkCount}

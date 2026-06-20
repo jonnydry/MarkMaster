@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
+import { buttonVariants } from "@/components/ui/button";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import {
   CompactFloatingSearchStrip,
@@ -171,9 +172,9 @@ export const OrbitMapCommandBar = forwardRef<
               href="/orbit"
               aria-label="Back to Orbit queue"
               className={cn(
-                "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-                compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm",
-                appToolbarSurfaceClassName
+                buttonVariants({ variant: "outline", size: compact ? "sm" : "default" }),
+                appToolbarSurfaceClassName,
+                compact && "h-8"
               )}
             >
               <ArrowLeft className="size-4" />

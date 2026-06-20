@@ -57,7 +57,7 @@ interface OrbitMapRailProps {
 /** Shared panel surface for both rail and overlay variants, theme-aware. */
 function panelClass( isOverlay: boolean) {
   if (isOverlay) return "min-w-0 shrink-0";
-  return "min-w-0 shrink-0 surface-inset-strong p-4 shadow-sm backdrop-blur-sm dark:bg-white/[0.04]";
+  return "min-w-0 shrink-0 surface-inset-strong p-4 backdrop-blur-sm dark:bg-white/[0.04]";
 }
 
 function pluralize(count: number, singular: string, plural?: string) {
@@ -252,6 +252,7 @@ function SelectedClusterBody({
             className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
             onClick={onAssign}
             disabled={!selectedBookmarkId}
+            title={!selectedBookmarkId ? "Select a bookmark on the graph first" : undefined}
           >
             <Crosshair className="size-4" />
             Assign
@@ -265,6 +266,7 @@ function SelectedClusterBody({
             )}
             onClick={onAddTag}
             disabled={!selectedBookmarkId}
+            title={!selectedBookmarkId ? "Select a bookmark on the graph first" : undefined}
           >
             <TagIcon className="size-4" />
             Tag
@@ -336,6 +338,7 @@ function SelectedClusterBody({
                 className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
                 onClick={onAssign}
                 disabled={!actionState.canAssign}
+                title={!actionState.canAssign ? (actionState.readOnlyReason ?? "Select a bookmark on the graph first") : undefined}
               >
                 <Crosshair className="size-4" />
                 Assign
@@ -349,6 +352,7 @@ function SelectedClusterBody({
                 )}
                 onClick={onAddToCollection}
                 disabled={!actionState.canCollect}
+                title={!actionState.canCollect ? (actionState.readOnlyReason ?? "Select a bookmark on the graph first") : undefined}
               >
                 <Folder className="size-4" />
                 Collect
@@ -524,15 +528,15 @@ function SelectedClusterBody({
           <p className={bodyText}>{node.title}</p>
         )}
         {hasExplicitSelection && (
-          <button
-            type="button"
-            className={cn(
-              "text-xs underline-offset-2 hover:underline",
-              orbitMetaSoft(),
-              "hover:text-foreground"
-            )}
-            onClick={onClearSelection}
-          >
+            <button
+              type="button"
+              className={cn(
+                "text-xs underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+                orbitMetaSoft(),
+                "hover:text-foreground"
+              )}
+              onClick={onClearSelection}
+            >
             Clear selection
           </button>
         )}
@@ -552,7 +556,7 @@ function DashboardLink({ href}: { href: string;  }) {
     <Link
       href={href}
       className={cn(
-        "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors",
+        "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-sm border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         orbitGhostButtonClass()
       )}
     >
@@ -636,7 +640,7 @@ function ConnectedList({
                 <button
                   type="button"
                   onClick={() => onOpenBookmark(b.id)}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                 >
                   <span
                     className={cn(

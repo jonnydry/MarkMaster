@@ -58,8 +58,9 @@ import {
 import { SettingsTagsSection } from "./settings-tags-section";
 import {
   OrbitReadyBadge,
-  SETTINGS_SECTIONS,
   SettingsHero,
+  SettingsMobileNav,
+  SettingsScrollspyProvider,
   SettingsNav,
   SettingsRow,
   SettingsSection,
@@ -243,26 +244,17 @@ export default function SettingsPage() {
                 />
               )}
 
+              <SettingsScrollspyProvider>
               <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:gap-10">
                 <aside className="hidden shrink-0 lg:block lg:w-36">
-                  <SettingsNav className="sticky top-[calc(var(--header-height)+1.25rem)]" />
+                  <SettingsNav
+                    className="sticky top-[calc(var(--header-height)+1.25rem)]"
+                    onNavigate={scrollToSettingsSection}
+                  />
                 </aside>
 
                 <div className="min-w-0 flex-1 space-y-0">
-                  <nav
-                    aria-label="Settings sections"
-                    className="mb-6 flex gap-1 overflow-x-auto pb-0.5 scrollbar-none lg:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  >
-                    {SETTINGS_SECTIONS.map(({ id, label }) => (
-                      <a
-                        key={id}
-                        href={`#${id}`}
-                        className="inline-flex h-8 shrink-0 items-center rounded-sm border border-hairline-soft px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
-                      >
-                        {label}
-                      </a>
-                    ))}
-                  </nav>
+                  <SettingsMobileNav onNavigate={scrollToSettingsSection} />
 
                   <SettingsSection
                     id="connection"
@@ -410,6 +402,7 @@ export default function SettingsPage() {
                   <SettingsTagsSection {...tagsState} tagSearchRef={tagSearchRef} />
                 </div>
               </div>
+              </SettingsScrollspyProvider>
             </div>
           </div>
     </AppPageShell>

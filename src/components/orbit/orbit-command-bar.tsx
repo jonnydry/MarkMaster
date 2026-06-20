@@ -13,7 +13,7 @@ import {
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitPageIdentity } from "@/components/orbit/orbit-page-identity";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
@@ -349,9 +349,9 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 aria-label="Open graph"
                 title="Open graph"
                 className={cn(
-                  "inline-flex shrink-0 items-center justify-center rounded-sm border border-hairline-strong text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-                  compact ? "size-8" : "size-9",
-                  appToolbarSurfaceClassName
+                  buttonVariants({ variant: "outline", size: compact ? "icon" : "icon-lg" }),
+                  appToolbarSurfaceClassName,
+                  compact && "size-8"
                 )}
               >
                 <MapIcon className="size-4 text-primary" aria-hidden />

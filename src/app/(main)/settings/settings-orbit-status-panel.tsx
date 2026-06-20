@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatRow } from "@/components/ui/stat-row";
 import { fetchJson } from "@/lib/fetch-json";
 import { orbitXaiStatusPayloadSchema } from "@/lib/api-response-schemas";
 import { cn } from "@/lib/utils";
@@ -97,20 +98,36 @@ export function OrbitGrokStatusPanel({
       ) : null}
 
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        <OrbitStatusRow
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
+          valueClassName="break-words text-foreground"
           label="Model"
           value={`${status.model}${status.modelSource === "environment" ? " · env" : ""}`}
         />
-        <OrbitStatusRow
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
+          valueClassName="break-words text-foreground"
           label="Privacy"
           value={`${privacyLabel} · ${zeroDataRetentionLabel}`}
         />
-        <OrbitStatusRow
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
+          className={cn(!status.apiKeyConfigured && "text-amber-800 dark:text-amber-100")}
+          valueClassName="break-words text-foreground"
           label="xAI key"
           value={status.apiKeyConfigured ? "Configured" : "Missing"}
-          highlight={!status.apiKeyConfigured}
         />
-        <OrbitStatusRow
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
+          valueClassName="break-words text-foreground"
           label="Endpoint"
           value={`${status.baseUrl}${status.baseUrlSource === "environment" ? " · env" : ""}`}
         />
@@ -127,23 +144,6 @@ export function OrbitGrokStatusPanel({
           Open Orbit queue
         </Link>
       </div>
-    </div>
-  );
-}
-
-function OrbitStatusRow({
-  label,
-  value,
-  highlight = false,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={cn(highlight && "text-amber-800 dark:text-amber-100")}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
     </div>
   );
 }

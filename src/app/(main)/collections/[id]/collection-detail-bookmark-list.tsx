@@ -129,14 +129,15 @@ export function CollectionDetailBookmarkList({
   }
 
   return (
-    <BookmarkList
-      scrollRef={scrollRef}
-      bookmarks={bookmarks}
-      viewMode={viewMode}
-      aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
-      selectionMode={false}
-      selectedBookmarkIdSet={new Set()}
-      activeBookmarkId={activeBookmarkId}
+    <div className={bookmarkCollectionRowWithReorderClassName}>
+      <BookmarkList
+        scrollRef={scrollRef}
+        bookmarks={bookmarks}
+        viewMode={viewMode}
+        aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+        selectionMode={false}
+        selectedBookmarkIdSet={new Set()}
+        activeBookmarkId={activeBookmarkId}
       onSelect={onSelectBookmark}
       onSelectionChange={() => {}}
       onTagClick={() => {}}
@@ -148,6 +149,7 @@ export function CollectionDetailBookmarkList({
       deleteLabel={isSyncedFromX ? undefined : "Remove from collection"}
       disableVirtualization
     />
+    </div>
   );
 }
 

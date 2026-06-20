@@ -17,6 +17,7 @@ import {
   orbitHairlineBorder,
   orbitHoverRowClass,
   orbitLabelClass,
+  orbitMetaMuted,
 } from "@/lib/orbit-route-chrome";
 import { OrbitActionPill } from "./orbit-quick-actions";
 
@@ -154,21 +155,22 @@ export const OrbitListRow = memo(function OrbitListRow({
         <div
           className={cn(
             "flex min-w-0 items-center gap-1.5 truncate text-2xs",
-            "text-muted-foreground dark:text-white/65"
+            "text-muted-foreground",
+            orbitMetaMuted()
           )}
         >
           <span
             className={cn(
               orbitLabelClass(),
               "shrink-0 normal-case font-medium tracking-normal",
-              "text-foreground/90 dark:text-white/90"
+              "text-foreground/90"
             )}
           >
             {author}
           </span>
           {handle ? (
             <>
-              <span className={"text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50"}>
                 ·
               </span>
               <span className={cn(orbitDataClass(), "truncate normal-case")}>
@@ -178,7 +180,7 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
           {timeAgo ? (
             <>
-              <span className={"text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50"}>
                 ·
               </span>
               <span className={cn(orbitDataClass(), "shrink-0 tabular-nums")}>
@@ -188,14 +190,14 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
           {engagement ? (
             <>
-              <span className={"text-muted-foreground/50 dark:text-white/25"}>
+              <span className={"text-muted-foreground/50"}>
                 ·
               </span>
               <span
                 className={cn(
                   orbitDataClass(),
                   "hidden shrink-0 tabular-nums sm:inline",
-                  "text-muted-foreground dark:text-white/50"
+                  orbitMetaMuted()
                 )}
               >
                 {engagement}
@@ -214,9 +216,9 @@ export const OrbitListRow = memo(function OrbitListRow({
           stopClickPropagation
           textClassName={cn(
             "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
-            "text-foreground dark:text-white",
+            "text-foreground",
             queueStatus === "dismissed" &&
-              "line-through decoration-foreground/30 dark:decoration-white/30"
+              "line-through decoration-foreground/30"
           )}
         />
 
@@ -269,7 +271,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 Applied
               </span>
             ) : queueStatus === "dismissed" ? (
-              <span className="text-2xs text-muted-foreground dark:text-white/40">Skipped</span>
+              <span className={cn("text-2xs", orbitMetaMuted())}>Skipped</span>
             ) : null}
           </div>
 
@@ -295,7 +297,8 @@ export const OrbitListRow = memo(function OrbitListRow({
               }}
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-sm border border-transparent transition-colors",
-                "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-primary"
+                "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+                orbitMetaMuted()
               )}
               title="More actions"
               aria-label="More actions"
