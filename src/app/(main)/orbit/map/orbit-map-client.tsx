@@ -10,10 +10,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
-import {
-  appContentInsetClassName,
-  appFeedHeaderFrostedClassName,
-} from "@/lib/app-chrome";
+import { appContentInsetClassName } from "@/lib/app-chrome";
 import { orbitMapStageClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import { PageWatermark } from "@/components/page-watermark";
@@ -194,12 +191,8 @@ export default function OrbitMapPage() {
     >
         <PageHeader
           sticky
-          chromeless
+          feedChrome
           compactable
-          className={cn(
-            "border-b border-hairline-strong",
-            appFeedHeaderFrostedClassName
-          )}
           bodyClassName="px-0 py-0"
         >
           <OrbitMapCommandBar

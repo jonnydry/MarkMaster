@@ -8,7 +8,6 @@ import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
-import { appFeedHeaderFrostedClassName } from "@/lib/app-chrome";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
@@ -184,12 +183,8 @@ function DashboardContent() {
     >
           <PageHeader
             sticky
-            chromeless
+            feedChrome
             compactable
-            className={cn(
-              "border-b border-hairline-strong",
-              appFeedHeaderFrostedClassName
-            )}
             bodyClassName="px-0 py-0"
           >
                 <DashboardToolbar

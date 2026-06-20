@@ -6,6 +6,7 @@ export const MAX_BOOKMARK_QUERY_PAGE = 500;
 export const MAX_BOOKMARK_QUERY_LENGTH = 240;
 export const MAX_BOOKMARK_FILTER_LENGTH = 120;
 export const MAX_TAG_FILTER_IDS = 100;
+export const MAX_TAG_NAME_LENGTH = 50;
 
 const booleanQueryFlagSchema = z
   .enum(["true", "false"])
@@ -81,7 +82,11 @@ const bookmarkTargetSchema = z
   });
 
 export const createTagSchema = z.object({
-  name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Tag name is required")
+    .max(MAX_TAG_NAME_LENGTH, "Tag name too long"),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format")
@@ -98,7 +103,12 @@ export const deleteTagSchema = z.object({
 
 export const patchTagSchema = z.object({
   tagId: idSchema,
-  name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name too long").optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Tag name is required")
+    .max(MAX_TAG_NAME_LENGTH, "Tag name too long")
+    .optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format").optional(),
 }).refine((value) => value.name || value.color, {
   message: "At least one of name or color is required",

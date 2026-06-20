@@ -7,15 +7,12 @@ import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import {
   appContentGutterClassName,
+  appFeedHeaderFrostedClassName,
   appToolbarSurfaceClassName,
   appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
-import {
-  CompactFloatingSearchStrip,
-  CompactSearchTrigger,
-} from "@/components/compact-floating-search";
-import { useCompactFloatingSearch } from "@/hooks/use-compact-floating-search";
+import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
@@ -75,9 +72,6 @@ export function DashboardToolbar({
   user,
 }: DashboardToolbarProps) {
   const { compact } = usePageHeaderCompact();
-  const { expanded: searchExpanded, toggle: toggleSearch, closeIfEmpty } =
-    useCompactFloatingSearch(compact, search, searchInputRef);
-  const hasSearchQuery = search.trim().length > 0;
 
   const searchField = (
     <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
@@ -87,7 +81,7 @@ export function DashboardToolbar({
         value={search}
         onChange={onSearchChange}
         placeholder="Search bookmarks, authors, notes..."
-        inputClassName={compact ? "h-8" : "h-9"}
+        inputClassName="h-9"
       />
     </div>
   );
@@ -180,48 +174,44 @@ export function DashboardToolbar({
       <PageHeaderCompactToggle
         className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
       />
-
-      {user ? (
-        <div className={cn("shrink-0", !compact && "sm:hidden")}>
-          <UserNavDynamic user={user} />
-        </div>
-      ) : null}
     </>
   );
 
+  const userNav = user ? (
+    <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
+  ) : null;
+
   if (compact) {
     return (
-      <div
-        className={cn("dashboard-toolbar min-w-0 py-1", appContentGutterClassName)}
-        data-compact-search-expanded={searchExpanded ? "" : undefined}
-      >
-        <div className="flex min-w-0 items-center gap-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:max-w-[38%] md:shrink [&::-webkit-scrollbar]:hidden">
-            <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-            {primaryFilterChip}
-            {tagFilterChips}
-          </div>
+      <>
+        <div
+          className={cn(
+            "border-b border-hairline-strong",
+            appFeedHeaderFrostedClassName
+          )}
+        >
+          <div
+            className={cn(
+              "dashboard-toolbar flex min-w-0 items-center gap-1.5 py-0.5",
+              appContentGutterClassName
+            )}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+              {primaryFilterChip}
+              {tagFilterChips}
+            </div>
 
-          <CompactSearchTrigger
-            onToggle={toggleSearch}
-            expanded={searchExpanded}
-            hasQuery={hasSearchQuery}
-          />
+            <div className="flex min-w-0 shrink items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {toolbarActions}
+            </div>
 
-          <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {toolbarActions}
+            {userNav ? <div className="shrink-0">{userNav}</div> : null}
           </div>
         </div>
 
-        <CompactFloatingSearchStrip
-          expanded={searchExpanded}
-          search={search}
-          onSearchChange={onSearchChange}
-          searchInputRef={searchInputRef}
-          placeholder="Search bookmarks, authors, notes..."
-          onCloseIfEmpty={closeIfEmpty}
-        />
-      </div>
+        <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
+      </>
     );
   }
 
@@ -244,7 +234,10 @@ export function DashboardToolbar({
           {filterChips}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">{toolbarActions}</div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {toolbarActions}
+          {userNav ? <div className="shrink-0 sm:hidden">{userNav}</div> : null}
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,11 @@ import type { ComponentProps, ReactNode } from "react";
 import { useRef } from "react";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { useStickyHeaderHeight } from "@/hooks/use-sticky-header-height";
-import { appChromeFrostedClassName, appContentGutterClassName } from "@/lib/app-chrome";
+import {
+  appChromeFrostedClassName,
+  appContentGutterClassName,
+  appFeedHeaderFrostedClassName,
+} from "@/lib/app-chrome";
 import { bookmarkFeedMaxWidthClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
@@ -22,6 +26,12 @@ type PageHeaderProps = Omit<ComponentProps<"header">, "title"> & {
   chromeless?: boolean;
   /** Show a compact-header toggle; only affects header chrome and toolbar children. */
   compactable?: boolean;
+  /**
+   * Feed-surface chrome (dashboard / Orbit toolbars). Applies the lighter frosted
+   * header background + hairline. When compact, the header itself goes transparent
+   * so the toolbar can paint its own bar and the search bubble floats below it.
+   */
+  feedChrome?: boolean;
 };
 
 export function PageHeader({
@@ -37,6 +47,7 @@ export function PageHeader({
   sticky = false,
   chromeless = false,
   compactable = false,
+  feedChrome = false,
   ...props
 }: PageHeaderProps) {
   const t = useTypography();
@@ -45,11 +56,16 @@ export function PageHeader({
   useStickyHeaderHeight(sticky, headerRef);
   const isCompact = compactable && compact;
   const hasHeaderRow = title || description || leading || actions;
+  const chromeClassName = feedChrome
+    ? isCompact
+      ? "border-b-0 bg-transparent"
+      : cn("border-b border-hairline-strong", appFeedHeaderFrostedClassName)
+    : chromeless
+      ? "border-b-0 bg-transparent"
+      : cn("border-b border-hairline-strong", appChromeFrostedClassName);
   const mergedHeaderClassName = cn(
     "shrink-0",
-    chromeless
-      ? "border-b-0 bg-transparent"
-      : cn("border-b border-hairline-strong", appChromeFrostedClassName),
+    chromeClassName,
     sticky && "sticky top-0 z-[var(--z-sticky-header)]",
     className
   );
@@ -63,8 +79,10 @@ export function PageHeader({
     >
       <div
         className={cn(
-          appContentGutterClassName,
-          isCompact ? "py-1.5" : "py-3",
+          // Feed surfaces self-gutter (toolbar / filter panel / search bubble),
+          // so the body wrapper stays edge-to-edge — the bar chrome can span full
+          // width. Other surfaces get the standard gutter + vertical rhythm.
+          feedChrome ? undefined : cn(appContentGutterClassName, isCompact ? "py-1.5" : "py-3"),
           bodyClassName
         )}
       >

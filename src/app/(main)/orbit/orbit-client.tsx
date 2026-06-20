@@ -48,10 +48,7 @@ import {
   orbitLabelClass,
   orbitSelectionBarClass,
 } from "@/lib/orbit-route-chrome";
-import {
-  appContentGutterClassName,
-  appFeedHeaderFrostedClassName,
-} from "@/lib/app-chrome";
+import { appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { useOrbitPage } from "@/hooks/use-orbit-page";
 import { cn } from "@/lib/utils";
@@ -240,12 +237,8 @@ export default function OrbitPage() {
     >
           <PageHeader
             sticky
-            chromeless
+            feedChrome
             compactable
-            className={cn(
-              "border-b border-hairline-strong",
-              appFeedHeaderFrostedClassName
-            )}
             bodyClassName="px-0 py-0"
           >
             <OrbitCommandBar

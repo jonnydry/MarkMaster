@@ -58,7 +58,9 @@ describe("AddTagDialog", () => {
     const props = renderDialog();
 
     await user.type(screen.getByPlaceholderText(/filter tags/i), "newtopic");
-    await user.click(screen.getByRole("button", { name: /create .newtopic./i }));
+    await user.click(
+      screen.getByRole("button", { name: /create tag .newtopic./i })
+    );
 
     expect(props.onAddTag).toHaveBeenCalledTimes(1);
     const [ids, name, color] = props.onAddTag.mock.calls[0];
@@ -76,6 +78,17 @@ describe("AddTagDialog", () => {
 
     await user.click(applied);
     expect(props.onRemoveTag).toHaveBeenCalledWith(["b1"], "t2");
+  });
+
+  it("rejects tag names longer than the server limit", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const input = screen.getByPlaceholderText(/filter tags/i);
+    const longName = "a".repeat(51);
+    await user.type(input, longName);
+
+    expect(input).toHaveValue("a".repeat(50));
   });
 
   it("keeps sibling chips enabled while one tag is pending", async () => {

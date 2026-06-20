@@ -22,6 +22,7 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { ToolbarIconButton, ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import {
   appContentGutterClassName,
+  appFeedHeaderFrostedClassName,
   appToolbarSurfaceClassName,
   appToolbarSurfaceGroupClassName,
   appToolbarSurfaceShellClassName,
@@ -39,11 +40,7 @@ import {
 } from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
-import {
-  CompactFloatingSearchStrip,
-  CompactSearchTrigger,
-} from "@/components/compact-floating-search";
-import { useCompactFloatingSearch } from "@/hooks/use-compact-floating-search";
+import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import type { DbUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -148,10 +145,20 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
   ) {
     const scanBusy = queueIsLoading || scanning;
     const { compact } = usePageHeaderCompact();
-    const { expanded: searchExpanded, toggle: toggleSearch, closeIfEmpty } =
-      useCompactFloatingSearch(compact, search, searchRef);
-    const hasSearchQuery = search.trim().length > 0;
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
+
+    const searchField = (
+      <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
+        <SearchBar
+          ref={searchRef}
+          glass
+          value={search}
+          onChange={onSearchChange}
+          placeholder="Search Orbit by author, text, or notes…"
+          inputClassName="h-9"
+        />
+      </div>
+    );
     const reviewLabel =
       scanPlanSuggestionCount === 1
         ? "Review 1"
@@ -162,10 +169,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       <div
         className={cn(
           "orbit-toolbar relative min-w-0",
-          compact ? "space-y-1 py-1" : "space-y-1.5 py-1.5",
-          appContentGutterClassName
+          compact ? "" : cn("space-y-1.5 py-1.5", appContentGutterClassName)
         )}
-        data-compact-search-expanded={compact && searchExpanded ? "" : undefined}
         aria-busy={scanning}
       >
         {scanning ? <ScrollingProgressBar className="absolute inset-x-0 top-0" /> : null}
@@ -173,45 +178,25 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         <div
           className={
             compact
-              ? "flex flex-col gap-1.5 md:flex-row md:items-center md:gap-2"
+              ? cn(
+                  "flex flex-col gap-1.5 py-0.5 md:flex-row md:items-center md:gap-2 border-b border-hairline-strong",
+                  appFeedHeaderFrostedClassName,
+                  appContentGutterClassName
+                )
               : "contents"
           }
         >
           <div
             className={cn(
               "flex items-center gap-1.5",
-              compact && "md:max-w-xs lg:max-w-sm"
+              compact && "md:hidden"
             )}
           >
             {mobileSidebar ? <div className="shrink-0 md:hidden">{mobileSidebar}</div> : null}
 
             {!compact ? <OrbitPageIdentity queueTotal={total} /> : null}
 
-            {compact ? (
-              <CompactSearchTrigger
-                onToggle={toggleSearch}
-                expanded={searchExpanded}
-                hasQuery={hasSearchQuery}
-              />
-            ) : (
-              <div className="min-w-0 flex-1">
-                <div
-                  className={cn(
-                    highlightSearchShellClass,
-                    appToolbarSurfaceShellClassName
-                  )}
-                >
-                  <SearchBar
-                    ref={searchRef}
-                    glass
-                    value={search}
-                    onChange={onSearchChange}
-                    placeholder="Search Orbit by author, text, or notes…"
-                    inputClassName="h-9"
-                  />
-                </div>
-              </div>
-            )}
+            {!compact ? <div className="min-w-0 flex-1">{searchField}</div> : null}
 
             {user ? (
               <div
@@ -220,7 +205,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                   compact && "md:hidden"
                 )}
               >
-                <UserNavDynamic user={user} />
+                <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
               </div>
             ) : null}
           </div>
@@ -386,7 +371,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
 
               {user ? (
                 <div className={cn("shrink-0", compact ? "hidden md:block" : "sm:hidden")}>
-                  <UserNavDynamic user={user} />
+                  <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
                 </div>
               ) : null}
             </div>
@@ -395,14 +380,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         </div>
 
         {compact ? (
-          <CompactFloatingSearchStrip
-            expanded={searchExpanded}
-            search={search}
-            onSearchChange={onSearchChange}
-            searchInputRef={searchRef}
-            placeholder="Search Orbit by author, text, or notes…"
-            onCloseIfEmpty={closeIfEmpty}
-          />
+          <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
         ) : null}
 
         {canSelect && !compact ? (
@@ -428,6 +406,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <div
             className={cn(
               "mt-2 rounded-sm border border-hairline-soft p-3",
+              compact && "mx-4 sm:mx-5",
               appToolbarSurfaceClassName
             )}
           >

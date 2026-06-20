@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";
 
 const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] = [
+  { value: "grid", label: "Grid", icon: Grid3x3 },
   { value: "feed", label: "Feed", icon: LayoutList },
   { value: "compact", label: "Compact", icon: AlignJustify },
-  { value: "grid", label: "Grid", icon: Grid3x3 },
 ];
 
 type ViewModeControlsProps = {

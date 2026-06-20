@@ -21,9 +21,11 @@ import type { DbUser } from "@/lib/auth";
 
 interface UserNavProps {
   user: DbUser;
+  /** Avatar size for the trigger. Defaults to "xl"; compact headers use "lg". */
+  avatarSize?: "default" | "lg" | "xl";
 }
 
-export function UserNav({ user }: UserNavProps) {
+export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
   const { theme, toggleTheme } = useTheme();
   const { typographyPreset, setTypographyPreset } = useFontMode();
   const { colorTheme, setColorTheme } = useColorTheme();
@@ -37,7 +39,7 @@ export function UserNav({ user }: UserNavProps) {
           "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
       >
-        <Avatar size="xl" className="shrink-0">
+        <Avatar size={avatarSize} className="shrink-0">
           {user.profileImageUrl ? (
             <AvatarImage
               src={user.profileImageUrl}

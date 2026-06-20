@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
+import { Compass, Sparkles, RotateCcw, Plus, RefreshCw, EyeOff } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import {
@@ -18,6 +18,7 @@ import {
   type DashboardDiscoveryParentData,
 } from "@/hooks/use-dashboard-discovery";
 import { useTypography } from "@/hooks/use-typography";
+import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
@@ -49,10 +50,12 @@ function DiscoveryFeedHeader({
   meta,
   hint,
   actions,
+  onHide,
 }: {
   meta?: string;
   hint?: string;
   actions: ReactNode;
+  onHide?: () => void;
 }) {
   const t = useTypography();
 
@@ -79,7 +82,59 @@ function DiscoveryFeedHeader({
           ) : null}
         </p>
       </div>
-      {actions}
+      <div className="flex shrink-0 items-center gap-1">
+        {actions}
+        {onHide ? (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Hide Discovery"
+            title="Hide Discovery"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm border border-hairline-soft text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+          >
+            <EyeOff className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DiscoveryRestoreBar({
+  meta,
+  onShow,
+  className,
+}: {
+  meta?: string;
+  onShow: () => void;
+  className?: string;
+}) {
+  const t = useTypography();
+
+  return (
+    <div className={cn(bookmarkFeedColumnClassName, "w-full pt-0.5 pb-2", className)}>
+      <button
+        type="button"
+        onClick={onShow}
+        aria-label="Show Discovery"
+        className="group flex w-full items-center gap-1.5 rounded-sm border border-hairline-soft px-2.5 py-1.5 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
+          <Compass className="size-3" aria-hidden />
+        </span>
+        <p className={cn(t.sectionLabel, "min-w-0 truncate text-muted-foreground")}>
+          <span className="text-primary/70">Discovery</span>
+          <span className="mx-1 text-muted-foreground/35" aria-hidden>
+            ·
+          </span>
+          <span className="font-normal normal-case tracking-normal text-muted-foreground/65">
+            {meta ? `${meta} hidden` : "hidden"}
+          </span>
+        </p>
+        <span className="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 transition-colors group-hover:text-foreground">
+          Show
+        </span>
+      </button>
     </div>
   );
 }
@@ -180,6 +235,10 @@ export function DashboardDiscovery({
   const shellClass = variantShellClass[variant];
   const isFeedIntegrated = variant === "default";
 
+  // Hide/restore is only offered on the dashboard feed strip, not the flush module.
+  const { hidden, setHidden } = useDiscoveryHidden();
+  const canHide = isFeedIntegrated;
+
   const {
     nurturedCount,
     celebration,
@@ -218,6 +277,8 @@ export function DashboardDiscovery({
       : undefined;
 
   if (isLoading) {
+    // Don't surface a loading skeleton for a hidden module.
+    if (hidden && canHide) return null;
     return (
       <div
         className={cn(shellClass, "space-y-2", className)}
@@ -236,6 +297,7 @@ export function DashboardDiscovery({
   }
 
   if (hasError) {
+    if (hidden && canHide) return null;
     return (
       <ErrorState
         layout="inline"
@@ -248,6 +310,17 @@ export function DashboardDiscovery({
 
   const showModule = discoveryCarouselItems.length > 0 || ritualTotal > 0;
   if (!showModule) return null;
+
+  // Hidden: collapse to a slim restore row instead of the full strip.
+  if (hidden && canHide) {
+    return (
+      <DiscoveryRestoreBar
+        meta={feedMetaLine}
+        onShow={() => setHidden(false)}
+        className={cn("border-b border-hairline-soft", className)}
+      />
+    );
+  }
 
   const hasRitual = ritualTotal > 0;
   const headerActions = (
@@ -364,6 +437,7 @@ export function DashboardDiscovery({
           meta={feedMetaLine}
           hint={explainer ?? defaultExplainer}
           actions={headerActions}
+          onHide={canHide ? () => setHidden(true) : undefined}
         />
         {celebration ? (
           <DiscoveryCelebration celebration={celebration} className="mb-1.5" />

@@ -5,12 +5,16 @@ import { useCallback, useSyncExternalStore } from "react";
 const STORAGE_KEY = "markmaster-page-header-compact";
 const CHANGE_EVENT = "markmaster-page-header-compact-change";
 
+/** Compact is the default header layout; only an explicit opt-out ("false") disables it. */
+const DEFAULT_COMPACT = true;
+
 function readStoredCompact(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return DEFAULT_COMPACT;
   try {
-    return localStorage.getItem(STORAGE_KEY) === "true";
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === null ? DEFAULT_COMPACT : stored === "true";
   } catch {
-    return false;
+    return DEFAULT_COMPACT;
   }
 }
 
@@ -44,7 +48,7 @@ export function usePageHeaderCompact() {
   const storedCompact = useSyncExternalStore(
     subscribeStoredCompact,
     readStoredCompact,
-    () => false
+    () => DEFAULT_COMPACT
   );
 
   const hydrated = useSyncExternalStore(
@@ -53,7 +57,9 @@ export function usePageHeaderCompact() {
     () => false
   );
 
-  const compact = hydrated ? storedCompact : false;
+  // Render the default during SSR + hydration so the common (default) case never
+  // flashes; only an explicit opt-out re-renders once after hydration.
+  const compact = hydrated ? storedCompact : DEFAULT_COMPACT;
 
   const setCompact = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
     writeStoredCompact(

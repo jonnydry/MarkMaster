@@ -15,6 +15,7 @@ import { PRESET_COLORS } from "@/lib/constants";
 import { highlightActiveClass, highlightIdleClass, highlightInteractiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { getBalancedTagColor } from "@/lib/tag-colors";
+import { MAX_TAG_NAME_LENGTH } from "@/lib/validations";
 import { useTypography } from "@/hooks/use-typography";
 import type { TagWithCount } from "@/types";
 
@@ -64,7 +65,11 @@ export function AddTagDialog({
     () => existingTags.find((tag) => tag.name.toLowerCase() === query),
     [existingTags, query]
   );
-  const canCreate = name.trim().length > 0 && !exactMatch;
+  const trimmedName = name.trim();
+  const canCreate = trimmedName.length > 0 && !exactMatch;
+  const createButtonLabel = trimmedName
+    ? `Create “${trimmedName}”`
+    : "Create";
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -95,7 +100,7 @@ export function AddTagDialog({
     if (!canCreate || bookmarkIds.length === 0) return;
     setAddingNew(true);
     try {
-      await onAddTag(bookmarkIds, name.trim(), color);
+      await onAddTag(bookmarkIds, trimmedName, color);
       setName("");
       setManualColor(null);
     } finally {
@@ -105,7 +110,7 @@ export function AddTagDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="min-w-0 overflow-x-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {isBulk ? `Tag ${bookmarkIds.length} bookmarks` : "Manage Tags"}
@@ -123,6 +128,14 @@ export function AddTagDialog({
             placeholder={
               existingTags.length > 0 ? "Filter tags or create new…" : "Tag name"
             }
+            aria-label={
+              existingTags.length > 0
+                ? "Filter tags or enter a new tag name"
+                : "Tag name"
+            }
+            maxLength={MAX_TAG_NAME_LENGTH}
+            autoComplete="off"
+            spellCheck={false}
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               if (exactMatch) {
@@ -148,7 +161,7 @@ export function AddTagDialog({
                           aria-pressed={isApplied}
                           disabled={isPending}
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-60",
+                            "inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-sm border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-60",
                             isApplied
                               ? highlightActiveClass
                               : cn(
@@ -168,7 +181,7 @@ export function AddTagDialog({
                               aria-hidden
                             />
                           )}
-                          {tag.name}
+                          <span className="min-w-0 truncate">{tag.name}</span>
                           {isApplied && !isPending && (
                             <Check className="h-3 w-3" aria-hidden />
                           )}
@@ -178,7 +191,9 @@ export function AddTagDialog({
                   </div>
                 ) : (
                   <p className="py-1 text-xs text-muted-foreground">
-                    No tags match &ldquo;{name.trim()}&rdquo;.
+                    No tags match &ldquo;
+                    <span className="break-all">{trimmedName}</span>
+                    &rdquo;.
                   </p>
                 )}
               </div>
@@ -207,17 +222,20 @@ export function AddTagDialog({
                   />
                 ))}
               </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleAdd}
-                  disabled={!canCreate || addingNew}
-                >
-                  {addingNew && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                  {name.trim()
-                    ? `Create “${name.trim()}”`
-                    : "Create"}
-                </Button>
-              </div>
+              <Button
+                type="button"
+                className="w-full min-w-0 shrink"
+                onClick={handleAdd}
+                disabled={!canCreate || addingNew}
+                aria-label={
+                  trimmedName ? `Create tag “${trimmedName}”` : "Create tag"
+                }
+              >
+                {addingNew && (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 shrink-0 animate-spin" />
+                )}
+                <span className="truncate">{createButtonLabel}</span>
+              </Button>
             </div>
           )}
         </div>

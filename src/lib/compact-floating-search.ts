@@ -1,13 +1,13 @@
 import type { RefObject } from "react";
 
-/** Dispatched when a surface should open its compact floating search strip. */
-export const COMPACT_SEARCH_FOCUS_EVENT = "markmaster-compact-search-focus";
-
-/** Opens compact search when collapsed; focuses the inline search input when visible. */
+/**
+ * Focuses the search input. The compact floating search bubble is always
+ * visible, so this simply moves focus to it (or to the inline search bar when
+ * the header is not compact).
+ */
 export function requestCompactSearchFocus(
   searchInputRef?: RefObject<HTMLInputElement | null> | null
 ) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(COMPACT_SEARCH_FOCUS_EVENT));
   searchInputRef?.current?.focus();
 }

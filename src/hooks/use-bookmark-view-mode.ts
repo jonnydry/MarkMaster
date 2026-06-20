@@ -5,8 +5,8 @@ import type { ViewMode } from "@/types";
 
 const STORAGE_KEY = "markmaster-bookmark-view-mode";
 
-function readStoredViewMode(): ViewMode {
-  if (typeof window === "undefined") return "feed";
+function readStoredViewMode(fallback: ViewMode): ViewMode {
+  if (typeof window === "undefined") return fallback;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "feed" || stored === "compact" || stored === "grid") {
@@ -15,7 +15,7 @@ function readStoredViewMode(): ViewMode {
   } catch {
     // ignore storage errors
   }
-  return "feed";
+  return fallback;
 }
 
 const listeners = new Set<() => void>();
@@ -27,12 +27,15 @@ function subscribe(callback: () => void) {
   };
 }
 
-/** Shared feed / compact / grid preference across bookmark surfaces. */
-export function useBookmarkViewMode() {
+/**
+ * Shared feed / compact / grid preference across bookmark surfaces. `defaultViewMode`
+ * is the fallback before the user has made an explicit choice (persisted across surfaces).
+ */
+export function useBookmarkViewMode(defaultViewMode: ViewMode = "feed") {
   const viewMode = useSyncExternalStore(
     subscribe,
-    readStoredViewMode,
-    () => "feed" as ViewMode
+    () => readStoredViewMode(defaultViewMode),
+    () => defaultViewMode
   );
 
   const setViewMode = useCallback((mode: ViewMode) => {

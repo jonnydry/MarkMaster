@@ -9,6 +9,9 @@ const UserNavLazy = dynamic(
 );
 
 /** User menu: client-only mount avoids SSR/hydration mismatches from Radix + theme in the shell header. */
-export function UserNavDynamic(props: { user: DbUser }) {
+export function UserNavDynamic(props: {
+  user: DbUser;
+  avatarSize?: "default" | "lg" | "xl";
+}) {
   return <UserNavLazy {...props} />;
 }
