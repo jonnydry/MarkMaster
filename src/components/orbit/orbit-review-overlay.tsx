@@ -205,6 +205,7 @@ export function OrbitReviewOverlay({
                 bookmarkKey={activeBookmark.id}
                 variant="feed"
                 priorityMedia
+                expandMedia
                 stopClickPropagation
                 className="mt-5"
                 textClassName="whitespace-pre-wrap break-words text-[17px] leading-8 text-foreground"

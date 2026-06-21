@@ -36,11 +36,26 @@ export function OrbitMapStatsStrip({
           </>
         )}
       </div>
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-center gap-2.5 px-2 py-1 lg:hidden">
+      <div
+        className={cn(
+          orbitMapFloatingShellClass(),
+          "pointer-events-none absolute right-3 top-3 z-10 flex max-w-[calc(100%-7.5rem)] items-center gap-3 overflow-x-auto px-2.5 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:max-w-[calc(100%-14rem)] lg:hidden [&::-webkit-scrollbar]:hidden"
+        )}
+      >
         <CompactMetric label="Loose" value={stats.looseBookmarks} />
+        <MapMetricDivider />
         <CompactMetric label="Tags" value={stats.tagCount} />
-        <CompactMetric label="Collections" value={stats.userCollectionCount + stats.xFolderCount} />
-        {truncatedCount > 0 && <CompactMetric label="Hidden" value={truncatedCount} />}
+        <MapMetricDivider />
+        <CompactMetric
+          label="Collections"
+          value={stats.userCollectionCount + stats.xFolderCount}
+        />
+        {truncatedCount > 0 ? (
+          <>
+            <MapMetricDivider />
+            <CompactMetric label="Hidden" value={truncatedCount} />
+          </>
+        ) : null}
       </div>
     </>
   );
@@ -66,14 +81,16 @@ function MapMetric({
 }
 
 function MapMetricDivider() {
-  return <span className="h-6 w-px bg-hairline-soft" />;
+  return <span className="h-4 w-px shrink-0 bg-hairline-soft" />;
 }
 
 function CompactMetric({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex items-center gap-1 text-2xs text-muted-foreground/80">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-2xs text-muted-foreground/80">
       <span className="font-medium uppercase tracking-[0.14em]">{label}</span>
-      <span className="tabular-nums font-semibold text-foreground/85">{value.toLocaleString()}</span>
+      <span className="font-semibold tabular-nums text-foreground/85">
+        {value.toLocaleString()}
+      </span>
     </span>
   );
 }

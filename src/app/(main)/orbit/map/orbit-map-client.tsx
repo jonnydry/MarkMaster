@@ -296,7 +296,6 @@ export default function OrbitMapPage() {
                 onNodeDropped={handleNodeDropped}
                 focus={focus}
                 className="h-full w-full"
-                filterControlsClassName="left-4 top-4"
                 zoomControlsClassName="bottom-[calc(30dvh+1.25rem)] right-4 lg:bottom-4"
               />
             ) : null}

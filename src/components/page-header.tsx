@@ -64,7 +64,7 @@ export function PageHeader({
       ? "border-b-0 bg-transparent"
       : cn("border-b border-hairline-strong", appChromeFrostedClassName);
   const mergedHeaderClassName = cn(
-    "shrink-0",
+    "w-full min-w-0 shrink-0",
     chromeClassName,
     sticky && "sticky top-0 z-[var(--z-sticky-header)]",
     className
@@ -82,7 +82,7 @@ export function PageHeader({
           // Feed surfaces self-gutter (toolbar / filter panel / search bubble),
           // so the body wrapper stays edge-to-edge — the bar chrome can span full
           // width. Other surfaces get the standard gutter + vertical rhythm.
-          feedChrome ? undefined : cn(appContentGutterClassName, isCompact ? "py-1.5" : "py-3"),
+          feedChrome ? "w-full min-w-0" : cn(appContentGutterClassName, isCompact ? "py-1.5" : "py-3"),
           bodyClassName
         )}
       >

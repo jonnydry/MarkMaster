@@ -19,6 +19,8 @@ export interface BookmarkPostPreviewProps {
   stopClickPropagation?: boolean;
   /** Render media only (text shown elsewhere). */
   mediaOnly?: boolean;
+  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  expandMedia?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function BookmarkPostPreview({
   galleryClassName,
   stopClickPropagation,
   mediaOnly = false,
+  expandMedia = false,
 }: BookmarkPostPreviewProps) {
   const hasMedia = Boolean(media?.length);
 
@@ -51,6 +54,7 @@ export function BookmarkPostPreview({
         priority={priorityMedia}
         stopClickPropagation={stopClickPropagation}
         className={galleryClassName}
+        expandSingle={expandMedia}
       />
     ) : null;
 

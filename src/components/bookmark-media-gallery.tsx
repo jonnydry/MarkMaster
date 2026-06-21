@@ -97,6 +97,8 @@ interface MediaTileProps {
   mode: TileMode;
   onActivate: () => void;
   showCountOverlay?: number;
+  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  expandSingle?: boolean;
 }
 
 function MediaTile({
@@ -112,6 +114,7 @@ function MediaTile({
   mode,
   onActivate,
   showCountOverlay,
+  expandSingle,
 }: MediaTileProps) {
   const poster = getMediaPosterUrl(item);
   const isCompact = Boolean(layout.compactTileClass);
@@ -171,11 +174,15 @@ function MediaTile({
 
   if (!poster || imageError.has(poster)) return null;
 
-  const imageClass = cn(
-    "w-full object-cover",
-    layout.compactTileClass,
-    !isCompact && (singleInGallery ? layout.singleTileClass : layout.multiTileClass)
-  );
+  // Expanded single image (overlay): show the whole picture at natural aspect.
+  const expandedSingle = !isCompact && singleInGallery && Boolean(expandSingle);
+  const imageClass = expandedSingle
+    ? "h-auto w-full"
+    : cn(
+        "w-full object-cover",
+        layout.compactTileClass,
+        !isCompact && (singleInGallery ? layout.singleTileClass : layout.multiTileClass)
+      );
 
   if (videoLike) {
     return (
@@ -265,6 +272,8 @@ export interface BookmarkMediaGalleryProps {
   /** When set, video without playback_url opens this tweet on X. */
   tweetLink?: BookmarkTweetLink;
   stopClickPropagation?: boolean;
+  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  expandSingle?: boolean;
 }
 
 export function BookmarkMediaGallery({
@@ -276,6 +285,7 @@ export function BookmarkMediaGallery({
   className,
   tweetLink,
   stopClickPropagation = false,
+  expandSingle = false,
 }: BookmarkMediaGalleryProps) {
   const layout = LAYOUT[variant];
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -397,6 +407,7 @@ export function BookmarkMediaGallery({
             mode={getMode(item, tileKey)}
             onActivate={() => handleActivate(item, tileKey)}
             showCountOverlay={showCountOverlay}
+            expandSingle={expandSingle}
           />
         );
       })}

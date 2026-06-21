@@ -7,17 +7,11 @@ import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 
 type CompactFloatingSearchBubbleProps = {
-  /** The search field to float — provides its own shell (border + surface). */
   children: ReactNode;
   className?: string;
 };
 
-/**
- * Always-visible search "bubble" that floats just below the compact header bar.
- * Rendered inside the sticky (now transparent) header region so it stays pinned
- * while scrolling, but sits on its own — feed content scrolls behind it. Centers
- * on the feed column to mirror the inline search bar it replaces.
- */
+/** Search bubble pinned below the compact feed toolbar; centered on the feed column. */
 export function CompactFloatingSearchBubble({
   children,
   className,
@@ -25,7 +19,7 @@ export function CompactFloatingSearchBubble({
   return (
     <div
       className={cn(
-        "min-w-0 w-full max-w-full pt-2 pb-1 animate-slide-down-fade motion-reduce:animate-none",
+        "w-full min-w-0 pt-2 pb-1 animate-slide-down-fade motion-reduce:animate-none",
         appContentGutterClassName,
         className
       )}

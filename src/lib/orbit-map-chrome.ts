@@ -17,7 +17,7 @@ export function orbitMapFloatingMenuClass(extra?: string) {
 
 export function orbitMapControlButtonClass(active: boolean) {
   return cn(
-    "pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium transition-colors backdrop-blur-xl focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+    "pointer-events-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-transparent px-2.5 text-xs font-medium whitespace-nowrap transition-colors backdrop-blur-xl focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
     active
       ? "border-hairline-soft bg-accent-soft text-foreground"
       : "text-muted-foreground hover:bg-accent-soft/60 hover:text-foreground"

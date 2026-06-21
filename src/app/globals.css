@@ -661,8 +661,9 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .dashboard-toolbar {
-    container-type: inline-size;
+  .feed-toolbar,
+  .dashboard-toolbar,
+  .orbit-toolbar {
     min-width: 0;
     max-width: 100%;
   }

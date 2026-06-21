@@ -6,11 +6,13 @@ import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import {
-  appContentGutterClassName,
-  appFeedHeaderFrostedClassName,
-  appToolbarSurfaceClassName,
-  appToolbarSurfaceShellClassName,
-} from "@/lib/app-chrome";
+  FeedCompactToolbarShell,
+  FeedSearchFieldShell,
+  FeedToolbarControlsRow,
+  FeedToolbarRow,
+  FeedToolbarSearchRow,
+} from "@/components/feed-toolbar-layout";
+import { appContentGutterClassName, appToolbarSurfaceClassName } from "@/lib/app-chrome";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
@@ -19,7 +21,6 @@ import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
 import {
   highlightActiveClass,
   highlightInteractiveClass,
-  highlightSearchShellClass,
 } from "@/lib/highlight-chrome";
 import type { DbUser } from "@/lib/auth";
 import type { SortField, TagWithCount, ViewMode } from "@/types";
@@ -74,7 +75,7 @@ export function DashboardToolbar({
   const { compact } = usePageHeaderCompact();
 
   const searchField = (
-    <div className={cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)}>
+    <FeedSearchFieldShell>
       <SearchBar
         ref={searchInputRef}
         glass
@@ -83,7 +84,7 @@ export function DashboardToolbar({
         placeholder="Search bookmarks, authors, notes..."
         inputClassName="h-9"
       />
-    </div>
+    </FeedSearchFieldShell>
   );
 
   const primaryFilterChip = (
@@ -184,61 +185,35 @@ export function DashboardToolbar({
   if (compact) {
     return (
       <>
-        <div
-          className={cn(
-            "border-b border-hairline-strong",
-            appFeedHeaderFrostedClassName
-          )}
-        >
-          <div
-            className={cn(
-              "dashboard-toolbar flex min-w-0 items-center gap-1.5 py-0.5",
-              appContentGutterClassName
-            )}
-          >
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-              {primaryFilterChip}
-              {tagFilterChips}
-            </div>
-
-            <div className="flex min-w-0 shrink items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {toolbarActions}
-            </div>
-
-            {userNav ? <div className="shrink-0">{userNav}</div> : null}
-          </div>
-        </div>
-
+        <FeedCompactToolbarShell>
+          <FeedToolbarRow
+            leading={
+              <>
+                <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+                {filterChips}
+              </>
+            }
+            actions={toolbarActions}
+            userNav={userNav}
+          />
+        </FeedCompactToolbarShell>
         <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
       </>
     );
   }
 
   return (
-    <div className={cn("dashboard-toolbar py-2", appContentGutterClassName)}>
-      <div className="flex items-center gap-2">
-        <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-
-        <div className="min-w-0 flex-1">{searchField}</div>
-
-        {user ? (
-          <div className="hidden shrink-0 sm:block">
-            <UserNavDynamic user={user} />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-2 flex min-w-0 items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {filterChips}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5">
-          {toolbarActions}
-          {userNav ? <div className="shrink-0 sm:hidden">{userNav}</div> : null}
-        </div>
-      </div>
+    <div className={cn("feed-toolbar py-2", appContentGutterClassName)}>
+      <FeedToolbarSearchRow
+        leading={<div className="shrink-0 md:hidden">{mobileSidebar}</div>}
+        search={searchField}
+        userNav={userNav}
+      />
+      <FeedToolbarControlsRow
+        leading={filterChips}
+        actions={toolbarActions}
+        mobileUserNav={userNav}
+      />
     </div>
   );
 }

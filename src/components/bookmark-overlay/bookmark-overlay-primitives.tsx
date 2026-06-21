@@ -339,6 +339,7 @@ export function BookmarkOverlayPostColumn({
         bookmarkKey={bookmark.id}
         variant="feed"
         priorityMedia
+        expandMedia
         stopClickPropagation
         className="mt-5"
         textClassName={textClassName}

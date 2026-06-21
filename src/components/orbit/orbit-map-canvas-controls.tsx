@@ -39,7 +39,7 @@ export function OrbitMapCanvasControls({
     <>
       <div
         className={cn(
-          "pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-1",
+          "pointer-events-none absolute left-3 top-3 z-20 flex shrink-0 flex-nowrap items-center gap-1 sm:left-4 sm:top-4",
           filterControlsClassName
         )}
         onMouseDown={(event) => event.stopPropagation()}
