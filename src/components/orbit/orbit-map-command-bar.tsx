@@ -75,6 +75,7 @@ export const OrbitMapCommandBar = forwardRef<
 
   const graphSearch = (
     <OrbitMapGraphSearch
+      embedded={compact}
       isFetching={isFetching}
       hasGraph={hasGraph}
       search={search}

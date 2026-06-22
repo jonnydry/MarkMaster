@@ -87,7 +87,7 @@ export function DashboardToolbar({
       : "";
 
   const searchField = (
-    <FeedSearchFieldShell>
+    <FeedSearchFieldShell embedded={compact}>
       <SearchBar
         ref={searchInputRef}
         glass

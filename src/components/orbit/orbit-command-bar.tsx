@@ -144,7 +144,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
 
     const searchField = (
-      <FeedSearchFieldShell>
+      <FeedSearchFieldShell embedded={compact}>
         <SearchBar
           ref={searchRef}
           glass

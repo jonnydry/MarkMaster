@@ -26,6 +26,8 @@ interface OrbitMapGraphSearchProps {
   className?: string;
   inputClassName?: string;
   placeholder?: string;
+  /** Skip toolbar well chrome when nested inside CompactFloatingSearchBubble. */
+  embedded?: boolean;
 }
 
 function selectionForNode(node: OrbitGraphNode): OrbitMapSelection {
@@ -59,14 +61,16 @@ export function OrbitMapGraphSearch({
   className,
   inputClassName,
   placeholder = "Search graph by tag, collection, or author…",
+  embedded = false,
 }: OrbitMapGraphSearchProps) {
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>
       <div
-        className={cn(
-          highlightSearchShellClass,
-          appToolbarSurfaceShellClassName
-        )}
+        className={
+          embedded
+            ? "min-w-0 w-full"
+            : cn(highlightSearchShellClass, appToolbarSurfaceShellClassName)
+        }
       >
         <SearchBar
           ref={searchInputRef}

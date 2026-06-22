@@ -911,6 +911,25 @@
   .highlight-search-shell:focus-within {
     border-color: color-mix(in srgb, var(--primary) 28%, var(--hairline-strong));
   }
+  .toolbar-search-shell .text-muted-foreground {
+    color: color-mix(in srgb, var(--foreground) 72%, var(--muted-foreground));
+  }
+  .toolbar-search-shell input::placeholder {
+    color: color-mix(in srgb, var(--foreground) 64%, var(--muted-foreground));
+  }
+  .floating-search-shell {
+    isolation: isolate;
+    border-color: color-mix(in srgb, var(--foreground) 32%, var(--hairline-strong));
+  }
+  .dark .floating-search-shell {
+    border-color: color-mix(in srgb, var(--foreground) 26%, var(--hairline-strong));
+  }
+  .floating-search-shell .text-muted-foreground {
+    color: color-mix(in srgb, var(--foreground) 64%, var(--muted-foreground));
+  }
+  .floating-search-shell input::placeholder {
+    color: color-mix(in srgb, var(--foreground) 56%, var(--muted-foreground));
+  }
   .highlight-search-shell::before {
     content: "";
     position: absolute;

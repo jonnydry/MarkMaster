@@ -17,10 +17,17 @@ export const feedToolbarScrollClassName =
 export function FeedSearchFieldShell({
   children,
   className,
+  /** Skip toolbar well chrome when nested inside CompactFloatingSearchBubble. */
+  embedded = false,
 }: {
   children: ReactNode;
   className?: string;
+  embedded?: boolean;
 }) {
+  if (embedded) {
+    return <div className={cn("min-w-0 w-full", className)}>{children}</div>;
+  }
+
   return (
     <div
       className={cn(

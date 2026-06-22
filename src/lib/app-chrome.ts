@@ -6,19 +6,26 @@ export const appChromeFrostedClassName =
 export const appFeedHeaderFrostedClassName =
   "bg-background/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/50";
 
+/**
+ * Compact floating search — frosted card over scrolling feed media (denser than
+ * the feed header bar so thumbnails do not wash out the field).
+ */
+export const appFloatingSearchFrostedClassName =
+  "bg-background/96 supports-[backdrop-filter]:bg-background/90 backdrop-blur-xl backdrop-saturate-150 dark:supports-[backdrop-filter]:bg-background/91";
+
 /** Translucent wells for search bars, segments, and icon tiles in feed toolbars. */
 export const appToolbarSurfaceClassName =
   "bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm";
 
 export const appToolbarSurfaceShellClassName =
-  "border-hairline-strong bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm shadow-[0_18px_44px_-34px_color-mix(in_srgb,var(--foreground)_80%,transparent)]";
+  "toolbar-search-shell surface-veil border-hairline-strong backdrop-blur-xl backdrop-saturate-150";
 
 export const appToolbarSurfaceGroupClassName =
   "border-hairline-soft bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm";
 
 /** Frosted shell for compact floating search over scrolling feed media. */
 export const appFloatingSearchShellClassName =
-  "bg-background/92 supports-[backdrop-filter]:bg-background/84 backdrop-blur-xl backdrop-saturate-150 shadow-[0_12px_40px_-16px_color-mix(in_srgb,var(--foreground)_48%,transparent),inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)] dark:supports-[backdrop-filter]:bg-background/88";
+  `floating-search-shell ${appFloatingSearchFrostedClassName} shadow-[0_12px_40px_-16px_color-mix(in_srgb,var(--foreground)_48%,transparent),inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)]`;
 
 /** Horizontal page gutter — headers, toolbars, scroll content */
 export const appContentGutterClassName = "px-4 sm:px-5";
