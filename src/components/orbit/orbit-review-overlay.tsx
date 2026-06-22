@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,13 +13,14 @@ import {
   RotateCcw,
   Sparkles,
   Tags,
-  X,
 } from "lucide-react";
 
-import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import {
+  BookmarkOverlayAuthorHeader,
+  BookmarkOverlayPostColumn,
+} from "@/components/bookmark-overlay/bookmark-overlay-primitives";
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   OrbitReviewCollectionField,
   OrbitReviewDecisionControl,
@@ -45,7 +45,6 @@ import {
   type UseOrbitReviewSessionArgs,
 } from "@/hooks/use-orbit-review-session";
 import { confidenceLabel } from "@/lib/orbit-decision";
-import { formatPostDate } from "@/lib/format-metrics";
 import {
   orbitReviewDecisionUsesCollection,
   orbitReviewDecisionUsesTags,
@@ -61,12 +60,6 @@ export type OrbitReviewOverlayProps = UseOrbitReviewSessionArgs & {
   applying: boolean;
   onActiveBookmarkChange?: (bookmarkId: string) => void;
 };
-
-function getAuthorLabel(
-  bookmark: NonNullable<ReturnType<typeof useOrbitReviewSession>["activeBookmark"]>
-): string {
-  return bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
-}
 
 export function OrbitReviewOverlay({
   applying,
@@ -126,108 +119,36 @@ export function OrbitReviewOverlay({
             data-orbit-review-overlay
             className={appOverlayDialogGridReviewClassName}
           >
-            {/* Full post — same shell as OrbitBookmarkOverlay */}
-            <div className="scrollbar-native min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-              <div className="flex min-w-0 items-start gap-3">
-                {activeBookmark.authorProfileImage ? (
-                  <Image
-                    src={activeBookmark.authorProfileImage}
-                    alt={`${activeBookmark.authorDisplayName} avatar`}
-                    width={44}
-                    height={44}
-                    sizes="44px"
-                    className="h-11 w-11 shrink-0 rounded-full"
-                  />
-                ) : (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-muted-foreground">
-                    {getAuthorLabel(activeBookmark).charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="truncate text-base font-semibold text-foreground">
-                      {getAuthorLabel(activeBookmark)}
-                    </span>
-                    {activeBookmark.authorUsername ? (
-                      <span className="text-sm text-muted-foreground">
-                        @{activeBookmark.authorUsername}
+            <BookmarkOverlayPostColumn
+              bookmark={activeBookmark}
+              textClassName="whitespace-pre-wrap break-words text-[17px] leading-8 text-foreground"
+              header={
+                <BookmarkOverlayAuthorHeader
+                  bookmark={activeBookmark}
+                  onClose={() => onOpenChange(false)}
+                  closeLabel="Close review"
+                  badges={
+                    <>
+                      <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-primary">
+                        <OrbitLogoMark className="size-3" aria-hidden="true" />
+                        {title}
                       </span>
-                    ) : null}
-                    <span className="text-muted-foreground" aria-hidden>
-                      ·
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatPostDate(activeBookmark.tweetCreatedAt)}
-                    </span>
-                    <XLogoMark
-                      className="h-3.5 w-3.5 text-muted-foreground/60"
-                      title="Post from X"
-                    />
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-primary">
-                      <OrbitLogoMark className="size-3" aria-hidden="true" />
-                      {title}
-                    </span>
-                    <span className="font-mono text-2xs tabular-nums text-muted-foreground">
-                      {activePositionLabel}
-                    </span>
-                    {activeOriginal?.confidence ? (
-                      <span className="rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.08em] text-emerald-500">
-                        {confidenceLabel(activeOriginal.confidence)}
+                      <span className="font-mono text-2xs tabular-nums text-muted-foreground">
+                        {activePositionLabel}
                       </span>
-                    ) : null}
-                    {activeHasChanges ? (
-                      <span className="text-2xs text-amber-500">Edited</span>
-                    ) : null}
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => onOpenChange(false)}
-                  aria-label="Close review"
-                  className="surface-inset-strong text-muted-foreground hover:bg-accent-soft hover:text-foreground"
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
-
-              <BookmarkPostPreview
-                tweetText={activeBookmark.tweetText}
-                authorUsername={activeBookmark.authorUsername}
-                media={activeBookmark.media}
-                tweetLink={{
-                  authorUsername: activeBookmark.authorUsername,
-                  tweetId: activeBookmark.tweetId,
-                }}
-                bookmarkKey={activeBookmark.id}
-                variant="feed"
-                priorityMedia
-                expandMedia
-                stopClickPropagation
-                className="mt-5"
-                textClassName="whitespace-pre-wrap break-words text-[17px] leading-8 text-foreground"
-                galleryClassName="!mt-4 border-hairline-strong bg-black/10"
-              />
-
-              {activeBookmark.quotedTweet ? (
-                <div className="mt-4 surface-inset p-3">
-                  <div className="mb-1 flex items-center gap-1.5 text-sm">
-                    <span className="font-medium text-foreground">
-                      {activeBookmark.quotedTweet.author?.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      @{activeBookmark.quotedTweet.author?.username}
-                    </span>
-                  </div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {activeBookmark.quotedTweet.text}
-                  </p>
-                </div>
-              ) : null}
-            </div>
+                      {activeOriginal?.confidence ? (
+                        <span className="rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.08em] text-emerald-500">
+                          {confidenceLabel(activeOriginal.confidence)}
+                        </span>
+                      ) : null}
+                      {activeHasChanges ? (
+                        <span className="text-2xs text-amber-500">Edited</span>
+                      ) : null}
+                    </>
+                  }
+                />
+              }
+            />
 
             {/* Review sidebar */}
             <aside className="flex min-h-0 flex-col border-t border-hairline-soft bg-surface-2/45 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">

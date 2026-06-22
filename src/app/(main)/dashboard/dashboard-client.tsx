@@ -9,6 +9,7 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
+import { useDashboardDiscovery } from "@/hooks/use-dashboard-discovery";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { highlightActiveClass } from "@/lib/highlight-chrome";
@@ -156,6 +157,12 @@ function DashboardContent() {
     selectedTagEntries,
   } = useDashboardPage();
 
+  const {
+    hasMixContent: discoveryAvailable,
+    rawTotal: discoveryUntouchedCount,
+    isLoading: discoveryLoading,
+  } = useDashboardDiscovery({ feedReady });
+
   return (
     <>
     <AppPageShell
@@ -232,6 +239,8 @@ function DashboardContent() {
                   onSortFieldChange={filters.setSortField}
                   onViewModeChange={setViewMode}
                   user={dbUser ?? undefined}
+                  discoveryAvailable={discoveryAvailable && !discoveryLoading}
+                  discoveryUntouchedCount={discoveryUntouchedCount}
                 />
 
                 {(isFetching || filters.isSearchPending) && !isLoading && (
@@ -280,6 +289,7 @@ function DashboardContent() {
               onSelectBookmark={setActiveBookmarkId}
               onFocusForTriage={focusPerformanceHighlight}
               onSaveAsCollection={handleSaveGemsAsCollection}
+              viewMode={viewMode}
             />
           )}
 

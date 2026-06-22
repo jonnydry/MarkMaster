@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 
-import { appContentGutterClassName } from "@/lib/app-chrome";
+import { appContentGutterClassName, appFloatingSearchShellClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { highlightSearchShellClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 type CompactFloatingSearchBubbleProps = {
@@ -19,14 +20,16 @@ export function CompactFloatingSearchBubble({
   return (
     <div
       className={cn(
-        "w-full min-w-0 pt-2 pb-1 animate-slide-down-fade motion-reduce:animate-none",
+        "min-w-0 w-full max-w-full pt-2 pb-1 animate-slide-down-fade motion-reduce:animate-none",
         appContentGutterClassName,
         className
       )}
     >
       <div
         className={cn(
-          "relative z-[var(--z-sticky-subbar)] mx-auto w-full rounded-sm bg-background/70 supports-[backdrop-filter]:bg-background/60 backdrop-blur-md shadow-[0_18px_44px_-30px_color-mix(in_srgb,var(--foreground)_70%,transparent)]",
+          "relative z-[var(--z-sticky-subbar)] mx-auto w-full",
+          highlightSearchShellClass,
+          appFloatingSearchShellClassName,
           bookmarkFeedColumnClassName
         )}
       >

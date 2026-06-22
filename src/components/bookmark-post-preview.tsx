@@ -1,6 +1,9 @@
 "use client";
 
-import { BookmarkMediaGallery } from "@/components/bookmark-media-gallery";
+import {
+  BookmarkMediaGallery,
+  type BookmarkMediaGalleryVariant,
+} from "@/components/bookmark-media-gallery";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import type { BookmarkTweetLink } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
@@ -11,7 +14,7 @@ export interface BookmarkPostPreviewProps {
   media?: BookmarkMediaJson[] | null;
   tweetLink: BookmarkTweetLink;
   bookmarkKey: string;
-  variant: "feed" | "compact" | "inline";
+  variant: "feed" | "compact" | "inline" | "overlay";
   textClassName?: string;
   priorityMedia?: boolean;
   className?: string;
@@ -19,7 +22,7 @@ export interface BookmarkPostPreviewProps {
   stopClickPropagation?: boolean;
   /** Render media only (text shown elsewhere). */
   mediaOnly?: boolean;
-  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  /** Legacy alias for callers that have not moved to variant="overlay" yet. */
   expandMedia?: boolean;
 }
 
@@ -43,18 +46,21 @@ export function BookmarkPostPreview({
 }: BookmarkPostPreviewProps) {
   const hasMedia = Boolean(media?.length);
 
+  const galleryVariant: BookmarkMediaGalleryVariant = expandMedia
+    ? "overlay"
+    : variant;
+
   const gallery =
     hasMedia && media ? (
       <BookmarkMediaGallery
         media={media}
         authorUsername={authorUsername}
-        variant={variant === "compact" ? "compact" : variant}
+        variant={galleryVariant}
         bookmarkKey={bookmarkKey}
         tweetLink={tweetLink}
         priority={priorityMedia}
         stopClickPropagation={stopClickPropagation}
         className={galleryClassName}
-        expandSingle={expandMedia}
       />
     ) : null;
 

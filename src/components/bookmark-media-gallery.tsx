@@ -14,6 +14,7 @@ import { Play } from "lucide-react";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import {
   type BookmarkMediaJson,
+  getMediaImageUrl,
   getMediaPlaybackUrl,
   getMediaPosterUrl,
   getMediaTileKey,
@@ -24,13 +25,19 @@ import { cn } from "@/lib/utils";
 
 export type { BookmarkMediaJson as BookmarkMediaItem };
 
-export type BookmarkMediaGalleryVariant = "feed" | "compact" | "inline";
+export type BookmarkMediaGalleryVariant = "feed" | "compact" | "inline" | "overlay";
+
+// Expanded overlay: whole image visible, scaled to fit the scroll column.
+const OVERLAY_IMAGE_MAX_HEIGHT = "min(70dvh, calc(100dvh - 14rem))";
+const OVERLAY_TILE_CLASS =
+  "mx-auto block h-auto w-auto max-w-full object-contain";
 
 const LAYOUT: Record<
   BookmarkMediaGalleryVariant,
   {
     maxTiles: number;
     allowInlinePlayback: boolean;
+    expandedLayout: boolean;
     shellClass: string;
     gridClass: (tileCount: number) => string;
     imageSizes: string;
@@ -42,6 +49,7 @@ const LAYOUT: Record<
   feed: {
     maxTiles: 4,
     allowInlinePlayback: true,
+    expandedLayout: false,
     shellClass: "mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent",
     gridClass: (n) => (n === 1 ? "" : "grid grid-cols-2 gap-0.5"),
     imageSizes: `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`,
@@ -52,6 +60,7 @@ const LAYOUT: Record<
   inline: {
     maxTiles: 4,
     allowInlinePlayback: true,
+    expandedLayout: false,
     shellClass: "mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent",
     gridClass: (n) => (n === 1 ? "" : "grid grid-cols-2 gap-0.5"),
     imageSizes: "(max-width: 768px) 100vw, 460px",
@@ -59,9 +68,22 @@ const LAYOUT: Record<
     multiTileClass: "aspect-square",
     compactTileClass: "",
   },
+  overlay: {
+    maxTiles: 4,
+    allowInlinePlayback: true,
+    expandedLayout: true,
+    shellClass:
+      "mt-3 rounded-sm border border-hairline-strong bg-black/10 supports-[backdrop-filter]:bg-black/15",
+    gridClass: (n) => (n === 1 ? "" : "flex flex-col gap-2"),
+    imageSizes: "(max-width: 768px) 100vw, 680px",
+    singleTileClass: "",
+    multiTileClass: OVERLAY_TILE_CLASS,
+    compactTileClass: "",
+  },
   compact: {
     maxTiles: 1,
     allowInlinePlayback: false,
+    expandedLayout: false,
     shellClass: "shrink-0",
     gridClass: () => "",
     imageSizes: "80px",
@@ -84,6 +106,88 @@ function getTileAspectStyle(item: BookmarkMediaJson): CSSProperties | undefined 
   return undefined;
 }
 
+function useExpandedLayout(
+  layout: (typeof LAYOUT)[BookmarkMediaGalleryVariant],
+  expandSingle: boolean | undefined,
+  isCompact: boolean,
+  singleInGallery: boolean
+): boolean {
+  return (
+    layout.expandedLayout ||
+    Boolean(!isCompact && singleInGallery && expandSingle)
+  );
+}
+
+function expandedImageClass(
+  layout: (typeof LAYOUT)[BookmarkMediaGalleryVariant],
+  _singleInGallery: boolean
+): string {
+  return cn(layout.multiTileClass || OVERLAY_TILE_CLASS);
+}
+
+function GalleryImage({
+  src,
+  alt,
+  width,
+  height,
+  sizes,
+  className,
+  priority,
+  expanded,
+  onError,
+}: {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  sizes: string;
+  className: string;
+  priority?: boolean;
+  expanded: boolean;
+  onError: () => void;
+}) {
+  if (expanded) {
+    const expandedStyle: CSSProperties = {
+      display: "block",
+      height: "auto",
+      marginInline: "auto",
+      maxHeight: OVERLAY_IMAGE_MAX_HEIGHT,
+      maxWidth: "100%",
+      objectFit: "contain",
+      width: "auto",
+    };
+
+    return (
+      // Native img avoids Next.js aspect-ratio wrapper clipping in overlay scroll.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className={className}
+        style={expandedStyle}
+        onError={onError}
+      />
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      sizes={sizes}
+      className={className}
+      priority={priority}
+      onError={onError}
+    />
+  );
+}
+
 interface MediaTileProps {
   item: BookmarkMediaJson;
   tileKey: string;
@@ -97,7 +201,7 @@ interface MediaTileProps {
   mode: TileMode;
   onActivate: () => void;
   showCountOverlay?: number;
-  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  /** Legacy alias — prefer variant="overlay" in expanded bookmark shells. */
   expandSingle?: boolean;
 }
 
@@ -116,8 +220,14 @@ function MediaTile({
   showCountOverlay,
   expandSingle,
 }: MediaTileProps) {
-  const poster = getMediaPosterUrl(item);
   const isCompact = Boolean(layout.compactTileClass);
+  const expandedLayout = useExpandedLayout(
+    layout,
+    expandSingle,
+    isCompact,
+    singleInGallery
+  );
+  const poster = getMediaImageUrl(item, { preferFullSize: expandedLayout });
   const videoLike = isVideoLikeMediaType(item.type);
   const playbackUrl = getMediaPlaybackUrl(item);
   const isGif = item.type === "animated_gif";
@@ -128,11 +238,24 @@ function MediaTile({
       <div
         data-media-tile={tileKey}
         className={cn(
-          "relative w-full overflow-hidden bg-black",
+          "relative bg-black",
           isCompact ? layout.compactTileClass : "",
-          !isCompact && singleInGallery && layout.singleTileClass,
-          !isCompact && !aspectStyle && !singleInGallery && "aspect-video",
-          !isCompact && !aspectStyle && singleInGallery && "aspect-video"
+          !isCompact && !expandedLayout && "w-full overflow-hidden",
+          expandedLayout && "mx-auto max-w-full",
+          !isCompact &&
+            singleInGallery &&
+            !expandedLayout &&
+            layout.singleTileClass,
+          !isCompact &&
+            !aspectStyle &&
+            !singleInGallery &&
+            !expandedLayout &&
+            "aspect-video",
+          !isCompact &&
+            !aspectStyle &&
+            singleInGallery &&
+            !expandedLayout &&
+            "aspect-video"
         )}
         style={aspectStyle}
       >
@@ -174,15 +297,22 @@ function MediaTile({
 
   if (!poster || imageError.has(poster)) return null;
 
-  // Expanded single image (overlay): show the whole picture at natural aspect.
-  const expandedSingle = !isCompact && singleInGallery && Boolean(expandSingle);
-  const imageClass = expandedSingle
-    ? "h-auto w-full"
+  const imageClass = expandedLayout
+    ? expandedImageClass(layout, singleInGallery)
     : cn(
         "w-full object-cover",
         layout.compactTileClass,
-        !isCompact && (singleInGallery ? layout.singleTileClass : layout.multiTileClass)
+        !isCompact &&
+          (singleInGallery ? layout.singleTileClass : layout.multiTileClass)
       );
+
+  const tileWrapperClass = cn(
+    "relative",
+    !expandedLayout && "w-full",
+    isCompact && layout.compactTileClass
+  );
+  const imageWidth = item.width || 1200;
+  const imageHeight = item.height || 900;
 
   if (videoLike) {
     return (
@@ -190,8 +320,9 @@ function MediaTile({
         type="button"
         data-media-tile={tileKey}
         className={cn(
-          "relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left",
-          isCompact && layout.compactTileClass
+          "relative block cursor-pointer border-0 bg-transparent p-0 text-left",
+          isCompact ? layout.compactTileClass : "w-full",
+          expandedLayout && "mx-auto max-w-full"
         )}
         onClick={(e) => {
           stopGalleryEventBubble(e);
@@ -204,14 +335,15 @@ function MediaTile({
             : `Open video on X from @${authorUsername}`
         }
       >
-        <Image
+        <GalleryImage
           src={poster}
           alt=""
-          width={item.width || 1200}
-          height={item.height || 900}
+          width={imageWidth}
+          height={imageHeight}
           sizes={layout.imageSizes}
           className={imageClass}
           priority={priority && index === 0}
+          expanded={expandedLayout}
           onError={() => onImageError(poster)}
         />
         <div
@@ -238,15 +370,16 @@ function MediaTile({
   }
 
   return (
-    <div className={cn("relative", isCompact && layout.compactTileClass)}>
-      <Image
+    <div className={tileWrapperClass}>
+      <GalleryImage
         src={poster}
         alt={`Media ${index + 1} from @${authorUsername}`}
-        width={item.width || 1200}
-        height={item.height || 900}
+        width={imageWidth}
+        height={imageHeight}
         sizes={layout.imageSizes}
         className={imageClass}
         priority={priority && index === 0}
+        expanded={expandedLayout}
         onError={() => onImageError(poster)}
       />
       {showCountOverlay != null && showCountOverlay > 0 && (
@@ -272,7 +405,7 @@ export interface BookmarkMediaGalleryProps {
   /** When set, video without playback_url opens this tweet on X. */
   tweetLink?: BookmarkTweetLink;
   stopClickPropagation?: boolean;
-  /** Single image renders uncropped at its natural aspect (expanded overlay). */
+  /** Legacy alias — prefer variant="overlay" in expanded bookmark shells. */
   expandSingle?: boolean;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject, ReactNode } from "react";
-import { CheckSquare, Keyboard, SlidersHorizontal } from "lucide-react";
+import { CheckSquare, Compass, Keyboard, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
@@ -15,6 +15,7 @@ import {
 import { appContentGutterClassName, appToolbarSurfaceClassName } from "@/lib/app-chrome";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
+import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
@@ -47,6 +48,8 @@ interface DashboardToolbarProps {
   onSortFieldChange: (field: SortField) => void;
   onViewModeChange: (mode: ViewMode) => void;
   user?: DbUser;
+  discoveryAvailable?: boolean;
+  discoveryUntouchedCount?: number;
 }
 
 export function DashboardToolbar({
@@ -71,8 +74,17 @@ export function DashboardToolbar({
   onSortFieldChange,
   onViewModeChange,
   user,
+  discoveryAvailable = false,
+  discoveryUntouchedCount = 0,
 }: DashboardToolbarProps) {
   const { compact } = usePageHeaderCompact();
+  const { hidden: discoveryHidden, setHidden: setDiscoveryHidden } =
+    useDiscoveryHidden();
+  const showDiscovery = !discoveryHidden;
+  const discoveryCountLabel =
+    discoveryUntouchedCount > 0
+      ? ` (${discoveryUntouchedCount.toLocaleString()} untouched)`
+      : "";
 
   const searchField = (
     <FeedSearchFieldShell>
@@ -147,6 +159,23 @@ export function DashboardToolbar({
           className={cn(appToolbarSurfaceClassName, compact && "size-8")}
         />
       </div>
+
+      {discoveryAvailable ? (
+        <ToolbarIconButton
+          active={showDiscovery}
+          label={
+            showDiscovery
+              ? `Hide Discovery${discoveryCountLabel}`
+              : `Show Discovery${discoveryCountLabel}`
+          }
+          icon={Compass}
+          onClick={() => setDiscoveryHidden(!discoveryHidden)}
+          pressed={showDiscovery}
+          aria-controls="dashboard-discovery-panel"
+          showIndicator={discoveryHidden}
+          className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+        />
+      ) : null}
 
       <ToolbarIconButton
         label="Keyboard shortcuts"

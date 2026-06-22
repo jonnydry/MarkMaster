@@ -58,14 +58,17 @@ export const appOverlayDialogSmClassName = cn(
   "app-overlay-dialog-sm surface-overlay p-0 max-w-md"
 );
 
-/** Two-column overlay grid — bookmark overlay sidebar width. */
+/** Two-column overlay grid — bookmark overlay sidebar width.
+ * Mobile stacks (1 col, 2 rows): main flexible + sidebar auto-sized.
+ * Desktop: side-by-side in a single row.
+ */
 export const appOverlayDialogGridBookmarkClassName = cn(
-  "app-overlay-dialog-grid grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]"
+  "app-overlay-dialog-grid grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]"
 );
 
 /** Two-column overlay grid — Orbit review sidebar width. */
 export const appOverlayDialogGridReviewClassName = cn(
-  "app-overlay-dialog-grid grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]"
+  "app-overlay-dialog-grid grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)]"
 );
 
 /** Floating panel over the Orbit map canvas (mobile rail). */

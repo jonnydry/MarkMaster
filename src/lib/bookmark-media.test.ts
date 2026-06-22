@@ -4,6 +4,7 @@ import {
   pickBestMp4Variant,
   mapStoredBookmarkMedia,
   hasVideoLikeMedia,
+  getMediaImageUrl,
   getMediaPosterUrl,
 } from "./bookmark-media";
 
@@ -79,6 +80,45 @@ describe("getMediaPosterUrl", () => {
   it("prefers preview_image_url over url", () => {
     expect(
       getMediaPosterUrl({
+        type: "photo",
+        preview_image_url: "https://a/preview.jpg",
+        url: "https://a/full.jpg",
+      })
+    ).toBe("https://a/preview.jpg");
+  });
+});
+
+describe("getMediaImageUrl", () => {
+  it("prefers full photo url and upgrades twitter name param in overlay mode", () => {
+    expect(
+      getMediaImageUrl(
+        {
+          type: "photo",
+          preview_image_url: "https://pbs.twimg.com/media/x.jpg?format=jpg&name=small",
+          url: "https://pbs.twimg.com/media/x.jpg?format=jpg&name=large",
+        },
+        { preferFullSize: true }
+      )
+    ).toBe("https://pbs.twimg.com/media/x.jpg?format=jpg&name=orig");
+  });
+
+  it("adds original-size param to bare twitter media urls", () => {
+    expect(
+      getMediaImageUrl(
+        {
+          type: "photo",
+          url: "https://pbs.twimg.com/media/HKeZ1KTWkAAjZKP.jpg",
+          width: 2048,
+          height: 4096,
+        },
+        { preferFullSize: true }
+      )
+    ).toBe("https://pbs.twimg.com/media/HKeZ1KTWkAAjZKP.jpg?name=orig");
+  });
+
+  it("keeps poster url behavior for feed thumbnails", () => {
+    expect(
+      getMediaImageUrl({
         type: "photo",
         preview_image_url: "https://a/preview.jpg",
         url: "https://a/full.jpg",

@@ -29,6 +29,34 @@ export function getMediaPosterUrl(item: BookmarkMediaJson): string | undefined {
   return item.preview_image_url || item.url;
 }
 
+function upgradeTwitterImageUrl(url: string): string {
+  if (!url.includes("twimg.com")) return url;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "pbs.twimg.com") {
+      parsed.searchParams.set("name", "orig");
+      return parsed.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+/** Image URL for rendering — optionally prefers full photo resolution in overlays. */
+export function getMediaImageUrl(
+  item: BookmarkMediaJson,
+  options?: { preferFullSize?: boolean }
+): string | undefined {
+  if (options?.preferFullSize && !isVideoLikeMediaType(item.type)) {
+    const raw = item.url || item.preview_image_url;
+    return raw ? upgradeTwitterImageUrl(raw) : undefined;
+  }
+
+  return getMediaPosterUrl(item);
+}
+
 /** MP4 URL for inline playback when stored on the bookmark row. */
 export function getMediaPlaybackUrl(item: BookmarkMediaJson): string | undefined {
   return item.playback_url;

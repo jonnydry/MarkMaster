@@ -337,13 +337,11 @@ export function BookmarkOverlayPostColumn({
           tweetId: bookmark.tweetId,
         }}
         bookmarkKey={bookmark.id}
-        variant="feed"
+        variant="overlay"
         priorityMedia
-        expandMedia
         stopClickPropagation
         className="mt-5"
         textClassName={textClassName}
-        galleryClassName="!mt-4 border-hairline-strong bg-black/10"
       />
       {bookmark.quotedTweet ? (
         <BookmarkOverlayQuotedTweet quotedTweet={bookmark.quotedTweet} />

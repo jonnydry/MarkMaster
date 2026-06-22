@@ -16,6 +16,10 @@ export const appToolbarSurfaceShellClassName =
 export const appToolbarSurfaceGroupClassName =
   "border-hairline-soft bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm";
 
+/** Frosted shell for compact floating search over scrolling feed media. */
+export const appFloatingSearchShellClassName =
+  "bg-background/92 supports-[backdrop-filter]:bg-background/84 backdrop-blur-xl backdrop-saturate-150 shadow-[0_12px_40px_-16px_color-mix(in_srgb,var(--foreground)_48%,transparent),inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)] dark:supports-[backdrop-filter]:bg-background/88";
+
 /** Horizontal page gutter — headers, toolbars, scroll content */
 export const appContentGutterClassName = "px-4 sm:px-5";
 

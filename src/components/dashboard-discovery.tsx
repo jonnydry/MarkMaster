@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, Sparkles, RotateCcw, Plus, RefreshCw, EyeOff } from "lucide-react";
+import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import {
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import type { BookmarkWithRelations } from "@/types";
+import type { ViewMode } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
 import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
 
@@ -39,104 +40,19 @@ export interface DashboardDiscoveryProps {
   /** default — chromeless strip aligned with feed; flush — frosted module (collections). */
   variant?: "default" | "flush";
   className?: string;
+  /** When the integrated (default) discovery is shown on the main dashboard, passing "grid" makes the carousel span full content width. */
+  viewMode?: ViewMode;
 }
 
-const variantShellClass: Record<NonNullable<DashboardDiscoveryProps["variant"]>, string> = {
-  default: cn("border-b border-hairline-soft pb-2 pt-0.5", bookmarkFeedColumnClassName),
-  flush: "mb-0 max-w-none px-0",
-};
-
-function DiscoveryFeedHeader({
-  meta,
-  hint,
-  actions,
-  onHide,
-}: {
-  meta?: string;
-  hint?: string;
-  actions: ReactNode;
-  onHide?: () => void;
-}) {
-  const t = useTypography();
-
-  return (
-    <div
-      className="mb-1 flex items-center justify-between gap-2"
-      title={hint}
-    >
-      <div className="flex min-w-0 items-center gap-1.5">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
-          <Compass className="size-3" aria-hidden />
-        </span>
-        <p className={cn(t.sectionLabel, "truncate text-muted-foreground")}>
-          <span className="text-primary/70">Discovery</span>
-          {meta ? (
-            <>
-              <span className="mx-1 text-muted-foreground/35" aria-hidden>
-                ·
-              </span>
-              <span className="font-normal normal-case tracking-normal text-muted-foreground/65">
-                {meta}
-              </span>
-            </>
-          ) : null}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {actions}
-        {onHide ? (
-          <button
-            type="button"
-            onClick={onHide}
-            aria-label="Hide Discovery"
-            title="Hide Discovery"
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm border border-hairline-soft text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-          >
-            <EyeOff className="size-3.5" aria-hidden />
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function DiscoveryRestoreBar({
-  meta,
-  onShow,
-  className,
-}: {
-  meta?: string;
-  onShow: () => void;
-  className?: string;
-}) {
-  const t = useTypography();
-
-  return (
-    <div className={cn(bookmarkFeedColumnClassName, "w-full pt-0.5 pb-2", className)}>
-      <button
-        type="button"
-        onClick={onShow}
-        aria-label="Show Discovery"
-        className="group flex w-full items-center gap-1.5 rounded-sm border border-hairline-soft px-2.5 py-1.5 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
-      >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
-          <Compass className="size-3" aria-hidden />
-        </span>
-        <p className={cn(t.sectionLabel, "min-w-0 truncate text-muted-foreground")}>
-          <span className="text-primary/70">Discovery</span>
-          <span className="mx-1 text-muted-foreground/35" aria-hidden>
-            ·
-          </span>
-          <span className="font-normal normal-case tracking-normal text-muted-foreground/65">
-            {meta ? `${meta} hidden` : "hidden"}
-          </span>
-        </p>
-        <span className="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 transition-colors group-hover:text-foreground">
-          Show
-        </span>
-      </button>
-    </div>
-  );
+function getDiscoveryShellClass(variant: "default" | "flush", viewMode?: ViewMode): string {
+  if (variant === "flush") {
+    return "mb-0 max-w-none px-0";
+  }
+  if (viewMode === "grid") {
+    // Full-width carousel above the grid masonry. Matches grid container side padding.
+    return "w-full px-3 pb-3 pt-1";
+  }
+  return cn("pb-2 pt-1", bookmarkFeedColumnClassName);
 }
 
 function DiscoveryHeaderActions({
@@ -214,6 +130,7 @@ export function DashboardDiscovery({
   explainer,
   variant = "default",
   className,
+  viewMode,
 }: DashboardDiscoveryProps) {
   const router = useRouter();
   const t = useTypography();
@@ -232,11 +149,10 @@ export function DashboardDiscovery({
     itemLabels = {},
   } = useDashboardDiscovery({ feedReady, parentData });
 
-  const shellClass = variantShellClass[variant];
   const isFeedIntegrated = variant === "default";
 
-  // Hide/restore is only offered on the dashboard feed strip, not the flush module.
-  const { hidden, setHidden } = useDiscoveryHidden();
+  // Hide/show is controlled from the dashboard toolbar (compass button).
+  const { hidden } = useDiscoveryHidden();
   const canHide = isFeedIntegrated;
 
   const {
@@ -248,6 +164,10 @@ export function DashboardDiscovery({
     batch: ritualBatch,
     onSaveAsCollection,
   });
+
+  const shellClass = getDiscoveryShellClass(variant, viewMode);
+  const isGridView = viewMode === "grid";
+  const isWideStrip = isFeedIntegrated && isGridView;
 
   const handleOrbitReview = (id: string) => {
     trackFlywheelEvent("cta.review_in_orbit", {
@@ -267,8 +187,6 @@ export function DashboardDiscovery({
 
   const defaultExplainer =
     "Popular untouched saves — tag or collect them to clear the queue.";
-  const feedMetaLine =
-    rawTotal > 0 ? `${rawTotal.toLocaleString()} untouched` : undefined;
   const moduleMetaLine =
     rawTotal > 0
       ? `${rawTotal.toLocaleString()} waiting for triage${
@@ -311,16 +229,7 @@ export function DashboardDiscovery({
   const showModule = discoveryCarouselItems.length > 0 || ritualTotal > 0;
   if (!showModule) return null;
 
-  // Hidden: collapse to a slim restore row instead of the full strip.
-  if (hidden && canHide) {
-    return (
-      <DiscoveryRestoreBar
-        meta={feedMetaLine}
-        onShow={() => setHidden(false)}
-        className={cn("border-b border-hairline-soft", className)}
-      />
-    );
-  }
+  if (hidden && canHide) return null;
 
   const hasRitual = ritualTotal > 0;
   const headerActions = (
@@ -341,7 +250,11 @@ export function DashboardDiscovery({
         key={item.bookmark.id}
         index={index}
         desktopTwoUp={!isFeedIntegrated}
-        className={isFeedIntegrated ? "w-full" : undefined}
+        className={cn(
+          isFeedIntegrated ? "w-full" : undefined,
+          // Give discovery cards a little more presence when the strip spans the full page (grid view).
+          isWideStrip && "sm:w-[300px] lg:w-[320px] xl:w-[340px]"
+        )}
       >
         <HighlightCard
           bookmark={item.bookmark}
@@ -429,16 +342,12 @@ export function DashboardDiscovery({
   if (isFeedIntegrated) {
     return (
       <section
+        id="dashboard-discovery-panel"
         className={cn(shellClass, "w-full", className)}
         aria-label="Discovery"
         title={explainer ?? defaultExplainer}
       >
-        <DiscoveryFeedHeader
-          meta={feedMetaLine}
-          hint={explainer ?? defaultExplainer}
-          actions={headerActions}
-          onHide={canHide ? () => setHidden(true) : undefined}
-        />
+        <div className="mb-1.5 flex justify-end">{headerActions}</div>
         {celebration ? (
           <DiscoveryCelebration celebration={celebration} className="mb-1.5" />
         ) : null}
