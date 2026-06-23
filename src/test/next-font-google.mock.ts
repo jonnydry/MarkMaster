@@ -20,4 +20,5 @@ export const JetBrains_Mono = createMockFont("jetbrains-mono");
 export const IBM_Plex_Mono = createMockFont("ibm-plex-mono");
 export const Inter = createMockFont("inter");
 export const DM_Sans = createMockFont("dm-sans");
-export const Instrument_Sans = createMockFont("instrument-sans");
+export const Newsreader = createMockFont("newsreader");
+export const Source_Serif_4 = createMockFont("source-serif");

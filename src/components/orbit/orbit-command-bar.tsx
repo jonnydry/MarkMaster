@@ -3,9 +3,7 @@
 import { forwardRef, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  BadgeCheck,
   CheckSquare,
-  ListChecks,
   Loader2,
   Map as MapIcon,
   RefreshCw,
@@ -69,18 +67,13 @@ export interface OrbitCommandBarProps {
   scanning: boolean;
   scanTargetCount: number;
   hasScanPlan: boolean;
-  scanPlanSuggestionCount: number;
   batchMode: OrbitScanBatchMode;
   resolvedBatchProfile: OrbitScanBatchProfileId;
   deepUnlocked: boolean;
   deepLockedReason: string;
-  applyingBatch: boolean;
-  canApplyStrongMatches: boolean;
   mapHref: string;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
   onScan: () => void;
-  onApplyStrongMatches: () => void;
-  onReviewPass: () => void;
   scanError?: ReactNode;
 
   // Utility
@@ -116,18 +109,13 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       scanning,
       scanTargetCount,
       hasScanPlan,
-      scanPlanSuggestionCount,
       batchMode,
       resolvedBatchProfile,
       deepUnlocked,
       deepLockedReason,
-      applyingBatch,
-      canApplyStrongMatches,
       mapHref,
       onBatchModeChange,
       onScan,
-      onApplyStrongMatches,
-      onReviewPass,
       scanError,
       search,
       onSearchChange,
@@ -156,10 +144,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       </FeedSearchFieldShell>
     );
 
-    const reviewLabel =
-      scanPlanSuggestionCount === 1
-        ? "Review 1"
-        : `Review ${scanPlanSuggestionCount.toLocaleString()}`;
     const showTriageProgress = passTotal > 0 && triagedCount > 0;
 
     const userNav = user ? (
@@ -212,40 +196,12 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     const toolbarActions = canSelect ? (
       <>
         {hasScanPlan ? (
-          <>
-            <Button
-              type="button"
-              variant="highlight"
-              size="sm"
-              className={cn(
-                "gap-1.5 px-2.5 text-xs",
-                compact ? "h-7" : "h-8"
-              )}
-              disabled={scanning || applyingBatch}
-              onClick={onReviewPass}
-            >
-              {applyingBatch ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <ListChecks className="size-3.5" />
-              )}
-              <span className="hidden sm:inline">{reviewLabel}</span>
-              <span className="sm:hidden">{scanPlanSuggestionCount}</span>
-            </Button>
-            <ToolbarIconButton
-              label="Apply strong matches"
-              icon={BadgeCheck}
-              disabled={scanning || applyingBatch || !canApplyStrongMatches}
-              onClick={onApplyStrongMatches}
-              className="border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 dark:text-emerald-100"
-            />
-            <ToolbarIconButton
-              label={scanButtonLabel}
-              icon={RefreshCw}
-              disabled={scanBusy || scanTargetCount === 0}
-              onClick={onScan}
-            />
-          </>
+          <ToolbarIconButton
+            label={scanButtonLabel}
+            icon={RefreshCw}
+            disabled={scanBusy || scanTargetCount === 0}
+            onClick={onScan}
+          />
         ) : (
           <div className="flex items-center gap-1.5">
             <Button

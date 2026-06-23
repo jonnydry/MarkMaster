@@ -2,9 +2,10 @@ import {
   DM_Sans,
   IBM_Plex_Mono,
   IBM_Plex_Sans,
-  Instrument_Sans,
   Inter,
   JetBrains_Mono,
+  Newsreader,
+  Source_Serif_4,
 } from "next/font/google";
 
 import type { TypographyPresetId } from "@/lib/typography-presets";
@@ -43,8 +44,14 @@ export const dmSans = DM_Sans({
 });
 
 /** Editorial preset — lazy-loaded when selected. */
-export const instrumentSans = Instrument_Sans({
-  variable: "--font-instrument-sans",
+export const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
+  subsets: ["latin"],
+  preload: false,
+});
+
+export const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
   preload: false,
 });
@@ -58,7 +65,7 @@ export const defaultFontVariables = [
 const PRESET_FONT_VARIABLES: Record<TypographyPresetId, string[]> = {
   orbit: [],
   classic: [inter.variable, dmSans.variable],
-  editorial: [instrumentSans.variable],
+  editorial: [sourceSerif.variable, newsreader.variable],
   mono: [],
 };
 

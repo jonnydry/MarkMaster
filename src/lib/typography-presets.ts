@@ -44,12 +44,12 @@ export const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
   {
     id: "editorial",
     name: "Editorial",
-    description: "A softer, more human sans family for longer sessions.",
-    bodyFace: "Instrument Sans",
-    headingFace: "Instrument Sans",
-    labelFace: "Instrument Sans",
+    description: "Scholarly serif rhythm with a modern broadsheet voice.",
+    bodyFace: "Source Serif 4",
+    headingFace: "Newsreader",
+    labelFace: "IBM Plex Sans",
     dataFace: "IBM Plex Mono",
-    previewCopy: "Warmer texture without getting loud.",
+    previewCopy: "Built for archives, essays, and close reading.",
   },
   {
     id: "mono",

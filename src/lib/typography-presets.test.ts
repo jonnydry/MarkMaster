@@ -24,4 +24,12 @@ describe("typography presets", () => {
     expect(isTypographyPresetId("default")).toBe(false);
     expect(isTypographyPresetId("invalid")).toBe(false);
   });
+
+  it("gives Editorial a distinct publication hierarchy", () => {
+    const editorial = getTypographyPreset("editorial");
+
+    expect(editorial.bodyFace).toBe("Source Serif 4");
+    expect(editorial.headingFace).toBe("Newsreader");
+    expect(editorial.headingFace).not.toBe(editorial.bodyFace);
+  });
 });

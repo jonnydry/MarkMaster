@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ChevronDown, FolderOpen, Tags } from "lucide-react";
+import {
+  BadgeCheck,
+  ChevronDown,
+  FolderOpen,
+  ListChecks,
+  Loader2,
+  Tags,
+} from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { Button } from "@/components/ui/button";
@@ -19,6 +26,12 @@ const STRATEGY_PREVIEW = 140;
 
 interface OrbitScanOverviewStripProps {
   payload: OrbitScanResponsePayload;
+  suggestionCount: number;
+  scanning: boolean;
+  applyingBatch: boolean;
+  canApplyStrongMatches: boolean;
+  onReview: () => void;
+  onApplyStrongMatches: () => void;
   className?: string;
 }
 
@@ -244,6 +257,12 @@ function getWideSnapshot() {
 
 export function OrbitScanOverviewStrip({
   payload,
+  suggestionCount,
+  scanning,
+  applyingBatch,
+  canApplyStrongMatches,
+  onReview,
+  onApplyStrongMatches,
   className}: OrbitScanOverviewStripProps) {
   const prefersWide = useSyncExternalStore(
     subscribeWide,
@@ -263,6 +282,10 @@ export function OrbitScanOverviewStrip({
 
   const { summary, tagRollups, collectionRollups, plan } = payload;
   const { overview } = plan;
+  const reviewLabel =
+    suggestionCount === 1
+      ? "Review 1 suggestion"
+      : `Review ${suggestionCount.toLocaleString()} suggestions`;
 
   return (
     <section
@@ -316,6 +339,46 @@ export function OrbitScanOverviewStrip({
           </p>
         </div>
       </button>
+
+      {suggestionCount > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-hairline-soft bg-surface-1/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="min-w-0">
+            <p className={cn(orbitLabelClass(), "text-foreground/80")}>
+              Next step
+            </p>
+            <p className={cn("mt-0.5 text-xs", orbitMetaMuted())}>
+              Review each suggestion, or apply only high-confidence matches.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="order-2 h-9 gap-1.5 border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:border-emerald-400/45 hover:bg-emerald-400/15 sm:order-1 dark:text-emerald-100"
+              disabled={scanning || applyingBatch || !canApplyStrongMatches}
+              onClick={onApplyStrongMatches}
+            >
+              {applyingBatch ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <BadgeCheck className="size-3.5" aria-hidden />
+              )}
+              Apply strong matches
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="order-1 h-9 gap-1.5 sm:order-2"
+              disabled={scanning || applyingBatch}
+              onClick={onReview}
+            >
+              <ListChecks className="size-3.5" aria-hidden />
+              {reviewLabel}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {open ? (
         <div className="animate-in fade-in-0 slide-in-from-top-2 border-t border-hairline-soft">

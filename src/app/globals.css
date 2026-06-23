@@ -428,9 +428,9 @@
 }
 
 [data-typography-preset="editorial"] {
-  --font-sans: var(--font-instrument-sans);
-  --font-heading: var(--font-instrument-sans);
-  --font-label: var(--font-instrument-sans);
+  --font-sans: var(--font-source-serif);
+  --font-heading: var(--font-newsreader);
+  --font-label: var(--font-ibm-plex-sans);
   --font-data: var(--font-ibm-plex-mono);
   --font-mono: var(--font-ibm-plex-mono);
 }

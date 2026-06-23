@@ -273,18 +273,13 @@ export default function OrbitPage() {
               scanning={scan.scanning}
               scanTargetCount={scanTargetIds.length}
               hasScanPlan={activeScanPlanSuggestionCount > 0}
-              scanPlanSuggestionCount={activeScanPlanSuggestionCount}
               batchMode={resolvedScanBatchMode}
               resolvedBatchProfile={scanBatchProfile}
               deepUnlocked={deepUnlocked}
               deepLockedReason={deepLockedReason}
-              applyingBatch={scan.applyingBatch}
-              canApplyStrongMatches={canApplyStrongMatches}
               mapHref={orbitMapHref}
               onBatchModeChange={setScanBatchMode}
               onScan={handleScan}
-              onApplyStrongMatches={handleApplyStrongMatches}
-              onReviewPass={handleOpenReviewAll}
               search={search}
               onSearchChange={handleSearchChange}
               visibleStatusLabel={visibleStatusLabel}
@@ -315,7 +310,15 @@ export default function OrbitPage() {
               <OrbitTriageHint />
 
               {scan.plan ? (
-                <OrbitScanOverviewStrip payload={scan.plan} />
+                <OrbitScanOverviewStrip
+                  payload={scan.plan}
+                  suggestionCount={activeScanPlanSuggestionCount}
+                  scanning={scan.scanning}
+                  applyingBatch={scan.applyingBatch}
+                  canApplyStrongMatches={canApplyStrongMatches}
+                  onReview={handleOpenReviewAll}
+                  onApplyStrongMatches={handleApplyStrongMatches}
+                />
               ) : null}
             </section>
 
