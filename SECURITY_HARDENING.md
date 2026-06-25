@@ -208,7 +208,7 @@ Subphase 2 is now in good shape. The highest-value gap (Orbit graph) has been cl
 
 **Security Headers (`next.config.ts`)**:
 - Added `Reporting-Endpoints` header.
-- Tightened `script-src` by replacing `'unsafe-inline'` with a SHA-256 hash of the theme initialization script.
+- Tightened `script-src` by loading the theme initialization script from a first-party route (`/theme-init`) so `script-src` can remain `'self'` without `'unsafe-inline'` or an inline hash.
 - Significantly expanded `Permissions-Policy`.
 - Extracted theme script to `src/lib/theme-init.ts` for maintainability.
 
@@ -225,7 +225,7 @@ Subphase 2 is now in good shape. The highest-value gap (Orbit graph) has been cl
 After completing Subphases 1–3 and performing an extensive multi-agent bughunt across the codebase, the following was achieved:
 
 **Key Wins in Phase 3**:
-- **CSP Strategy**: Moved to a clean Report-Only posture with `Reporting-Endpoints` header. Tightened `script-src` by replacing broad `'unsafe-inline'` with a SHA-256 hash for the single theme initialization script. Significantly expanded `Permissions-Policy`.
+- **CSP Strategy**: Moved to a clean Report-Only posture with `Reporting-Endpoints` header. Tightened `script-src` to `'self'` by serving the theme initialization script from a first-party route (`/theme-init`), avoiding the need for `'unsafe-inline'` or an inline hash. Significantly expanded `Permissions-Policy`.
 - **Auth Cookies**: Fully hardened all Auth.js cookies (`sessionToken`, `csrfToken`, `pkceCodeVerifier`, `state`, `nonce`, etc.) with proper `httpOnly`, `Secure`, `__Secure-`/`__Host-` prefixes, and `sameSite: "lax"`. Session lifetime reduced from 30 days to 14 days for better security.
 - **Proxy / Rate Limiting**: 
   - Switched to the modern Next.js 16 `proxy.ts` convention (exporting `proxy`) for rate limiting + JWE session extraction.
@@ -239,11 +239,18 @@ After completing Subphases 1–3 and performing an extensive multi-agent bughunt
 
 **Current Recommended Posture**:
 - CSP **mode is env-driven** via `CSP_MODE` (defaults to Report-Only). Collect real usage data via `/debug/rate-limits`, then set `CSP_MODE=enforce` in the production environment to serve an enforcing `Content-Security-Policy` header. Flip back to `report-only` at any time for instant rollback — no code change required.
+- `script-src` is kept to `'self'`; the theme bootstrap is served as a first-party script route (`/theme-init`) so no inline hash or `'unsafe-inline'` is required.
 - The global rate-limiter resolves the client IP via `getClientIp` (`src/lib/client-ip.ts`), which ignores client-spoofable `x-forwarded-for` hops. Set `TRUSTED_PROXY_HOPS` to match your deployment's proxy chain (default 1 for Vercel/Cloudflare/single proxy; 0 if the app is directly exposed).
 - All other security headers are active and production-appropriate.
 - Auth cookies are properly hardened.
 - Rate limiting is active and resilient.
 - Internal debug tools (`/api/debug/rate-limits`, `GET /api/csp-report`) fail **closed** in production: they require `OWNER_USER_ID` to be set and to match the caller, otherwise they return 404.
+
+**Required Production Environment Variables**:
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — required by the proxy; production deploys return 503 if missing.
+- `SYNC_WORKER_SECRET` — required to dispatch and authorize the sync worker (`kickSyncWorker` throws in production if missing).
+- `CRON_SECRET` — required for Vercel Cron queue draining; also acts as an authorized caller of the sync worker route.
+- `OWNER_USER_ID` — required for debug/admin endpoints; those routes fail closed (404) in production if unset.
 
 #### Completed Hardening Checklist
 

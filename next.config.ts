@@ -33,7 +33,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "upgrade-insecure-requests",
   // Report violations to our endpoint (see /api/csp-report)
-  "report-to default;",
+  "report-to default",
 ].join("; ");
 
 // === CSP Strategy ===
@@ -165,24 +165,30 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      {
-        source: "/_next/image/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
+      // Long-lived cache for hashed static assets — production only. In dev,
+      // Next.js manages these routes and custom Cache-Control breaks HMR.
+      ...(process.env.NODE_ENV === "production"
+        ? [
+            {
+              source: "/_next/static/:path*",
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "public, max-age=31536000, immutable",
+                },
+              ],
+            },
+            {
+              source: "/_next/image/:path*",
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "public, max-age=31536000, immutable",
+                },
+              ],
+            },
+          ]
+        : []),
     ];
   },
 };

@@ -35,6 +35,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
           <ul className={cn("mt-3 space-y-3 text-sm", orbitMetaMuted())}>
             <li className="flex items-center gap-3">
               <span
+                // eslint-disable-next-line no-restricted-syntax -- intentional glow for the legend dot
                 className="inline-block size-3 rounded-full border border-[#bfdbfe]/80 bg-[#2f6fed] shadow-[0_0_0_3px_rgba(47,111,237,0.12)]"
                 aria-hidden="true"
               />

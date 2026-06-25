@@ -6,6 +6,7 @@ import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
 import { readJsonBody } from "@/lib/request-body";
 import { collectionDetailQuerySchema, patchCollectionSchema } from "@/lib/validations";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import {
   buildCollectionItemListNextCursor,
   buildPrismaCollectionItemKeysetFilter,
@@ -111,6 +112,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const body = await readJsonBody(req);
   if (!body.ok) {
     return NextResponse.json({ error: body.error }, { status: body.status });
@@ -175,6 +181,11 @@ export async function DELETE(
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const collection = await prisma.collection.findUnique({

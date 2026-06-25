@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";

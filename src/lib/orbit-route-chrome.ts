@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /** Classic void keeps softer corners; default Button uses rounded-sm. */
 export function orbitControlRadius() {
-  return "rounded-lg";
+  return "rounded-sm";
 }
 
 /** Shell wrapper for /orbit routes. Classic mode follows the app light/dark color mode. */
@@ -43,10 +43,7 @@ export function orbitForeground() {
 }
 
 export function orbitPanelClass(extra?: string) {
-  return cn(
-    "rounded-lg border border-hairline-soft bg-surface-2/70 dark:border-white/10 dark:bg-white/[0.04]",
-    extra
-  );
+  return cn("surface-inset-strong", extra);
 }
 
 export function orbitBannerClass(extra?: string) {
@@ -61,15 +58,15 @@ export function orbitHoverRowClass() {
 }
 
 export function orbitGhostButtonClass() {
-  return "border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10";
+  return "surface-inset-strong text-foreground hover:bg-accent-soft";
 }
 
 export function orbitMapLinkClass() {
-  return "inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-sm border border-hairline-soft bg-surface-2/70 px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground dark:border-white/15 dark:bg-white/[0.045]";
+  return "inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap surface-inset-strong px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground";
 }
 
-export function orbitSelectionBarClass() {
-  return "rounded-sm border border-hairline-soft bg-surface-1/95 backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(10,15,29,0.95),rgba(15,23,42,0.92))]";
+export function orbitSelectionBarClass(extra?: string) {
+  return cn("surface-glass", extra);
 }
 
 /** Clamp floating menu position within the viewport. */

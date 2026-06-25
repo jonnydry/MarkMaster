@@ -1,6 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logger";
 
 /**
  * Rate Limiting Configuration
@@ -239,7 +240,7 @@ export async function checkRateLimit(
 
     return result;
   } catch (error) {
-    console.error(`[RateLimit] checkRateLimit failed for action "${action}" (failing open):`, error);
+    logError("RateLimit", `checkRateLimit failed for action "${action}" (failing open)`, error);
     // Fail open — never let rate limiting break the application
     return {
       success: true,
@@ -280,7 +281,7 @@ export async function resetUserRateLimit(
     await ratelimiter.resetUsedTokens(userId);
     return { ok: true };
   } catch (error) {
-    console.error(`[RateLimit] resetUserRateLimit failed for "${action}":`, error);
+    logError("RateLimit", `resetUserRateLimit failed for "${action}"`, error);
     return { ok: false, message: "Failed to reset rate limit." };
   }
 }
@@ -341,7 +342,7 @@ export async function checkGlobalRateLimit(
 
     return result;
   } catch (error) {
-    console.error(`[RateLimit] checkGlobalRateLimit failed for "${action}" (failing open):`, error);
+    logError("RateLimit", `checkGlobalRateLimit failed for "${action}" (failing open)`, error);
     return {
       success: true,
       limit: 999,

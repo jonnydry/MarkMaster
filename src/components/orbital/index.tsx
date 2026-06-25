@@ -12,7 +12,7 @@ export type OrbitalTone = "cyan" | "bronze" | "emerald";
 
 /** Shared surface primitives for elevated panels and auth chrome. */
 export const orbital = {
-  glass: "glass-orbital rounded-sm",
+  glass: "surface-card backdrop-blur-xl",
   label: orbitalTypography.label,
   data: orbitalTypography.data,
   badge: (tone: OrbitalTone) =>
@@ -30,7 +30,7 @@ export const orbital = {
     "inline-flex items-center gap-px rounded-sm border border-primary/20 bg-surface-1/95 px-1 py-0.5 backdrop-blur",
   sectionLabel: orbitalTypography.sectionLabel,
   slideIn:
-    "glass-orbital border-l-2 border-primary/40",
+    "surface-card backdrop-blur-xl border-l-2 border-primary/40",
 };
 
 export function OrbitalCard({

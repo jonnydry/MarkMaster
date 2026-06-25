@@ -88,7 +88,7 @@ npm install
 cp .env.example .env
 ```
 
-Fill in required values, then validate:
+Fill in required values. Production deployments must also set the variables marked **Yes in production** above. Validate with:
 
 ```bash
 npm run env:check
@@ -103,7 +103,11 @@ npm run env:check
 | `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
 | `ENCRYPTION_KEY` | Yes | 64-char hex for token encryption (`openssl rand -hex 32`) |
 | `XAI_API_KEY` | No | Enables Grok Orbit scans |
-| `UPSTASH_REDIS_*` | No | Distributed rate limiting in production |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | **Yes in production** | Distributed rate limiting; proxy returns 503 if absent in production |
+| `SYNC_WORKER_SECRET` | **Yes in production** | Authorizes sync-worker dispatch and `/api/internal/sync/worker` |
+| `CRON_SECRET` | **Yes in production** | Authorizes Vercel Cron queue draining (and can authorize worker route as fallback) |
+| `OWNER_USER_ID` | **Yes in production** | Prisma User.id allowed to access debug tools; endpoints fail closed if unset in production |
+| `CSP_MODE` | No | `report-only` (default) or `enforce` for CSP header mode |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 

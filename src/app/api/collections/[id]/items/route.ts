@@ -9,6 +9,7 @@ import {
   reorderCollectionItemsSchema,
 } from "@/lib/validations";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 async function requireCollection(
   collectionId: string,
@@ -30,7 +31,11 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit collection item writes
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -122,7 +127,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit collection item writes
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -171,7 +180,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit collection item writes
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   const collection = await requireCollection(collectionId, user.id);
   if (!collection) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -541,6 +541,10 @@
     backdrop-filter: blur(40px);
   }
 }
+@utility surface-glass {
+  /* Frosted chrome bar — sticky subbars, selection bars, etc. */
+  @apply rounded-sm border border-hairline-soft bg-surface-1/95 backdrop-blur-md;
+}
 
 @layer base {
   * {
@@ -637,18 +641,30 @@
     min-width: 0;
   }
   .app-overlay-dialog {
-    max-height: calc(100dvh - (var(--app-overlay-inset) * 2));
+    max-height: min(88dvh, 880px);
     width: calc(100vw - (var(--app-overlay-inset) * 2));
-    max-width: calc(100vw - (var(--app-overlay-inset) * 2));
+    max-width: min(1120px, calc(100vw - (var(--app-overlay-inset) * 2)));
     overflow: hidden;
+  }
+  @media (min-width: 1024px) {
+    .app-overlay-dialog {
+      width: min(1120px, calc(100vw - 4rem));
+      max-width: min(1120px, calc(100vw - 4rem));
+      max-height: min(86dvh, 840px);
+    }
   }
   .app-overlay-dialog-sm {
     width: calc(100vw - (var(--app-overlay-inset-wide) * 2));
     max-width: calc(100vw - (var(--app-overlay-inset-wide) * 2));
   }
   .app-overlay-dialog-grid {
-    max-height: calc(100dvh - (var(--app-overlay-inset) * 2));
+    max-height: min(88dvh, 880px);
     min-height: 0;
+  }
+  @media (min-width: 1024px) {
+    .app-overlay-dialog-grid {
+      max-height: min(86dvh, 840px);
+    }
   }
   .app-overlay-panel {
     max-height: min(68dvh, 620px);

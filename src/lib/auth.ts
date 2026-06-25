@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Twitter from "next-auth/providers/twitter";
+import { logError } from "@/lib/logger";
 import { prisma } from "./prisma";
 import { decrypt } from "./encryption";
 import {
@@ -160,7 +161,7 @@ export async function getDbUser(): Promise<DbUser | null> {
     const session = (await auth()) as SessionWithUser | null;
     return session?.dbUser ?? null;
   } catch (e) {
-    console.error("[auth] getDbUser failed:", e);
+    logError("auth", "getDbUser failed", e);
     return null;
   }
 }
@@ -178,7 +179,7 @@ export async function getUserTokens(userId: string) {
       tokenExpiresAt: user.tokenExpiresAt,
     };
   } catch (e) {
-    console.error("[auth] getUserTokens decrypt failed:", e);
+    logError("auth", "getUserTokens decrypt failed", e);
     return null;
   }
 }

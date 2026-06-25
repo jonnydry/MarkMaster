@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { readJsonBody } from "@/lib/request-body";
 import { createCollectionSchema } from "@/lib/validations";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 export async function GET() {
   const user = await getDbUser();
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit("api:write", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const body = await readJsonBody(req);

@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { logError } from "@/lib/logger";
 
 let _redis: Redis | null = null;
 
@@ -17,7 +18,7 @@ export async function getUserCacheVersion(userId: string): Promise<number> {
     const version = await redis.get<number>(`cache:ver:${userId}`);
     return version ?? 0;
   } catch (error) {
-    console.error(`[Cache] version read failed for ${userId}:`, error);
+    logError("Cache", `version read failed for ${userId}`, error);
     return 0;
   }
 }
@@ -49,7 +50,7 @@ async function flushInvalidateUserResponseCache(userId: string): Promise<void> {
   try {
     await redis.incr(`cache:ver:${userId}`);
   } catch (error) {
-    console.error(`[Cache] invalidate failed for ${userId}:`, error);
+    logError("Cache", `invalidate failed for ${userId}`, error);
   }
 }
 
@@ -66,9 +67,9 @@ export async function getCachedJson<T>(
       if (cached) {
         return JSON.parse(cached) as T;
       }
-    } catch (error) {
-      console.error(`[Cache] read failed for ${key}:`, error);
-    }
+  } catch (error) {
+    logError("Cache", `read failed for ${key}`, error);
+  }
   }
 
   const value = await inFlightCompute(key, compute);
@@ -76,9 +77,9 @@ export async function getCachedJson<T>(
   if (redis) {
     try {
       await redis.set(key, JSON.stringify(value), { ex: ttlSeconds });
-    } catch (error) {
-      console.error(`[Cache] write failed for ${key}:`, error);
-    }
+  } catch (error) {
+    logError("Cache", `write failed for ${key}`, error);
+  }
   }
 
   return value;

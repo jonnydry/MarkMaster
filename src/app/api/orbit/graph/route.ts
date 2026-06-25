@@ -7,6 +7,7 @@ import {
   orbitGraphQuerySchema,
   DEFAULT_ORBIT_GRAPH_NODE_CAP,
 } from "@/lib/validations";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import type { OrbitGraphPayload } from "@/types";
 
 const GRAPH_CACHE_HEADERS = {
@@ -17,6 +18,11 @@ export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit("orbit", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const queryParams = Object.fromEntries(req.nextUrl.searchParams.entries());

@@ -3,12 +3,12 @@
 import {
   useState,
   useCallback,
+  useEffect,
   useRef,
   type MouseEvent,
   type PointerEvent,
   type CSSProperties,
 } from "react";
-import { flushSync } from "react-dom";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
@@ -21,16 +21,17 @@ import {
   isVideoLikeMediaType,
 } from "@/lib/bookmark-media";
 import { openBookmarkOnX, type BookmarkTweetLink } from "@/lib/bookmark-url";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { cn } from "@/lib/utils";
 
 export type { BookmarkMediaJson as BookmarkMediaItem };
 
 export type BookmarkMediaGalleryVariant = "feed" | "compact" | "inline" | "overlay";
 
-// Expanded overlay: whole image visible, scaled to fit the scroll column.
-const OVERLAY_IMAGE_MAX_HEIGHT = "min(70dvh, calc(100dvh - 14rem))";
 const OVERLAY_TILE_CLASS =
-  "mx-auto block h-auto w-auto max-w-full object-contain";
+  "mx-auto block min-w-0 max-w-full object-contain cursor-pointer";
+const OVERLAY_SINGLE_CAP = "max-h-[min(48dvh,520px)]";
+const OVERLAY_MULTI_CAP = "max-h-[min(36dvh,400px)]";
 
 const LAYOUT: Record<
   BookmarkMediaGalleryVariant,
@@ -53,7 +54,7 @@ const LAYOUT: Record<
     shellClass: "mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent",
     gridClass: (n) => (n === 1 ? "" : "grid grid-cols-2 gap-0.5"),
     imageSizes: `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`,
-    singleTileClass: "max-h-80",
+    singleTileClass: "max-h-[70vh] object-contain",
     multiTileClass: "aspect-square",
     compactTileClass: "",
   },
@@ -64,7 +65,7 @@ const LAYOUT: Record<
     shellClass: "mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent",
     gridClass: (n) => (n === 1 ? "" : "grid grid-cols-2 gap-0.5"),
     imageSizes: "(max-width: 768px) 100vw, 460px",
-    singleTileClass: "max-h-72",
+    singleTileClass: "max-h-72 object-contain",
     multiTileClass: "aspect-square",
     compactTileClass: "",
   },
@@ -73,11 +74,11 @@ const LAYOUT: Record<
     allowInlinePlayback: true,
     expandedLayout: true,
     shellClass:
-      "mt-3 rounded-sm border border-hairline-strong bg-black/10 supports-[backdrop-filter]:bg-black/15",
+      "mt-3 overflow-hidden rounded-sm border border-hairline-strong bg-black/10 supports-[backdrop-filter]:bg-black/15",
     gridClass: (n) => (n === 1 ? "" : "flex flex-col gap-2"),
     imageSizes: "(max-width: 768px) 100vw, 680px",
-    singleTileClass: "",
-    multiTileClass: OVERLAY_TILE_CLASS,
+    singleTileClass: cn(OVERLAY_TILE_CLASS, OVERLAY_SINGLE_CAP),
+    multiTileClass: cn(OVERLAY_TILE_CLASS, OVERLAY_MULTI_CAP),
     compactTileClass: "",
   },
   compact: {
@@ -119,8 +120,7 @@ function useExpandedLayout(
 }
 
 function expandedImageClass(
-  layout: (typeof LAYOUT)[BookmarkMediaGalleryVariant],
-  _singleInGallery: boolean
+  layout: (typeof LAYOUT)[BookmarkMediaGalleryVariant]
 ): string {
   return cn(layout.multiTileClass || OVERLAY_TILE_CLASS);
 }
@@ -135,6 +135,7 @@ function GalleryImage({
   priority,
   expanded,
   onError,
+  onClick,
 }: {
   src: string;
   alt: string;
@@ -145,31 +146,22 @@ function GalleryImage({
   priority?: boolean;
   expanded: boolean;
   onError: () => void;
+  onClick?: () => void;
 }) {
   if (expanded) {
-    const expandedStyle: CSSProperties = {
-      display: "block",
-      height: "auto",
-      marginInline: "auto",
-      maxHeight: OVERLAY_IMAGE_MAX_HEIGHT,
-      maxWidth: "100%",
-      objectFit: "contain",
-      width: "auto",
-    };
-
     return (
-      // Native img avoids Next.js aspect-ratio wrapper clipping in overlay scroll.
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt}
-        width={width}
-        height={height}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
-        className={className}
-        style={expandedStyle}
+        className={cn(
+          "h-auto w-auto max-w-full object-contain",
+          className
+        )}
+        style={{ objectFit: "contain" }}
         onError={onError}
+        onClick={onClick}
       />
     );
   }
@@ -203,6 +195,7 @@ interface MediaTileProps {
   showCountOverlay?: number;
   /** Legacy alias — prefer variant="overlay" in expanded bookmark shells. */
   expandSingle?: boolean;
+  onOpenLightbox?: (src: string, alt: string) => void;
 }
 
 function MediaTile({
@@ -219,6 +212,7 @@ function MediaTile({
   onActivate,
   showCountOverlay,
   expandSingle,
+  onOpenLightbox,
 }: MediaTileProps) {
   const isCompact = Boolean(layout.compactTileClass);
   const expandedLayout = useExpandedLayout(
@@ -232,6 +226,28 @@ function MediaTile({
   const playbackUrl = getMediaPlaybackUrl(item);
   const isGif = item.type === "animated_gif";
   const aspectStyle = getTileAspectStyle(item);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (mode !== "video" || !playbackUrl) return;
+    const video = videoRef.current;
+    if (!video) return;
+    if (isGif) {
+      video.muted = true;
+      video.loop = true;
+    }
+    const attemptPlay = () => {
+      void video.play().catch(() => {});
+    };
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      attemptPlay();
+      return;
+    }
+    video.addEventListener("loadeddata", attemptPlay, { once: true });
+    return () => {
+      video.removeEventListener("loadeddata", attemptPlay);
+    };
+  }, [mode, playbackUrl, isGif]);
 
   if (mode === "video" && playbackUrl) {
     return (
@@ -241,7 +257,11 @@ function MediaTile({
           "relative bg-black",
           isCompact ? layout.compactTileClass : "",
           !isCompact && !expandedLayout && "w-full overflow-hidden",
-          expandedLayout && "mx-auto max-w-full",
+          expandedLayout &&
+            cn(
+              "mx-auto max-w-full",
+              singleInGallery ? OVERLAY_SINGLE_CAP : OVERLAY_MULTI_CAP
+            ),
           !isCompact &&
             singleInGallery &&
             !expandedLayout &&
@@ -255,13 +275,15 @@ function MediaTile({
             !aspectStyle &&
             singleInGallery &&
             !expandedLayout &&
-            "aspect-video"
+            "aspect-video",
+          !isCompact && !aspectStyle && expandedLayout && "aspect-video"
         )}
         style={aspectStyle}
       >
         <video
+          ref={videoRef}
           src={playbackUrl}
-          controls
+          controls={!isGif}
           playsInline
           preload="metadata"
           loop={isGif}
@@ -271,7 +293,7 @@ function MediaTile({
             "block size-full",
             isCompact ? "object-cover" : "object-contain"
           )}
-          aria-label={`Video from @${authorUsername}`}
+          aria-label={`${isGif ? "GIF" : "Video"} from @${authorUsername}`}
         />
       </div>
     );
@@ -298,7 +320,10 @@ function MediaTile({
   if (!poster || imageError.has(poster)) return null;
 
   const imageClass = expandedLayout
-    ? expandedImageClass(layout, singleInGallery)
+    ? cn(
+        expandedImageClass(layout),
+        singleInGallery ? OVERLAY_SINGLE_CAP : OVERLAY_MULTI_CAP
+      )
     : cn(
         "w-full object-cover",
         layout.compactTileClass,
@@ -381,6 +406,11 @@ function MediaTile({
         priority={priority && index === 0}
         expanded={expandedLayout}
         onError={() => onImageError(poster)}
+        onClick={
+          expandedLayout
+            ? () => onOpenLightbox?.(poster, `Media ${index + 1} from @${authorUsername}`)
+            : undefined
+        }
       />
       {showCountOverlay != null && showCountOverlay > 0 && (
         <div
@@ -421,9 +451,9 @@ export function BookmarkMediaGallery({
   expandSingle = false,
 }: BookmarkMediaGalleryProps) {
   const layout = LAYOUT[variant];
-  const galleryRef = useRef<HTMLDivElement>(null);
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const [playingKey, setPlayingKey] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
 
   // Reset transient gallery state when switching to a different bookmark.
   const [prevBookmarkKey, setPrevBookmarkKey] = useState(bookmarkKey);
@@ -431,6 +461,7 @@ export function BookmarkMediaGallery({
     setPrevBookmarkKey(bookmarkKey);
     setPlayingKey(null);
     setImageError(new Set());
+    setLightbox(null);
   }
 
   const onImageError = useCallback((url: string) => {
@@ -440,25 +471,6 @@ export function BookmarkMediaGallery({
   const openOnX = useCallback(() => {
     if (tweetLink) openBookmarkOnX(tweetLink);
   }, [tweetLink]);
-
-  const playMountedVideo = useCallback((item: BookmarkMediaJson, key: string) => {
-    const video = galleryRef.current?.querySelector<HTMLVideoElement>(
-      `[data-media-tile="${key}"] video`
-    );
-    if (!video) return;
-    if (item.type === "animated_gif") {
-      video.muted = true;
-      video.loop = true;
-    }
-    const attemptPlay = () => {
-      void video.play().catch(() => {});
-    };
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      attemptPlay();
-      return;
-    }
-    video.addEventListener("loadeddata", attemptPlay, { once: true });
-  }, []);
 
   if (!media.length || !authorUsername) return null;
 
@@ -499,8 +511,7 @@ export function BookmarkMediaGallery({
     if (!videoLike) return;
 
     if (layout.allowInlinePlayback && getMediaPlaybackUrl(item)) {
-      flushSync(() => setPlayingKey(key));
-      playMountedVideo(item, key);
+      setPlayingKey(key);
       return;
     }
     openOnX();
@@ -508,7 +519,7 @@ export function BookmarkMediaGallery({
 
   return (
     <div
-      ref={galleryRef}
+      data-variant={variant}
       className={cn(
         layout.shellClass,
         layout.gridClass(visible.length),
@@ -541,9 +552,17 @@ export function BookmarkMediaGallery({
             onActivate={() => handleActivate(item, tileKey)}
             showCountOverlay={showCountOverlay}
             expandSingle={expandSingle}
+            onOpenLightbox={(src, alt) => setLightbox({ src, alt })}
           />
         );
       })}
+      {lightbox && (
+        <ImageLightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }

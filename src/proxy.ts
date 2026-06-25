@@ -5,6 +5,7 @@ import { checkRateLimit, createRateLimitResponse, isRateLimitingEnabled } from "
 import { isLightweightApiRequest } from "@/lib/lightweight-api-routes";
 import { getUserIdFromRequest } from "@/lib/auth-edge";
 import { getClientIp } from "@/lib/client-ip";
+import { logError } from "@/lib/logger";
 
 // === Global Safety Limiter ===
 // Protects the entire system from abuse (e.g. one IP hammering the API)
@@ -21,7 +22,7 @@ if (isGlobalRateLimitingEnabled) {
       prefix: "ratelimit:global",
     });
   } catch (err) {
-    console.error("[Proxy] Failed to initialize global rate limiter:", err);
+    logError("Proxy", "Failed to initialize global rate limiter", err);
     globalLimiter = null;
   }
 }
@@ -45,7 +46,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (process.env.NODE_ENV === "production" && !isRateLimitingEnabled) {
-    console.error("[Proxy] UPSTASH_REDIS_REST_URL is required in production.");
+    logError("Proxy", "UPSTASH_REDIS_REST_URL is required in production");
     return NextResponse.json(
       {
         error: "Service Unavailable",
@@ -80,7 +81,7 @@ export async function proxy(request: NextRequest) {
         );
       }
     } catch (error) {
-      console.error("[Proxy] Global rate limit check failed (failing open):", error);
+      logError("Proxy", "Global rate limit check failed (failing open)", error);
       // Fail open to avoid taking down the entire application
     }
   }
@@ -110,7 +111,7 @@ export async function proxy(request: NextRequest) {
       return createRateLimitResponse(rateLimitResult);
     }
   } catch (error) {
-    console.error("[Proxy] Per-user rate limit check failed (failing open):", error);
+    logError("Proxy", "Per-user rate limit check failed (failing open)", error);
     // Fail open — do not block legitimate users when rate limiting is broken
   }
 

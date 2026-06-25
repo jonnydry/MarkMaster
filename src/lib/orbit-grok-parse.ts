@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logWarn } from "@/lib/logger";
 import { PRESET_COLORS } from "@/lib/constants";
 import { getTagColorSpectrum } from "@/lib/tag-colors";
 import {
@@ -131,11 +132,13 @@ export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlan {
     return parsedLoosePlan.data;
   }
 
-  console.warn(
-    "[orbit] xAI scan plan failed schema validation:",
-    formatZodIssues(parsedPlan.error),
-    "loose:",
-    formatZodIssues(parsedLoosePlan.error)
+  logWarn(
+    "orbit",
+    "xAI scan plan failed schema validation",
+    {
+      strict: formatZodIssues(parsedPlan.error),
+      loose: formatZodIssues(parsedLoosePlan.error),
+    }
   );
 
   throw new OrbitGrokError(

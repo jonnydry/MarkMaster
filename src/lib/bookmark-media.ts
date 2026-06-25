@@ -34,7 +34,14 @@ function upgradeTwitterImageUrl(url: string): string {
 
   try {
     const parsed = new URL(url);
-    if (parsed.hostname === "pbs.twimg.com") {
+    if (parsed.hostname.endsWith("twimg.com")) {
+      // Replace legacy `:small`/`:large`/`:orig` suffixes with a query param.
+      const suffixMatch = parsed.pathname.match(/(:[a-zA-Z0-9_]+)$/);
+      if (suffixMatch) {
+        parsed.pathname = parsed.pathname.slice(0, -suffixMatch[1].length);
+      }
+      // Strip any existing size/format params so `name=orig` is the only sizing directive.
+      parsed.searchParams.delete("name");
       parsed.searchParams.set("name", "orig");
       return parsed.toString();
     }

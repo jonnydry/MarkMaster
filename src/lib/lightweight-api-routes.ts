@@ -4,6 +4,13 @@
  * in route handlers where relevant.
  */
 export function isLightweightApiRequest(pathname: string, method: string): boolean {
+  // Collection mutation routes apply their own api:write checks explicitly.
+  const isCollectionsRoute =
+    pathname === "/api/collections" || pathname.startsWith("/api/collections/");
+  if (isCollectionsRoute && method !== "GET" && method !== "HEAD") {
+    return true;
+  }
+
   if (pathname.startsWith("/api/bookmarks/sync")) {
     return method === "GET" || method === "HEAD";
   }

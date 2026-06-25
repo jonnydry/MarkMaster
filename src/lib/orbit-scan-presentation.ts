@@ -56,11 +56,9 @@ export function getScanFailurePresentation(error: OrbitScanFailure): {
       return {
         Icon: AlertTriangle,
         label: "Request",
-        badgeClassName:
-          "border-hairline-soft bg-surface-2/80 text-foreground/80 dark:border-white/20 dark:bg-white/[0.08] dark:text-white/80",
-        panelClassName:
-          "border-hairline-soft bg-surface-2/60 dark:border-white/14 dark:bg-white/[0.055]",
-        iconClassName: "text-muted-foreground dark:text-white/75",
+        badgeClassName: "surface-inset-strong text-foreground/80",
+        panelClassName: "surface-inset text-foreground/80",
+        iconClassName: "text-muted-foreground",
         helper: "Refresh the page scope or scan a selected subset.",
       };
     case "provider":

@@ -222,6 +222,11 @@ function getSyncWorkerBaseUrl() {
 export async function kickSyncWorker(runId: string) {
   const secret = process.env.SYNC_WORKER_SECRET?.trim();
   if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SYNC_WORKER_SECRET is required in production. Set it or the sync worker cannot be dispatched."
+      );
+    }
     await processSyncRun(runId);
     return;
   }
