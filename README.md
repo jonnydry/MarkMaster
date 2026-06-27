@@ -22,11 +22,6 @@
 
 MarkMaster is a **bookmark manager built for people who save a lot on X** and need to **find, organize, and act on** what they kept. Your library syncs into PostgreSQL, stays full-text searchable, and gains structure through tags, collections, notes, and optional Grok-assisted workflows.
 
-<div align="center">
-  <img src="docs/design/orbit-hero-integrated-page-mockup.svg.png" alt="MarkMaster Orbit Map interface" width="85%" />
-  <p><em>The Orbit Map — a force-directed graph of your tags, collections, and bookmark relationships</em></p>
-</div>
-
 ---
 
 ## 🚀 Features
