@@ -1,18 +1,65 @@
-# MarkMaster
+<div align="center">
+  <img src="public/logo.png" alt="MarkMaster logo" width="120" height="120" />
+  <h1>MarkMaster</h1>
+  <p><strong>Search, tag, annotate, and curate your X bookmarks</strong> — with collections, analytics, Grok-powered triage, and a local archive that stays searchable after sync.</p>
 
-**Search, tag, annotate, and curate your X bookmarks** — with collections, analytics, Grok-powered triage, and a local archive that stays searchable after sync.
-
-[![CI](https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml/badge.svg)](https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  <p>
+    <a href="https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml">
+      <img src="https://github.com/jonnydry/MarkMaster/actions/workflows/ci.yml/badge.svg" alt="CI" />
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
+    </a>
+    <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" alt="Next.js 16" />
+    <img src="https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql" alt="PostgreSQL" />
+  </p>
+</div>
 
 ---
 
-## Overview
+## ✨ What is MarkMaster?
 
-MarkMaster is a bookmark manager built for people who save a lot on X and need to **find, organize, and act on** what they kept. Your library syncs into PostgreSQL, stays full-text searchable, and gains structure through tags, collections, notes, and optional Grok-assisted workflows.
+MarkMaster is a **bookmark manager built for people who save a lot on X** and need to **find, organize, and act on** what they kept. Your library syncs into PostgreSQL, stays full-text searchable, and gains structure through tags, collections, notes, and optional Grok-assisted workflows.
+
+<div align="center">
+  <img src="docs/design/orbit-hero-integrated-page-mockup.svg.png" alt="MarkMaster Orbit Map interface" width="85%" />
+  <p><em>The Orbit Map — a force-directed graph of your tags, collections, and bookmark relationships</em></p>
+</div>
+
+---
+
+## 🚀 Features
+
+### 📚 Library & Search
+- **Full-text search** across tweet text, authors, and notes
+- Sort and filter by date, engagement, media type, author, and tags
+- Custom tags with colors; notes per bookmark
+- **Keyboard shortcuts** — `j`/`k` navigate, `/` search, `⌘K` command palette, `t` tag, `c` collect, `n` note
+- Export to JSON or CSV with metadata
+
+### 🗂️ Organization
+- **Collections** with drag ordering and public `/share/[slug]` pages
+- **X folder sync** — import premium bookmark folders into managed collections
+- Incremental sync with encrypted token storage and local archive
+
+### 🤖 Orbit & Grok (optional)
+- Batch Grok scans with adaptive sizing (quick / balanced / deep)
+- Review overlay to accept, edit, or keep suggestions before applying
+- Strong-match auto-apply, author history hints, and decision telemetry
+- Flywheel flows from Discovery → Orbit review with digest batches
+
+### 🎨 Presentation
+- Dark / light themes with accent presets and typography options (Orbit, Classic, Editorial)
+- Frosted app chrome aligned across dashboard, collections, and Orbit
+- Command palette for fast navigation and actions
+
+---
+
+## 🏗️ Architecture Overview
 
 | Module | What it does |
-|--------|----------------|
+|--------|-------------|
 | **Dashboard** | Browse, search, filter, and sort your full library with feed / compact / grid views |
 | **Discovery** | Surface high-engagement untouched saves and batch-review them in Orbit |
 | **Orbit** | Triage queue for unorganized bookmarks — Grok suggests tags and collections |
@@ -23,49 +70,22 @@ MarkMaster is a bookmark manager built for people who save a lot on X and need t
 
 ---
 
-## Features
-
-### Library & search
-- Full-text search across tweet text, authors, and notes
-- Sort and filter by date, engagement, media type, author, and tags
-- Custom tags with colors; notes per bookmark
-- Keyboard shortcuts — `j`/`k` navigate, `/` search, `⌘K` command palette, `t` tag, `c` collect, `n` note
-- Export to JSON or CSV with metadata
-
-### Organization
-- **Collections** with drag ordering and public `/share/[slug]` pages
-- **X folder sync** — import premium bookmark folders into managed collections
-- Incremental sync with encrypted token storage and local archive
-
-### Orbit & Grok (optional)
-- Batch Grok scans with adaptive sizing (quick / balanced / deep)
-- Review overlay to accept, edit, or keep suggestions before applying
-- Strong-match auto-apply, author history hints, and decision telemetry
-- Flywheel flows from Discovery → Orbit review with digest batches
-
-### Presentation
-- Dark / light themes with accent presets and typography options (Orbit, Classic, Editorial)
-- Frosted app chrome aligned across dashboard, collections, and Orbit
-- Command palette for fast navigation and actions
-
----
-
-## Tech stack
+## 🛠️ Tech Stack
 
 | Layer | Choices |
 |-------|---------|
-| Framework | Next.js 16 (App Router), React 19, TypeScript |
-| Styling | Tailwind CSS 4, shadcn/ui |
-| Data | PostgreSQL, Prisma |
-| Auth | Auth.js (NextAuth v5) — X OAuth 2.0 |
-| Client state | TanStack Query |
-| Charts | Custom SVG (recharts removed for bundle size) |
-| Graph | d3-force, Pixi.js (Orbit map) |
-| AI (optional) | xAI Grok via Responses API |
+| **Framework** | Next.js 16 (App Router), React 19, TypeScript |
+| **Styling** | Tailwind CSS 4, shadcn/ui |
+| **Data** | PostgreSQL, Prisma |
+| **Auth** | Auth.js (NextAuth v5) — X OAuth 2.0 |
+| **Client state** | TanStack Query |
+| **Charts** | Custom SVG (recharts removed for bundle size) |
+| **Graph** | d3-force, Pixi.js (Orbit map) |
+| **AI (optional)** | xAI Grok via Responses API |
 
 ---
 
-## Getting started
+## 📦 Getting Started
 
 ### Prerequisites
 
@@ -88,7 +108,7 @@ npm install
 cp .env.example .env
 ```
 
-Fill in required values. Production deployments must also set the variables marked **Yes in production** above. Validate with:
+Fill in required values. Production deployments must also set the variables marked **Yes in production** below. Validate with:
 
 ```bash
 npm run env:check
@@ -151,7 +171,7 @@ npm run deploy:build
 
 ---
 
-## Scripts
+## 🧞 Available Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -165,7 +185,7 @@ npm run deploy:build
 
 ---
 
-## Project structure
+## 📁 Project Structure
 
 ```
 src/
@@ -189,7 +209,7 @@ Design notes and archived plans live under [`docs/design/`](docs/design/).
 
 ---
 
-## X API costs
+## 💰 X API Costs
 
 Bookmark access requires X API entitlement (Basic tier or pay-per-use):
 
@@ -200,7 +220,7 @@ MarkMaster minimizes repeat calls through incremental sync and local storage.
 
 ---
 
-## Development
+## 🤝 Development
 
 - **CI** runs lint, tests, and build on every push to `main` and on pull requests.
 - **AGENTS.md** documents Next.js conventions for AI-assisted development in this repo.
@@ -208,6 +228,6 @@ MarkMaster minimizes repeat calls through incremental sync and local storage.
 
 ---
 
-## License
+## 📄 License
 
 [MIT](LICENSE) © Jonny Drybanski
