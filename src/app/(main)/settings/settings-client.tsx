@@ -134,8 +134,8 @@ export default function SettingsPage() {
     router.push(`/dashboard?tag=${encodeURIComponent(tagId)}`);
   };
 
-  const handleSyncComplete = useCallback(() => {
-    completeLibrarySync(queryClient, {
+  const handleSyncComplete = useCallback(async () => {
+    await completeLibrarySync(queryClient, {
       updateSession: () => updateSession({ refresh: "lastSyncAt" }),
     });
   }, [queryClient, updateSession]);

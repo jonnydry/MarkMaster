@@ -57,6 +57,7 @@ import {
 import {
   getOrbitMapLabelFill,
   getOrbitMapPalette,
+  parseHexColorToNumber,
   type OrbitMapColorMode,
 } from '@/lib/orbit-map-palette';
 import { buildOrbitMapStructureKey } from '@/lib/orbit-map-structure-key';
@@ -214,6 +215,7 @@ const LABEL_BASE_FONT_SIZE = 18;
 const LABEL_MIN_WORLD_SCALE = 0.16;
 const LABEL_MAX_WORLD_SCALE = 2.35;
 let colorMode: OrbitMapColorMode = 'dark';
+let accentHex: string | undefined;
 const MIN_CAMERA_ZOOM = 0.12;
 const MAX_CAMERA_ZOOM = 1.85;
 const CAMERA_FRAME_PADDING = 72;
@@ -244,7 +246,11 @@ const activeAnimations: MapAnimation[] = [];
 let renderLoopRunning = false;
 
 function getPalette() {
-  return getOrbitMapPalette(colorMode);
+  return getOrbitMapPalette(colorMode, accentHex);
+}
+
+function getPaletteAccent(): number {
+  return parseHexColorToNumber(accentHex, colorMode === 'light' ? 0x2563eb : 0x2f6fed);
 }
 
 /** Send a message back to the main thread. */
@@ -512,6 +518,7 @@ function handleInit(msg: InitMessage) {
   }
 
   colorMode = msg.colorMode ?? 'dark';
+  accentHex = msg.accentHex;
   const palette = getPalette();
 
   try {
@@ -579,8 +586,9 @@ function handleResize(msg: ResizeMessage) {
 }
 
 function handleSetTheme(msg: SetThemeMessage) {
-  if (msg.colorMode === colorMode) return;
+  if (msg.colorMode === colorMode && msg.accentHex === accentHex) return;
   colorMode = msg.colorMode;
+  accentHex = msg.accentHex;
   applyColorMode();
 }
 
@@ -591,6 +599,7 @@ function applyColorMode() {
   }
   refreshBackgroundAtmosphere();
   if (currentGraph) {
+    reapplyBookmarkVisuals();
     rebuildLinkDataFromGraph();
   }
   updateNodeStyles();
@@ -608,10 +617,24 @@ function refreshBackgroundAtmosphere() {
     vignetteSprite = null;
   }
 
-  vignetteSprite = createOrbitMapVignetteSprite(colorMode);
+  vignetteSprite = createOrbitMapVignetteSprite(colorMode, getPaletteAccent());
   backgroundContainer.addChildAt(vignetteSprite, 0);
   layoutVignette(app.renderer.width, app.renderer.height);
-  buildOrbitMapStarfield(starfieldContainer, colorMode);
+  buildOrbitMapStarfield(starfieldContainer, colorMode, getPaletteAccent());
+}
+
+function reapplyBookmarkVisuals() {
+  const palette = getPalette();
+  for (const datum of nodeData) {
+    if (datum.kind !== 'bookmark') continue;
+    datum.visual = getOrbitMapNodeVisualStyle(datum.node, palette);
+  }
+  applyBookmarkAccentColors();
+  for (const datum of nodeData) {
+    if (datum.kind === 'bookmark') {
+      redrawNodeGraphics(datum);
+    }
+  }
 }
 
 function handleSetGraph(msg: SetGraphMessage) {
@@ -751,13 +774,14 @@ function buildBackground() {
   if (!app || !backgroundContainer || !starfieldContainer) return;
 
   glowTexture = glowTexture ?? createOrbitMapGlowTexture();
+  const accent = getPaletteAccent();
 
   if (!vignetteSprite) {
-    vignetteSprite = createOrbitMapVignetteSprite(colorMode);
+    vignetteSprite = createOrbitMapVignetteSprite(colorMode, accent);
     backgroundContainer.addChild(vignetteSprite);
   }
   layoutVignette(app.renderer.width, app.renderer.height);
-  buildOrbitMapStarfield(starfieldContainer, colorMode);
+  buildOrbitMapStarfield(starfieldContainer, colorMode, accent);
 }
 
 /**
@@ -838,7 +862,7 @@ function rebuildScene() {
     x: 0,
     y: 0,
     radius: getOrbitMapNodeRadius(node),
-    visual: getOrbitMapNodeVisualStyle(node),
+    visual: getOrbitMapNodeVisualStyle(node, getPalette()),
   }));
 
   // Deterministic two-phase layout: anchor constellation + bookmark orbits.
@@ -986,7 +1010,7 @@ function applyBookmarkAccentColors() {
     const neighbors = adjacency.get(datum.id);
     if (!neighbors) continue;
 
-    const baseVisual = getOrbitMapNodeVisualStyle(datum.node);
+    const baseVisual = getOrbitMapNodeVisualStyle(datum.node, getPalette());
     let accent: number | null = null;
     let collectionAccent: number | null = null;
     for (const neighborId of neighbors) {
@@ -1106,7 +1130,7 @@ function updateSceneMetadata() {
     const previousVisual = datum.visual;
     datum.node = graphNode;
     datum.radius = getOrbitMapNodeRadius(graphNode);
-    datum.visual = getOrbitMapNodeVisualStyle(graphNode);
+    datum.visual = getOrbitMapNodeVisualStyle(graphNode, getPalette());
 
     if (
       datum.radius !== previousRadius ||

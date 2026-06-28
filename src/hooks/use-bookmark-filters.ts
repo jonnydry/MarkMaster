@@ -228,6 +228,7 @@ export function useBookmarkFilters() {
       toggleTag,
       hasActiveFilters,
       clearFilters,
+      resetPage,
       queryString,
       isSearchPending: search !== debouncedSearch,
     }),
@@ -258,6 +259,7 @@ export function useBookmarkFilters() {
       toggleTag,
       hasActiveFilters,
       clearFilters,
+      resetPage,
       queryString,
       debouncedSearch,
     ]

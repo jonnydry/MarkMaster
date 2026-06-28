@@ -290,8 +290,8 @@ export function useOrbitMapPage() {
       ? stats?.looseBookmarks === 0
       : stats?.totalBookmarks === 0 || renderedBookmarkCount === 0);
 
-  const handleSyncComplete = useCallback(() => {
-    completeLibrarySyncFromBootstrap({ refetch: () => void refetch() });
+  const handleSyncComplete = useCallback(async () => {
+    await completeLibrarySyncFromBootstrap({ refetch: () => void refetch() });
   }, [completeLibrarySyncFromBootstrap, refetch]);
 
   const handleSyncStateChange = useCallback((syncing: boolean) => {

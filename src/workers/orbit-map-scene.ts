@@ -41,21 +41,43 @@ export function createOrbitMapGlowTexture(): Texture {
   ]);
 }
 
+function pixiColorToRgb(color: number): [number, number, number] {
+  return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
+}
+
 export function createOrbitMapVignetteSprite(
-  mode: OrbitMapColorMode = "dark"
+  mode: OrbitMapColorMode = "dark",
+  accent?: number
 ): Sprite {
-  const stops =
-    mode === "light"
-      ? ([
-          [0, "rgba(15,23,42,0.05)"],
-          [0.55, "rgba(15,23,42,0.025)"],
-          [1, "rgba(0,0,0,0)"],
-        ] as Array<[number, string]>)
-      : ([
-          [0, "rgba(30,41,59,0.5)"],
-          [0.55, "rgba(15,23,42,0.22)"],
-          [1, "rgba(0,0,0,0)"],
-        ] as Array<[number, string]>);
+  let stops: Array<[number, string]>;
+  if (typeof accent === "number") {
+    const [r, g, b] = pixiColorToRgb(accent);
+    stops =
+      mode === "light"
+        ? [
+            [0, `rgba(${r},${g},${b},0.06)`],
+            [0.55, `rgba(${r},${g},${b},0.03)`],
+            [1, "rgba(0,0,0,0)"],
+          ]
+        : [
+            [0, `rgba(${r},${g},${b},0.42)`],
+            [0.55, `rgba(${r},${g},${b},0.2)`],
+            [1, "rgba(0,0,0,0)"],
+          ];
+  } else {
+    stops =
+      mode === "light"
+        ? ([
+            [0, "rgba(15,23,42,0.05)"],
+            [0.55, "rgba(15,23,42,0.025)"],
+            [1, "rgba(0,0,0,0)"],
+          ] as Array<[number, string]>)
+        : ([
+            [0, "rgba(30,41,59,0.5)"],
+            [0.55, "rgba(15,23,42,0.22)"],
+            [1, "rgba(0,0,0,0)"],
+          ] as Array<[number, string]>);
+  }
   const texture = createOrbitMapRadialGradientTexture(256, stops);
   const sprite = new Sprite(texture);
   sprite.anchor.set(0.5);
@@ -74,14 +96,17 @@ function createSeededRandom(seed: number) {
   };
 }
 
-/** Fills the container with distant stars (rebuilt when color mode changes). */
 export function buildOrbitMapStarfield(
   container: Container,
-  mode: OrbitMapColorMode = "dark"
+  mode: OrbitMapColorMode = "dark",
+  accent?: number
 ) {
   container.removeChildren();
   const random = createSeededRandom(0x0c0ffee);
   const stars = new Graphics();
+  const blueStarColor =
+    accent ??
+    (mode === "light" ? 0x2563eb : 0x93c5fd);
   for (let i = 0; i < 240; i++) {
     const x = (random() - 0.5) * 6000;
     const y = (random() - 0.5) * 6000;
@@ -92,10 +117,10 @@ export function buildOrbitMapStarfield(
       color:
         mode === "light"
           ? blue
-            ? 0x2563eb
+            ? blueStarColor
             : 0x64748b
           : blue
-            ? 0x93c5fd
+            ? blueStarColor
             : 0xffffff,
       alpha:
         mode === "light"

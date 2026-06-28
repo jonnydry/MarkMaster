@@ -654,8 +654,8 @@
     }
   }
   .app-overlay-dialog-sm {
-    width: calc(100vw - (var(--app-overlay-inset-wide) * 2));
-    max-width: calc(100vw - (var(--app-overlay-inset-wide) * 2));
+    width: min(22rem, calc(100vw - (var(--app-overlay-inset) * 2)));
+    max-width: min(22rem, calc(100vw - (var(--app-overlay-inset) * 2)));
   }
   .app-overlay-dialog-grid {
     max-height: min(88dvh, 880px);
@@ -925,10 +925,21 @@
   }
   .highlight-search-shell:hover,
   .highlight-search-shell:focus-within {
-    border-color: color-mix(in srgb, var(--primary) 28%, var(--hairline-strong));
+    border-color: color-mix(in srgb, var(--primary) 52%, var(--hairline-strong));
   }
   .toolbar-search-shell .text-muted-foreground {
     color: color-mix(in srgb, var(--foreground) 72%, var(--muted-foreground));
+  }
+  .toolbar-search-shell {
+    transition: background-color 150ms;
+  }
+  .toolbar-search-shell:hover,
+  .toolbar-search-shell:focus-within {
+    background-color: color-mix(
+      in srgb,
+      var(--primary) 12%,
+      color-mix(in srgb, var(--surface-1) 55%, transparent)
+    );
   }
   .toolbar-search-shell input::placeholder {
     color: color-mix(in srgb, var(--foreground) 64%, var(--muted-foreground));
@@ -955,12 +966,14 @@
     background: linear-gradient(
       var(--highlight-search-beam-angle),
       transparent 0%,
-      color-mix(in srgb, var(--primary) 50%, transparent) 18%,
+      color-mix(in srgb, var(--primary) 72%, white 8%) 14%,
       color-mix(in srgb, var(--primary) 88%, white 12%) 50%,
-      color-mix(in srgb, var(--primary) 50%, transparent) 82%,
+      color-mix(in srgb, var(--primary) 72%, white 8%) 86%,
       transparent 100%
     );
-    box-shadow: 0 0 8px 1px color-mix(in srgb, var(--primary) 40%, transparent);
+    box-shadow:
+      0 0 12px 3px color-mix(in srgb, var(--primary) 68%, white 14%),
+      0 0 22px 6px color-mix(in srgb, var(--primary) 38%, white 8%);
     will-change: top, left, width, height, opacity;
   }
   .highlight-search-shell > * {

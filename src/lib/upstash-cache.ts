@@ -44,6 +44,18 @@ export function invalidateUserResponseCache(userId: string): void {
   invalidationTimers.set(userId, timer);
 }
 
+/** Immediate bump — use when downstream clients refetch right away (e.g. sync finish). */
+export async function invalidateUserResponseCacheImmediate(
+  userId: string
+): Promise<void> {
+  const existing = invalidationTimers.get(userId);
+  if (existing) {
+    clearTimeout(existing);
+    invalidationTimers.delete(userId);
+  }
+  await flushInvalidateUserResponseCache(userId);
+}
+
 async function flushInvalidateUserResponseCache(userId: string): Promise<void> {
   const redis = getRedis();
   if (!redis) return;

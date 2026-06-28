@@ -346,11 +346,12 @@ export function useDashboardPage() {
     [setBookmarkId, setActiveBookmarkId, setPage]
   );
 
-  const handleSyncComplete = useCallback(() => {
-    completeLibrarySync(queryClient, {
+  const handleSyncComplete = useCallback(async () => {
+    filters.resetPage();
+    await completeLibrarySync(queryClient, {
       updateSession: () => updateSession({ refresh: "lastSyncAt" }),
     });
-  }, [queryClient, updateSession]);
+  }, [queryClient, updateSession, filters.resetPage]);
 
   const handleSyncStateChange = useCallback((syncing: boolean) => {
     setSyncRequestLoading(syncing);

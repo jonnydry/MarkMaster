@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { syncBookmarks } from "@/lib/sync";
-import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { invalidateUserResponseCacheImmediate } from "@/lib/upstash-cache";
 
 export async function executeSyncRun(
   runId: string,
@@ -48,7 +48,7 @@ export async function executeSyncRun(
       },
     });
 
-    await invalidateUserResponseCache(userId);
+    await invalidateUserResponseCacheImmediate(userId);
   } catch (error) {
     console.error("Sync error:", error);
 

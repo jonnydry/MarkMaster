@@ -124,6 +124,36 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
     const activeFilter = filter ?? internalFilter;
 
+    const accentRef = useRef<string | undefined>(undefined);
+    const readAccentHex = useCallback((): string | undefined => {
+      if (typeof window === 'undefined') return undefined;
+      const raw = window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue('--primary')
+        .trim();
+      if (!raw) return undefined;
+      return raw.startsWith('#') || /^[0-9a-fA-F]{3,6}$/.test(raw)
+        ? raw
+        : undefined;
+    }, []);
+    const [accentVersion, setAccentVersion] = useState(0);
+    useEffect(() => {
+      const el = document.documentElement;
+      const update = () => {
+        accentRef.current = readAccentHex();
+        setAccentVersion((v) => v + 1);
+      };
+      const observer = new MutationObserver(update);
+      observer.observe(el, {
+        attributes: true,
+        attributeFilter: ['class', 'data-color-theme'],
+      });
+      return () => observer.disconnect();
+    }, [readAccentHex]);
+    useEffect(() => {
+      accentRef.current = readAccentHex();
+    }, [readAccentHex]);
+
     useEffect(() => {
       if (filter) setInternalFilter(filter);
     }, [filter]);
@@ -174,6 +204,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             dpr: window.devicePixelRatio || 1,
             debugPerf: getOrbitMapDebugPerfEnabled(),
             colorMode: theme,
+            accentHex: accentRef.current,
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -343,8 +374,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         type: WorkerMessageType.SET_THEME,
         protocolVersion: 1,
         colorMode: theme,
+        accentHex: accentRef.current,
       });
-    }, [theme, useFallback, workerGeneration]);
+    }, [theme, useFallback, workerGeneration, accentVersion]);
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");

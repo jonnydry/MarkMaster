@@ -34,8 +34,8 @@ export function useOrbitLibraryBootstrap() {
   const { data: libraryStats } = useLibraryStatsQuery();
 
   const handleSyncComplete = useCallback(
-    (options?: SyncCompleteOptions) => {
-      completeLibrarySync(queryClient, {
+    async (options?: SyncCompleteOptions) => {
+      await completeLibrarySync(queryClient, {
         updateSession: () => updateSession({ refresh: "lastSyncAt" }),
       });
       options?.refetch?.();

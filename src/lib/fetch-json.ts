@@ -58,7 +58,10 @@ export async function fetchJson<T>(
   init?: RequestInit,
   schema?: v.GenericSchema<unknown, T>
 ): Promise<T> {
-  const res = await fetch(input, init);
+  const res = await fetch(input, {
+    cache: "no-store",
+    ...init,
+  });
 
   const contentType = res.headers.get("content-type") || "";
   const isJson = contentType.includes("application/json");

@@ -1,4 +1,5 @@
 import type { OrbitGraphNode } from "@/types";
+import type { OrbitMapPalette } from "@/lib/orbit-map-palette";
 
 export interface OrbitMapNodeVisualStyle {
   color: number;
@@ -14,7 +15,8 @@ function parseHexColor(value: string | undefined, fallback: number) {
 }
 
 export function getOrbitMapNodeVisualStyle(
-  node: OrbitGraphNode
+  node: OrbitGraphNode,
+  palette?: OrbitMapPalette
 ): OrbitMapNodeVisualStyle {
   switch (node.kind) {
     case "core":
@@ -41,10 +43,12 @@ export function getOrbitMapNodeVisualStyle(
         isHub: true,
       };
     case "bookmark": {
-      const color = node.affiliated ? 0x737373 : 0x2f6fed;
+      const accent = palette?.accent ?? 0x2f6fed;
+      const accentSoft = palette?.accentSoft ?? 0xbfdbfe;
+      const color = node.affiliated ? 0x737373 : accent;
       return {
         color,
-        strokeColor: node.affiliated ? 0xa3a3a3 : 0xbfdbfe,
+        strokeColor: node.affiliated ? 0xa3a3a3 : accentSoft,
         strokeWidth: node.affiliated ? 0.9 : 1.2,
         isHub: false,
       };

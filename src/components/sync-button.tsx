@@ -7,6 +7,7 @@ import { RefreshCw } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { sendJson, FetchJsonError } from "@/lib/fetch-json";
 import { useSyncStatus } from "@/hooks/use-sync-status";
+import { findTerminalRunForId, isExpectedFinishedRun } from "@/lib/sync-client-completion";
 import type { SyncRunSummary } from "@/types";
 
 interface SyncButtonProps {
@@ -30,8 +31,10 @@ export function SyncButton({
   const [syncing, setSyncing] = useState(false);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
   const initiatedSyncRef = useRef(false);
+  const pendingRunIdRef = useRef<string | null>(null);
+  const notifiedRunIdsRef = useRef(new Set<string>());
+  const lastProgressNewBookmarksRef = useRef(0);
   const previousCurrentRunRef = useRef<SyncRunSummary | null | undefined>(undefined);
-  const previousNewBookmarksRef = useRef(0);
   const [countdown, setCountdown] = useState<string>("");
 
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
@@ -43,30 +46,58 @@ export function SyncButton({
   const isAnySyncRunning = syncing || Boolean(currentRun) || isRateLimited;
 
   useEffect(() => {
-    const previousRun = previousCurrentRunRef.current;
-    previousCurrentRunRef.current = currentRun;
+    if (!syncStatus || !initiatedSyncRef.current) return;
 
-    if (!currentRun) {
-      previousNewBookmarksRef.current = 0;
-    } else if (
-      currentRun.newBookmarks > previousNewBookmarksRef.current &&
-      onSyncComplete
+    const { currentRun, recentRuns } = syncStatus;
+    const pendingRunId = pendingRunIdRef.current;
+
+    if (
+      pendingRunId &&
+      currentRun?.id === pendingRunId &&
+      currentRun.newBookmarks > lastProgressNewBookmarksRef.current
     ) {
-      previousNewBookmarksRef.current = currentRun.newBookmarks;
-      onSyncComplete();
+      lastProgressNewBookmarksRef.current = currentRun.newBookmarks;
+      onSyncComplete?.();
     }
 
-    if (!initiatedSyncRef.current || !previousRun || currentRun) {
-      return;
+    if (pendingRunId) {
+      const finishedRun = findTerminalRunForId(recentRuns, pendingRunId);
+      if (finishedRun) {
+        pendingRunIdRef.current = null;
+        initiatedSyncRef.current = false;
+        lastProgressNewBookmarksRef.current = 0;
+        if (!notifiedRunIdsRef.current.has(finishedRun.id)) {
+          notifiedRunIdsRef.current.add(finishedRun.id);
+          showSyncCompletionToast(finishedRun);
+        }
+        onSyncComplete?.();
+        return;
+      }
     }
 
-    initiatedSyncRef.current = false;
-    const run = syncStatus?.recentRuns[0];
-    if (run) {
-      showSyncCompletionToast(run);
+    const previousRun = previousCurrentRunRef.current;
+    previousCurrentRunRef.current = currentRun ?? null;
+
+    if (previousRun && !currentRun && recentRuns[0]) {
+      const finishedRun = recentRuns[0];
+      if (
+        !isExpectedFinishedRun(finishedRun, {
+          pendingRunId,
+          previousRunId: previousRun.id,
+        })
+      ) {
+        return;
+      }
+      pendingRunIdRef.current = null;
+      initiatedSyncRef.current = false;
+      lastProgressNewBookmarksRef.current = 0;
+      if (!notifiedRunIdsRef.current.has(finishedRun.id)) {
+        notifiedRunIdsRef.current.add(finishedRun.id);
+        showSyncCompletionToast(finishedRun);
+      }
+      onSyncComplete?.();
     }
-    onSyncComplete?.();
-  }, [currentRun, onSyncComplete, syncStatus?.recentRuns]);
+  }, [syncStatus, onSyncComplete]);
 
   // Live countdown for rate limit
   useEffect(() => {
@@ -113,6 +144,9 @@ export function SyncButton({
         data.status === "RUNNING" ||
         data.status === "PENDING"
       ) {
+        if (data.runId) {
+          pendingRunIdRef.current = data.runId;
+        }
         pollForCompletion = true;
         setSyncing(false);
         onSyncStateChange?.(false);
@@ -122,10 +156,16 @@ export function SyncButton({
 
       showSyncResultToast(data);
       initiatedSyncRef.current = false;
+      pendingRunIdRef.current = null;
       void refetchSyncStatus();
       onSyncComplete?.();
     } catch (error) {
       if (error instanceof FetchJsonError && error.status === 409) {
+        const body = error.body as Record<string, unknown> | null;
+        const conflictRun = body?.currentRun as SyncRunSummary | undefined;
+        if (conflictRun?.id) {
+          pendingRunIdRef.current = conflictRun.id;
+        }
         pollForCompletion = true;
         setSyncing(false);
         onSyncStateChange?.(false);

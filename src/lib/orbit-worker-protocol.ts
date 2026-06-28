@@ -191,6 +191,8 @@ export interface InitMessage {
   debugPerf?: boolean;
   /** App color mode — drives canvas background and label contrast. */
   colorMode?: "light" | "dark";
+  /** Active accent hex (e.g. "#2563eb") read from `--primary`. */
+  accentHex?: string;
 }
 
 export interface SetGraphMessage {
@@ -387,6 +389,8 @@ export interface SetThemeMessage {
   type: typeof WorkerMessageType.SET_THEME;
   protocolVersion: number;
   colorMode: "light" | "dark";
+  /** Active accent hex (e.g. "#2563eb") read from `--primary`. */
+  accentHex?: string;
 }
 
 /** Union of all messages the main thread may send to the worker. */

@@ -466,7 +466,13 @@ export default function OrbitPage() {
                           size="sm"
                           tone="cyan"
                         />
-                        <OrbitLogoMark className="relative size-8 text-primary drop-shadow-[0_0_18px_rgba(37,99,235,0.35)]" />
+                        <OrbitLogoMark
+                          className="relative size-8 text-primary"
+                          style={{
+                            filter:
+                              "drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 35%, transparent))",
+                          }}
+                        />
                       </div>
                     )
                   }
