@@ -8,13 +8,15 @@ import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, FolderOpen, Search, Tag } from "lucide-react";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 import { OrbitalRings } from "@/components/orbital";
+import { SANS_SECTION_LABEL } from "@/lib/typography";
 
 type FeatureRow = {
   step: string;
   title: string;
-  icon: "grok" | "search" | "tag" | "collection";
+  icon: "grok" | "search" | "tag" | "collection" | "graph";
 };
 
 const FEATURE_ROWS: readonly FeatureRow[] = [
@@ -37,6 +39,11 @@ const FEATURE_ROWS: readonly FeatureRow[] = [
     step: "04",
     title: "Curate collections",
     icon: "collection",
+  },
+  {
+    step: "05",
+    title: "Explore the interactive graph and manually tag or collect",
+    icon: "graph",
   },
 ] as const;
 
@@ -62,6 +69,10 @@ function FeatureIcon({
     return <Tag className={className} aria-hidden="true" />;
   }
 
+  if (icon === "graph") {
+    return <OrbitLogoMark className={className} aria-hidden="true" />;
+  }
+
   return <FolderOpen className={className} aria-hidden="true" />;
 }
 
@@ -75,11 +86,7 @@ export function OrbitalAuthExperience({
   errorMessage?: string | null;
 }) {
   return (
-    <div
-      className={`auth-splash dark relative isolate flex min-w-0 flex-col bg-[#00040B] text-foreground selection:bg-primary/30 ${
-        errorMessage ? "auth-splash--with-error" : ""
-      }`}
-    >
+    <div className="auth-splash dark relative isolate flex min-w-0 flex-col bg-background text-foreground selection:bg-primary/30">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
@@ -99,75 +106,84 @@ export function OrbitalAuthExperience({
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_58%,rgba(10,132,255,0.20)_0%,rgba(10,132,255,0.08)_21%,rgba(0,4,11,0)_48%)]"
       />
 
-      <header className="auth-splash__header relative z-10 mx-auto flex w-full max-w-[1440px] shrink-0 items-center justify-end px-5 pt-5 sm:px-8 sm:pt-7 lg:px-[72px] lg:pt-8">
-        <button
+      <header className="auth-splash__header auth-splash__inset-x mx-auto flex w-full max-w-[1440px] items-center justify-end">
+        <Button
           type="button"
+          variant="highlight"
           onClick={handleSignIn}
-          className="inline-flex items-center gap-2 rounded-sm px-4 py-2 text-[15px] font-semibold text-white/90 shadow-[0_1px_20px_rgba(0,0,0,0.45)] transition-colors hover:bg-white/10 hover:text-white"
+          className="highlight-search-shell relative h-9 gap-2 overflow-hidden px-4 text-[15px]"
         >
+          <XLogoMark
+            className="size-4 shrink-0 text-foreground"
+            title={undefined}
+          />
           Sign in
-          <ArrowRight className="size-4 opacity-80" aria-hidden="true" />
-        </button>
+          <ArrowRight className="size-4 shrink-0 opacity-85" aria-hidden="true" />
+        </Button>
       </header>
 
-      <main className="auth-splash__main relative z-[1] mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 items-center px-5 pb-10 pt-8 sm:px-8 sm:pt-10 lg:px-[72px] lg:pb-12 lg:pt-10">
-        <div className="grid w-full min-w-0 grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,520px)_minmax(340px,400px)] lg:justify-between lg:gap-8">
+      <main className="auth-splash__main auth-splash__inset-x scrollbar-thin relative z-[1] mx-auto w-full max-w-[1440px]">
+        <div className="auth-splash__main-inner">
+          <div className="auth-splash__grid grid w-full min-w-0 grid-cols-1 items-center lg:grid-cols-[minmax(0,520px)_minmax(340px,400px)] lg:justify-between">
           <section className="min-w-0">
             <div className="flex max-w-[540px] flex-col items-start">
-              <div className="animate-fade-in-up stagger-1 flex items-center gap-5 sm:gap-6">
-                <span className="auth-splash__brand-badge grid size-[70px] shrink-0 place-items-center rounded-full border border-primary/45 bg-primary/10 shadow-[0_0_42px_rgba(10,132,255,0.42)] backdrop-blur-sm sm:size-[82px] lg:size-[88px]">
+              <div className="auth-splash__brand-row animate-fade-in-up stagger-1 flex items-center">
+                <span className="auth-splash__brand-badge shrink-0 rounded-full border border-primary/45 bg-primary/10 backdrop-blur-sm">
                   <MarkMasterLogo
-                    width={82}
-                    height={82}
+                    width={56}
+                    height={56}
                     priority
-                    className="auth-splash__brand-logo h-[54px] w-[54px] drop-shadow-[0_0_18px_rgba(10,132,255,0.72)] sm:h-[64px] sm:w-[64px] lg:h-[68px] lg:w-[68px]"
+                    decorative
+                    className="auth-splash__brand-logo"
                   />
                 </span>
-                <span className="auth-splash__wordmark heading-font text-[2.45rem] font-extrabold leading-none text-white drop-shadow-[0_3px_24px_rgba(0,0,0,0.9)] sm:text-[3.2rem] lg:text-[3.35rem]">
+                <span className="auth-splash__wordmark heading-font font-extrabold leading-none text-foreground">
                   MarkMaster
                 </span>
               </div>
 
-              <h1 className="auth-splash__headline animate-fade-in-up stagger-2 heading-font mt-14 max-w-[540px] text-[3.35rem] font-extrabold leading-[0.98] text-white drop-shadow-[0_5px_34px_rgba(0,0,0,0.9)] sm:text-[4.25rem] lg:mt-[78px] lg:text-[4.55rem]">
+              <h1 className="auth-splash__headline animate-fade-in-up stagger-2 heading-font max-w-[540px] font-extrabold text-foreground">
                 <span className="block">Put your X bookmarks in</span>
-                <span className="block text-primary drop-shadow-[0_0_32px_rgba(10,132,255,0.56)]">
+                <span className="block text-primary">
                   Orbit
                 </span>
               </h1>
 
-              <p className="auth-splash__lead animate-fade-in-up stagger-3 mt-7 max-w-[455px] text-[1.075rem] font-light leading-[1.75] text-[#D4DDEA] drop-shadow-[0_2px_18px_rgba(0,0,0,0.85)] sm:text-[1.18rem]">
-                Grok auto-tags and sorts your saves so you can find them fast
-                without leaving your bookmarks in a black box.
+              <p className="auth-splash__lead animate-fade-in-up stagger-3 max-w-[455px] font-light text-muted-foreground">
+                Grok auto-tags your saves, then Orbit maps them into a living
+                graph — pan the links between tags and collections, drag to
+                reassign, and watch clusters form.
               </p>
 
               {errorMessage && (
                 <div
                   role="alert"
-                  className="animate-fade-in mt-7 max-w-[520px] rounded-[24px] border border-destructive/40 bg-destructive/15 p-5 text-[14.5px] leading-relaxed text-destructive-foreground shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:p-6"
+                  className="auth-splash__error animate-fade-in max-w-[520px] rounded-sm border border-destructive/40 bg-destructive/15 p-4 text-[14.5px] leading-relaxed text-destructive-foreground sm:p-5"
                 >
                   {errorMessage}
                 </div>
               )}
 
-              <div className="auth-splash__cta animate-fade-in-up stagger-4 mt-9 flex flex-col items-start gap-4">
+              <div className="auth-splash__cta animate-fade-in-up stagger-4 flex flex-col items-start">
                 <Button
-                  size="lg"
+                  type="button"
+                  variant="highlight"
                   onClick={handleSignIn}
-                  className="auth-splash__primary-button group h-[58px] rounded-sm border border-white/10 bg-primary px-7 text-[1rem] font-bold text-primary-foreground shadow-[0_18px_52px_rgba(10,132,255,0.42),inset_0_1px_0_rgba(255,255,255,0.24)] transition-all hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:bg-primary/95 hover:shadow-[0_22px_60px_rgba(10,132,255,0.52)] sm:h-[62px] sm:px-8 sm:text-[1.05rem]"
+                  className="auth-splash__primary-button highlight-search-shell group relative w-full gap-2.5 overflow-hidden sm:w-auto"
                 >
                   <XLogoMark
-                    className="mr-2.5 size-[22px] text-primary-foreground"
+                    className="size-[22px] shrink-0 text-foreground"
                     title={undefined}
                   />
                   Sign in with X
                   <ArrowRight
-                    className="ml-2 size-[18px] opacity-85 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
+                    className="size-[18px] shrink-0 opacity-85"
                     aria-hidden="true"
                   />
                 </Button>
 
-                <p className="flex items-center gap-2.5 text-[13.5px] text-[#B8C6DA] drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)]">
-                  <span className="size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_12px_rgba(10,132,255,0.7)]" />
+                <p className="flex items-center gap-2.5 text-[13.5px] text-muted-foreground">
+                  <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                   Read-only bookmark access. No posting, no feed clutter.
                 </p>
               </div>
@@ -175,67 +191,62 @@ export function OrbitalAuthExperience({
           </section>
 
           <aside
-            className="auth-splash__aside animate-fade-in-up stagger-3 relative isolate min-w-0 overflow-hidden rounded-[34px] border border-white/15 bg-[#071427]/65 p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_24px_90px_rgba(0,0,0,0.52)] backdrop-blur-xl sm:p-8 lg:p-8"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(12,18,30,0.82) 0%, rgba(4,12,24,0.70) 100%)",
-            }}
+            className="auth-splash__aside surface-overlay animate-fade-in-up stagger-3 relative isolate min-w-0 overflow-hidden"
           >
             <OrbitalRings
-              className="pointer-events-none absolute -right-24 top-14 h-[260px] w-[360px] text-primary/35"
+              className="auth-splash__aside-rings pointer-events-none absolute -right-24 text-primary/35"
             />
 
             <div className="relative z-10">
-              <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#A9B9D1]">
-                HOW IT WORKS
-              </p>
-              <h2 className="auth-splash__aside-title heading-font mt-5 max-w-[320px] text-[2.25rem] font-extrabold leading-[1.08] text-white drop-shadow-[0_2px_22px_rgba(0,0,0,0.76)] sm:text-[2.45rem]">
+              <p className={SANS_SECTION_LABEL}>How it works</p>
+              <h2 className="auth-splash__aside-title heading-font max-w-[320px] font-extrabold text-foreground">
                 Let Grok do the sorting.
               </h2>
-              <p className="auth-splash__aside-copy mt-5 max-w-[310px] text-[1rem] leading-[1.7] text-[#C2CEE0]">
+              <p className="auth-splash__aside-copy max-w-[310px] text-muted-foreground">
                 Import your X bookmarks, review Grok&apos;s suggestions, and build a
                 searchable library you control.
               </p>
             </div>
 
-            <div className="auth-splash__feature-list relative z-10 mt-8 flex flex-col">
+            <div className="auth-splash__feature-list relative z-10 flex flex-col">
               {FEATURE_ROWS.map((feature) => (
                 <div
                   key={feature.step}
-                  className="auth-splash__feature-row group flex items-center gap-4 border-t border-white/[0.06] py-4 first:border-t-0"
+                  className="auth-splash__feature-row group flex items-center border-t border-hairline-soft first:border-t-0"
                 >
-                  <span className="font-mono text-[13px] font-medium text-white/40">
+                  <span className="font-mono text-[13px] font-medium text-muted-foreground">
                     {feature.step}
                   </span>
-                  <FeatureIcon icon={feature.icon} className="size-[16px] text-white/60" />
-                  <h3 className="min-w-0 text-[15px] font-semibold text-white/90">
+                  <FeatureIcon icon={feature.icon} className="size-[16px] shrink-0 text-foreground/65" />
+                  <h3 className="auth-splash__feature-title min-w-0 font-semibold text-foreground">
                     {feature.title}
                   </h3>
                 </div>
               ))}
             </div>
 
-            <div className="auth-splash__note relative z-10 mt-8 flex items-start gap-3.5 rounded-[22px] border border-primary/20 bg-primary/[0.08] p-4 text-[13.5px] leading-relaxed text-[#BFD0E7]">
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15 text-primary">
-                <GrokMark className="size-4" title="Grok" />
+            <div className="auth-splash__note surface-inset-strong relative z-10 flex items-start border-primary/20 text-muted-foreground">
+              <span className="auth-splash__note-icon mt-0.5 flex shrink-0 items-center justify-center rounded-full border border-primary/35 bg-primary/15 text-primary">
+                <GrokMark className="size-3.5" title="Grok" />
               </span>
               <p>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-foreground">
                   AI-assisted, not AI-replaced.
                 </span>{" "}
                 Grok suggests tags and collections; you approve every move.
                 Scans run with{" "}
-                <code className="rounded-sm bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/90">
+                <code className="rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-foreground">
                   store: false
                 </code>
                 .
               </p>
             </div>
           </aside>
+          </div>
         </div>
       </main>
 
-      <footer className="auth-splash__footer relative z-10 mx-auto w-full max-w-[1440px] shrink-0 px-5 pb-6 text-center text-[13px] text-[#AEBBD0]/70 sm:px-8 lg:px-[72px] lg:pb-8">
+      <footer className="auth-splash__footer auth-splash__inset-x mx-auto w-full max-w-[1440px] text-center text-[13px] text-muted-foreground/70">
         © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
       </footer>
     </div>

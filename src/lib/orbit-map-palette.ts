@@ -46,20 +46,49 @@ function mixOrbitHex(colorA: number, colorB: number, amount: number): number {
   return (r << 16) | (g << 8) | b;
 }
 
+function orbitHexToString(color: number): string {
+  return `#${(color & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+const MAP_CANVAS_BASE_DARK = 0x0a0a0a;
+const MAP_CANVAS_BASE_LIGHT = 0xf4f5f7;
 const DEFAULT_ACCENT_DARK = 0x2f6fed;
 const DEFAULT_ACCENT_SOFT_DARK = 0xbfdbfe;
 const DEFAULT_ACCENT_LIGHT = 0x2563eb;
 const DEFAULT_ACCENT_SOFT_LIGHT = 0x93c5fd;
+/** Visible but subtle — space-black with a theme wash. */
+const MAP_CANVAS_TINT_DARK = 0.14;
+const MAP_CANVAS_TINT_LIGHT = 0.07;
+
+/** Space-black / soft-gray canvas fill with a slight accent tint. */
+export function getOrbitMapBackgroundTint(
+  mode: OrbitMapColorMode,
+  accentHex: string
+): string {
+  const isLight = mode === "light";
+  const base = isLight ? MAP_CANVAS_BASE_LIGHT : MAP_CANVAS_BASE_DARK;
+  const fallbackAccent = isLight ? DEFAULT_ACCENT_LIGHT : DEFAULT_ACCENT_DARK;
+  const accent = parseHexColorToNumber(accentHex, fallbackAccent);
+  const mixed = mixOrbitHex(
+    base,
+    accent,
+    isLight ? MAP_CANVAS_TINT_LIGHT : MAP_CANVAS_TINT_DARK
+  );
+  return orbitHexToString(mixed);
+}
 
 export function getOrbitMapPalette(
   mode: OrbitMapColorMode,
-  accentHex?: string | null
+  accentHex?: string | null,
+  backgroundHex?: string | null
 ): OrbitMapPalette {
   const isLight = mode === "light";
+  const defaultBackground = isLight ? MAP_CANVAS_BASE_LIGHT : MAP_CANVAS_BASE_DARK;
+  const background = parseHexColorToNumber(backgroundHex, defaultBackground);
 
   const base = isLight
     ? {
-        background: 0xf4f5f7,
+        background,
         labelActive: 0x0f172a,
         labelNeighbor: 0x334155,
         labelDefault: 0x475569,
@@ -68,7 +97,7 @@ export function getOrbitMapPalette(
         hubInnerStroke: 0xffffff,
       }
     : {
-        background: 0x000000,
+        background,
         labelActive: 0xf8fafc,
         labelNeighbor: 0xcbd5e1,
         labelDefault: 0xe2e8f0,

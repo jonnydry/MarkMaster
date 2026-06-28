@@ -60,21 +60,21 @@ export function createOrbitMapVignetteSprite(
             [1, "rgba(0,0,0,0)"],
           ]
         : [
-            [0, `rgba(${r},${g},${b},0.42)`],
-            [0.55, `rgba(${r},${g},${b},0.2)`],
+            [0, `rgba(${r},${g},${b},0.14)`],
+            [0.55, `rgba(${r},${g},${b},0.05)`],
             [1, "rgba(0,0,0,0)"],
           ];
   } else {
     stops =
       mode === "light"
         ? ([
-            [0, "rgba(15,23,42,0.05)"],
-            [0.55, "rgba(15,23,42,0.025)"],
+            [0, "rgba(15,23,42,0.04)"],
+            [0.55, "rgba(15,23,42,0.02)"],
             [1, "rgba(0,0,0,0)"],
           ] as Array<[number, string]>)
         : ([
-            [0, "rgba(30,41,59,0.5)"],
-            [0.55, "rgba(15,23,42,0.22)"],
+            [0, "rgba(30,41,59,0.14)"],
+            [0.55, "rgba(15,23,42,0.05)"],
             [1, "rgba(0,0,0,0)"],
           ] as Array<[number, string]>);
   }
@@ -104,23 +104,23 @@ export function buildOrbitMapStarfield(
   container.removeChildren();
   const random = createSeededRandom(0x0c0ffee);
   const stars = new Graphics();
-  const blueStarColor =
+  const accentStarColor =
     accent ??
-    (mode === "light" ? 0x2563eb : 0x93c5fd);
+    (mode === "light" ? 0x64748b : 0xd4d4d4);
   for (let i = 0; i < 240; i++) {
     const x = (random() - 0.5) * 6000;
     const y = (random() - 0.5) * 6000;
     const radius = 0.4 + random() * 1.0;
-    const blue = random() > 0.7;
+    const tinted = random() > 0.7;
     stars.circle(x, y, radius);
     stars.fill({
       color:
         mode === "light"
-          ? blue
-            ? blueStarColor
+          ? tinted
+            ? accentStarColor
             : 0x64748b
-          : blue
-            ? blueStarColor
+          : tinted
+            ? accentStarColor
             : 0xffffff,
       alpha:
         mode === "light"

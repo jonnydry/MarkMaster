@@ -30,8 +30,10 @@ export type BookmarkMediaGalleryVariant = "feed" | "compact" | "inline" | "overl
 
 const OVERLAY_TILE_CLASS =
   "mx-auto block min-w-0 max-w-full object-contain cursor-pointer";
-const OVERLAY_SINGLE_CAP = "max-h-[min(48dvh,520px)]";
-const OVERLAY_MULTI_CAP = "max-h-[min(36dvh,400px)]";
+const OVERLAY_SINGLE_CAP =
+  "max-h-[min(40dvh,420px)] lg:max-h-[min(48dvh,520px)]";
+const OVERLAY_MULTI_CAP =
+  "max-h-[min(32dvh,320px)] lg:max-h-[min(36dvh,400px)]";
 
 const LAYOUT: Record<
   BookmarkMediaGalleryVariant,

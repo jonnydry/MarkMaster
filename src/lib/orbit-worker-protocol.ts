@@ -193,6 +193,10 @@ export interface InitMessage {
   colorMode?: "light" | "dark";
   /** Active accent hex (e.g. "#2563eb") read from `--primary`. */
   accentHex?: string;
+  /** Canvas clear color from `--background`. */
+  backgroundHex?: string;
+  /** Active color theme id (e.g. "ember") for atmosphere refresh. */
+  colorTheme?: string;
 }
 
 export interface SetGraphMessage {
@@ -391,9 +395,11 @@ export interface SetThemeMessage {
   colorMode: "light" | "dark";
   /** Active accent hex (e.g. "#2563eb") read from `--primary`. */
   accentHex?: string;
+  /** Canvas clear color from `--background`. */
+  backgroundHex?: string;
+  /** Active color theme id (e.g. "ember") for atmosphere refresh. */
+  colorTheme?: string;
 }
-
-/** Union of all messages the main thread may send to the worker. */
 export type WorkerMessage =
   | InitMessage
   | SetGraphMessage

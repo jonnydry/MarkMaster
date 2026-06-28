@@ -45,12 +45,12 @@ export const appOverlayBackdropClassName =
 
 /** Large overlay dialog shell (bookmark overlay). */
 export const appOverlayDialogBookmarkClassName = cn(
-  "app-overlay-dialog surface-overlay p-0 max-w-[1120px] sm:max-w-[1120px]"
+  "app-overlay-dialog surface-overlay flex min-h-0 flex-col gap-0 p-0 max-w-[1120px] sm:max-w-[1120px]"
 );
 
 /** Large overlay dialog shell (Orbit review). */
 export const appOverlayDialogReviewClassName = cn(
-  "app-overlay-dialog surface-overlay p-0 max-w-[1180px] sm:max-w-[1180px]"
+  "app-overlay-dialog surface-overlay flex min-h-0 flex-col gap-0 p-0 max-w-[1180px] sm:max-w-[1180px]"
 );
 
 /** Small overlay dialog shell (keyboard shortcuts, etc.). */
@@ -59,16 +59,20 @@ export const appOverlayDialogSmClassName = cn(
 );
 
 /** Two-column overlay grid — bookmark overlay sidebar width.
- * Mobile stacks (1 col, 2 rows): main flexible + sidebar auto-sized.
+ * Mobile stacks (1 col, 2 rows): post column flexes; sidebar capped + scrolls.
  * Desktop: side-by-side in a single row.
  */
 export const appOverlayDialogGridBookmarkClassName = cn(
-  "app-overlay-dialog-grid grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]"
+  "app-overlay-dialog-grid grid min-h-0 grid-cols-1",
+  "grid-rows-[minmax(0,1fr)_minmax(0,min(40dvh,380px))]",
+  "lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]"
 );
 
 /** Two-column overlay grid — Orbit review sidebar width. */
 export const appOverlayDialogGridReviewClassName = cn(
-  "app-overlay-dialog-grid grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)]"
+  "app-overlay-dialog-grid grid min-h-0 grid-cols-1",
+  "grid-rows-[minmax(0,1fr)_minmax(0,min(40dvh,380px))]",
+  "lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)]"
 );
 
 /** Floating panel over the Orbit map canvas (mobile rail). */

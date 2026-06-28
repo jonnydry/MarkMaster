@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
-import { useTheme } from '@/components/providers';
+import { useTheme, useColorTheme } from '@/components/providers';
+import { resolveOrbitMapCanvasTheme } from '@/lib/orbit-map-theme-colors';
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
 import { OrbitMapMinimap } from './orbit-map-minimap';
@@ -100,6 +101,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const propsRef = useRef(props);
     propsRef.current = props;
     const { theme } = useTheme();
+    const { colorTheme } = useColorTheme();
+    const themeRef = useRef(theme);
+    const colorThemeRef = useRef(colorTheme);
+    themeRef.current = theme;
+    colorThemeRef.current = colorTheme;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const canvasTransferRetryRef = useRef(0);
@@ -124,35 +130,19 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
     const activeFilter = filter ?? internalFilter;
 
-    const accentRef = useRef<string | undefined>(undefined);
-    const readAccentHex = useCallback((): string | undefined => {
-      if (typeof window === 'undefined') return undefined;
-      const raw = window
-        .getComputedStyle(document.documentElement)
-        .getPropertyValue('--primary')
-        .trim();
-      if (!raw) return undefined;
-      return raw.startsWith('#') || /^[0-9a-fA-F]{3,6}$/.test(raw)
-        ? raw
-        : undefined;
-    }, []);
-    const [accentVersion, setAccentVersion] = useState(0);
+    const themeColorsRef = useRef(resolveOrbitMapCanvasTheme(theme, colorTheme));
+    const [themeColorsVersion, setThemeColorsVersion] = useState(0);
+
+    const syncThemeColors = useCallback(() => {
+      const resolved = resolveOrbitMapCanvasTheme(theme, colorTheme);
+      themeColorsRef.current = resolved;
+      return resolved;
+    }, [theme, colorTheme]);
+
     useEffect(() => {
-      const el = document.documentElement;
-      const update = () => {
-        accentRef.current = readAccentHex();
-        setAccentVersion((v) => v + 1);
-      };
-      const observer = new MutationObserver(update);
-      observer.observe(el, {
-        attributes: true,
-        attributeFilter: ['class', 'data-color-theme'],
-      });
-      return () => observer.disconnect();
-    }, [readAccentHex]);
-    useEffect(() => {
-      accentRef.current = readAccentHex();
-    }, [readAccentHex]);
+      syncThemeColors();
+      setThemeColorsVersion((version) => version + 1);
+    }, [syncThemeColors]);
 
     useEffect(() => {
       if (filter) setInternalFilter(filter);
@@ -194,6 +184,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           pendingWorker = null;
           workerRef.current = worker;
 
+          const { accentHex, backgroundHex } = resolveOrbitMapCanvasTheme(
+            themeRef.current,
+            colorThemeRef.current
+          );
+
           // Send initialization message with transferred canvas
           const initMessage: WorkerMessage = {
             type: WorkerMessageType.INIT,
@@ -203,8 +198,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             height: canvas.clientHeight,
             dpr: window.devicePixelRatio || 1,
             debugPerf: getOrbitMapDebugPerfEnabled(),
-            colorMode: theme,
-            accentHex: accentRef.current,
+            colorMode: themeRef.current,
+            accentHex,
+            backgroundHex,
+            colorTheme: colorThemeRef.current,
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -366,17 +363,20 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           workerRef.current = null;
         }
       };
-    }, [canvasInstance, bumpLayoutVersion, theme]);
+    }, [canvasInstance, bumpLayoutVersion]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
+      const { accentHex, backgroundHex } = themeColorsRef.current;
       workerRef.current.postMessage({
         type: WorkerMessageType.SET_THEME,
         protocolVersion: 1,
         colorMode: theme,
-        accentHex: accentRef.current,
+        accentHex,
+        backgroundHex,
+        colorTheme,
       });
-    }, [theme, useFallback, workerGeneration, accentVersion]);
+    }, [theme, colorTheme, useFallback, workerGeneration, themeColorsVersion]);
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");

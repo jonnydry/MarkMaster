@@ -216,6 +216,8 @@ const LABEL_MIN_WORLD_SCALE = 0.16;
 const LABEL_MAX_WORLD_SCALE = 2.35;
 let colorMode: OrbitMapColorMode = 'dark';
 let accentHex: string | undefined;
+let backgroundHex: string | undefined;
+let colorThemeId: string | undefined;
 const MIN_CAMERA_ZOOM = 0.12;
 const MAX_CAMERA_ZOOM = 1.85;
 const CAMERA_FRAME_PADDING = 72;
@@ -246,7 +248,7 @@ const activeAnimations: MapAnimation[] = [];
 let renderLoopRunning = false;
 
 function getPalette() {
-  return getOrbitMapPalette(colorMode, accentHex);
+  return getOrbitMapPalette(colorMode, accentHex, backgroundHex);
 }
 
 function getPaletteAccent(): number {
@@ -519,6 +521,8 @@ function handleInit(msg: InitMessage) {
 
   colorMode = msg.colorMode ?? 'dark';
   accentHex = msg.accentHex;
+  backgroundHex = msg.backgroundHex;
+  colorThemeId = msg.colorTheme;
   const palette = getPalette();
 
   try {
@@ -586,9 +590,18 @@ function handleResize(msg: ResizeMessage) {
 }
 
 function handleSetTheme(msg: SetThemeMessage) {
-  if (msg.colorMode === colorMode && msg.accentHex === accentHex) return;
+  if (
+    msg.colorMode === colorMode &&
+    msg.accentHex === accentHex &&
+    msg.backgroundHex === backgroundHex &&
+    msg.colorTheme === colorThemeId
+  ) {
+    return;
+  }
   colorMode = msg.colorMode;
   accentHex = msg.accentHex;
+  backgroundHex = msg.backgroundHex;
+  colorThemeId = msg.colorTheme;
   applyColorMode();
 }
 
