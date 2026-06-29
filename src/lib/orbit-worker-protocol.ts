@@ -35,6 +35,78 @@ import type { OrbitGraphPayload, OrbitGraphNode } from "@/types";
 
 export const PROTOCOL_VERSION = 1 as const;
 
+export function getSafeDpr(value?: number): number {
+  if (!value || !Number.isFinite(value) || value <= 0) return 1;
+  return Math.min(value, 2);
+}
+
+const DPR_BAND_EPSILON = 0.001;
+
+/**
+ * Notify when `window.devicePixelRatio` changes — including fractional shifts that
+ * keep the same clamped render DPR. Uses a tight resolution band (not a single
+ * `(resolution: Xdppx)` query, which tracks min-resolution and misses in-band
+ * changes) plus viewport resize fallbacks.
+ */
+export function subscribeToDevicePixelRatioChanges(
+  onChange: () => void
+): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  let lastRawDpr = window.devicePixelRatio;
+  let disposeBandListener: (() => void) | null = null;
+
+  const syncAfterChange = () => {
+    onChange();
+    armResolutionBandListener();
+  };
+
+  const armResolutionBandListener = () => {
+    disposeBandListener?.();
+    disposeBandListener = null;
+
+    if (typeof window.matchMedia !== "function") return;
+
+    const raw = window.devicePixelRatio;
+    if (!Number.isFinite(raw) || raw <= 0) return;
+
+    const min = Math.max(0, raw - DPR_BAND_EPSILON);
+    const max = raw + DPR_BAND_EPSILON;
+    const mediaQuery = window.matchMedia(
+      `(min-resolution: ${min}dppx) and (max-resolution: ${max}dppx)`
+    );
+
+    const handleBandChange = () => {
+      const nextRaw = window.devicePixelRatio;
+      if (nextRaw === lastRawDpr) return;
+      lastRawDpr = nextRaw;
+      syncAfterChange();
+    };
+
+    mediaQuery.addEventListener("change", handleBandChange);
+    disposeBandListener = () =>
+      mediaQuery.removeEventListener("change", handleBandChange);
+  };
+
+  const notifyIfRawChanged = () => {
+    const raw = window.devicePixelRatio;
+    if (raw === lastRawDpr) return;
+    lastRawDpr = raw;
+    syncAfterChange();
+  };
+
+  window.addEventListener("resize", notifyIfRawChanged);
+  window.visualViewport?.addEventListener("resize", notifyIfRawChanged);
+
+  armResolutionBandListener();
+
+  return () => {
+    disposeBandListener?.();
+    window.removeEventListener("resize", notifyIfRawChanged);
+    window.visualViewport?.removeEventListener("resize", notifyIfRawChanged);
+  };
+}
+
 /**
  * Message types sent FROM main thread TO worker.
  * Use these constants instead of magic strings for type safety.
@@ -557,24 +629,225 @@ export type MainMessage =
 /* Utility Type Guards (optional but convenient)                      */
 /* ------------------------------------------------------------------ */
 
-function hasProtocolVersion(msg: object): msg is { protocolVersion: number } {
+type MessageRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is MessageRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function hasProtocolVersion(msg: MessageRecord): msg is MessageRecord & { protocolVersion: number } {
   return "protocolVersion" in msg && typeof msg.protocolVersion === "number";
 }
 
-export function isWorkerMessage(msg: unknown): msg is WorkerMessage {
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isTouchPoint(value: unknown): value is TouchPoint {
   return (
-    typeof msg === "object" &&
-    msg !== null &&
-    "type" in msg &&
-    hasProtocolVersion(msg) &&
-    msg.protocolVersion === PROTOCOL_VERSION
+    isRecord(value) &&
+    isFiniteNumber(value.identifier) &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y)
   );
+}
+
+function isTouchPointArray(value: unknown): value is TouchPoint[] {
+  return Array.isArray(value) && value.every(isTouchPoint);
+}
+
+function isCameraState(value: unknown): value is CameraState {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y) &&
+    isFiniteNumber(value.zoom)
+  );
+}
+
+function isOrbitMapSelection(value: unknown): value is OrbitMapSelection {
+  return (
+    isRecord(value) &&
+    (value.kind === "tag" ||
+      value.kind === "collection" ||
+      value.kind === "bookmark" ||
+      value.kind === "core" ||
+      value.kind === "overflow") &&
+    typeof value.id === "string"
+  );
+}
+
+function isGraphFilter(value: unknown): value is GraphFilter {
+  return value === "all" || value === "loose" || value === "recent";
+}
+
+function isColorMode(value: unknown): value is "light" | "dark" {
+  return value === "light" || value === "dark";
+}
+
+function hasObjectField(msg: MessageRecord, field: string): boolean {
+  return isRecord(msg[field]);
+}
+
+function finiteNumberFieldError(msg: MessageRecord, field: string): string | null {
+  return isFiniteNumber(msg[field]) ? null : `${String(msg.type)}.${field} must be a finite number`;
+}
+
+function optionalFiniteNumberFieldError(msg: MessageRecord, field: string): string | null {
+  return msg[field] === undefined || isFiniteNumber(msg[field])
+    ? null
+    : `${String(msg.type)}.${field} must be a finite number when provided`;
+}
+
+function stringFieldError(msg: MessageRecord, field: string): string | null {
+  return typeof msg[field] === "string" ? null : `${String(msg.type)}.${field} must be a string`;
+}
+
+function optionalStringFieldError(msg: MessageRecord, field: string): string | null {
+  return msg[field] === undefined || typeof msg[field] === "string"
+    ? null
+    : `${String(msg.type)}.${field} must be a string when provided`;
+}
+
+function validatePointerMessage(msg: MessageRecord): string | null {
+  if (msg.type === WorkerMessageType.POINTER_LEAVE) return null;
+  return (
+    finiteNumberFieldError(msg, "x") ??
+    finiteNumberFieldError(msg, "y") ??
+    (msg.type === WorkerMessageType.POINTER_MOVE
+      ? finiteNumberFieldError(msg, "buttons")
+      : finiteNumberFieldError(msg, "button"))
+  );
+}
+
+export function getWorkerMessageValidationError(msg: unknown): string | null {
+  if (!isRecord(msg)) return "Worker message must be an object";
+  if (typeof msg.type !== "string") return "Worker message type must be a string";
+  if (!hasProtocolVersion(msg)) return `${msg.type}.protocolVersion must be ${PROTOCOL_VERSION}`;
+  if (msg.protocolVersion !== PROTOCOL_VERSION) {
+    return `${msg.type}.protocolVersion ${msg.protocolVersion} is not supported`;
+  }
+
+  switch (msg.type) {
+    case WorkerMessageType.INIT:
+      return (
+        ("canvas" in msg ? null : "INIT.canvas is required") ??
+        finiteNumberFieldError(msg, "width") ??
+        finiteNumberFieldError(msg, "height") ??
+        finiteNumberFieldError(msg, "dpr") ??
+        (msg.colorMode === undefined || isColorMode(msg.colorMode)
+          ? null
+          : "INIT.colorMode must be light or dark") ??
+        optionalStringFieldError(msg, "accentHex") ??
+        optionalStringFieldError(msg, "backgroundHex") ??
+        optionalStringFieldError(msg, "colorTheme")
+      );
+
+    case WorkerMessageType.RESIZE:
+      return (
+        finiteNumberFieldError(msg, "width") ??
+        finiteNumberFieldError(msg, "height") ??
+        optionalFiniteNumberFieldError(msg, "dpr")
+      );
+
+    case WorkerMessageType.SET_GRAPH:
+      return hasObjectField(msg, "graph") ? null : "SET_GRAPH.graph must be an object";
+
+    case WorkerMessageType.POINTER_DOWN:
+    case WorkerMessageType.POINTER_MOVE:
+    case WorkerMessageType.POINTER_UP:
+    case WorkerMessageType.POINTER_LEAVE:
+      return validatePointerMessage(msg);
+
+    case WorkerMessageType.WHEEL:
+      return (
+        finiteNumberFieldError(msg, "deltaY") ??
+        finiteNumberFieldError(msg, "x") ??
+        finiteNumberFieldError(msg, "y")
+      );
+
+    case WorkerMessageType.TOUCH_START:
+    case WorkerMessageType.TOUCH_MOVE:
+    case WorkerMessageType.TOUCH_END:
+      return isTouchPointArray(msg.touches) && isTouchPointArray(msg.changedTouches)
+        ? null
+        : `${msg.type}.touches and changedTouches must be touch point arrays`;
+
+    case WorkerMessageType.DOUBLE_CLICK:
+      return finiteNumberFieldError(msg, "x") ?? finiteNumberFieldError(msg, "y");
+
+    case WorkerMessageType.PAN:
+      return finiteNumberFieldError(msg, "dx") ?? finiteNumberFieldError(msg, "dy");
+
+    case WorkerMessageType.ZOOM:
+      return (
+        finiteNumberFieldError(msg, "factor") ??
+        optionalFiniteNumberFieldError(msg, "focalX") ??
+        optionalFiniteNumberFieldError(msg, "focalY")
+      );
+
+    case WorkerMessageType.SET_FILTER:
+      return isGraphFilter(msg.filter) ? null : "SET_FILTER.filter must be all, loose, or recent";
+
+    case WorkerMessageType.SET_SELECTION:
+      return msg.selection === null || isOrbitMapSelection(msg.selection)
+        ? null
+        : "SET_SELECTION.selection must be a selection or null";
+
+    case WorkerMessageType.SET_CAMERA:
+      return isCameraState(msg.camera) ? null : "SET_CAMERA.camera must be a camera state";
+
+    case WorkerMessageType.SET_HIGHLIGHT:
+      return msg.nodeIds === null || isStringArray(msg.nodeIds)
+        ? null
+        : "SET_HIGHLIGHT.nodeIds must be a string array or null";
+
+    case WorkerMessageType.SET_SEARCH:
+      return stringFieldError(msg, "query");
+
+    case WorkerMessageType.FOCUS_ON:
+      return isOrbitMapSelection(msg.selection) ? null : "FOCUS_ON.selection must be a selection";
+
+    case WorkerMessageType.RESET_VIEW:
+    case WorkerMessageType.REQUEST_LAYOUT:
+    case WorkerMessageType.DESTROY:
+      return null;
+
+    case WorkerMessageType.ANIMATE_ASSIGN:
+      return (
+        stringFieldError(msg, "bookmarkId") ??
+        stringFieldError(msg, "anchorId") ??
+        optionalFiniteNumberFieldError(msg, "duration") ??
+        optionalStringFieldError(msg, "requestId")
+      );
+
+    case WorkerMessageType.FOCUS_PULSE:
+      return stringFieldError(msg, "nodeId") ?? optionalFiniteNumberFieldError(msg, "duration");
+
+    case WorkerMessageType.SET_THEME:
+      return (
+        (isColorMode(msg.colorMode) ? null : "SET_THEME.colorMode must be light or dark") ??
+        optionalStringFieldError(msg, "accentHex") ??
+        optionalStringFieldError(msg, "backgroundHex") ??
+        optionalStringFieldError(msg, "colorTheme")
+      );
+
+    default:
+      return `Unknown worker message type: ${msg.type}`;
+  }
+}
+
+export function isWorkerMessage(msg: unknown): msg is WorkerMessage {
+  return getWorkerMessageValidationError(msg) === null;
 }
 
 export function isMainMessage(msg: unknown): msg is MainMessage {
   return (
-    typeof msg === "object" &&
-    msg !== null &&
+    isRecord(msg) &&
     "type" in msg &&
     hasProtocolVersion(msg) &&
     msg.protocolVersion === PROTOCOL_VERSION

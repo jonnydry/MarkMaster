@@ -69,6 +69,19 @@ export function getMediaPlaybackUrl(item: BookmarkMediaJson): string | undefined
   return item.playback_url;
 }
 
+/**
+ * Same-origin proxy URL for a video/gif MP4. Twitter's video CDN
+ * (video.twimg.com) rejects cross-origin hotlinking with a 403, and the
+ * `<video>` element can't suppress the Referer, so playback bytes are routed
+ * through `/api/media`. See `src/app/api/media/route.ts`.
+ */
+export function getMediaPlaybackProxyUrl(
+  playbackUrl: string | undefined
+): string | undefined {
+  if (!playbackUrl) return undefined;
+  return `/api/media?url=${encodeURIComponent(playbackUrl)}`;
+}
+
 export function getMediaTileKey(item: BookmarkMediaJson, index: number): string {
   return item.playback_url ?? getMediaPosterUrl(item) ?? `${item.type}-${index}`;
 }

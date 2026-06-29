@@ -3,6 +3,7 @@
 import { type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
+import { useScrollElement } from "@/hooks/use-scroll-element";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
@@ -53,6 +54,40 @@ function OrbitListRowSkeleton() {
   );
 }
 
+function OrbitListStatic({
+  bookmarks,
+  selectedId,
+  onSelect,
+  onQuickAction,
+  className,
+  selectionMode,
+  selectedIds,
+  onToggleSelect,
+  getDecision,
+  dismissedBookmarkIds,
+  appliedBookmarkIds,
+}: Omit<OrbitListProps, "scrollRef" | "isLoading">) {
+  return (
+    <div className={cn("flex flex-col", className)}>
+      {bookmarks.map((bookmark) => (
+        <OrbitListRow
+          key={bookmark.id}
+          bookmark={bookmark}
+          selected={selectedId === bookmark.id}
+          selectionMode={selectionMode}
+          bulkSelected={selectedIds?.has(bookmark.id) ?? false}
+          decision={getDecision?.(bookmark.id) ?? null}
+          dismissedBookmarkIds={dismissedBookmarkIds}
+          appliedBookmarkIds={appliedBookmarkIds}
+          onSelect={onSelect}
+          onQuickAction={onQuickAction}
+          onToggleSelect={onToggleSelect}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function OrbitList({
   scrollRef,
   bookmarks,
@@ -68,10 +103,11 @@ export function OrbitList({
   dismissedBookmarkIds,
   appliedBookmarkIds,
 }: OrbitListProps) {
+  const scrollElement = useScrollElement(scrollRef);
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
-    getScrollElement: () => scrollRef?.current ?? null,
+    getScrollElement: () => scrollElement,
     estimateSize: () => ORBIT_ROW_ESTIMATE_PX,
     overscan: 5,
   });
@@ -94,13 +130,36 @@ export function OrbitList({
     return null;
   }
 
+  const virtualItems = scrollElement ? virtualizer.getVirtualItems() : [];
+  const useStaticFallback =
+    bookmarks.length > 0 &&
+    (!scrollElement || virtualItems.length === 0);
+
+  if (useStaticFallback) {
+    return (
+      <OrbitListStatic
+        bookmarks={bookmarks}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        onQuickAction={onQuickAction}
+        className={className}
+        selectionMode={selectionMode}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        getDecision={getDecision}
+        dismissedBookmarkIds={dismissedBookmarkIds}
+        appliedBookmarkIds={appliedBookmarkIds}
+      />
+    );
+  }
+
   return (
     <div className={cn("relative w-full", className)}>
       <div
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
+        {virtualItems.map((virtualRow) => {
           const bookmark = bookmarks[virtualRow.index];
 
           return (

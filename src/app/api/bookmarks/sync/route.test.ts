@@ -58,4 +58,54 @@ describe("/api/bookmarks/sync POST", () => {
     });
     expect(kickSyncWorkerMock).toHaveBeenCalledWith("run-1");
   });
+
+  it("uses a valid JSON body to override the saved folder preference", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(new Request("http://localhost/api/bookmarks/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ includeFolders: true }),
+    }));
+
+    expect(response.status).toBe(202);
+    expect(enqueueSyncRunMock).toHaveBeenCalledWith("user-1", {
+      includeFolders: true,
+    });
+  });
+
+  it("returns 400 for malformed JSON instead of silently using saved preferences", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(new Request("http://localhost/api/bookmarks/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{ nope",
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json).toEqual({ error: "Invalid JSON body" });
+    expect(enqueueSyncRunMock).not.toHaveBeenCalled();
+    expect(kickSyncWorkerMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 for JSON sync bodies above the route limit", async () => {
+    const { POST } = await import("./route");
+
+    const response = await POST(new Request("http://localhost/api/bookmarks/sync", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(256 * 1024 + 1),
+      },
+      body: JSON.stringify({ includeFolders: true }),
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(413);
+    expect(json).toEqual({ error: "Request body is too large" });
+    expect(enqueueSyncRunMock).not.toHaveBeenCalled();
+    expect(kickSyncWorkerMock).not.toHaveBeenCalled();
+  });
 });

@@ -18,6 +18,8 @@ import {
   type GraphFilter,
   type OrbitMapSelection,
   type OrbitMapFocus,
+  getSafeDpr,
+  subscribeToDevicePixelRatioChanges,
 } from '@/lib/orbit-worker-protocol';
 
 interface OrbitMapCanvasHostProps {
@@ -196,7 +198,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             canvas: offscreen,
             width: canvas.clientWidth,
             height: canvas.clientHeight,
-            dpr: window.devicePixelRatio || 1,
+            dpr: getSafeDpr(window.devicePixelRatio),
             debugPerf: getOrbitMapDebugPerfEnabled(),
             colorMode: themeRef.current,
             accentHex,
@@ -449,25 +451,33 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       const canvas = canvasRef.current;
       if (!canvas || useFallback || !workerRef.current) return;
 
-      const observer = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) return;
-
-        setViewportSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
+      const postResize = (width: number, height: number) => {
+        setViewportSize({ width, height });
         workerRef.current?.postMessage({
           type: WorkerMessageType.RESIZE,
           protocolVersion: 1,
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
+          width,
+          height,
+          dpr: getSafeDpr(window.devicePixelRatio),
         });
+      };
+
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        postResize(entry.contentRect.width, entry.contentRect.height);
       });
 
       observer.observe(canvas);
+      const unsubscribeDpr = subscribeToDevicePixelRatioChanges(() => {
+        const rect = canvas.getBoundingClientRect();
+        postResize(rect.width, rect.height);
+      });
 
-      return () => observer.disconnect();
+      return () => {
+        observer.disconnect();
+        unsubscribeDpr();
+      };
     }, [useFallback, workerGeneration]);
 
     const canvasPoint = (clientX: number, clientY: number) => {

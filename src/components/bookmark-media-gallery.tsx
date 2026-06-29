@@ -16,6 +16,7 @@ import {
   type BookmarkMediaJson,
   getMediaImageUrl,
   getMediaPlaybackUrl,
+  getMediaPlaybackProxyUrl,
   getMediaPosterUrl,
   getMediaTileKey,
   isVideoLikeMediaType,
@@ -284,7 +285,7 @@ function MediaTile({
       >
         <video
           ref={videoRef}
-          src={playbackUrl}
+          src={getMediaPlaybackProxyUrl(playbackUrl)}
           controls={!isGif}
           playsInline
           preload="metadata"

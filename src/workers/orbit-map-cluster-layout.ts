@@ -69,6 +69,8 @@ const MULTI_JITTER_MIN = 14;
 const MULTI_JITTER_RANGE = 26;
 const MULTI_MIN_SEPARATION = 13;
 const MULTI_RELAX_ITERATIONS = 3;
+const LOOSE_MIN_SEPARATION = 11;
+const LOOSE_RELAX_ITERATIONS = 4;
 
 function hashId(id: string, salt = 0): number {
   let hash = (2166136261 ^ salt) >>> 0;
@@ -450,14 +452,29 @@ export function computeOrbitMapClusterLayout(
   if (looseIds.length > 0) {
     const bandInner = constellationRadius + ORBIT_MAP_LOOSE_BAND_GAP;
     const bandWidth = Math.min(420, Math.max(120, looseIds.length * 1.4));
-    looseIds.forEach((id, index) => {
+    const loosePositions = looseIds.map((id, index) => {
       const t = (index + 0.5) / looseIds.length;
       const radius = bandInner + bandWidth * Math.sqrt(t);
-      const angle = index * GOLDEN_ANGLE + hash01(id, 3) * 0.06;
-      positions.set(id, {
+      // Keep the low-discrepancy sunflower ordering, but add tiny deterministic
+      // per-node angle noise so Fibonacci-neighbor streaks don't line up exactly
+      // in very large loose bands.
+      const angle =
+        index * GOLDEN_ANGLE +
+        hash01(id, 3) * 0.06 +
+        (hash01(id, 29) - 0.5) * 0.018;
+      return {
         x: Math.cos(angle) * radius,
         y: Math.sin(angle) * radius,
-      });
+      };
+    });
+    relaxOverlaps(
+      loosePositions,
+      [],
+      LOOSE_MIN_SEPARATION,
+      LOOSE_RELAX_ITERATIONS
+    );
+    looseIds.forEach((id, index) => {
+      positions.set(id, loosePositions[index]);
     });
   }
 

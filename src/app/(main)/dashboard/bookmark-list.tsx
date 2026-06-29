@@ -1,24 +1,14 @@
 "use client";
 
 import { useCallback, useState, type RefObject } from "react";
-import dynamic from "next/dynamic";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BookmarkCard } from "@/components/bookmark-card";
+import { GridBookmarkCard } from "@/components/grid-bookmark-card";
 import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
+import { useScrollElement } from "@/hooks/use-scroll-element";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
-
-const GridBookmarkCard = dynamic(
-  () =>
-    import("@/components/grid-bookmark-card").then((m) => m.GridBookmarkCard),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="mb-3 h-48 break-inside-avoid surface-veil" />
-    ),
-  }
-);
 
 const FEED_ROW_ESTIMATE_PX = 168;
 const COMPACT_ROW_ESTIMATE_PX = 72;
@@ -74,6 +64,7 @@ function VirtualizedBookmarkRows({
   expandedCompactBookmarkIds,
   onCompactExpandedChange,
 }: BookmarkRowListProps) {
+  const scrollElement = useScrollElement(scrollRef);
   const rowEstimate =
     viewMode === "compact" ? COMPACT_ROW_ESTIMATE_PX : FEED_ROW_ESTIMATE_PX;
 
@@ -82,7 +73,7 @@ function VirtualizedBookmarkRows({
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollElement,
     estimateSize: () => rowEstimate,
     overscan: 4,
   });
@@ -92,6 +83,36 @@ function VirtualizedBookmarkRows({
   useVirtualListFocus(virtualizer, bookmarks, focusedBookmarkId);
 
   const listContainerClass = getBookmarkListContainerClassName(viewMode);
+  const virtualItems = scrollElement ? virtualizer.getVirtualItems() : [];
+  const useStaticFallback =
+    bookmarks.length > 0 &&
+    (!scrollElement || virtualItems.length === 0);
+
+  if (useStaticFallback) {
+    return (
+      <StaticBookmarkRows
+        bookmarks={bookmarks}
+        viewMode={viewMode}
+        searchQuery={searchQuery}
+        aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+        selectionMode={selectionMode}
+        selectedBookmarkIdSet={selectedBookmarkIdSet}
+        activeBookmarkId={activeBookmarkId}
+        onSelect={onSelect}
+        onSelectionChange={onSelectionChange}
+        onTagClick={onTagClick}
+        onAddTag={onAddTag}
+        onAddToCollection={onAddToCollection}
+        onAddNote={onAddNote}
+        onOpenExpanded={onOpenExpanded}
+        onDelete={onDelete}
+        deleteLabel={deleteLabel}
+        performanceHighlightId={performanceHighlightId}
+        expandedCompactBookmarkIds={expandedCompactBookmarkIds}
+        onCompactExpandedChange={onCompactExpandedChange}
+      />
+    );
+  }
 
   return (
     <div className={listContainerClass}>
@@ -99,7 +120,7 @@ function VirtualizedBookmarkRows({
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
+        {virtualItems.map((virtualRow) => {
           const bookmark = bookmarks[virtualRow.index];
           const index = virtualRow.index;
 

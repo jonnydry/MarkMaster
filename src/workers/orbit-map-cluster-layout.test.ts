@@ -150,4 +150,24 @@ describe("computeOrbitMapClusterLayout", () => {
     expect(dist(positions.get("loose-1")!)).toBeGreaterThan(100);
     expect(positions.get("loose-1")).not.toEqual(positions.get("loose-2"));
   });
+
+  it("keeps very large loose bands from creating near-overlapping bookmarks", () => {
+    const looseCount = 2000;
+    const nodes: OrbitMapLayoutNodeInput[] = [core()];
+    for (let i = 0; i < looseCount; i++) {
+      nodes.push(bookmark(`loose-${i}`));
+    }
+
+    const { positions } = computeOrbitMapClusterLayout(nodes, []);
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < looseCount; i++) {
+      const a = positions.get(`loose-${i}`)!;
+      for (let j = i + 1; j < looseCount; j++) {
+        const b = positions.get(`loose-${j}`)!;
+        minDistance = Math.min(minDistance, dist(a, b));
+      }
+    }
+
+    expect(minDistance).toBeGreaterThan(10);
+  });
 });

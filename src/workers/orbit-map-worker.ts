@@ -45,6 +45,8 @@ import {
   type LayoutUpdatedMessage,
   type CameraState,
   collectTransferables,
+  getSafeDpr,
+  getWorkerMessageValidationError,
 } from '@/lib/orbit-worker-protocol';
 
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
@@ -144,6 +146,7 @@ interface MapLink {
 // Basic Pixi Application instance (created on INIT)
 let app: Application | null = null;
 let isInitialized = false;
+let destroyed = false;
 
 // Current graph data and filter (stored in worker)
 let currentGraph: OrbitGraphPayload | null = null;
@@ -416,11 +419,25 @@ const interactions = createOrbitMapInteractions<MapNode>({
 });
 
 /** Handle incoming messages from the main thread. */
-function handleMessage(event: MessageEvent<WorkerMessage>) {
-  const msg = event.data;
+function handleMessage(event: MessageEvent<unknown>) {
+  const validationError = getWorkerMessageValidationError(event.data);
+  if (validationError) {
+    postToMain({
+      type: MainMessageType.ERROR,
+      protocolVersion: 1,
+      message: `Invalid worker message: ${validationError}`,
+    });
+    return;
+  }
 
-  if (msg.protocolVersion !== 1) {
-    console.warn('[OrbitWorker] Protocol version mismatch');
+  const msg = event.data as WorkerMessage;
+
+  if (destroyed) {
+    postToMain({
+      type: MainMessageType.ERROR,
+      protocolVersion: 1,
+      message: `Worker has been destroyed; ignoring ${msg.type}`,
+    });
     return;
   }
 
@@ -519,6 +536,7 @@ function handleInit(msg: InitMessage) {
     return;
   }
 
+  destroyed = false;
   colorMode = msg.colorMode ?? 'dark';
   accentHex = msg.accentHex;
   backgroundHex = msg.backgroundHex;
@@ -537,7 +555,7 @@ function handleInit(msg: InitMessage) {
       canvas: msg.canvas,
       width: msg.width,
       height: msg.height,
-      resolution: msg.dpr,
+      resolution: getSafeDpr(msg.dpr),
       antialias: true,
       backgroundColor: palette.background,
       autoDensity: true,
@@ -583,6 +601,9 @@ function handleInit(msg: InitMessage) {
 function handleResize(msg: ResizeMessage) {
   if (!app || !isInitialized) return;
 
+  if (msg.dpr !== undefined) {
+    app.renderer.resolution = getSafeDpr(msg.dpr);
+  }
   app.renderer.resize(msg.width, msg.height);
   layoutVignette(msg.width, msg.height);
   constrainCamera();
@@ -743,16 +764,72 @@ function matchesFilter(datum: MapNode): boolean {
   return !datum.node.affiliated;
 }
 
+function destroyContainerChildren(container: Container | null) {
+  if (!container) return;
+  for (const child of container.removeChildren()) {
+    child.destroy({ children: true });
+  }
+}
+
+function destroyGlowForNode(nodeId: string) {
+  const glow = glowSpriteMap.get(nodeId);
+  if (!glow) return;
+  glow.parent?.removeChild(glow);
+  glow.destroy({ texture: false, textureSource: false });
+  glowSpriteMap.delete(nodeId);
+}
+
+function createGlowForNode(datum: MapNode) {
+  if (!glowTexture || !glowContainer || glowSpriteMap.has(datum.id)) return;
+  const glow = new Sprite(glowTexture);
+  glow.anchor.set(0.5);
+  glow.tint = datum.visual.color;
+  glow.alpha = HUB_GLOW_ALPHA;
+  const glowSize = datum.radius * 6;
+  glow.width = glowSize;
+  glow.height = glowSize;
+  glow.position.set(datum.x, datum.y);
+  glowContainer.addChild(glow);
+  glowSpriteMap.set(datum.id, glow);
+}
+
 function handleDestroy() {
+  destroyed = true;
   interactions.reset();
   cancelCameraAnimation();
+  cancelScheduledCameraRefresh();
+  if (wheelRefreshTimer !== null) {
+    clearTimeout(wheelRefreshTimer);
+    wheelRefreshTimer = null;
+  }
   renderLoopRunning = false;
   activeAnimations.length = 0;
-  labelMap.clear();
-  nodeGraphicsMap.clear();
-  glowSpriteMap.clear();
-  haloSpriteMap.clear();
-  nodeById.clear();
+
+  destroyContainerChildren(effectsContainer);
+  destroyContainerChildren(labelsContainer);
+  destroyContainerChildren(ringsContainer);
+  destroyContainerChildren(nodesContainer);
+  destroyContainerChildren(glowContainer);
+  destroyContainerChildren(linksContainer);
+  destroyContainerChildren(starfieldContainer);
+  destroyContainerChildren(backgroundContainer);
+
+  try {
+    BitmapFont.uninstall('OrbitLabel');
+  } catch {
+    // Font may not have been installed if init failed midway.
+  }
+
+  app?.destroy(false, {
+    children: true,
+    texture: true,
+    textureSource: true,
+    context: true,
+  });
+
+  currentGraph = null;
+  nodeData = [];
+  linkData = [];
   clusters.clear();
   hitTestNodes = [];
   adjacency.clear();
@@ -760,12 +837,30 @@ function handleDestroy() {
   activeSearchQuery = '';
   lastStructureKey = '';
   highlightedNodeIds = null;
+  currentSelection = null;
+  lastFittedScope = null;
+  hasPlayedEntrance = false;
+  entranceStartedAt = null;
+  camera = { x: 0, y: 0, zoom: 1 };
+
+  labelMap.clear();
+  nodeGraphicsMap.clear();
+  glowSpriteMap.clear();
+  haloSpriteMap.clear();
+  nodeById.clear();
+
   backgroundContainer = null;
   starfieldContainer = null;
+  linksContainer = null;
   glowContainer = null;
+  nodesContainer = null;
+  ringsContainer = null;
+  labelsContainer = null;
+  effectsContainer = null;
+  linkGraphics = null;
+  ringGraphics = null;
   vignetteSprite = null;
   glowTexture = null;
-  app?.destroy();
   app = null;
   isInitialized = false;
 }
@@ -807,22 +902,19 @@ function rebuildScene() {
     typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   // Clear scene
-  if (linksContainer) linksContainer.removeChildren();
+  destroyContainerChildren(linksContainer);
   if (glowContainer) {
-    for (const glow of glowSpriteMap.values()) glow.destroy();
-    for (const halo of haloSpriteMap.values()) halo.destroy();
+    destroyContainerChildren(glowContainer);
     glowSpriteMap.clear();
     haloSpriteMap.clear();
-    glowContainer.removeChildren();
   }
-  if (nodesContainer) nodesContainer.removeChildren();
-  if (ringsContainer) ringsContainer.removeChildren();
+  destroyContainerChildren(nodesContainer);
+  destroyContainerChildren(ringsContainer);
   if (labelsContainer) {
-    for (const label of labelMap.values()) label.destroy();
+    destroyContainerChildren(labelsContainer);
     labelMap.clear();
-    labelsContainer.removeChildren();
   }
-  if (effectsContainer) effectsContainer.removeChildren();
+  destroyContainerChildren(effectsContainer);
   linkGraphics = null;
   ringGraphics = null;
   nodeGraphicsMap.clear();
@@ -981,18 +1073,8 @@ function buildScene() {
     nodeGraphicsMap.set(datum.id, g);
 
     // Soft glow under hubs, tinted to match.
-    const visualStyle = datum.visual;
-    if (visualStyle.isHub && glowTexture) {
-      const glow = new Sprite(glowTexture);
-      glow.anchor.set(0.5);
-      glow.tint = visualStyle.color;
-      glow.alpha = HUB_GLOW_ALPHA;
-      const glowSize = datum.radius * 6;
-      glow.width = glowSize;
-      glow.height = glowSize;
-      glow.position.set(datum.x, datum.y);
-      glowContainer.addChild(glow);
-      glowSpriteMap.set(datum.id, glow);
+    if (datum.visual.isHub) {
+      createGlowForNode(datum);
     }
   }
 }
@@ -1112,12 +1194,18 @@ function redrawNodeGraphics(datum: MapNode) {
   g.position.set(datum.x, datum.y);
 
   const glow = glowSpriteMap.get(datum.id);
-  if (datum.visual.isHub && glowTexture && glow) {
-    glow.tint = datum.visual.color;
-    const glowSize = datum.radius * 6;
-    glow.width = glowSize;
-    glow.height = glowSize;
-    glow.position.set(datum.x, datum.y);
+  if (datum.visual.isHub) {
+    if (!glow) createGlowForNode(datum);
+    const nextGlow = glowSpriteMap.get(datum.id);
+    if (glowTexture && nextGlow) {
+      nextGlow.tint = datum.visual.color;
+      const glowSize = datum.radius * 6;
+      nextGlow.width = glowSize;
+      nextGlow.height = glowSize;
+      nextGlow.position.set(datum.x, datum.y);
+    }
+  } else if (glow) {
+    destroyGlowForNode(datum.id);
   }
 }
 
@@ -1562,7 +1650,7 @@ function positionLabel(
 function renderEffects() {
   if (!effectsContainer) return;
 
-  effectsContainer.removeChildren();
+  destroyContainerChildren(effectsContainer);
 
   activeAnimations.forEach((anim) => {
     if (anim.type === 'pulse') {

@@ -13,10 +13,13 @@ import {
 } from "@/lib/sync-queue";
 import { getRetryAfterSeconds } from "@/lib/sync-throttle";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/request-body";
 
 const syncPostBodySchema = z.object({
   includeFolders: z.boolean().optional(),
 });
+
+const SYNC_POST_MAX_JSON_BODY_BYTES = 256 * 1024;
 
 function syncCooldownResponse(
   retryUntil: Date,
@@ -100,14 +103,17 @@ export async function POST(req: Request) {
   let includeFolders = user.syncXFolders ?? false;
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    try {
-      const rawBody = await req.json();
-      const parsed = syncPostBodySchema.safeParse(rawBody);
-      if (parsed.success && parsed.data.includeFolders !== undefined) {
-        includeFolders = parsed.data.includeFolders;
-      }
-    } catch {
-      // Malformed JSON — use the saved preference.
+    const body = await readJsonBody(req, SYNC_POST_MAX_JSON_BODY_BYTES);
+    if (!body.ok) {
+      return NextResponse.json({ error: body.error }, { status: body.status });
+    }
+
+    const parsed = syncPostBodySchema.safeParse(body.data);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid sync request body" }, { status: 400 });
+    }
+    if (parsed.data.includeFolders !== undefined) {
+      includeFolders = parsed.data.includeFolders;
     }
   }
 

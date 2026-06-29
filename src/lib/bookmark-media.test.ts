@@ -6,7 +6,22 @@ import {
   hasVideoLikeMedia,
   getMediaImageUrl,
   getMediaPosterUrl,
+  getMediaPlaybackProxyUrl,
 } from "./bookmark-media";
+
+describe("getMediaPlaybackProxyUrl", () => {
+  it("returns undefined when no playback url is provided", () => {
+    expect(getMediaPlaybackProxyUrl(undefined)).toBeUndefined();
+  });
+
+  it("routes the mp4 through the same-origin media proxy", () => {
+    expect(
+      getMediaPlaybackProxyUrl("https://video.twimg.com/amplify_video/1/vid/a.mp4")
+    ).toBe(
+      "/api/media?url=https%3A%2F%2Fvideo.twimg.com%2Famplify_video%2F1%2Fvid%2Fa.mp4"
+    );
+  });
+});
 
 describe("pickBestMp4Variant", () => {
   it("returns undefined when variants are missing or empty", () => {
