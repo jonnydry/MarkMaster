@@ -2,7 +2,11 @@
 
 import { AlignJustify, Grid3x3, LayoutList } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { appToolbarSurfaceGroupClassName } from "@/lib/app-chrome";
+import {
+  appToolbarControlCompactHeightClassName,
+  appToolbarControlExpandedHeightClassName,
+  appToolbarSurfaceGroupClassName,
+} from "@/lib/app-chrome";
 import { highlightActiveClass, highlightIdleClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";
@@ -32,7 +36,9 @@ export function ViewModeControls({
       className={cn(
         "dashboard-view-mode flex items-center gap-0.5 rounded-sm p-0.5",
         appToolbarSurfaceGroupClassName,
-        compact ? "shrink-0" : "flex-1 sm:flex-none",
+        compact
+          ? cn(appToolbarControlCompactHeightClassName, "shrink-0")
+          : cn(appToolbarControlExpandedHeightClassName, "flex-1 sm:flex-none"),
         className
       )}
     >
@@ -45,8 +51,8 @@ export function ViewModeControls({
             size="sm"
             aria-pressed={selected}
             className={cn(
-              "dashboard-view-button h-8 rounded-sm border border-transparent text-sm",
-              compact ? "size-8 px-0" : "px-2.5",
+              "dashboard-view-button rounded-sm border border-transparent text-sm",
+              compact ? "size-7 px-0" : "h-8 px-2.5",
               selected
                 ? cn(highlightActiveClass, "border")
                 : cn(highlightIdleClass, "hover:border-hairline-soft")

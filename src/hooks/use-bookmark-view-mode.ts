@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import type { ViewMode } from "@/types";
 
 const STORAGE_KEY = "markmaster-bookmark-view-mode";
@@ -35,11 +35,11 @@ function subscribe(callback: () => void) {
  * client paint (avoids layout swaps and mismatched skeleton/list chrome).
  */
 export function useBookmarkViewMode(defaultViewMode: ViewMode = "feed") {
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
+  const hasHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const storedViewMode = useSyncExternalStore(
     subscribe,

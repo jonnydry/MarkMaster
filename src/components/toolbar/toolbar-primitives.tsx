@@ -4,6 +4,12 @@ import type { ReactNode, RefObject } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Search, X } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
+import {
+  appToolbarControlCompactClassName,
+  appToolbarControlCompactHeightClassName,
+  appToolbarControlExpandedClassName,
+  appToolbarControlExpandedHeightClassName,
+} from "@/lib/app-chrome";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import {
   highlightActiveClass,
@@ -125,6 +131,10 @@ export function ToolbarSegmentControl<T extends string>({
   size = "sm",
   className,
 }: ToolbarSegmentControlProps<T>) {
+  const shellHeight =
+    size === "md"
+      ? appToolbarControlExpandedHeightClassName
+      : appToolbarControlCompactHeightClassName;
   const buttonHeight = size === "md" ? "h-8" : "h-7";
   const buttonPadding = size === "md" ? "px-2.5" : "px-2";
 
@@ -133,7 +143,8 @@ export function ToolbarSegmentControl<T extends string>({
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex shrink-0 rounded-sm border p-0.5",
+        "inline-flex shrink-0 items-center rounded-sm border p-0.5",
+        shellHeight,
         variant === "library"
           ? "border-hairline-soft bg-background/35"
           : cn(orbitHairlineBorder(), "bg-background/35"),
@@ -175,6 +186,7 @@ interface ToolbarIconButtonProps {
   disabled?: boolean;
   "aria-controls"?: string;
   showIndicator?: boolean;
+  size?: "default" | "compact";
   className?: string;
 }
 
@@ -187,9 +199,14 @@ export function ToolbarIconButton({
   disabled,
   "aria-controls": ariaControls,
   showIndicator,
+  size = "default",
   className,
 }: ToolbarIconButtonProps) {
   const isActive = active ?? pressed;
+  const boxClassName =
+    size === "compact"
+      ? appToolbarControlCompactClassName
+      : appToolbarControlExpandedClassName;
 
   return (
     <button
@@ -201,7 +218,8 @@ export function ToolbarIconButton({
       aria-label={label}
       aria-controls={ariaControls}
       className={cn(
-        "relative inline-flex size-9 shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
+        "relative inline-flex shrink-0 items-center justify-center rounded-sm border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
+        boxClassName,
         isActive
           ? highlightActiveClass
           : cn(

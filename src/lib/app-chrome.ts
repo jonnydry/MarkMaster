@@ -20,6 +20,30 @@ export const appToolbarSurfaceGroupClassName =
 export const appFloatingSearchShellClassName =
   `floating-search-shell surface-overlay rounded-sm`;
 
+/** 32px — compact feed toolbar control box (icon tiles, avatar, menu). */
+export const appToolbarControlCompactClassName = "size-8";
+
+/** 32px height for chips, triggers, and segmented shells in compact toolbars. */
+export const appToolbarControlCompactHeightClassName = "h-8";
+
+/** 36px — expanded feed toolbar control box. */
+export const appToolbarControlExpandedClassName = "size-9";
+
+/** 36px height for chips and triggers in expanded feed toolbars. */
+export const appToolbarControlExpandedHeightClassName = "h-9";
+
+export function appToolbarControlBoxClassName(compact: boolean): string {
+  return compact
+    ? appToolbarControlCompactClassName
+    : appToolbarControlExpandedClassName;
+}
+
+export function appToolbarControlHeightClassName(compact: boolean): string {
+  return compact
+    ? appToolbarControlCompactHeightClassName
+    : appToolbarControlExpandedHeightClassName;
+}
+
 /** Horizontal page gutter — headers, toolbars, scroll content */
 export const appContentGutterClassName = "px-4 sm:px-5";
 

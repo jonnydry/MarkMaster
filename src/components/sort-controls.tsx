@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/select";
 import { ViewModeControls } from "@/components/view-mode-controls";
 import type { SortField, ViewMode } from "@/types";
-import { appToolbarSurfaceClassName } from "@/lib/app-chrome";
+import {
+  appToolbarControlCompactHeightClassName,
+  appToolbarControlExpandedHeightClassName,
+  appToolbarSurfaceClassName,
+} from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 
 interface SortControlsProps {
@@ -47,8 +51,11 @@ export function SortControls({
             "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong font-semibold hover:border-primary/30",
             appToolbarSurfaceClassName,
             compact
-              ? "h-8 w-8 shrink-0 justify-center p-0 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
-              : "h-9 min-w-[100px] flex-1 sm:flex-none"
+              ? cn(
+                  appToolbarControlCompactHeightClassName,
+                  "w-8 shrink-0 justify-center p-0 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
+                )
+              : cn(appToolbarControlExpandedHeightClassName, "min-w-[100px] flex-1 sm:flex-none")
           )}
         >
           <ArrowDownUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />

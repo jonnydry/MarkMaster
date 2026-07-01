@@ -24,8 +24,16 @@ import {
   FeedToolbarControlsRow,
   FeedToolbarRow,
   FeedToolbarSearchRow,
+  withCompactToolbarSidebar,
 } from "@/components/feed-toolbar-layout";
-import { appContentGutterClassName, appToolbarSurfaceClassName, appToolbarSurfaceGroupClassName } from "@/lib/app-chrome";
+import {
+  appContentGutterClassName,
+  appToolbarControlBoxClassName,
+  appToolbarControlExpandedClassName,
+  appToolbarControlHeightClassName,
+  appToolbarSurfaceClassName,
+  appToolbarSurfaceGroupClassName,
+} from "@/lib/app-chrome";
 import { orbitControlRadius, orbitDataClass } from "@/lib/orbit-route-chrome";
 import {
   type OrbitScanBatchMode,
@@ -147,7 +155,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     const showTriageProgress = passTotal > 0 && triagedCount > 0;
 
     const userNav = user ? (
-      <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
+      <UserNavDynamic user={user} avatarSize={compact ? "default" : "xl"} />
     ) : null;
 
     const scopeControls = canSelect ? (
@@ -201,6 +209,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
             icon={RefreshCw}
             disabled={scanBusy || scanTargetCount === 0}
             onClick={onScan}
+            size={compact ? "compact" : "default"}
+            className={appToolbarSurfaceClassName}
           />
         ) : (
           <div className="flex items-center gap-1.5">
@@ -209,7 +219,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               size="sm"
               className={cn(
                 "gap-1.5 px-2.5 text-xs",
-                compact ? "h-7" : "h-8",
+                appToolbarControlHeightClassName(compact),
                 orbitControlRadius()
               )}
               disabled={scanBusy || scanTargetCount === 0}
@@ -238,9 +248,12 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           aria-label="Open graph"
           title="Open graph"
           className={cn(
-            buttonVariants({ variant: "outline", size: compact ? "icon" : "icon-lg" }),
+            buttonVariants({
+              variant: "outline",
+              size: compact ? "icon" : "icon-lg",
+            }),
             appToolbarSurfaceClassName,
-            compact && "size-8"
+            appToolbarControlBoxClassName(compact)
           )}
         >
           <MapIcon className="size-4 text-primary" aria-hidden />
@@ -253,21 +266,21 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           }
           icon={CheckSquare}
           onClick={onToggleSelectionMode}
-          className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+          size={compact ? "compact" : "default"}
+          className={appToolbarSurfaceClassName}
         />
         <KeyboardShortcutsHelpButton
           open={keyboardShortcutsOpen}
           onOpenChange={onKeyboardShortcutsOpenChange}
           groups={shortcutGroups}
           description="Orbit queue navigation and review actions."
-          className={cn(
-            "shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
-            compact ? "size-8" : "size-9",
-            appToolbarSurfaceClassName
-          )}
+          toolbarSize={compact ? "compact" : "default"}
         />
         <PageHeaderCompactToggle
-          className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
+          className={cn(
+            appToolbarSurfaceClassName,
+            !compact && appToolbarControlExpandedClassName
+          )}
         />
       </>
     ) : null;
@@ -316,9 +329,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               <FeedToolbarRow
                 leading={
                   <>
-                    {mobileSidebar ? (
-                      <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-                    ) : null}
+                {mobileSidebar ? (
+                  <div className="shrink-0 md:hidden">
+                    {withCompactToolbarSidebar(mobileSidebar, compact)}
+                  </div>
+                ) : null}
                     {scopeControls}
                   </>
                 }
@@ -347,9 +362,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         <FeedToolbarSearchRow
           leading={
             <>
-              {mobileSidebar ? (
-                <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-              ) : null}
+                {mobileSidebar ? (
+                  <div className="shrink-0 md:hidden">
+                    {withCompactToolbarSidebar(mobileSidebar, compact)}
+                  </div>
+                ) : null}
               <OrbitPageIdentity queueTotal={total} />
             </>
           }

@@ -126,7 +126,7 @@ function DashboardContent() {
     visibleSelectedBookmarkIds,
     selectedBookmarkIdSet,
     searchQuery,
-    aboveFoldMediaBookmarkId,
+    aboveFoldMediaBookmarkIds,
     dialogTagIds,
     dialogCollectionIds,
     activeBookmarkIdForView,
@@ -364,7 +364,7 @@ function DashboardContent() {
                 bookmarks={bookmarks}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
-                aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+                aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
                 selectionMode={selectionMode}
                 selectedBookmarkIdSet={selectedBookmarkIdSet}
                 activeBookmarkId={

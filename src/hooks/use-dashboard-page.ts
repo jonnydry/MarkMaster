@@ -22,6 +22,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { requestCompactSearchFocus } from "@/lib/compact-floating-search";
+import { getAboveFoldMediaBookmarkIds } from "@/lib/bookmark-feed-layout";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
 import type { BookmarkWithRelations, MediaFilter } from "@/types";
@@ -50,6 +51,7 @@ export function useDashboardPage() {
   const { data: session, update: updateSession } = useSession();
 
   const filters = useBookmarkFilters();
+  const { resetPage } = filters;
   const actions = useBookmarkActions();
   const { createCollectionQuick, createCollection } = useCreateCollection();
 
@@ -195,13 +197,10 @@ export function useDashboardPage() {
     [filters.search]
   );
 
-  const aboveFoldMediaBookmarkId = useMemo(() => {
-    const first = bookmarks.find((b) => {
-      const m = b.media?.[0];
-      return Boolean(m?.url || m?.preview_image_url);
-    });
-    return first?.id ?? null;
-  }, [bookmarks]);
+  const aboveFoldMediaBookmarkIds = useMemo(
+    () => getAboveFoldMediaBookmarkIds(bookmarks),
+    [bookmarks]
+  );
   const dialogs = useBookmarkDialogs({
     bookmarkById,
     bulkSelectionIds:
@@ -347,11 +346,11 @@ export function useDashboardPage() {
   );
 
   const handleSyncComplete = useCallback(async () => {
-    filters.resetPage();
+    resetPage();
     await completeLibrarySync(queryClient, {
       updateSession: () => updateSession({ refresh: "lastSyncAt" }),
     });
-  }, [queryClient, updateSession, filters.resetPage]);
+  }, [queryClient, updateSession, resetPage]);
 
   const handleSyncStateChange = useCallback((syncing: boolean) => {
     setSyncRequestLoading(syncing);
@@ -490,7 +489,7 @@ export function useDashboardPage() {
       visibleSelectedBookmarkIds,
       selectedBookmarkIdSet,
       searchQuery,
-      aboveFoldMediaBookmarkId,
+      aboveFoldMediaBookmarkIds,
       tagDialogBookmarks: dialogs.tagDialogBookmarks,
       collectionDialogBookmarks: dialogs.collectionDialogBookmarks,
       dialogTagIds: dialogs.dialogTagIds,
@@ -565,7 +564,7 @@ export function useDashboardPage() {
       visibleSelectedBookmarkIds,
       selectedBookmarkIdSet,
       searchQuery,
-      aboveFoldMediaBookmarkId,
+      aboveFoldMediaBookmarkIds,
       activeBookmarkIdForView,
       activeBookmark,
       gridOverlayBookmark,

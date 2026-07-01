@@ -63,7 +63,7 @@ export default function CollectionDetailClient({
     handlePageChange,
     canReorder,
     prefetchCollectionPage,
-    aboveFoldMediaBookmarkId,
+    aboveFoldMediaBookmarkIds,
     isSyncedFromX,
     isUserCollection,
     itemCountLabel,
@@ -206,7 +206,7 @@ export default function CollectionDetailClient({
             viewMode={viewMode}
             isSyncedFromX={isSyncedFromX}
             canReorder={canReorder}
-            aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+            aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
             activeBookmarkId={activeBookmarkId}
             reordering={reordering}
             onSelectBookmark={handleBookmarkSelect}

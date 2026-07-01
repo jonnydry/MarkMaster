@@ -24,7 +24,7 @@ type CollectionDetailBookmarkListProps = {
   viewMode: ViewMode;
   isSyncedFromX: boolean;
   canReorder: boolean;
-  aboveFoldMediaBookmarkId: string | null;
+  aboveFoldMediaBookmarkIds: ReadonlySet<string>;
   activeBookmarkId: string | null;
   reordering: boolean;
   onSelectBookmark: (id: string) => void;
@@ -40,7 +40,7 @@ export function CollectionDetailBookmarkList({
   viewMode,
   isSyncedFromX,
   canReorder,
-  aboveFoldMediaBookmarkId,
+  aboveFoldMediaBookmarkIds,
   activeBookmarkId,
   reordering,
   onSelectBookmark,
@@ -114,7 +114,7 @@ export function CollectionDetailBookmarkList({
               <BookmarkCard
                 bookmark={item.bookmark}
                 viewMode="feed"
-                priorityMedia={item.bookmark.id === aboveFoldMediaBookmarkId}
+                priorityMedia={aboveFoldMediaBookmarkIds.has(item.bookmark.id)}
                 selected={activeBookmarkId === item.bookmark.id}
                 onSelect={onSelectBookmark}
                 onOpenExpanded={onOpenExpanded}
@@ -134,7 +134,7 @@ export function CollectionDetailBookmarkList({
         scrollRef={scrollRef}
         bookmarks={bookmarks}
         viewMode={viewMode}
-        aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+        aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
         selectionMode={false}
         selectedBookmarkIdSet={new Set()}
         activeBookmarkId={activeBookmarkId}

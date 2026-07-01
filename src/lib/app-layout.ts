@@ -55,7 +55,9 @@ export const appOverlayDialogReviewClassName = cn(
 
 /** Small overlay dialog shell (keyboard shortcuts, etc.). */
 export const appOverlayDialogSmClassName = cn(
-  "app-overlay-dialog-sm surface-overlay p-0"
+  "app-overlay-dialog-sm surface-overlay p-0",
+  "max-w-[min(22rem,calc(100vw-var(--app-overlay-inset)*2))]",
+  "sm:max-w-[min(22rem,calc(100vw-var(--app-overlay-inset)*2))]"
 );
 
 /** Two-column overlay grid — bookmark overlay sidebar width.

@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -251,6 +253,13 @@ export async function kickSyncWorker(runId: string) {
   }
 }
 
+function timingSafeStringEqual(a: string, b: string) {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 export function isSyncWorkerAuthorized(request: Request) {
   const secret = process.env.SYNC_WORKER_SECRET?.trim();
   if (!secret) {
@@ -258,10 +267,12 @@ export function isSyncWorkerAuthorized(request: Request) {
   }
 
   const auth = request.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) {
+  if (!auth) return false;
+
+  if (timingSafeStringEqual(auth, `Bearer ${secret}`)) {
     return true;
   }
 
   const cronSecret = process.env.CRON_SECRET?.trim();
-  return Boolean(cronSecret && auth === `Bearer ${cronSecret}`);
+  return Boolean(cronSecret && timingSafeStringEqual(auth, `Bearer ${cronSecret}`));
 }

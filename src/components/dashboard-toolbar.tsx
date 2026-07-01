@@ -11,8 +11,14 @@ import {
   FeedToolbarControlsRow,
   FeedToolbarRow,
   FeedToolbarSearchRow,
+  withCompactToolbarSidebar,
 } from "@/components/feed-toolbar-layout";
-import { appContentGutterClassName, appToolbarSurfaceClassName } from "@/lib/app-chrome";
+import {
+  appContentGutterClassName,
+  appToolbarControlExpandedClassName,
+  appToolbarControlHeightClassName,
+  appToolbarSurfaceClassName,
+} from "@/lib/app-chrome";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
@@ -106,7 +112,7 @@ export function DashboardToolbar({
       aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-        compact ? "h-7" : "h-8",
+        appToolbarControlHeightClassName(compact),
         highlightActiveClass,
         highlightInteractiveClass
       )}
@@ -126,7 +132,7 @@ export function DashboardToolbar({
       onClick={() => onTagToggle(tag.id)}
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-sm border px-2.5 text-xs font-semibold",
-        compact ? "h-7" : "h-8",
+        appToolbarControlHeightClassName(compact),
         highlightActiveClass,
         highlightInteractiveClass
       )}
@@ -156,7 +162,8 @@ export function DashboardToolbar({
           pressed={showFilters}
           aria-controls="dashboard-filter-panel"
           showIndicator={hasActiveFilters}
-          className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+          size={compact ? "compact" : "default"}
+          className={appToolbarSurfaceClassName}
         />
       </div>
 
@@ -173,7 +180,8 @@ export function DashboardToolbar({
           pressed={showDiscovery}
           aria-controls="dashboard-discovery-panel"
           showIndicator={discoveryHidden}
-          className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+          size={compact ? "compact" : "default"}
+          className={appToolbarSurfaceClassName}
         />
       ) : null}
 
@@ -181,7 +189,8 @@ export function DashboardToolbar({
         label="Keyboard shortcuts"
         icon={Keyboard}
         onClick={onOpenKeyboardShortcuts}
-        className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+        size={compact ? "compact" : "default"}
+        className={appToolbarSurfaceClassName}
       />
 
       <ToolbarIconButton
@@ -190,7 +199,8 @@ export function DashboardToolbar({
         icon={CheckSquare}
         onClick={onToggleSelectionMode}
         pressed={selectionMode}
-        className={cn(appToolbarSurfaceClassName, compact && "size-8")}
+        size={compact ? "compact" : "default"}
+        className={appToolbarSurfaceClassName}
       />
 
       <SortControls
@@ -202,13 +212,16 @@ export function DashboardToolbar({
       />
 
       <PageHeaderCompactToggle
-        className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
+        className={cn(
+          appToolbarSurfaceClassName,
+          !compact && appToolbarControlExpandedClassName
+        )}
       />
     </>
   );
 
   const userNav = user ? (
-    <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
+    <UserNavDynamic user={user} avatarSize={compact ? "default" : "xl"} />
   ) : null;
 
   if (compact) {
@@ -218,7 +231,9 @@ export function DashboardToolbar({
           <FeedToolbarRow
             leading={
               <>
-                <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+                <div className="shrink-0 md:hidden">
+                  {withCompactToolbarSidebar(mobileSidebar, compact)}
+                </div>
                 {filterChips}
               </>
             }
@@ -234,7 +249,11 @@ export function DashboardToolbar({
   return (
     <div className={cn("feed-toolbar py-2", appContentGutterClassName)}>
       <FeedToolbarSearchRow
-        leading={<div className="shrink-0 md:hidden">{mobileSidebar}</div>}
+        leading={
+          <div className="shrink-0 md:hidden">
+            {withCompactToolbarSidebar(mobileSidebar, compact)}
+          </div>
+        }
         search={searchField}
         userNav={userNav}
       />

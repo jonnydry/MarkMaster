@@ -14,12 +14,18 @@ import {
   FeedToolbarControlsRow,
   FeedToolbarRow,
   FeedToolbarSearchRow,
+  withCompactToolbarSidebar,
 } from "@/components/feed-toolbar-layout";
 import { OrbitMapGraphSearch } from "@/components/orbit/orbit-map-graph-search";
 import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
 import { OrbitMapPageIdentity } from "@/components/orbit/orbit-map-page-identity";
 import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
-import { appContentGutterClassName, appToolbarSurfaceClassName } from "@/lib/app-chrome";
+import {
+  appContentGutterClassName,
+  appToolbarControlExpandedClassName,
+  appToolbarControlHeightClassName,
+  appToolbarSurfaceClassName,
+} from "@/lib/app-chrome";
 import { orbitDataClass } from "@/lib/orbit-route-chrome";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
@@ -88,7 +94,7 @@ export const OrbitMapCommandBar = forwardRef<
   );
 
   const userNav = user ? (
-    <UserNavDynamic user={user} avatarSize={compact ? "lg" : "xl"} />
+    <UserNavDynamic user={user} avatarSize={compact ? "default" : "xl"} />
   ) : null;
 
   const scopeControl = (
@@ -96,25 +102,27 @@ export const OrbitMapCommandBar = forwardRef<
       graphScope={graphScope}
       isLoading={isLoading}
       onScopeChange={onScopeChange}
-      className={cn(appToolbarSurfaceClassName, compact ? "h-8" : "h-9")}
+      className={cn(
+        appToolbarSurfaceClassName,
+        appToolbarControlHeightClassName(compact)
+      )}
     />
   );
 
   const toolbarActions = (
     <>
       <OrbitMapLegendButton
-        className={cn(appToolbarSurfaceClassName, compact ? "h-8" : "h-9")}
+        className={cn(
+          appToolbarSurfaceClassName,
+          appToolbarControlHeightClassName(compact)
+        )}
       />
       <KeyboardShortcutsHelpButton
         open={keyboardShortcutsOpen}
         onOpenChange={onKeyboardShortcutsOpenChange}
         groups={shortcutGroups}
         description="Orbit graph search, view, and assignment shortcuts."
-        className={cn(
-          "shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
-          compact ? "size-8" : "size-9",
-          appToolbarSurfaceClassName
-        )}
+        toolbarSize={compact ? "compact" : "default"}
       />
       <Link
         href="/orbit"
@@ -122,14 +130,17 @@ export const OrbitMapCommandBar = forwardRef<
         className={cn(
           buttonVariants({ variant: "outline", size: compact ? "sm" : "default" }),
           appToolbarSurfaceClassName,
-          compact && "h-8"
+          appToolbarControlHeightClassName(compact)
         )}
       >
         <ArrowLeft className="size-4" />
         <span className="hidden sm:inline">Orbit queue</span>
       </Link>
       <PageHeaderCompactToggle
-        className={cn(appToolbarSurfaceClassName, compact ? "size-8" : "size-9")}
+        className={cn(
+          appToolbarSurfaceClassName,
+          !compact && appToolbarControlExpandedClassName
+        )}
       />
     </>
   );
@@ -142,7 +153,9 @@ export const OrbitMapCommandBar = forwardRef<
             leading={
               <>
                 {mobileSidebar ? (
-                  <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+                  <div className="shrink-0 md:hidden">
+                    {withCompactToolbarSidebar(mobileSidebar, compact)}
+                  </div>
                 ) : null}
                 {scopeControl}
               </>
@@ -167,7 +180,9 @@ export const OrbitMapCommandBar = forwardRef<
         leading={
           <>
             {mobileSidebar ? (
-              <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+              <div className="shrink-0 md:hidden">
+                {withCompactToolbarSidebar(mobileSidebar, compact)}
+              </div>
             ) : null}
             <OrbitMapPageIdentity />
           </>

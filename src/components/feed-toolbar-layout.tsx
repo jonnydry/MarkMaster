@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { cloneElement, isValidElement } from "react";
 
 import {
   appContentGutterClassName,
@@ -13,6 +14,17 @@ import { cn } from "@/lib/utils";
 /** Horizontal scroll without visible scrollbar — feed toolbar rows. */
 export const feedToolbarScrollClassName =
   "overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+/** Pass compact toolbar sizing into a `MobileSidebar` element. */
+export function withCompactToolbarSidebar(
+  node: ReactNode,
+  compactToolbar: boolean
+): ReactNode {
+  if (!isValidElement(node)) return node;
+  return cloneElement(node as ReactElement<{ compactToolbar?: boolean }>, {
+    compactToolbar,
+  });
+}
 
 export function FeedSearchFieldShell({
   children,
@@ -90,7 +102,7 @@ export function FeedToolbarRow({
       </div>
       <div
         className={cn(
-          "flex min-w-0 shrink items-center gap-1",
+          "flex min-w-0 shrink items-center gap-1.5",
           feedToolbarScrollClassName
         )}
       >

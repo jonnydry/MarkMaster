@@ -8,6 +8,7 @@ import {
   appFixedViewportClassName,
   appOverlayBackdropClassName,
 } from "@/lib/app-layout";
+import { appToolbarControlCompactClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 
@@ -31,9 +32,14 @@ interface MobileSidebarProps {
   onSyncStateChange?: (syncing: boolean) => void;
   lastSyncAt?: Date | null;
   totalBookmarks?: number;
+  /** Match 32px feed toolbar controls when rendered inside a compact toolbar row. */
+  compactToolbar?: boolean;
 }
 
-export function MobileSidebar(props: MobileSidebarProps) {
+export function MobileSidebar({
+  compactToolbar = false,
+  ...props
+}: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -106,11 +112,14 @@ export function MobileSidebar(props: MobileSidebarProps) {
         ref={triggerRef}
         variant="ghost"
         size="icon"
-        className="md:hidden size-10"
+        className={cn(
+          "md:hidden",
+          compactToolbar ? appToolbarControlCompactClassName : "size-10"
+        )}
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >
-        <Menu className="w-5 h-5" />
+        <Menu className={compactToolbar ? "size-4" : "size-5"} />
       </Button>
 
       <div

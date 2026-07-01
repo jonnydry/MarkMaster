@@ -12,6 +12,7 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { bookmarkLabel } from "@/lib/collections-presentation";
+import { getAboveFoldMediaBookmarkIds } from "@/lib/bookmark-feed-layout";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import {
   collectionDetailSchema,
@@ -145,13 +146,10 @@ export function useCollectionDetailPage(collectionId: string) {
     [sortedItems]
   );
 
-  const aboveFoldMediaBookmarkId = useMemo(() => {
-    const row = sortedItems.find((item) => {
-      const media = item.bookmark.media?.[0];
-      return Boolean(media?.url || media?.preview_image_url);
-    });
-    return row?.bookmark.id ?? null;
-  }, [sortedItems]);
+  const aboveFoldMediaBookmarkIds = useMemo(
+    () => getAboveFoldMediaBookmarkIds(sortedItems.map((item) => item.bookmark)),
+    [sortedItems]
+  );
 
   const isSyncedFromX = collection?.type === "x_folder";
   const isUserCollection = collection?.type === "user_collection";
@@ -440,7 +438,7 @@ export function useCollectionDetailPage(collectionId: string) {
     handlePageChange,
     canReorder,
     prefetchCollectionPage,
-    aboveFoldMediaBookmarkId,
+    aboveFoldMediaBookmarkIds,
     isSyncedFromX,
     isUserCollection,
     itemCountLabel,

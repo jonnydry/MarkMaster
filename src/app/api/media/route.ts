@@ -73,6 +73,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Upstream fetch failed" }, { status: 502 });
   }
 
+  // `redirect: "follow"` means the final response may come from a different
+  // host than the one we validated — re-check so an upstream redirect can
+  // never turn this into an open proxy.
+  if (!isAllowedUrl(upstream.url)) {
+    return NextResponse.json({ error: "URL not allowed" }, { status: 502 });
+  }
+
   if (!upstream.ok && upstream.status !== 206) {
     return NextResponse.json(
       { error: "Upstream error" },

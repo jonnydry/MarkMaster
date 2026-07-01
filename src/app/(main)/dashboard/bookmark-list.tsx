@@ -18,7 +18,7 @@ interface BookmarkListProps {
   bookmarks: BookmarkWithRelations[];
   viewMode: ViewMode;
   searchQuery?: string;
-  aboveFoldMediaBookmarkId: string | null;
+  aboveFoldMediaBookmarkIds: ReadonlySet<string>;
   selectionMode: boolean;
   selectedBookmarkIdSet: Set<string>;
   activeBookmarkId: string | null;
@@ -47,7 +47,7 @@ function VirtualizedBookmarkRows({
   bookmarks,
   viewMode,
   searchQuery,
-  aboveFoldMediaBookmarkId,
+  aboveFoldMediaBookmarkIds,
   selectionMode,
   selectedBookmarkIdSet,
   activeBookmarkId,
@@ -94,7 +94,7 @@ function VirtualizedBookmarkRows({
         bookmarks={bookmarks}
         viewMode={viewMode}
         searchQuery={searchQuery}
-        aboveFoldMediaBookmarkId={aboveFoldMediaBookmarkId}
+        aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
         selectionMode={selectionMode}
         selectedBookmarkIdSet={selectedBookmarkIdSet}
         activeBookmarkId={activeBookmarkId}
@@ -137,7 +137,7 @@ function VirtualizedBookmarkRows({
                 viewMode={viewMode}
                 searchQuery={searchQuery}
                 rank={index + 1}
-                priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
+                priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
                 selected={
                   selectionMode
                     ? selectedBookmarkIdSet.has(bookmark.id)
@@ -175,7 +175,7 @@ function StaticBookmarkRows({
   bookmarks,
   viewMode,
   searchQuery,
-  aboveFoldMediaBookmarkId,
+  aboveFoldMediaBookmarkIds,
   selectionMode,
   selectedBookmarkIdSet,
   activeBookmarkId,
@@ -203,7 +203,7 @@ function StaticBookmarkRows({
           viewMode={viewMode}
           searchQuery={searchQuery}
           rank={index + 1}
-          priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
+          priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
           selected={
             selectionMode
               ? selectedBookmarkIdSet.has(bookmark.id)
@@ -238,7 +238,7 @@ export function BookmarkList({
   bookmarks,
   viewMode,
   searchQuery,
-  aboveFoldMediaBookmarkId,
+  aboveFoldMediaBookmarkIds,
   selectionMode,
   selectedBookmarkIdSet,
   activeBookmarkId,
@@ -281,7 +281,7 @@ export function BookmarkList({
             key={bookmark.id}
             bookmark={bookmark}
             searchQuery={searchQuery}
-            priorityMedia={bookmark.id === aboveFoldMediaBookmarkId}
+            priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
             selected={
               selectionMode
                 ? selectedBookmarkIdSet.has(bookmark.id)
@@ -306,7 +306,7 @@ export function BookmarkList({
     bookmarks,
     viewMode: viewMode as Exclude<ViewMode, "grid">,
     searchQuery,
-    aboveFoldMediaBookmarkId,
+    aboveFoldMediaBookmarkIds,
     selectionMode,
     selectedBookmarkIdSet,
     activeBookmarkId,
