@@ -101,13 +101,15 @@ const nextConfig: NextConfig = {
     root: turbopackRoot,
   },
   // lucide-react and date-fns are optimized by default in Next.js 16.
-  // @base-ui/react and @tanstack/react-query benefit from explicit opt-in.
+  // @tanstack/react-query benefits from explicit opt-in.
+  // @base-ui/react is excluded from optimizePackageImports: its entry barrels use
+  // `export * as`, which breaks Turbopack dev HMR (vercel/next.js#86714). Use
+  // `npm run dev` (webpack) until upstream fixes land; `dev:turbo` is opt-in.
   experimental: {
     optimizePackageImports: [
       "@tanstack/react-query",
       "lucide-react",
       "date-fns",
-      "@base-ui/react",
     ],
   },
   poweredByHeader: false,
@@ -148,7 +150,7 @@ const nextConfig: NextConfig = {
         cacheGroups: {
           ...cacheGroups,
           baseUiPopup: {
-            test: /[\\/]node_modules[\\/]@base-ui[\\/]react[\\/]esm[\\/](utils[\\/]popups|floating-ui-react)[\\/]/,
+            test: /[\\/]node_modules[\\/]@base-ui[\\/]react[\\/](utils[\\/]popups|floating-ui-react)[\\/]/,
             name: "base-ui-popup",
             chunks: "all",
             priority: 20,

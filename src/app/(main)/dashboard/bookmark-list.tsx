@@ -275,7 +275,10 @@ export function BookmarkList({
 
   if (viewMode === "grid") {
     return (
-      <div className="columns-1 gap-3 p-3 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5">
+      // Container-query columns: the masonry reflows to its own width, so it fills
+      // whatever space the (collapsible) dashboard rail leaves — no rail state needed.
+      <div className="@container p-3">
+      <div className="columns-1 gap-3 @sm:columns-2 @2xl:columns-3 @4xl:columns-4 @6xl:columns-5">
         {bookmarks.map((bookmark, i) => (
           <GridBookmarkCard
             key={bookmark.id}
@@ -298,6 +301,7 @@ export function BookmarkList({
             isPerformanceHighlight={performanceHighlightId === bookmark.id}
           />
         ))}
+      </div>
       </div>
     );
   }

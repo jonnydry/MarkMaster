@@ -87,6 +87,7 @@ describe("getFreshXAccessToken", () => {
         accessToken: expect.any(String),
         refreshToken: expect.any(String),
         tokenExpiresAt: expect.any(Date),
+        tokenRefreshedAt: expect.any(Date),
       },
     });
 

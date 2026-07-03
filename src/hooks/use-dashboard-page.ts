@@ -76,7 +76,7 @@ export function useDashboardPage() {
     [queryClient, createCollectionQuick]
   );
 
-  const { viewMode, setViewMode } = useBookmarkViewMode("feed");
+  const { viewMode, setViewMode } = useBookmarkViewMode("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);

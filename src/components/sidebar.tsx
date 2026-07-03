@@ -22,10 +22,39 @@ import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { useTypography } from "@/hooks/use-typography";
 import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
+import { useTagsQuery, useCollectionsQuery } from "@/hooks/use-library-data";
 
 const TAG_PREVIEW_LIMIT = 12;
 const COLLECTION_PREVIEW_LIMIT = 10;
 const X_FOLDER_PREVIEW_LIMIT = 8;
+
+/** Placeholder rows shown while the tag/collection index is still loading. */
+function SidebarSkeletonRows({
+  rows = 5,
+  withDot = false,
+}: {
+  rows?: number;
+  withDot?: boolean;
+}) {
+  const widths = ["72%", "58%", "66%", "45%", "62%", "50%"];
+  return (
+    <div className="space-y-1 px-1 pb-1" aria-hidden>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-2 py-1">
+          {withDot ? (
+            <span className="skeleton-shimmer h-1.5 w-1.5 shrink-0 rounded-full" />
+          ) : (
+            <span className="skeleton-shimmer size-4 shrink-0 rounded-[2px]" />
+          )}
+          <span
+            className="skeleton-shimmer h-3 rounded-[2px]"
+            style={{ width: widths[i % widths.length] }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function isSidebarInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
@@ -90,6 +119,14 @@ export function Sidebar({
     [collections]
   );
   const hasCollections = userCollections.length > 0 || xFolders.length > 0;
+
+  // Distinguish "still loading" from "genuinely empty" so a cold load shows
+  // skeletons, not the zero-state copy (which reads as data loss). These
+  // subscribe to the same cached queries the page already runs — no extra fetch.
+  const { isLoading: tagsQueryLoading } = useTagsQuery();
+  const { isLoading: collectionsQueryLoading } = useCollectionsQuery();
+  const tagsLoading = tagsQueryLoading && tags.length === 0;
+  const collectionsLoading = collectionsQueryLoading && !hasCollections;
 
   const [showAllTags, setShowAllTags] = useState(false);
   const [showAllCollections, setShowAllCollections] = useState(false);
@@ -181,9 +218,13 @@ export function Sidebar({
             <div className="space-y-4 pb-1">
               <SidebarSection id="tags" title="Tags" count={tags.length}>
                 {tags.length === 0 ? (
-                  <p className="px-1 pb-1 text-xs text-muted-foreground">
-                    Tags appear as you add them to bookmarks
-                  </p>
+                  tagsLoading ? (
+                    <SidebarSkeletonRows rows={6} withDot />
+                  ) : (
+                    <p className="px-1 pb-1 text-xs text-muted-foreground">
+                      Tags appear as you add them to bookmarks
+                    </p>
+                  )
                 ) : (
                   <div className="space-y-0.5">
                     {visibleTags.map((tag) => {
@@ -252,9 +293,13 @@ export function Sidebar({
                 }
               >
                 {!hasCollections ? (
-                  <p className="px-1 pb-1 text-xs text-muted-foreground/70">
-                    Create a collection to start curating
-                  </p>
+                  collectionsLoading ? (
+                    <SidebarSkeletonRows rows={4} />
+                  ) : (
+                    <p className="px-1 pb-1 text-xs text-muted-foreground/70">
+                      Create a collection to start curating
+                    </p>
+                  )
                 ) : (
                   <div className="space-y-0.5">
                     {visibleCollections.map((collection) => {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 
 import { Providers } from "@/components/providers";
+import { ThemeInitScript } from "@/components/theme-init-script";
 import { Toaster } from "@/components/ui/sonner";
 import { defaultFontVariables } from "@/lib/app-fonts";
 import "./globals.css";
@@ -30,11 +30,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://api.x.ai" crossOrigin="" />
       </head>
       <body className="flex min-h-full min-w-0 flex-col overflow-x-hidden">
-        <Script
-          id="markmaster-theme-init"
-          src="/theme-init"
-          strategy="beforeInteractive"
-        />
+        <ThemeInitScript />
         <Providers>
           {children}
           <Toaster />

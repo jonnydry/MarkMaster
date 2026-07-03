@@ -7,8 +7,9 @@
   "scripts": {
     "postinstall": "prisma generate",
     "predev": "node scripts/check-db-migrations.mjs",
-    "dev": "NODE_OPTIONS=--dns-result-order=ipv4first next dev",
-    "dev:unchecked": "NODE_OPTIONS=--dns-result-order=ipv4first next dev",
+    "dev": "NODE_OPTIONS=--dns-result-order=ipv4first next dev --webpack",
+    "dev:turbo": "NODE_OPTIONS=--dns-result-order=ipv4first next dev",
+    "dev:unchecked": "NODE_OPTIONS=--dns-result-order=ipv4first next dev --webpack",
     "dev:migrate": "npm run db:migrate && npm run dev:unchecked",
     "build": "next build",
     "analyze": "next experimental-analyze --output",

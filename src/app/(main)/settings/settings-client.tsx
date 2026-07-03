@@ -114,12 +114,13 @@ export default function SettingsPage() {
   const lastSyncAt = dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null;
 
   const tagsState = useSettingsTags();
-  const { tags, tagsError, tagsErrorValue, refetchTags } = tagsState;
+  const { tags, tagsLoading, tagsError, tagsErrorValue, refetchTags } = tagsState;
 
   const {
     data: collections = [],
     isError: collectionsError,
     error: collectionsErrorValue,
+    isLoading: collectionsLoading,
     refetch: refetchCollections,
   } = useCollectionsQuery();
 
@@ -225,6 +226,7 @@ export default function SettingsPage() {
                 user={dbUser}
                 tagCount={tags.length}
                 collectionCount={collections.length}
+                loading={tagsLoading || collectionsLoading}
               />
 
               {hasSettingsError && (

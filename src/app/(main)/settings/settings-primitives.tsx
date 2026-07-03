@@ -136,14 +136,26 @@ export function SettingsHero({
   user,
   tagCount,
   collectionCount,
+  loading = false,
 }: {
   user: DbUser | undefined;
   tagCount: number;
   collectionCount: number;
+  /** While the tag/collection index loads, show placeholders instead of 0. */
+  loading?: boolean;
 }) {
   const lastSyncLabel = user?.lastSyncAt
     ? `Synced ${formatDistanceToNow(new Date(user.lastSyncAt), { addSuffix: true })}`
     : "Not synced yet";
+  const statValue = (count: number) =>
+    loading ? (
+      <span
+        className="skeleton-shimmer inline-block h-4 w-6 rounded-[2px] align-middle"
+        aria-hidden
+      />
+    ) : (
+      count.toLocaleString()
+    );
 
   return (
     <section className="flex min-w-0 items-center gap-3 border-b border-hairline-soft pb-5">
@@ -173,8 +185,8 @@ export function SettingsHero({
         </p>
       </div>
       <dl className="hidden shrink-0 gap-4 text-right sm:flex">
-        <StatRow size="sm" headingFont={false} label="Tags" value={tagCount.toLocaleString()} />
-        <StatRow size="sm" headingFont={false} label="Collections" value={collectionCount.toLocaleString()} />
+        <StatRow size="sm" headingFont={false} label="Tags" value={statValue(tagCount)} />
+        <StatRow size="sm" headingFont={false} label="Collections" value={statValue(collectionCount)} />
       </dl>
     </section>
   );

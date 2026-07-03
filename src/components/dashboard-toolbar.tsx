@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject, ReactNode } from "react";
-import { CheckSquare, Compass, Keyboard, SlidersHorizontal } from "lucide-react";
+import { CheckSquare, Compass, Keyboard, PanelRight, SlidersHorizontal } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
@@ -56,6 +56,8 @@ interface DashboardToolbarProps {
   user?: DbUser;
   discoveryAvailable?: boolean;
   discoveryUntouchedCount?: number;
+  railOpen: boolean;
+  onToggleRail: () => void;
 }
 
 export function DashboardToolbar({
@@ -82,6 +84,8 @@ export function DashboardToolbar({
   user,
   discoveryAvailable = false,
   discoveryUntouchedCount = 0,
+  railOpen,
+  onToggleRail,
 }: DashboardToolbarProps) {
   const { compact } = usePageHeaderCompact();
   const { hidden: discoveryHidden, setHidden: setDiscoveryHidden } =
@@ -201,6 +205,17 @@ export function DashboardToolbar({
         pressed={selectionMode}
         size={compact ? "compact" : "default"}
         className={appToolbarSurfaceClassName}
+      />
+
+      <ToolbarIconButton
+        active={railOpen}
+        label={railOpen ? "Hide rail" : "Show rail"}
+        icon={PanelRight}
+        onClick={onToggleRail}
+        pressed={railOpen}
+        aria-controls="dashboard-rail"
+        size={compact ? "compact" : "default"}
+        className={cn(appToolbarSurfaceClassName, "hidden min-[1152px]:inline-flex")}
       />
 
       <SortControls

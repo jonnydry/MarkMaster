@@ -76,18 +76,30 @@ export async function GET() {
     currentRun = null;
   }
 
-  const recentRuns = await prisma.syncRun.findMany({
-    where: {
-      userId: user.id,
-      status: { notIn: [...ACTIVE_SYNC_STATUSES] },
-    },
-    orderBy: { startedAt: "desc" },
-    take: 5,
-    select: syncRunSelect,
-  });
+  const [recentRuns, tokenState] = await Promise.all([
+    prisma.syncRun.findMany({
+      where: {
+        userId: user.id,
+        status: { notIn: [...ACTIVE_SYNC_STATUSES] },
+      },
+      orderBy: { startedAt: "desc" },
+      take: 5,
+      select: syncRunSelect,
+    }),
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tokenRefreshedAt: true },
+    }),
+  ]);
 
   return NextResponse.json(
-    { currentRun, recentRuns },
+    {
+      currentRun,
+      recentRuns,
+      // Lets the client clear a "reconnect X" prompt once re-auth has happened
+      // after the failed run that triggered it.
+      reauthorizedAt: tokenState?.tokenRefreshedAt?.toISOString() ?? null,
+    },
     {
       headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=15" },
     }

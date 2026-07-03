@@ -79,3 +79,19 @@ export const appOverlayDialogGridReviewClassName = cn(
 
 /** Floating panel over the Orbit map canvas (mobile rail). */
 export const appOverlayPanelClassName = "app-overlay-panel";
+
+/**
+ * Dashboard secondary rail column (wide-screen only). Sticks below the header and
+ * scrolls independently; the main feed/grid column flexes beside it.
+ *
+ * The rail appears at 1152px — between lg (1024px, too cramped beside the sidebar)
+ * and xl (1280px). Keep `appDashboardRailMediaQuery` and every `min-[1152px]:`
+ * variant in sync with this value.
+ */
+export const appDashboardRailMediaQuery = "(min-width: 1152px)";
+
+export const appDashboardRailClassName = cn(
+  "hidden w-72 shrink-0 self-start min-[1152px]:block",
+  "sticky top-[var(--header-height)] max-h-[calc(100dvh-var(--header-height))]",
+  "overflow-y-auto overscroll-contain scrollbar-thin"
+);

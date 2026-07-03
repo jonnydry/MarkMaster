@@ -70,12 +70,18 @@ export function OrbitGrokStatusPanel({
   const privacyLabel = status.privacy.storeDisabled
     ? "Response storage off"
     : "Response storage on";
+  // Only qualify with retention when xAI affirmatively reports it. When it's
+  // undetermined, showing "Retention unknown" reads as a warning without adding
+  // information — let the accurate storage label stand on its own instead.
   const zeroDataRetentionLabel =
     status.privacy.zeroDataRetention === true
       ? "Zero retention"
       : status.privacy.zeroDataRetention === false
         ? "Retention active"
-        : "Retention unknown";
+        : null;
+  const privacyValue = zeroDataRetentionLabel
+    ? `${privacyLabel} · ${zeroDataRetentionLabel}`
+    : privacyLabel;
 
   return (
     <div className="space-y-3">
@@ -112,7 +118,7 @@ export function OrbitGrokStatusPanel({
           tabularNums={false}
           valueClassName="break-words text-foreground"
           label="Privacy"
-          value={`${privacyLabel} · ${zeroDataRetentionLabel}`}
+          value={privacyValue}
         />
         <StatRow
           size="sm"

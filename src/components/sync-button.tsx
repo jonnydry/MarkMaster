@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
+import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { toast } from "@/lib/toast";
 import { sendJson, FetchJsonError } from "@/lib/fetch-json";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { findTerminalRunForId, isExpectedFinishedRun } from "@/lib/sync-client-completion";
+import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 import type { SyncRunSummary } from "@/types";
 
 interface SyncButtonProps {
@@ -44,6 +47,33 @@ export function SyncButton({
   const latestRun = syncStatus?.recentRuns[0] ?? null;
   const isRateLimited = rateLimitedUntil !== null;
   const isAnySyncRunning = syncing || Boolean(currentRun) || isRateLimited;
+  // A 401/expired-token failure can't be retried — the X connection needs
+  // re-authorizing. Surface a reconnect action instead of a Sync that re-fails.
+  // Once the user has re-authorized (reauthorizedAt postdates the failed run),
+  // the failed run is stale evidence: drop the prompt and offer Sync again.
+  const failedRunEndedAt = latestRun
+    ? Date.parse(latestRun.completedAt ?? latestRun.startedAt)
+    : null;
+  const reauthorizedAt = syncStatus?.reauthorizedAt
+    ? Date.parse(syncStatus.reauthorizedAt)
+    : null;
+  const reauthorizedSinceFailure =
+    reauthorizedAt !== null &&
+    failedRunEndedAt !== null &&
+    reauthorizedAt > failedRunEndedAt;
+  const needsReconnect =
+    !currentRun &&
+    latestRun?.status === "FAILED" &&
+    isReauthRequiredError(latestRun.errorMessage) &&
+    !reauthorizedSinceFailure;
+
+  const handleReconnect = () => {
+    const callbackUrl =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/dashboard";
+    void signIn(TWITTER_PROVIDER_ID, { callbackUrl });
+  };
 
   useEffect(() => {
     if (!syncStatus || !initiatedSyncRef.current) return;
@@ -228,25 +258,57 @@ export function SyncButton({
       <div className="flex justify-center">
         <Button
           type="button"
-          onClick={handleSync}
-          aria-label={buttonLabel}
+          onClick={needsReconnect ? handleReconnect : handleSync}
+          aria-label={needsReconnect ? "Reconnect X" : buttonLabel}
           aria-busy={isAnySyncRunning}
-          title={syncTitle}
+          title={needsReconnect ? "Reconnect X — session expired" : syncTitle}
           variant="highlight"
-          disabled={isRateLimited}
+          disabled={isRateLimited && !needsReconnect}
           className="highlight-search-shell relative h-10 w-10 overflow-hidden p-0 disabled:opacity-70"
         >
-          <RefreshCw
-            className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
-            aria-hidden
-          />
+          {needsReconnect ? (
+            <XLogoMark className="size-4 shrink-0" title={undefined} />
+          ) : (
+            <RefreshCw
+              className={`size-4 shrink-0 ${isAnySyncRunning ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+          )}
           {/* absolute! — .highlight-search-shell > * forces position: relative
               on children; the status dot must stay corner-pinned. */}
           <span
-            className={`absolute! bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${statusDotClass}`}
+            className={`absolute! bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar ${needsReconnect ? "bg-destructive" : statusDotClass}`}
             aria-hidden
           />
         </Button>
+      </div>
+    );
+  }
+
+  if (needsReconnect) {
+    return (
+      <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-sm border border-destructive/30 bg-destructive/5 p-2">
+        <Button
+          type="button"
+          onClick={handleReconnect}
+          variant="highlight"
+          className="highlight-search-shell relative h-9 w-full gap-2 overflow-hidden text-sm"
+        >
+          <XLogoMark className="size-4 shrink-0" title={undefined} />
+          Reconnect X
+        </Button>
+        <div className="flex items-start gap-1.5 px-0.5" aria-live="polite">
+          <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+          <span className="min-w-0 text-xs leading-snug text-destructive">
+            X session expired — reconnect to resume syncing.
+          </span>
+        </div>
+        {detail === "full" ? (
+          <p className="mt-1 border-t border-hairline-soft pt-2 text-xs leading-snug text-muted-foreground">
+            Your X access token was revoked or expired. Reconnecting re-authorizes
+            read-only access and resumes syncing where it left off.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -381,6 +443,17 @@ function getSyncStatusCopy(
   }
 
   return null;
+}
+
+/**
+ * True when a sync failure stems from an expired/revoked X token — a state that
+ * retrying can't fix. Callers surface a reconnect (re-auth) action instead.
+ */
+function isReauthRequiredError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /\b401\b|unauthor|invalid[_ ]?grant|token (?:expired|revoked|invalid)|reconnect|re-?auth/i.test(
+    message
+  );
 }
 
 function formatFailedSyncLabel(relative: string, errorMessage: string | null | undefined) {

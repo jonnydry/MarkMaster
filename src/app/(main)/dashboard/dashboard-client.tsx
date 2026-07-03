@@ -11,6 +11,13 @@ import { PageHeader } from "@/components/page-header";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
 import { useDashboardDiscovery } from "@/hooks/use-dashboard-discovery";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
+import { useDashboardRail } from "@/hooks/use-dashboard-rail";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { DashboardRail } from "@/components/dashboard-rail";
+import {
+  appDashboardRailClassName,
+  appDashboardRailMediaQuery,
+} from "@/lib/app-layout";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -163,6 +170,13 @@ function DashboardContent() {
     isLoading: discoveryLoading,
   } = useDashboardDiscovery({ feedReady });
 
+  const { collapsed: railCollapsed, setCollapsed: setRailCollapsed } =
+    useDashboardRail();
+  const isWideViewport = useMediaQuery(appDashboardRailMediaQuery);
+  const railOpen = !railCollapsed;
+  // Rail is only mounted (and its authors query only fires) when actually visible.
+  const railVisible = railOpen && isWideViewport;
+
   return (
     <>
     <AppPageShell
@@ -241,6 +255,8 @@ function DashboardContent() {
                   user={dbUser ?? undefined}
                   discoveryAvailable={discoveryAvailable && !discoveryLoading}
                   discoveryUntouchedCount={discoveryUntouchedCount}
+                  railOpen={railOpen}
+                  onToggleRail={() => setRailCollapsed(!railCollapsed)}
                 />
 
                 {(isFetching || filters.isSearchPending) && !isLoading && (
@@ -282,6 +298,8 @@ function DashboardContent() {
                 )}
               </PageHeader>
 
+          <div className="flex min-w-0 items-start gap-4 min-[1152px]:pr-4">
+            <div className="min-w-0 flex-1">
           {!isError && (
             <DashboardDiscovery
               feedReady={feedReady}
@@ -393,6 +411,23 @@ function DashboardContent() {
               />
             </div>
           )}
+            </div>
+            {railOpen ? (
+              <div className={appDashboardRailClassName}>
+                <DashboardRail
+                  id="dashboard-rail"
+                  active={railVisible}
+                  filters={filters}
+                  tags={tags}
+                  libraryStats={libraryStats}
+                  total={total}
+                  untouchedCount={discoveryUntouchedCount}
+                  collectionCount={collections.length}
+                  lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                />
+              </div>
+            ) : null}
+          </div>
     </AppPageShell>
 
       {tagDialogOpen ? (

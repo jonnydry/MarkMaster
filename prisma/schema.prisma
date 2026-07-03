@@ -17,6 +17,8 @@ model User {
   accessToken     String
   refreshToken    String
   tokenExpiresAt  DateTime?
+  /** Last time valid X tokens were obtained (sign-in, reconnect, or refresh). */
+  tokenRefreshedAt DateTime?
   lastSyncAt      DateTime?
   /** When true, bookmark sync also mirrors X bookmark folders into collections. */
   syncXFolders    Boolean   @default(false)

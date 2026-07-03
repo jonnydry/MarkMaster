@@ -83,6 +83,7 @@ export async function authSignInCallback({
           accessToken: encrypt(account.access_token),
           refreshToken,
           tokenExpiresAt,
+          tokenRefreshedAt: new Date(),
         },
       });
     } else {
@@ -95,6 +96,7 @@ export async function authSignInCallback({
           accessToken: encrypt(account.access_token),
           refreshToken,
           tokenExpiresAt,
+          tokenRefreshedAt: new Date(),
         },
       });
     }

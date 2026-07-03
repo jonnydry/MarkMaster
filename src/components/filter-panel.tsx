@@ -23,6 +23,8 @@ interface FilterPanelProps {
   tags: TagWithCount[];
   onClearAll: () => void;
   hasActiveFilters: boolean;
+  /** "header" — full-width strip under the toolbar; "rail" — bare card body for the rail. */
+  variant?: "header" | "rail";
 }
 
 const MEDIA_OPTIONS: { value: MediaFilter; label: string; icon: React.ElementType }[] = [
@@ -47,29 +49,44 @@ export function FilterPanel({
   tags,
   onClearAll,
   hasActiveFilters,
+  variant = "header",
 }: FilterPanelProps) {
   const t = useTypography();
+  const isRail = variant === "rail";
   return (
     <div
       role="region"
       aria-label="Filters"
-      className={cn("space-y-3 border-b border-hairline-soft px-5 py-3", appChromeFrostedClassName)}
+      className={cn(
+        "space-y-3",
+        isRail
+          ? "px-0 py-0"
+          : cn("border-b border-hairline-soft px-5 py-3", appChromeFrostedClassName)
+      )}
     >
-      <div className="flex items-center justify-between">
-        <h3 className={cn(t.sectionLabel, "mb-0")}>
-          Filters
-        </h3>
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearAll}
-            className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-3 h-3" /> Clear all
-          </Button>
-        )}
-      </div>
+      {/* In the rail, the surrounding card already provides the "Filters" title. */}
+      {(!isRail || hasActiveFilters) && (
+        <div
+          className={cn(
+            "flex items-center",
+            isRail ? "justify-end" : "justify-between"
+          )}
+        >
+          {isRail ? null : (
+            <h3 className={cn(t.sectionLabel, "mb-0")}>Filters</h3>
+          )}
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearAll}
+              className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3 h-3" /> Clear all
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         <div>

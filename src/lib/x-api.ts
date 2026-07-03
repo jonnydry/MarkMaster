@@ -309,6 +309,7 @@ async function refreshAccessToken(
       accessToken: encrypt(data.access_token),
       refreshToken: encrypt(nextRefresh),
       tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+      tokenRefreshedAt: new Date(),
     },
   });
 

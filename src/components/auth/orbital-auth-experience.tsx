@@ -233,8 +233,8 @@ export function OrbitalAuthExperience({
                 <span className="font-semibold text-foreground">
                   AI-assisted, not AI-replaced.
                 </span>{" "}
-                Grok suggests tags and collections; you approve every move.
-                Scans run with{" "}
+                Grok suggests tags and collections; you approve every move. Scans
+                never store your data — every request runs with{" "}
                 <code className="rounded-sm bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-foreground">
                   store: false
                 </code>

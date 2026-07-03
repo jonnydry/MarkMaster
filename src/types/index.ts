@@ -175,6 +175,8 @@ export interface SyncRunSummary {
 export interface SyncStatusResponse {
   currentRun: SyncRunSummary | null;
   recentRuns: SyncRunSummary[];
+  /** When valid X tokens were last obtained (sign-in, reconnect, or refresh). */
+  reauthorizedAt: string | null;
 }
 
 export type OrbitScanConfidence = "high" | "medium" | "low";

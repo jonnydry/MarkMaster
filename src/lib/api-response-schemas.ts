@@ -104,6 +104,8 @@ const syncRunSummarySchema = v.object({
 export const syncStatusResponseSchema = v.object({
   currentRun: v.nullable(syncRunSummarySchema),
   recentRuns: v.array(syncRunSummarySchema),
+  // Optional so cached pre-field responses still validate.
+  reauthorizedAt: v.optional(v.nullable(v.string()), null),
 }) as unknown as v.GenericSchema<unknown, SyncStatusResponse>;
 
 export const analyticsDataSchema = v.looseObject({
