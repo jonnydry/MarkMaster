@@ -10,6 +10,7 @@ import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
+import { resolveBookmarkNavigationId } from "@/lib/grid-bookmark-navigation";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { bookmarkLabel } from "@/lib/collections-presentation";
 import { getAboveFoldMediaBookmarkIds } from "@/lib/bookmark-feed-layout";
@@ -23,7 +24,7 @@ import {
   invalidateCollectionMembershipQueries,
   invalidateCollectionMetadataQueries,
 } from "@/lib/query-invalidation";
-import type { BookmarkWithRelations } from "@/types";
+import type { BookmarkWithRelations, ViewMode } from "@/types";
 import type { ShareContent } from "@/lib/share-content";
 
 export const COLLECTION_DETAIL_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
@@ -84,7 +85,10 @@ function buildCollectionQueryString(
   return params.toString();
 }
 
-export function useCollectionDetailPage(collectionId: string) {
+export function useCollectionDetailPage(
+  collectionId: string,
+  viewMode: ViewMode = "feed"
+) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -161,25 +165,19 @@ export function useCollectionDetailPage(collectionId: string) {
 
   const selectBookmarkByOffset = useCallback(
     (offset: -1 | 1) => {
-      if (sortedBookmarkIds.length === 0) return;
-      const currentIndex = activeBookmarkId
-        ? sortedBookmarkIds.indexOf(activeBookmarkId)
-        : -1;
-      const nextIndex =
-        currentIndex === -1
-          ? 0
-          : Math.max(
-              0,
-              Math.min(sortedBookmarkIds.length - 1, currentIndex + offset)
-            );
-      const nextId = sortedBookmarkIds[nextIndex];
+      const nextId = resolveBookmarkNavigationId({
+        layout: viewMode === "grid" ? "grid" : "list",
+        bookmarkIds: sortedBookmarkIds,
+        currentId: activeBookmarkId,
+        offset,
+      });
       if (!nextId) return;
       setActiveBookmarkId(nextId);
       requestAnimationFrame(() =>
         scrollDataElementIntoView("data-dashboard-bookmark-id", nextId)
       );
     },
-    [activeBookmarkId, sortedBookmarkIds]
+    [activeBookmarkId, sortedBookmarkIds, viewMode]
   );
 
   const cancelEditingName = useCallback(() => {

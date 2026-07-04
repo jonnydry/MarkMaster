@@ -82,6 +82,28 @@ function getOrbitMapDebugPerfEnabled() {
   }
 }
 
+/**
+ * Living map (analytic orbital motion + sun corona in the worker) — on by
+ * default. Opt out via localStorage (`orbit-map-living` = "0") or a
+ * `?living=0` URL param (which persists the choice); `?living=1` re-enables.
+ * Always off for users who prefer reduced motion.
+ */
+function getOrbitMapLivingEnabled() {
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return false;
+    }
+    const param = new URLSearchParams(window.location.search).get('living');
+    if (param === '1' || param === '0') {
+      window.localStorage.setItem('orbit-map-living', param);
+      return param === '1';
+    }
+    return window.localStorage.getItem('orbit-map-living') !== '0';
+  } catch {
+    return false;
+  }
+}
+
 function isCanvasTransferReuseError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -204,6 +226,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             accentHex,
             backgroundHex,
             colorTheme: colorThemeRef.current,
+            livingMap: getOrbitMapLivingEnabled(),
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -445,6 +468,21 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         nodeId: props.focus.predictedAnchorId,
       });
     }, [props.focus, useFallback, workerGeneration]);
+
+    // Page visibility → worker (pauses the living-map motion loop while hidden)
+    useEffect(() => {
+      if (useFallback) return;
+      const handleVisibilityChange = () => {
+        workerRef.current?.postMessage({
+          type: WorkerMessageType.SET_VISIBILITY,
+          protocolVersion: 1,
+          visible: document.visibilityState === 'visible',
+        });
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () =>
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [useFallback, workerGeneration]);
 
     // Forward resize to worker
     useEffect(() => {

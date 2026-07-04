@@ -51,14 +51,14 @@ function orbitHexToString(color: number): string {
 }
 
 const MAP_CANVAS_BASE_DARK = 0x0a0a0a;
-const MAP_CANVAS_BASE_LIGHT = 0xf4f5f7;
+const MAP_CANVAS_BASE_LIGHT = 0xd8dce4;
 const DEFAULT_ACCENT_DARK = 0x2f6fed;
 const DEFAULT_ACCENT_SOFT_DARK = 0xbfdbfe;
 const DEFAULT_ACCENT_LIGHT = 0x2563eb;
 const DEFAULT_ACCENT_SOFT_LIGHT = 0x93c5fd;
 /** Visible but subtle — space-black with a theme wash. */
-const MAP_CANVAS_TINT_DARK = 0.14;
-const MAP_CANVAS_TINT_LIGHT = 0.07;
+const MAP_CANVAS_TINT_DARK = 0.08;
+const MAP_CANVAS_TINT_LIGHT = 0.06;
 
 /** Space-black / soft-gray canvas fill with a slight accent tint. */
 export function getOrbitMapBackgroundTint(
@@ -89,11 +89,11 @@ export function getOrbitMapPalette(
   const base = isLight
     ? {
         background,
-        labelActive: 0x0f172a,
-        labelNeighbor: 0x334155,
-        labelDefault: 0x475569,
-        linkFallback: 0x94a3b8,
-        linkHighlightMix: 0x1e293b,
+        labelActive: 0x020617,
+        labelNeighbor: 0x1e293b,
+        labelDefault: 0x0f172a,
+        linkFallback: 0x475569,
+        linkHighlightMix: 0x020617,
         hubInnerStroke: 0xffffff,
       }
     : {
@@ -116,7 +116,7 @@ export function getOrbitMapPalette(
       : DEFAULT_ACCENT_DARK;
 
   const accentSoft = hasAccent
-    ? mixOrbitHex(accent, 0xffffff, isLight ? 0.58 : 0.74)
+    ? mixOrbitHex(accent, 0xffffff, isLight ? 0.22 : 0.74)
     : isLight
       ? DEFAULT_ACCENT_SOFT_LIGHT
       : DEFAULT_ACCENT_SOFT_DARK;

@@ -11,6 +11,6 @@ describe("getOrbitMapPalette", () => {
 
   it("falls back to defaults when backgroundHex is missing", () => {
     expect(getOrbitMapPalette("dark").background).toBe(0x0a0a0a);
-    expect(getOrbitMapPalette("light").background).toBe(0xf4f5f7);
+    expect(getOrbitMapPalette("light").background).toBe(0xd8dce4);
   });
 });

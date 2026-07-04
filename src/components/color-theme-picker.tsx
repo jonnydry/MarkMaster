@@ -12,14 +12,14 @@ type ColorThemePickerProps = {
 
 export function ColorThemePicker({ value, onChange, className }: ColorThemePickerProps) {
   return (
-    /* Container-queried grid: column counts divide evenly into the six
-       themes (2/3/6), so resizing never strands an odd box on its own row. */
+    /* Container-queried grid: 2 → 3 → 4 columns, then a single row at wide
+       widths so seven themes stay balanced without a lone orphan tile. */
     <div
       className={cn("@container w-full", className)}
       role="radiogroup"
       aria-label="Accent color"
     >
-      <div className="grid grid-cols-2 gap-2 @[18rem]:grid-cols-3 @[37rem]:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 @[18rem]:grid-cols-3 @[37rem]:grid-cols-4 @[52rem]:grid-cols-7">
         {COLOR_THEMES.map((theme) => {
           const selected = value === theme.id;
           return (

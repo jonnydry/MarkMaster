@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { resolveBookmarkNavigationId } from "@/lib/grid-bookmark-navigation";
 
 export interface KeyboardShortcut {
   id: string;
@@ -23,6 +24,7 @@ interface UseSurfaceKeyboardShortcutsOptions {
 interface UseKeyboardShortcutsOptions {
   activeBookmarkId: string | null;
   bookmarks: { id: string }[];
+  navigationLayout?: "list" | "grid";
   onNavigate: (id: string | null) => void;
   onOpen?: (id: string) => void;
   onSearch?: () => void;
@@ -195,6 +197,7 @@ export function useSurfaceKeyboardShortcuts({
 export function useKeyboardShortcuts({
   activeBookmarkId,
   bookmarks,
+  navigationLayout = "list",
   onNavigate,
   onOpen,
   onSearch,
@@ -206,6 +209,7 @@ export function useKeyboardShortcuts({
   const refs = useRef({
     activeBookmarkId,
     bookmarks,
+    navigationLayout,
     onNavigate,
     onOpen,
     onSearch,
@@ -219,6 +223,7 @@ export function useKeyboardShortcuts({
     refs.current = {
       activeBookmarkId,
       bookmarks,
+      navigationLayout,
       onNavigate,
       onOpen,
       onSearch,
@@ -236,17 +241,16 @@ export function useKeyboardShortcuts({
         const {
           activeBookmarkId: currentId,
           bookmarks: currentBookmarks,
+          navigationLayout: layout,
           onNavigate: navigate,
         } = refs.current;
-        if (currentBookmarks.length === 0) return;
-        const currentIndex = currentBookmarks.findIndex(
-          (bookmark) => bookmark.id === currentId
-        );
-        const nextIndex =
-          currentIndex === -1
-            ? 0
-            : Math.min(currentBookmarks.length - 1, currentIndex + 1);
-        const nextId = currentBookmarks[nextIndex]?.id ?? null;
+        const bookmarkIds = currentBookmarks.map((bookmark) => bookmark.id);
+        const nextId = resolveBookmarkNavigationId({
+          layout,
+          bookmarkIds,
+          currentId,
+          offset: 1,
+        });
         navigate(nextId);
         if (nextId) {
           requestAnimationFrame(() =>
@@ -258,15 +262,16 @@ export function useKeyboardShortcuts({
         const {
           activeBookmarkId: currentId,
           bookmarks: currentBookmarks,
+          navigationLayout: layout,
           onNavigate: navigate,
         } = refs.current;
-        if (currentBookmarks.length === 0) return;
-        const currentIndex = currentBookmarks.findIndex(
-          (bookmark) => bookmark.id === currentId
-        );
-        const nextIndex =
-          currentIndex === -1 ? 0 : Math.max(0, currentIndex - 1);
-        const nextId = currentBookmarks[nextIndex]?.id ?? null;
+        const bookmarkIds = currentBookmarks.map((bookmark) => bookmark.id);
+        const nextId = resolveBookmarkNavigationId({
+          layout,
+          bookmarkIds,
+          currentId,
+          offset: -1,
+        });
         navigate(nextId);
         if (nextId) {
           requestAnimationFrame(() =>

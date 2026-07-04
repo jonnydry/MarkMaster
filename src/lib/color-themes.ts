@@ -5,6 +5,7 @@ export const COLOR_THEME_IDS = [
   "nebula",
   "canopy",
   "pulse",
+  "graphite",
 ] as const;
 
 export type ColorThemeId = (typeof COLOR_THEME_IDS)[number];
@@ -53,6 +54,12 @@ export const COLOR_THEMES: ColorThemeOption[] = [
     name: "Pulse",
     description: "Cherry nebula rose — bold and electric",
     swatch: "#f472b6",
+  },
+  {
+    id: "graphite",
+    name: "Graphite",
+    description: "Monochrome — black, white, and steel grays",
+    swatch: "#71717a",
   },
 ];
 

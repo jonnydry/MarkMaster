@@ -146,6 +146,8 @@ export const WorkerMessageType = {
   ANIMATE_ASSIGN: "ANIMATE_ASSIGN",
   FOCUS_PULSE: "FOCUS_PULSE",
   SET_THEME: "SET_THEME",
+  /** Page visibility — pauses the living-map motion loop while hidden. */
+  SET_VISIBILITY: "SET_VISIBILITY",
 
   // Lifecycle
   DESTROY: "DESTROY",
@@ -269,6 +271,12 @@ export interface InitMessage {
   backgroundHex?: string;
   /** Active color theme id (e.g. "ember") for atmosphere refresh. */
   colorTheme?: string;
+  /**
+   * Enables the living map: analytic orbital motion, sun corona. On by
+   * default; host-side gated on the `orbit-map-living` localStorage opt-out
+   * and `prefers-reduced-motion`.
+   */
+  livingMap?: boolean;
 }
 
 export interface SetGraphMessage {
@@ -472,6 +480,13 @@ export interface SetThemeMessage {
   /** Active color theme id (e.g. "ember") for atmosphere refresh. */
   colorTheme?: string;
 }
+
+export interface SetVisibilityMessage {
+  type: typeof WorkerMessageType.SET_VISIBILITY;
+  protocolVersion: number;
+  visible: boolean;
+}
+
 export type WorkerMessage =
   | InitMessage
   | SetGraphMessage
@@ -498,7 +513,8 @@ export type WorkerMessage =
   | RequestLayoutMessage
   | DestroyMessage
   | FocusPulseMessage
-  | SetThemeMessage;
+  | SetThemeMessage
+  | SetVisibilityMessage;
 
 // Grouped unions for handler typing
 export type CameraControlMessage =
@@ -744,7 +760,10 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
           : "INIT.colorMode must be light or dark") ??
         optionalStringFieldError(msg, "accentHex") ??
         optionalStringFieldError(msg, "backgroundHex") ??
-        optionalStringFieldError(msg, "colorTheme")
+        optionalStringFieldError(msg, "colorTheme") ??
+        (msg.livingMap === undefined || typeof msg.livingMap === "boolean"
+          ? null
+          : "INIT.livingMap must be a boolean when provided")
       );
 
     case WorkerMessageType.RESIZE:
@@ -835,6 +854,11 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
         optionalStringFieldError(msg, "backgroundHex") ??
         optionalStringFieldError(msg, "colorTheme")
       );
+
+    case WorkerMessageType.SET_VISIBILITY:
+      return typeof msg.visible === "boolean"
+        ? null
+        : "SET_VISIBILITY.visible must be a boolean";
 
     default:
       return `Unknown worker message type: ${msg.type}`;

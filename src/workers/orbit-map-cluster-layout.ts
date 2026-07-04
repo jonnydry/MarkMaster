@@ -32,6 +32,11 @@ export interface OrbitMapLayoutNodeInput {
   id: string;
   kind: OrbitGraphNode["kind"];
   radius: number;
+  /**
+   * Recency signal for bookmarks. Recent members fill a cluster's inner
+   * shells first, so orbital distance reads as age — like tree rings.
+   */
+  recent?: boolean;
 }
 
 export interface OrbitMapCluster {
@@ -44,9 +49,35 @@ export interface OrbitMapCluster {
   memberCount: number;
 }
 
+/**
+ * Circular-orbit geometry for one node, in world space. The node's layout
+ * position is exactly `center + radius × (cos θ, sin θ)`, so a renderer can
+ * animate `θ(t) = theta + ω·t` and the motion passes through the static
+ * layout at t = 0. Nodes on the same ring (or in the belt) rotate rigidly
+ * when they share an angular velocity, preserving the layout's spacing.
+ */
+export interface OrbitMapOrbitGeometry {
+  centerX: number;
+  centerY: number;
+  radius: number;
+  /** Angle (radians) of the node's layout position. */
+  theta: number;
+  /** Ring index within its cluster, or -1 for the loose belt. */
+  ringIndex: number;
+  /** Cluster anchor id for ring orbits; null for the loose belt. */
+  anchorId: string | null;
+}
+
 export interface OrbitMapClusterLayoutResult {
   positions: Map<string, { x: number; y: number }>;
   clusters: Map<string, OrbitMapCluster>;
+  /**
+   * Orbit geometry for every node that revolves around something: cluster
+   * ring members (single-anchor bookmarks + overflow) and loose-belt
+   * bookmarks. Multi-anchor bookmarks are tethered between hubs and have no
+   * orbit.
+   */
+  orbits: Map<string, OrbitMapOrbitGeometry>;
   /** Radius of the anchor constellation; the loose band starts outside it. */
   constellationRadius: number;
 }
@@ -111,6 +142,24 @@ function planRings(hubRadius: number, memberCount: number): RingPlan[] {
 function clusterRadiusFromRings(hubRadius: number, rings: RingPlan[]): number {
   if (rings.length === 0) return hubRadius + 14;
   return rings[rings.length - 1].radius + RING_GAP * 0.5;
+}
+
+/**
+ * Radii of a cluster's orbit shells, matching the planRings geometry — used
+ * to draw ring guides that pass through the actual bookmark positions.
+ * Capped so a degenerate radius can't produce an unbounded list.
+ */
+export function getOrbitMapClusterRingRadii(
+  hubRadius: number,
+  clusterRadius: number
+): number[] {
+  const radii: number[] = [];
+  let radius = hubRadius + RING_START_GAP;
+  while (radius <= clusterRadius - RING_GAP * 0.5 + 0.01 && radii.length < 12) {
+    radii.push(radius);
+    radius += RING_GAP;
+  }
+  return radii;
 }
 
 interface AnchorSimNode extends SimulationNodeDatum {
@@ -197,6 +246,7 @@ export function computeOrbitMapClusterLayout(
 ): OrbitMapClusterLayoutResult {
   const positions = new Map<string, { x: number; y: number }>();
   const clusters = new Map<string, OrbitMapCluster>();
+  const orbits = new Map<string, OrbitMapOrbitGeometry>();
 
   const anchors = nodes.filter(
     (node) => node.kind === "tag" || node.kind === "collection"
@@ -246,11 +296,21 @@ export function computeOrbitMapClusterLayout(
   }
 
   // --- Cluster sizing -----------------------------------------------------
+  const recentById = new Map<string, boolean>();
+  for (const node of nodes) {
+    if (node.recent) recentById.set(node.id, true);
+  }
+
   const ringPlans = new Map<string, RingPlan[]>();
   const clusterRadii = new Map<string, number>();
   const ringMembers = new Map<string, string[]>();
   for (const anchor of anchors) {
-    const members = [...(singleMembers.get(anchor.id) ?? [])];
+    // Recent bookmarks first, so they fill the inner shells and orbital
+    // distance reads as age (stable sort keeps the rest deterministic).
+    // The overflow marker always goes last — the outermost slot.
+    const members = [...(singleMembers.get(anchor.id) ?? [])].sort(
+      (a, b) => (recentById.has(b) ? 1 : 0) - (recentById.has(a) ? 1 : 0)
+    );
     const overflowId = anchorOverflow.get(anchor.id);
     if (overflowId && overflows.some((o) => o.id === overflowId)) {
       members.push(overflowId);
@@ -390,6 +450,14 @@ export function computeOrbitMapClusterLayout(
           x: center.x + Math.cos(angle) * ring.radius,
           y: center.y + Math.sin(angle) * ring.radius,
         });
+        orbits.set(members[memberIndex], {
+          centerX: center.x,
+          centerY: center.y,
+          radius: ring.radius,
+          theta: angle,
+          ringIndex,
+          anchorId: anchor.id,
+        });
         memberIndex++;
       }
     }
@@ -474,7 +542,22 @@ export function computeOrbitMapClusterLayout(
       LOOSE_RELAX_ITERATIONS
     );
     looseIds.forEach((id, index) => {
-      positions.set(id, loosePositions[index]);
+      const position = loosePositions[index];
+      positions.set(id, position);
+      // Belt orbit derived from the relaxed position so the circle passes
+      // exactly through it; the whole belt shares one ω, so it rotates
+      // rigidly and the relaxed spacing is preserved.
+      const radius = Math.hypot(position.x, position.y);
+      if (radius > 1) {
+        orbits.set(id, {
+          centerX: 0,
+          centerY: 0,
+          radius,
+          theta: Math.atan2(position.y, position.x),
+          ringIndex: -1,
+          anchorId: null,
+        });
+      }
     });
   }
 
@@ -495,5 +578,5 @@ export function computeOrbitMapClusterLayout(
     }
   }
 
-  return { positions, clusters, constellationRadius };
+  return { positions, clusters, orbits, constellationRadius };
 }

@@ -36,6 +36,7 @@ import {
   type AnimateAssignMessage,
   type FocusPulseMessage,
   type SetThemeMessage,
+  type SetVisibilityMessage,
   type FocusOnMessage,
   type SetSelectionMessage,
   type SetHighlightMessage,
@@ -82,7 +83,9 @@ import {
 } from './orbit-map-camera';
 import {
   computeOrbitMapClusterLayout,
+  getOrbitMapClusterRingRadii,
   type OrbitMapCluster,
+  type OrbitMapOrbitGeometry,
 } from './orbit-map-cluster-layout';
 import {
   getOrbitMapBookmarkLodAlpha,
@@ -114,9 +117,13 @@ import {
   getOrbitMapAnimationProgress,
 } from './orbit-map-animation';
 import {
+  applyOrbitMapStarfieldParallax,
   buildOrbitMapStarfield,
   createOrbitMapGlowTexture,
+  createOrbitMapNebulaTexture,
+  createOrbitMapSeededRandom,
   createOrbitMapVignetteSprite,
+  hashOrbitMapStringToSeed,
 } from './orbit-map-scene';
 
 /** Internal node type: original graph node + layout position + visuals. */
@@ -155,7 +162,8 @@ let perf = createOrbitMapPerfLogger(false);
 
 // Pixi containers for organization
 let backgroundContainer: Container | null = null; // Screen-space vignette (not camera-transformed)
-let starfieldContainer: Container | null = null;  // Distant stars with parallax
+let starfieldContainer: Container | null = null;  // Distant stars with layered parallax
+let nebulaContainer: Container | null = null;     // Per-cluster nebula haze (camera space)
 let linksContainer: Container | null = null;
 let glowContainer: Container | null = null;       // Cluster halos + hub glows (camera space)
 let nodesContainer: Container | null = null;
@@ -164,8 +172,15 @@ let labelsContainer: Container | null = null;
 let effectsContainer: Container | null = null;    // Temporary effects (pulses, flights)
 let linkGraphics: Graphics | null = null;
 let ringGraphics: Graphics | null = null;
+/** Star-chart lines between related hubs; visible only at far zoom. */
+let constellationGraphics: Graphics | null = null;
+// Pooled effect layers, cleared per frame instead of destroyed/recreated so
+// animation frames don't churn Pixi objects (GC + GPU geometry pressure).
+let effectsGraphics: Graphics | null = null;         // pulses, flight paths, ghosts
+let effectsAdditiveGraphics: Graphics | null = null; // flow particles, comet trails
 let vignetteSprite: Sprite | null = null;
 let glowTexture: Texture | null = null;
+let nebulaTexture: Texture | null = null;
 const glowSpriteMap = new Map<string, Sprite>();
 const haloSpriteMap = new Map<string, Sprite>();
 
@@ -177,8 +192,52 @@ const ENTRANCE_MAX_DELAY_MS = 420;
 const ENTRANCE_BASE_DELAY_MS = 180;
 const ENTRANCE_TOTAL_MS =
   ENTRANCE_BASE_DELAY_MS + ENTRANCE_MAX_DELAY_MS + ENTRANCE_NODE_FADE_MS;
-const STARFIELD_PARALLAX = 0.35;
-const HUB_GLOW_ALPHA = 0.22;
+const HUB_GLOW_ALPHA_DARK = 0.3;
+const HUB_GLOW_ALPHA_LIGHT = 0.38;
+/** Clusters below this size don't get a nebula haze. */
+const NEBULA_MIN_CLUSTER_MEMBERS = 3;
+/** Segments per focused edge when drawing its color gradient. */
+const GRADIENT_EDGE_SEGMENTS = 10;
+/** Energy-flow particles: travel period, per-edge count, and edge cap. */
+const FLOW_PARTICLE_PERIOD_MS = 1400;
+const FLOW_PARTICLES_PER_EDGE = 2;
+const FLOW_MAX_EDGES = 60;
+/** Rotation speed (radians/second) of the selection reticle arcs. */
+const SELECTION_RING_SPIN = 1.4;
+/** Rotation speed (radians/second) of the dashed cluster boundary ring. */
+const CLUSTER_RING_SPIN = 0.3;
+/** Duration of the edge trace-in after a selection lands. */
+const EDGE_REVEAL_MS = 340;
+/** Ambient frames (reticle spin, particles, breathing) cap at ~30fps; the
+ * motion is slow enough that this halves GPU work with no visible cost. */
+const AMBIENT_FRAME_MIN_MS = 32;
+/** Period of the selected hub's glow breathing. */
+const GLOW_BREATH_PERIOD_MS = 2400;
+/** Nodes scale from this factor to 1 during the entrance fade. */
+const ENTRANCE_SCALE_START = 0.62;
+/** Instant scale applied to the hovered node (no selection active). */
+const HOVER_POP_SCALE = 1.06;
+
+// === Living map (analytic orbital motion, behind the host-side flag) ===
+/** Tangential speed of ring bookmarks (px/s); ω = speed / radius, so outer
+ * shells revolve slower — night-sky pace, clearly alive but never busy. */
+const ORBIT_RING_LINEAR_SPEED = 2.2;
+/** Loose-belt angular velocity: one revolution ≈ 8 minutes. */
+const ORBIT_BELT_OMEGA = (Math.PI * 2) / 480;
+/** Radial wobble of belt bookmarks (px) — untriaged chaos reads restless. */
+const BELT_WOBBLE_AMPLITUDE = 2.5;
+/** Wobble oscillation speed (radians/second). */
+const BELT_WOBBLE_SPEED = 0.35;
+/** Cadence of the full style/declutter/minimap refresh while alive. */
+const LIVING_REFRESH_MS = 2000;
+/** Sun corona rotation speed (radians/second). */
+const CORONA_SPIN = 0.06;
+/** Sun corona alpha breathing period. */
+const CORONA_BREATH_PERIOD_MS = 3700;
+/** Hubs must share at least this many bookmarks to be constellation-linked. */
+const CONSTELLATION_MIN_SHARED = 2;
+/** Cap on constellation lines (strongest pairs win). */
+const CONSTELLATION_MAX_LINES = 40;
 
 // Labels
 const labelMap = new Map<string, BitmapText>();
@@ -245,17 +304,129 @@ interface MapAnimation {
   targetY?: number;
   fromX?: number;
   fromY?: number;
+  /** Quadratic control point for curved assign flights. */
+  controlX?: number;
+  controlY?: number;
 }
 
 const activeAnimations: MapAnimation[] = [];
 let renderLoopRunning = false;
 
+/** Focused-edge curves cached by drawLinks for the energy-flow particles. */
+interface FocusedEdgeCurve {
+  sx: number;
+  sy: number;
+  cx: number;
+  cy: number;
+  tx: number;
+  ty: number;
+  color: number;
+}
+const focusedEdgeCurves: FocusedEdgeCurve[] = [];
+
+/** Start of the in-flight edge trace-in (null once complete). */
+let edgeRevealStartedAt: number | null = null;
+/** Timestamp of the last ambient frame (30fps cap). */
+let lastAmbientFrameAt = 0;
+
+// === Living map state ===
+/** Per-node orbit: position(t) = center + r·(cos, sin)(θ₀ + ω·t). */
+interface OrbitMotionState {
+  cx: number;
+  cy: number;
+  r: number;
+  theta0: number;
+  omega: number;
+  /** Belt members wobble radially; ring members hold their shell. */
+  belt: boolean;
+  /** Deterministic per-node wobble phase (belt only). */
+  wobblePhase: number;
+}
+const orbitStates = new Map<string, OrbitMotionState>();
+/** Wall-clock epoch for orbit angles (reset per scene rebuild). */
+let orbitEpoch = 0;
+let livingMapEnabled = false;
+let pageVisible = true;
+/** Timestamp of the last full style/declutter/minimap refresh while alive. */
+let lastLivingRefreshAt = 0;
+/** Sun corona flare sprites (living map only). */
+let coronaFlares: Array<{ sprite: Sprite; spin: number; baseAlpha: number }> = [];
+
+/** True while the analytic orbital motion should run. */
+function isLivingActive() {
+  return livingMapEnabled && pageVisible && nodeData.length > 0 && app !== null;
+}
+
+/**
+ * Central selection setter: a changed selection restarts the edge trace-in;
+ * clearing the selection cancels it.
+ */
+function setCurrentSelectionState(selection: OrbitMapSelection | null) {
+  const previousId = currentSelection?.id ?? null;
+  currentSelection = selection;
+  if (!selection) {
+    edgeRevealStartedAt = null;
+  } else if (selection.id !== previousId) {
+    edgeRevealStartedAt = Date.now();
+  }
+}
+
+function isEdgeRevealActive() {
+  return edgeRevealStartedAt !== null;
+}
+
 function getPalette() {
   return getOrbitMapPalette(colorMode, accentHex, backgroundHex);
 }
 
+/**
+ * Glows read as luminous on the space-black canvas via additive blending;
+ * on the light canvas additive washes out, so fall back to normal.
+ */
+function getAdditiveBlendMode(): 'add' | 'normal' {
+  return colorMode === 'light' ? 'normal' : 'add';
+}
+
+/** Point on a quadratic Bézier (per axis): a → control c → b at t. */
+function getQuadraticPoint(a: number, c: number, b: number, t: number) {
+  const inv = 1 - t;
+  return inv * inv * a + 2 * inv * t * c + t * t * b;
+}
+
+function getHubGlowAlpha() {
+  return colorMode === 'light' ? HUB_GLOW_ALPHA_LIGHT : HUB_GLOW_ALPHA_DARK;
+}
+
 function getPaletteAccent(): number {
   return parseHexColorToNumber(accentHex, colorMode === 'light' ? 0x2563eb : 0x2f6fed);
+}
+
+/** White glyphs + per-label tint so theme switches stay legible. */
+function ensureOrbitLabelFont() {
+  try {
+    BitmapFont.uninstall('OrbitLabel');
+  } catch {
+    // First install or partial init.
+  }
+  BitmapFont.install({
+    name: 'OrbitLabel',
+    style: {
+      fontFamily:
+        'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: LABEL_BASE_FONT_SIZE,
+      fill: 0xffffff,
+    },
+    chars: BitmapFontManager.ASCII,
+  });
+}
+
+function resetLabelPool() {
+  if (!labelsContainer) return;
+  for (const label of labelMap.values()) {
+    labelsContainer.removeChild(label);
+    label.destroy();
+  }
+  labelMap.clear();
 }
 
 /** Send a message back to the main thread. */
@@ -384,7 +555,7 @@ const interactions = createOrbitMapInteractions<MapNode>({
   },
   getSelection: () => currentSelection,
   setSelection: (selection) => {
-    currentSelection = selection;
+    setCurrentSelectionState(selection);
     updateNodeStyles();
     postToMain({
       type: MainMessageType.SELECTION_CHANGED,
@@ -521,6 +692,10 @@ function handleMessage(event: MessageEvent<unknown>) {
       handleSetTheme(msg as SetThemeMessage);
       break;
 
+    case WorkerMessageType.SET_VISIBILITY:
+      handleSetVisibility(msg as SetVisibilityMessage);
+      break;
+
     case WorkerMessageType.DESTROY:
       handleDestroy();
       break;
@@ -541,6 +716,7 @@ function handleInit(msg: InitMessage) {
   accentHex = msg.accentHex;
   backgroundHex = msg.backgroundHex;
   colorThemeId = msg.colorTheme;
+  livingMapEnabled = Boolean(msg.livingMap);
   const palette = getPalette();
 
   try {
@@ -570,15 +746,7 @@ function handleInit(msg: InitMessage) {
       perf.mark('worker:init:ready', { initMs });
 
       // Install a BitmapFont once for fast, high-quality labels
-      BitmapFont.install({
-        name: 'OrbitLabel',
-        style: {
-          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSize: LABEL_BASE_FONT_SIZE,
-          fill: palette.labelDefault,
-        },
-        chars: BitmapFontManager.ASCII,
-      });
+      ensureOrbitLabelFont();
 
       // Rendering is driven on demand (interactions, animations, camera).
       postToMain({ type: MainMessageType.READY, protocolVersion: 1, width: 0, height: 0 });
@@ -610,6 +778,19 @@ function handleResize(msg: ResizeMessage) {
   updateNodeStyles();
 }
 
+function handleSetVisibility(msg: SetVisibilityMessage) {
+  if (pageVisible === msg.visible) return;
+  pageVisible = msg.visible;
+  if (msg.visible) {
+    // Orbits are pure functions of wall-clock time, so after a long hidden
+    // stretch the sky simply resumes at its current configuration — like a
+    // real sky. One style pass re-culls and restarts the loop.
+    advanceOrbits(Date.now());
+    updateNodeStyles();
+  }
+  // When hidden, the loop's continue-condition goes false and it winds down.
+}
+
 function handleSetTheme(msg: SetThemeMessage) {
   if (
     msg.colorMode === colorMode &&
@@ -631,10 +812,19 @@ function applyColorMode() {
   if (app) {
     app.renderer.background.color = palette.background;
   }
+  ensureOrbitLabelFont();
+  resetLabelPool();
   refreshBackgroundAtmosphere();
+  const blendMode = getAdditiveBlendMode();
+  for (const glow of glowSpriteMap.values()) glow.blendMode = blendMode;
+  for (const halo of haloSpriteMap.values()) halo.blendMode = blendMode;
+  for (const flare of coronaFlares) flare.sprite.blendMode = blendMode;
+  if (effectsAdditiveGraphics) effectsAdditiveGraphics.blendMode = blendMode;
+  buildNebulaField();
   if (currentGraph) {
-    reapplyBookmarkVisuals();
+    reapplyAllNodeVisuals();
     rebuildLinkDataFromGraph();
+    buildConstellations();
   }
   updateNodeStyles();
   if (app) {
@@ -657,17 +847,14 @@ function refreshBackgroundAtmosphere() {
   buildOrbitMapStarfield(starfieldContainer, colorMode, getPaletteAccent());
 }
 
-function reapplyBookmarkVisuals() {
+function reapplyAllNodeVisuals() {
   const palette = getPalette();
   for (const datum of nodeData) {
-    if (datum.kind !== 'bookmark') continue;
     datum.visual = getOrbitMapNodeVisualStyle(datum.node, palette);
   }
   applyBookmarkAccentColors();
   for (const datum of nodeData) {
-    if (datum.kind === 'bookmark') {
-      redrawNodeGraphics(datum);
-    }
+    redrawNodeGraphics(datum);
   }
 }
 
@@ -784,7 +971,8 @@ function createGlowForNode(datum: MapNode) {
   const glow = new Sprite(glowTexture);
   glow.anchor.set(0.5);
   glow.tint = datum.visual.color;
-  glow.alpha = HUB_GLOW_ALPHA;
+  glow.blendMode = getAdditiveBlendMode();
+  glow.alpha = getHubGlowAlpha();
   const glowSize = datum.radius * 6;
   glow.width = glowSize;
   glow.height = glowSize;
@@ -811,6 +999,7 @@ function handleDestroy() {
   destroyContainerChildren(nodesContainer);
   destroyContainerChildren(glowContainer);
   destroyContainerChildren(linksContainer);
+  destroyContainerChildren(nebulaContainer);
   destroyContainerChildren(starfieldContainer);
   destroyContainerChildren(backgroundContainer);
 
@@ -851,7 +1040,9 @@ function handleDestroy() {
 
   backgroundContainer = null;
   starfieldContainer = null;
+  nebulaContainer = null;
   linksContainer = null;
+  constellationGraphics = null;
   glowContainer = null;
   nodesContainer = null;
   ringsContainer = null;
@@ -861,6 +1052,17 @@ function handleDestroy() {
   ringGraphics = null;
   vignetteSprite = null;
   glowTexture = null;
+  nebulaTexture = null;
+  effectsGraphics = null;
+  effectsAdditiveGraphics = null;
+  coronaFlares = [];
+  focusedEdgeCurves.length = 0;
+  edgeRevealStartedAt = null;
+  orbitStates.clear();
+  orbitEpoch = 0;
+  livingMapEnabled = false;
+  pageVisible = true;
+  lastLivingRefreshAt = 0;
   app = null;
   isInitialized = false;
 }
@@ -893,6 +1095,51 @@ function buildBackground() {
 }
 
 /**
+ * Faint tinted haze behind each sizable cluster, in the hub's color: gives
+ * the far-zoom view a galaxy-map depth and signals cluster identity before
+ * labels are readable. Static sprites — no per-frame cost.
+ */
+function buildNebulaField() {
+  if (!nebulaContainer) return;
+  destroyContainerChildren(nebulaContainer);
+  if (clusters.size === 0) return;
+
+  nebulaTexture = nebulaTexture ?? createOrbitMapNebulaTexture();
+  const blendMode = getAdditiveBlendMode();
+  const baseAlpha = colorMode === 'light' ? 0.09 : 0.085;
+
+  for (const cluster of clusters.values()) {
+    if (cluster.memberCount < NEBULA_MIN_CLUSTER_MEMBERS) continue;
+    const anchorDatum = nodeById.get(cluster.anchorId);
+    if (!anchorDatum) continue;
+
+    const random = createOrbitMapSeededRandom(
+      hashOrbitMapStringToSeed(cluster.anchorId)
+    );
+    // Two overlapping puffs (one large centered-ish, one smaller offset) so
+    // the haze reads organic rather than concentric with the halo.
+    for (let i = 0; i < 2; i++) {
+      const sprite = new Sprite(nebulaTexture);
+      sprite.anchor.set(0.5);
+      sprite.tint = anchorDatum.visual.color;
+      sprite.blendMode = blendMode;
+      const angle = random() * Math.PI * 2;
+      const dist = random() * cluster.radius * (i === 0 ? 0.3 : 0.75);
+      const size =
+        cluster.radius * (i === 0 ? 3.4 + random() * 0.9 : 2.1 + random() * 0.7);
+      sprite.width = size;
+      sprite.height = size;
+      sprite.position.set(
+        cluster.x + Math.cos(angle) * dist,
+        cluster.y + Math.sin(angle) * dist
+      );
+      sprite.alpha = baseAlpha * (i === 0 ? 1 : 0.8);
+      nebulaContainer.addChild(sprite);
+    }
+  }
+}
+
+/**
  * Rebuilds the Pixi scene for a new graph payload. Positions come from the
  * deterministic cluster layout, so there is no ongoing simulation to manage.
  */
@@ -902,6 +1149,7 @@ function rebuildScene() {
     typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   // Clear scene
+  destroyContainerChildren(nebulaContainer);
   destroyContainerChildren(linksContainer);
   if (glowContainer) {
     destroyContainerChildren(glowContainer);
@@ -917,12 +1165,16 @@ function rebuildScene() {
   destroyContainerChildren(effectsContainer);
   linkGraphics = null;
   ringGraphics = null;
+  constellationGraphics = null;
+  effectsGraphics = null;
+  effectsAdditiveGraphics = null;
+  coronaFlares = [];
   nodeGraphicsMap.clear();
   nodeById.clear();
   activeAnimations.length = 0;
 
   // Container creation order defines z-order:
-  // background → starfield → links → glow → nodes → rings → labels → effects
+  // background → starfield → nebula → links → glow → nodes → rings → labels → effects
   if (!backgroundContainer) {
     backgroundContainer = new Container();
     app.stage.addChild(backgroundContainer);
@@ -930,6 +1182,10 @@ function rebuildScene() {
   if (!starfieldContainer) {
     starfieldContainer = new Container();
     app.stage.addChild(starfieldContainer);
+  }
+  if (!nebulaContainer) {
+    nebulaContainer = new Container();
+    app.stage.addChild(nebulaContainer);
   }
   if (!linksContainer) {
     linksContainer = new Container();
@@ -972,7 +1228,12 @@ function rebuildScene() {
 
   // Deterministic two-phase layout: anchor constellation + bookmark orbits.
   const layout = computeOrbitMapClusterLayout(
-    nodeData.map(({ id, kind, radius }) => ({ id, kind, radius })),
+    nodeData.map(({ id, kind, radius, node }) => ({
+      id,
+      kind,
+      radius,
+      recent: node.kind === 'bookmark' ? node.recent : false,
+    })),
     edges
   );
   clusters = layout.clusters;
@@ -983,6 +1244,7 @@ function rebuildScene() {
       datum.y = position.y;
     }
   }
+  buildOrbitStates(layout.orbits);
 
   nodeById = new Map(nodeData.map((datum) => [datum.id, datum]));
   applyHubLabelRanks();
@@ -1035,15 +1297,34 @@ function rebuildScene() {
  * its bookmarks). Per-frame updates mutate these instead of recreating them.
  */
 function buildScene() {
-  if (!linksContainer || !nodesContainer || !ringsContainer || !glowContainer) {
+  if (
+    !linksContainer ||
+    !nodesContainer ||
+    !ringsContainer ||
+    !glowContainer ||
+    !effectsContainer
+  ) {
     return;
   }
+
+  // Constellation lines sit under the bookmark edges.
+  constellationGraphics = new Graphics();
+  linksContainer.addChild(constellationGraphics);
+  buildConstellations();
 
   linkGraphics = new Graphics();
   linksContainer.addChild(linkGraphics);
 
   ringGraphics = new Graphics();
   ringsContainer.addChild(ringGraphics);
+
+  effectsGraphics = new Graphics();
+  effectsContainer.addChild(effectsGraphics);
+  effectsAdditiveGraphics = new Graphics();
+  effectsAdditiveGraphics.blendMode = getAdditiveBlendMode();
+  effectsContainer.addChild(effectsAdditiveGraphics);
+
+  buildNebulaField();
 
   // Cluster halos go in first so hub glows render above them.
   if (glowTexture) {
@@ -1054,6 +1335,7 @@ function buildScene() {
       const halo = new Sprite(glowTexture);
       halo.anchor.set(0.5);
       halo.tint = anchorDatum.visual.color;
+      halo.blendMode = getAdditiveBlendMode();
       const size = cluster.radius * 2.6;
       halo.width = size;
       halo.height = size;
@@ -1077,6 +1359,186 @@ function buildScene() {
       createGlowForNode(datum);
     }
   }
+
+  buildSunCorona();
+}
+
+/**
+ * Living map only: the core node gets a sun corona — two elongated,
+ * counter-rotating warm flares whose slow undulation reads as a burning
+ * star. Radially asymmetric sprites, so the rotation is actually visible.
+ */
+/**
+ * Star-chart lines between hubs that share bookmarks, drawn once per scene
+ * (hubs never move). updateNodeStyles fades the whole layer in only at far
+ * zoom, where clusters read as constellations — zero per-frame draw cost.
+ */
+function buildConstellations() {
+  if (!constellationGraphics || !currentGraph) return;
+  constellationGraphics.clear();
+
+  // Count shared bookmarks per hub pair.
+  const bookmarkHubs = new Map<string, string[]>();
+  for (const edge of currentGraph.edges) {
+    if (edge.kind !== 'bookmark-tag' && edge.kind !== 'bookmark-collection') {
+      continue;
+    }
+    const hubId = edge.kind === 'bookmark-tag' ? edge.tagId : edge.collectionId;
+    const list = bookmarkHubs.get(edge.bookmarkId);
+    if (list) list.push(hubId);
+    else bookmarkHubs.set(edge.bookmarkId, [hubId]);
+  }
+
+  const pairWeights = new Map<string, number>();
+  for (const hubIds of bookmarkHubs.values()) {
+    for (let i = 0; i < hubIds.length; i++) {
+      for (let j = i + 1; j < hubIds.length; j++) {
+        const key =
+          hubIds[i] < hubIds[j]
+            ? `${hubIds[i]}|${hubIds[j]}`
+            : `${hubIds[j]}|${hubIds[i]}`;
+        pairWeights.set(key, (pairWeights.get(key) ?? 0) + 1);
+      }
+    }
+  }
+
+  const strongest = [...pairWeights.entries()]
+    .filter(([, weight]) => weight >= CONSTELLATION_MIN_SHARED)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, CONSTELLATION_MAX_LINES);
+
+  const starColor = getPalette().labelNeighbor;
+  for (const [key, weight] of strongest) {
+    const [aId, bId] = key.split('|');
+    const a = nodeById.get(aId);
+    const b = nodeById.get(bId);
+    if (!a || !b) continue;
+    constellationGraphics.moveTo(a.x, a.y);
+    constellationGraphics.lineTo(b.x, b.y);
+    constellationGraphics.stroke({
+      width: 1,
+      color: starColor,
+      alpha:
+        (colorMode === 'light' ? 0.18 : 0.1) +
+        Math.min(colorMode === 'light' ? 0.22 : 0.16, weight * 0.03),
+    });
+  }
+}
+
+function buildSunCorona() {
+  coronaFlares = [];
+  if (!livingMapEnabled || !glowTexture || !glowContainer) return;
+  const coreDatum = nodeData.find((datum) => datum.kind === 'core');
+  if (!coreDatum) return;
+
+  const blendMode = getAdditiveBlendMode();
+  const configs = [
+    { width: 9, height: 4, tint: 0xfacc15, alpha: 0.3, spin: CORONA_SPIN },
+    { width: 6.5, height: 3, tint: 0xf97316, alpha: 0.24, spin: -CORONA_SPIN * 0.7 },
+  ];
+  for (const config of configs) {
+    const sprite = new Sprite(glowTexture);
+    sprite.anchor.set(0.5);
+    sprite.tint = config.tint;
+    sprite.blendMode = blendMode;
+    sprite.alpha = config.alpha;
+    sprite.width = coreDatum.radius * config.width;
+    sprite.height = coreDatum.radius * config.height;
+    sprite.position.set(coreDatum.x, coreDatum.y);
+    glowContainer.addChild(sprite);
+    coronaFlares.push({ sprite, spin: config.spin, baseAlpha: config.alpha });
+  }
+}
+
+/** Rotates and breathes the corona flares (living map frames only). */
+function animateCorona(now: number) {
+  if (coronaFlares.length === 0) return;
+  const t = (now - orbitEpoch) / 1000;
+  const breath =
+    Math.sin(((now % CORONA_BREATH_PERIOD_MS) / CORONA_BREATH_PERIOD_MS) * Math.PI * 2);
+  for (let i = 0; i < coronaFlares.length; i++) {
+    const flare = coronaFlares[i];
+    flare.sprite.rotation = flare.spin * t;
+    flare.sprite.alpha = flare.baseAlpha * (1 + 0.12 * (i === 0 ? breath : -breath));
+  }
+}
+
+/**
+ * Converts layout orbit geometry into motion states. Angular velocity policy:
+ * ring shells keep a constant tangential speed (outer shells slower, like a
+ * real system) with a deterministic per-cluster direction; the loose belt
+ * revolves as one rigid, very slow band.
+ */
+function buildOrbitStates(orbits: Map<string, OrbitMapOrbitGeometry>) {
+  orbitStates.clear();
+  orbitEpoch = Date.now();
+  for (const [nodeId, orbit] of orbits) {
+    const direction = orbit.anchorId
+      ? hashOrbitMapStringToSeed(orbit.anchorId) % 2 === 0
+        ? 1
+        : -1
+      : 1;
+    const belt = orbit.ringIndex < 0;
+    const omega = belt
+      ? ORBIT_BELT_OMEGA
+      : (ORBIT_RING_LINEAR_SPEED / Math.max(20, orbit.radius)) * direction;
+    orbitStates.set(nodeId, {
+      cx: orbit.centerX,
+      cy: orbit.centerY,
+      r: orbit.radius,
+      theta0: orbit.theta,
+      omega,
+      belt,
+      wobblePhase: belt
+        ? (hashOrbitMapStringToSeed(nodeId) % 6283) / 1000
+        : 0,
+    });
+  }
+}
+
+/**
+ * Advances every orbiting node to its analytic position at `now`. Nodes being
+ * dragged or driven by one-shot animations are skipped so the two systems
+ * never fight over datum.x/y.
+ */
+function advanceOrbits(now: number) {
+  if (!isLivingActive() || orbitStates.size === 0) return;
+  const t = (now - orbitEpoch) / 1000;
+  const draggingId = interactions.getDraggingNodeId();
+  const animatedIds =
+    activeAnimations.length > 0
+      ? new Set(activeAnimations.map((anim) => anim.nodeId))
+      : null;
+
+  for (const [nodeId, orbit] of orbitStates) {
+    if (nodeId === draggingId || animatedIds?.has(nodeId)) continue;
+    const datum = nodeById.get(nodeId);
+    if (!datum) continue;
+    const angle = orbit.theta0 + orbit.omega * t;
+    // Belt bookmarks breathe radially — the untriaged band reads restless
+    // next to the calm, ordered cluster shells.
+    const radius = orbit.belt
+      ? orbit.r +
+        BELT_WOBBLE_AMPLITUDE * Math.sin(t * BELT_WOBBLE_SPEED + orbit.wobblePhase)
+      : orbit.r;
+    datum.x = orbit.cx + Math.cos(angle) * radius;
+    datum.y = orbit.cy + Math.sin(angle) * radius;
+  }
+}
+
+/**
+ * Continues a node's orbit from wherever an assign flight dropped it, instead
+ * of snapping back to the pre-animation angle.
+ */
+function rebaseOrbitFromPosition(nodeId: string) {
+  const orbit = orbitStates.get(nodeId);
+  const datum = nodeById.get(nodeId);
+  if (!orbit || !datum) return;
+  const dx = datum.x - orbit.cx;
+  const dy = datum.y - orbit.cy;
+  orbit.r = Math.hypot(dx, dy);
+  orbit.theta0 =
+    Math.atan2(dy, dx) - orbit.omega * ((Date.now() - orbitEpoch) / 1000);
 }
 
 function applyHubLabelRanks() {
@@ -1124,8 +1586,16 @@ function applyBookmarkAccentColors() {
       accent !== null
         ? {
             ...baseVisual,
-            color: mixOrbitMapColors(baseVisual.color, accent, 0.55),
-            strokeColor: mixOrbitMapColors(baseVisual.strokeColor, accent, 0.4),
+            color: mixOrbitMapColors(
+              baseVisual.color,
+              accent,
+              colorMode === 'light' ? 0.52 : 0.62
+            ),
+            strokeColor: mixOrbitMapColors(
+              baseVisual.strokeColor,
+              accent,
+              colorMode === 'light' ? 0.4 : 0.5
+            ),
           }
         : baseVisual;
   }
@@ -1165,23 +1635,26 @@ function drawNodeShape(g: Graphics, datum: MapNode) {
   const palette = getPalette();
 
   if (visualStyle.isHub) {
+    const hubFillAlpha = colorMode === 'light' ? 0.38 : 0.24;
+    const hubStrokeAlpha = colorMode === 'light' ? 0.96 : 0.78;
     g.circle(0, 0, datum.radius + 1.5);
-    g.fill({ color: visualStyle.color, alpha: 0.16 });
+    g.fill({ color: visualStyle.color, alpha: hubFillAlpha });
     g.stroke({
       width: visualStyle.strokeWidth,
       color: visualStyle.strokeColor,
-      alpha: 0.6,
+      alpha: hubStrokeAlpha,
     });
     g.circle(0, 0, Math.max(3.2, datum.radius * 0.44));
     g.fill({ color: visualStyle.color, alpha: 1 });
     g.stroke({ width: 1, color: palette.hubInnerStroke, alpha: 0.43 });
   } else {
+    const nodeStrokeAlpha = colorMode === 'light' ? 0.92 : 0.72;
     g.circle(0, 0, datum.radius);
     g.fill({ color: visualStyle.color, alpha: 1 });
     g.stroke({
       width: visualStyle.strokeWidth,
       color: visualStyle.strokeColor,
-      alpha: 0.6,
+      alpha: nodeStrokeAlpha,
     });
   }
 }
@@ -1302,6 +1775,11 @@ function getNodeAlpha(
     lodFactor =
       currentFilter !== 'all' || spotlighted ? 1 : bookmarkLodAlpha;
     if (lodFactor <= 0.004) return 0;
+    // Freshness: stale bookmarks settle into a calmer, dimmer register
+    // (never while spotlighted — focus always wins).
+    if (!spotlighted && node.kind === 'bookmark' && !node.recent) {
+      lodFactor *= 0.85;
+    }
   }
 
   // Search highlight dominates: matches at full strength, the rest recede.
@@ -1361,6 +1839,10 @@ function updateNodeStyles() {
     entranceStartedAt = null;
   }
 
+  const hoverId = focusContext.hasSelection
+    ? null
+    : interactions.getHover()?.id ?? null;
+
   hitTestNodes = [];
   for (const datum of nodeData) {
     const g = nodeGraphicsMap.get(datum.id);
@@ -1375,9 +1857,16 @@ function updateNodeStyles() {
       (isActive || isInOrbitMapViewBounds(datum.x, datum.y, bounds));
     g.visible = visible;
     if (visible) {
-      g.alpha = alpha * getEntranceFactor(datum, entranceElapsed);
+      const entranceFactor = getEntranceFactor(datum, entranceElapsed);
+      g.alpha = alpha * entranceFactor;
       g.position.set(datum.x, datum.y);
-      g.scale.set(datum.scale || 1);
+      let scale = datum.scale || 1;
+      // Entrance: nodes pop from ENTRANCE_SCALE_START to full size as they fade in.
+      if (entranceElapsed !== null) {
+        scale *= ENTRANCE_SCALE_START + (1 - ENTRANCE_SCALE_START) * entranceFactor;
+      }
+      if (datum.id === hoverId) scale *= HOVER_POP_SCALE;
+      g.scale.set(scale);
     }
 
     const glow = glowSpriteMap.get(datum.id);
@@ -1385,7 +1874,7 @@ function updateNodeStyles() {
       glow.visible = visible;
       if (visible) {
         glow.alpha =
-          HUB_GLOW_ALPHA * alpha * getEntranceFactor(datum, entranceElapsed);
+          getHubGlowAlpha() * alpha * getEntranceFactor(datum, entranceElapsed);
         glow.position.set(datum.x, datum.y);
       }
     }
@@ -1411,11 +1900,20 @@ function updateNodeStyles() {
     if (halo.visible) halo.alpha = alpha;
   }
 
-  if (linksContainer) {
-    linksContainer.alpha =
-      entranceElapsed === null
-        ? 1
-        : easeOrbitMapOutCubic(Math.min(entranceElapsed / 800, 1));
+  const atmosphereAlpha =
+    entranceElapsed === null
+      ? 1
+      : easeOrbitMapOutCubic(Math.min(entranceElapsed / 800, 1));
+  if (linksContainer) linksContainer.alpha = atmosphereAlpha;
+  if (nebulaContainer) {
+    // Depth cue: nebulae are strongest far out and recede as dots take over.
+    nebulaContainer.alpha =
+      atmosphereAlpha * (0.45 + 0.55 * getOrbitMapClusterHaloAlpha(zoom));
+  }
+  if (constellationGraphics) {
+    // Star-chart band: constellation lines exist only at galaxy zoom.
+    constellationGraphics.alpha =
+      atmosphereAlpha * getOrbitMapClusterHaloAlpha(zoom);
   }
 
   drawLinks(focusContext, bounds);
@@ -1425,13 +1923,37 @@ function updateNodeStyles() {
 
   applyCameraTransform();
   app.renderer.render(app.stage);
+
+  // Time-based visuals (living-map orbits, reticle spin, edge particles)
+  // keep the loop alive. No-op if already running.
+  if (hasAmbientMotion() || isLivingActive()) startRenderLoop();
 }
 
 function drawLinks(focusContext: FocusContext, bounds: OrbitMapViewBounds | null) {
   if (!linkGraphics) return;
 
   const edgeLodAlpha = getOrbitMapEdgeLodAlpha(camera.zoom);
+  const palette = getPalette();
   linkGraphics.clear();
+  focusedEdgeCurves.length = 0;
+
+  // Living map redraws ambient edges every motion frame; straight two-tone
+  // spokes skip the curve tessellation and read naturally in an orrery.
+  // (Focused edges keep their gradient curves in both modes.)
+  const fastEdges = isLivingActive();
+
+  // Trace-in: after a selection lands, focused edges sweep bookmark→hub over
+  // EDGE_REVEAL_MS. Cleared here on the frame that draws the full length so
+  // the loop condition and the drawn state can't disagree.
+  let reveal = 1;
+  if (edgeRevealStartedAt !== null) {
+    const rawReveal = Math.min(
+      1,
+      (Date.now() - edgeRevealStartedAt) / EDGE_REVEAL_MS
+    );
+    if (rawReveal >= 1) edgeRevealStartedAt = null;
+    reveal = easeOrbitMapOutCubic(rawReveal);
+  }
 
   for (const link of linkData) {
     const { source, target } = link;
@@ -1452,26 +1974,6 @@ function drawLinks(focusContext: FocusContext, bounds: OrbitMapViewBounds | null
       continue;
     }
 
-    let linkAlpha = !focusContext.activeId
-      ? 0.14
-      : touchesActive
-        ? focusContext.hasSelection
-          ? 0.86
-          : 0.42
-        : focusContext.hasSelection
-          ? 0.075
-          : 0.085;
-    if (!touchesActive) linkAlpha *= edgeLodAlpha;
-
-    const linkWidth = touchesActive
-      ? focusContext.hasSelection
-        ? 2.05
-        : 1.35
-      : 0.85;
-    const linkColor = touchesActive
-      ? mixOrbitMapColors(link.color, getPalette().linkHighlightMix, 0.45)
-      : link.color;
-
     const sx = source.x;
     const sy = source.y;
     const tx = target.x;
@@ -1487,9 +1989,89 @@ function drawLinks(focusContext: FocusContext, bounds: OrbitMapViewBounds | null
     const cx = (sx + tx) / 2 - (dy / len) * bend;
     const cy = (sy + ty) / 2 + (dx / len) * bend;
 
-    linkGraphics.moveTo(sx, sy);
-    linkGraphics.quadraticCurveTo(cx, cy, tx, ty);
-    linkGraphics.stroke({ width: linkWidth, color: linkColor, alpha: linkAlpha });
+    if (touchesActive) {
+      // Focused edges get a smooth bookmark→hub color gradient, drawn as a
+      // short polyline with per-segment interpolated color.
+      const startColor = mixOrbitMapColors(
+        source.visual.color,
+        palette.linkHighlightMix,
+        0.3
+      );
+      const endColor = mixOrbitMapColors(link.color, palette.linkHighlightMix, 0.5);
+      const linkAlpha = focusContext.hasSelection ? 0.86 : 0.42;
+      const linkWidth = focusContext.hasSelection ? 2.05 : 1.35;
+
+      let prevX = sx;
+      let prevY = sy;
+      for (let s = 1; s <= GRADIENT_EDGE_SEGMENTS; s++) {
+        const segmentStart = (s - 1) / GRADIENT_EDGE_SEGMENTS;
+        if (segmentStart >= reveal) break;
+        // The segment at the sweep front fades in as the sweep crosses it.
+        const tipFade = Math.min(1, (reveal - segmentStart) * GRADIENT_EDGE_SEGMENTS);
+        const t = s / GRADIENT_EDGE_SEGMENTS;
+        const nextX = getQuadraticPoint(sx, cx, tx, t);
+        const nextY = getQuadraticPoint(sy, cy, ty, t);
+        linkGraphics.moveTo(prevX, prevY);
+        linkGraphics.lineTo(nextX, nextY);
+        linkGraphics.stroke({
+          width: linkWidth,
+          color: mixOrbitMapColors(
+            startColor,
+            endColor,
+            (s - 0.5) / GRADIENT_EDGE_SEGMENTS
+          ),
+          alpha: linkAlpha * tipFade,
+          cap: 'round',
+        });
+        prevX = nextX;
+        prevY = nextY;
+      }
+
+      // Cache the curve so the energy-flow particles can travel it.
+      if (focusContext.hasSelection && focusedEdgeCurves.length < FLOW_MAX_EDGES) {
+        focusedEdgeCurves.push({ sx, sy, cx, cy, tx, ty, color: endColor });
+      }
+      continue;
+    }
+
+    let linkAlpha = !focusContext.activeId
+      ? colorMode === 'light'
+        ? 0.38
+        : 0.14
+      : focusContext.hasSelection
+        ? colorMode === 'light'
+          ? 0.2
+          : 0.075
+        : colorMode === 'light'
+          ? 0.24
+          : 0.085;
+    linkAlpha *= edgeLodAlpha;
+
+    const ambientLinkWidth = colorMode === 'light' ? 1.05 : 0.85;
+
+    // Ambient edges: two-tone gradient by splitting the curve at t=0.5 —
+    // bookmark-colored near the bookmark, hub-colored near the hub.
+    const sourceColor = mixOrbitMapColors(source.visual.color, link.color, 0.2);
+
+    if (fastEdges) {
+      const midX = (sx + tx) / 2;
+      const midY = (sy + ty) / 2;
+      linkGraphics.moveTo(sx, sy);
+      linkGraphics.lineTo(midX, midY);
+      linkGraphics.stroke({ width: ambientLinkWidth, color: sourceColor, alpha: linkAlpha });
+      linkGraphics.moveTo(midX, midY);
+      linkGraphics.lineTo(tx, ty);
+      linkGraphics.stroke({ width: ambientLinkWidth, color: link.color, alpha: linkAlpha });
+    } else {
+      const midX = (sx + 2 * cx + tx) / 4;
+      const midY = (sy + 2 * cy + ty) / 4;
+      linkGraphics.moveTo(sx, sy);
+      linkGraphics.quadraticCurveTo((sx + cx) / 2, (sy + cy) / 2, midX, midY);
+      linkGraphics.stroke({ width: ambientLinkWidth, color: sourceColor, alpha: linkAlpha });
+      linkGraphics.moveTo(midX, midY);
+      linkGraphics.quadraticCurveTo((cx + tx) / 2, (cy + ty) / 2, tx, ty);
+      linkGraphics.stroke({ width: ambientLinkWidth, color: link.color, alpha: linkAlpha });
+    }
   }
 }
 
@@ -1513,13 +2095,79 @@ function drawRings(focusContext: FocusContext) {
 
   if (!focusContext.activeId) return;
 
+  // Orbit-shell guides: when a hub is selected, draw the cluster's actual
+  // bookmark rings (matching the layout geometry) plus a slowly rotating
+  // dashed boundary ring, tinted with the hub's color.
+  if (
+    currentSelection &&
+    (currentSelection.kind === 'tag' || currentSelection.kind === 'collection')
+  ) {
+    const cluster = clusters.get(currentSelection.id);
+    const anchor = nodeById.get(currentSelection.id);
+    if (cluster && anchor && cluster.memberCount > 0) {
+      const guideColor = anchor.visual.color;
+      for (const shellRadius of getOrbitMapClusterRingRadii(
+        anchor.radius,
+        cluster.radius
+      )) {
+        ringGraphics.circle(cluster.x, cluster.y, shellRadius);
+        ringGraphics.stroke({ width: 1, color: guideColor, alpha: 0.1 });
+      }
+
+      const dashAngle = (Date.now() % 3600000) / 1000 * CLUSTER_RING_SPIN;
+      const boundaryRadius = cluster.radius + 8;
+      for (let d = 0; d < 12; d++) {
+        const dashStart = dashAngle + (d * Math.PI * 2) / 12;
+        ringGraphics.arc(
+          cluster.x,
+          cluster.y,
+          boundaryRadius,
+          dashStart,
+          dashStart + 0.22
+        );
+        ringGraphics.stroke({
+          width: 1.2,
+          color: guideColor,
+          alpha: 0.4,
+          cap: 'round',
+        });
+      }
+    }
+  }
+
   const active = nodeById.get(focusContext.activeId);
   if (active) {
     const ringColor = currentSelection ? 0xfacc15 : 0x38bdf8;
-    ringGraphics.circle(active.x, active.y, active.radius + 10);
-    ringGraphics.stroke({ width: 5, color: ringColor, alpha: 0.2 });
-    ringGraphics.circle(active.x, active.y, active.radius + 6);
-    ringGraphics.stroke({ width: 2.4, color: ringColor, alpha: 0.98 });
+    if (focusContext.hasSelection) {
+      // Selection reticle: soft halo ring + counter-rotating arcs, animated
+      // by the ambient render loop that runs while a selection exists.
+      const angle = (Date.now() % 3600000) / 1000 * SELECTION_RING_SPIN;
+      ringGraphics.circle(active.x, active.y, active.radius + 10);
+      ringGraphics.stroke({ width: 5, color: ringColor, alpha: 0.16 });
+      for (const offset of [0, Math.PI]) {
+        ringGraphics.arc(
+          active.x,
+          active.y,
+          active.radius + 6,
+          angle + offset,
+          angle + offset + 2.1
+        );
+        ringGraphics.stroke({ width: 2.4, color: ringColor, alpha: 0.95, cap: 'round' });
+      }
+      ringGraphics.arc(
+        active.x,
+        active.y,
+        active.radius + 10.5,
+        -angle * 0.6,
+        -angle * 0.6 + 1.2
+      );
+      ringGraphics.stroke({ width: 1.6, color: ringColor, alpha: 0.55, cap: 'round' });
+    } else {
+      ringGraphics.circle(active.x, active.y, active.radius + 10);
+      ringGraphics.stroke({ width: 5, color: ringColor, alpha: 0.2 });
+      ringGraphics.circle(active.x, active.y, active.radius + 6);
+      ringGraphics.stroke({ width: 2.4, color: ringColor, alpha: 0.98 });
+    }
   }
 
   if (focusContext.hasSelection) {
@@ -1612,7 +2260,7 @@ function updateLabels(focusContext: FocusContext) {
       label.text = labelText;
     }
 
-    label.style.fill = getOrbitMapLabelFill(
+    label.tint = getOrbitMapLabelFill(
       getPalette(),
       isActive ? 'active' : isNeighbor ? 'neighbor' : 'default'
     );
@@ -1644,13 +2292,51 @@ function positionLabel(
     )
   );
   label.scale.set(labelScale);
-  label.alpha = isActive ? 0.88 : isNeighbor ? 0.72 : camera.zoom < 1.15 ? 0.56 : 0.74;
+  label.alpha =
+    colorMode === 'light'
+      ? 1
+      : isActive
+        ? 0.88
+        : isNeighbor
+          ? 0.72
+          : camera.zoom < 1.15
+            ? 0.56
+            : 0.74;
 }
 
 function renderEffects() {
-  if (!effectsContainer) return;
+  if (!effectsGraphics || !effectsAdditiveGraphics) return;
 
-  destroyContainerChildren(effectsContainer);
+  effectsGraphics.clear();
+  effectsAdditiveGraphics.clear();
+
+  // Energy-flow particles: bright dots travel bookmark→hub along the
+  // selected node's edges (curves cached by drawLinks). They hold off while
+  // the edge trace-in is still revealing the edges.
+  if (currentSelection && !isEdgeRevealActive() && focusedEdgeCurves.length > 0) {
+    const now = Date.now();
+    const particleRadius = 2.3 / Math.max(0.55, Math.sqrt(camera.zoom));
+
+    for (let edgeIndex = 0; edgeIndex < focusedEdgeCurves.length; edgeIndex++) {
+      const curve = focusedEdgeCurves[edgeIndex];
+      for (let p = 0; p < FLOW_PARTICLES_PER_EDGE; p++) {
+        // Golden-ratio phase offsets so particles don't march in lockstep.
+        const phase = (edgeIndex * 0.618 + p / FLOW_PARTICLES_PER_EDGE) % 1;
+        const t = (now / FLOW_PARTICLE_PERIOD_MS + phase) % 1;
+        const alpha = Math.sin(Math.PI * t) * 0.8;
+        if (alpha < 0.03) continue;
+        effectsAdditiveGraphics.circle(
+          getQuadraticPoint(curve.sx, curve.cx, curve.tx, t),
+          getQuadraticPoint(curve.sy, curve.cy, curve.ty, t),
+          particleRadius
+        );
+        effectsAdditiveGraphics.fill({
+          color: mixOrbitMapColors(curve.color, 0xffffff, 0.35),
+          alpha,
+        });
+      }
+    }
+  }
 
   activeAnimations.forEach((anim) => {
     if (anim.type === 'pulse') {
@@ -1667,10 +2353,8 @@ function renderEffects() {
         const pulseRadius = datum.radius + (ringProgress * 48);
         const pulseAlpha = (1 - ringProgress) * (0.8 - i * 0.11);
 
-        const pulse = new Graphics();
-        pulse.circle(datum.x, datum.y, pulseRadius);
-        pulse.stroke({ width: 3, color: 0x38bdf8, alpha: pulseAlpha });
-        effectsContainer!.addChild(pulse);
+        effectsGraphics!.circle(datum.x, datum.y, pulseRadius);
+        effectsGraphics!.stroke({ width: 3, color: 0x38bdf8, alpha: pulseAlpha });
       }
 
       // Subtle breathing scale on the node itself during the pulse.
@@ -1690,19 +2374,41 @@ function renderEffects() {
       const datum = nodeById.get(anim.nodeId);
       if (!datum) return;
 
-      // Elegant flight path line.
-      const flight = new Graphics();
-      flight.moveTo(anim.fromX, anim.fromY);
-      flight.lineTo(anim.targetX, anim.targetY);
-      flight.stroke({ width: 2.2, color: 0x64748b, alpha: 0.28 });
-      effectsContainer!.addChild(flight);
+      const controlX = anim.controlX ?? (anim.fromX + anim.targetX) / 2;
+      const controlY = anim.controlY ?? (anim.fromY + anim.targetY) / 2;
+
+      // Curved flight path line.
+      effectsGraphics!.moveTo(anim.fromX, anim.fromY);
+      effectsGraphics!.quadraticCurveTo(
+        controlX,
+        controlY,
+        anim.targetX,
+        anim.targetY
+      );
+      effectsGraphics!.stroke({ width: 2, color: 0x64748b, alpha: 0.24 });
 
       // Faded ghost at the original position.
-      const ghost = new Graphics();
-      ghost.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
-      ghost.fill({ color: 0x64748b, alpha: 0.14 });
-      ghost.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
-      effectsContainer!.addChild(ghost);
+      effectsGraphics!.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
+      effectsGraphics!.fill({ color: 0x64748b, alpha: 0.14 });
+      effectsGraphics!.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
+
+      // Comet trail behind the flying node. Samples in eased-progress space,
+      // so the trail stretches while fast and tightens on arrival.
+      const eased = easeOrbitMapOutCubic(getOrbitMapAnimationProgress(anim));
+      const trailColor = mixOrbitMapColors(datum.visual.color, 0xffffff, 0.4);
+      for (let k = 1; k <= 7; k++) {
+        const t = eased - k * 0.05;
+        if (t <= 0) break;
+        effectsAdditiveGraphics!.circle(
+          getQuadraticPoint(anim.fromX, controlX, anim.targetX, t),
+          getQuadraticPoint(anim.fromY, controlY, anim.targetY, t),
+          Math.max(0.6, datum.radius * (0.85 - k * 0.1))
+        );
+        effectsAdditiveGraphics!.fill({
+          color: trailColor,
+          alpha: 0.5 * (1 - k / 8),
+        });
+      }
     }
   });
 }
@@ -1710,6 +2416,91 @@ function renderEffects() {
 /* ============================================================
    RENDER LOOP (drives animations + the entrance fade)
    ============================================================ */
+
+/** True while time-based ambient visuals (selection reticle spin + edge
+ * particles) should keep the loop alive after one-shot animations finish. */
+function hasAmbientMotion() {
+  return currentSelection !== null && nodeData.length > 0;
+}
+
+/**
+ * Living-map frame: everything the ambient frame does, plus orbital node and
+ * label position sync and an edge redraw that tracks the moving bookmarks.
+ * Every LIVING_REFRESH_MS a full style pass re-culls, re-declutters labels,
+ * and syncs the minimap; between refreshes this path allocates nothing.
+ */
+function renderLivingFrame(now: number) {
+  if (!app) return;
+
+  if (now - lastLivingRefreshAt >= LIVING_REFRESH_MS) {
+    lastLivingRefreshAt = now;
+    updateNodeStyles();
+    sendLayoutUpdate(true);
+    return;
+  }
+
+  const focusContext = getFocusContext();
+
+  for (const nodeId of orbitStates.keys()) {
+    const g = nodeGraphicsMap.get(nodeId);
+    if (!g || !g.visible) continue;
+    const datum = nodeById.get(nodeId);
+    if (datum) g.position.set(datum.x, datum.y);
+  }
+
+  for (const [nodeId, label] of labelMap) {
+    if (!label.visible || !orbitStates.has(nodeId)) continue;
+    const datum = nodeById.get(nodeId);
+    if (datum) positionLabel(label, datum, focusContext);
+  }
+
+  if (currentSelection) {
+    const glow = glowSpriteMap.get(currentSelection.id);
+    if (glow && glow.visible) {
+      const breathPhase =
+        ((now % GLOW_BREATH_PERIOD_MS) / GLOW_BREATH_PERIOD_MS) * Math.PI * 2;
+      glow.alpha = getHubGlowAlpha() * (1 + 0.22 * Math.sin(breathPhase));
+    }
+  }
+
+  drawLinks(
+    focusContext,
+    getOrbitMapViewBounds(
+      camera,
+      app.renderer.width,
+      app.renderer.height,
+      VIEW_CULL_MARGIN
+    )
+  );
+  drawRings(focusContext);
+  renderEffects();
+  app.renderer.render(app.stage);
+}
+
+/**
+ * Cheap per-frame path for ambient motion: only the reticle arcs, flow
+ * particles, and glow breathing change, so skip the full style/label/link
+ * recompute and just mutate those layers. No allocations on this path.
+ */
+function renderAmbientFrame() {
+  if (!app) return;
+
+  // The selected hub's glow breathes gently (updateNodeStyles resets the
+  // alpha whenever a real style pass runs).
+  if (currentSelection) {
+    const glow = glowSpriteMap.get(currentSelection.id);
+    if (glow && glow.visible) {
+      const breathPhase =
+        ((Date.now() % GLOW_BREATH_PERIOD_MS) / GLOW_BREATH_PERIOD_MS) *
+        Math.PI * 2;
+      glow.alpha = getHubGlowAlpha() * (1 + 0.22 * Math.sin(breathPhase));
+    }
+  }
+
+  drawRings(getFocusContext());
+  renderEffects();
+  app.renderer.render(app.stage);
+}
 
 function startRenderLoop() {
   if (renderLoopRunning || !app) return;
@@ -1721,16 +2512,61 @@ function startRenderLoop() {
       return;
     }
 
-    updateAnimations();
-    updateNodeStyles();
-
-    if (activeAnimations.length > 0 || entranceStartedAt !== null) {
-      requestAnimationFrame(tick);
-    } else {
-      renderLoopRunning = false;
-      // Drag returns / assign flights may have moved nodes — sync the minimap.
-      sendLayoutUpdate(true);
+    const now = Date.now();
+    const living = isLivingActive();
+    if (living) {
+      // Orbits and corona advance analytically before any branch renders,
+      // so motion never freezes during one-shot animations or entrances.
+      advanceOrbits(now);
+      animateCorona(now);
     }
+
+    const hadAnimations = activeAnimations.length > 0;
+    updateAnimations();
+
+    if (
+      activeAnimations.length > 0 ||
+      entranceStartedAt !== null ||
+      isEdgeRevealActive()
+    ) {
+      updateNodeStyles();
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    if (hadAnimations) {
+      // One-shot animations just finished (possibly with the ambient loop
+      // still alive): settle styles and sync moved nodes to the minimap.
+      updateNodeStyles();
+      sendLayoutUpdate(true);
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    if (living) {
+      // Living-map motion is slow; cap at ~30fps to halve idle GPU work.
+      if (now - lastAmbientFrameAt >= AMBIENT_FRAME_MIN_MS) {
+        lastAmbientFrameAt = now;
+        renderLivingFrame(now);
+      }
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    if (hasAmbientMotion()) {
+      // Ambient motion is slow; cap it at ~30fps to halve idle GPU work.
+      if (now - lastAmbientFrameAt >= AMBIENT_FRAME_MIN_MS) {
+        lastAmbientFrameAt = now;
+        renderAmbientFrame();
+      }
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    updateNodeStyles();
+    renderLoopRunning = false;
+    // Drag returns / assign flights may have moved nodes — sync the minimap.
+    sendLayoutUpdate(true);
   };
 
   tick();
@@ -1761,8 +2597,13 @@ function updateAnimations() {
       anim.targetX !== undefined && anim.targetY !== undefined
     ) {
       const t = easeOrbitMapOutCubic(progress);
-      datum.x = anim.fromX + (anim.targetX - anim.fromX) * t;
-      datum.y = anim.fromY + (anim.targetY - anim.fromY) * t;
+      if (anim.type === 'assign' && anim.controlX !== undefined && anim.controlY !== undefined) {
+        datum.x = getQuadraticPoint(anim.fromX, anim.controlX, anim.targetX, t);
+        datum.y = getQuadraticPoint(anim.fromY, anim.controlY, anim.targetY, t);
+      } else {
+        datum.x = anim.fromX + (anim.targetX - anim.fromX) * t;
+        datum.y = anim.fromY + (anim.targetY - anim.fromY) * t;
+      }
 
       if (anim.type === 'assign') {
         datum.scale = progress < 1 ? 1.13 : undefined;
@@ -1771,6 +2612,8 @@ function updateAnimations() {
       if (progress >= 1) {
         toRemove.push(index);
         if (anim.type === 'assign') {
+          // Living map: continue the orbit from wherever the assign landed.
+          rebaseOrbitFromPosition(anim.nodeId);
           delete datum.scale;
           pushPulse(anim.nodeId);
           postToMain({
@@ -2018,7 +2861,7 @@ function handleDoubleClick(msg: DoubleClickMessage) {
 
   if (closest && (closest.node.kind === 'tag' || closest.node.kind === 'collection')) {
     const selection: OrbitMapSelection = { id: closest.id, kind: closest.node.kind };
-    currentSelection = selection;
+    setCurrentSelectionState(selection);
     updateNodeStyles();
     postToMain({
       type: MainMessageType.SELECTION_CHANGED,
@@ -2045,7 +2888,7 @@ function handleDoubleClick(msg: DoubleClickMessage) {
    ============================================================ */
 
 function handleSetSelection(msg: SetSelectionMessage) {
-  currentSelection = msg.selection;
+  setCurrentSelectionState(msg.selection);
   updateNodeStyles();
 }
 
@@ -2064,6 +2907,14 @@ function handleAnimateAssign(msg: AnimateAssignMessage) {
   removeAnimationsFor(bookmarkId, 'return');
   delete bookmarkDatum.scale;
 
+  // Curved flight: perpendicular bend off the straight line, side chosen
+  // deterministically per bookmark so repeat assigns fly the same arc.
+  const dx = anchorDatum.x - bookmarkDatum.x;
+  const dy = anchorDatum.y - bookmarkDatum.y;
+  const len = Math.hypot(dx, dy);
+  const side = hashOrbitMapStringToSeed(bookmarkId) % 2 === 0 ? 1 : -1;
+  const bend = len * 0.22 * side;
+
   activeAnimations.push({
     id: `assign-${bookmarkId}-${Date.now()}`,
     type: 'assign',
@@ -2074,6 +2925,10 @@ function handleAnimateAssign(msg: AnimateAssignMessage) {
     fromY: bookmarkDatum.y,
     targetX: anchorDatum.x,
     targetY: anchorDatum.y,
+    controlX:
+      (bookmarkDatum.x + anchorDatum.x) / 2 - (len > 1 ? (dy / len) * bend : 0),
+    controlY:
+      (bookmarkDatum.y + anchorDatum.y) / 2 + (len > 1 ? (dx / len) * bend : 0),
   });
 
   startRenderLoop();
@@ -2091,15 +2946,16 @@ function handleFocusOn(msg: FocusOnMessage) {
   if (!nodeById.has(selection.id)) return;
 
   // Update selection state immediately so neighbor highlighting reacts.
-  currentSelection = { id: selection.id, kind: selection.kind };
+  const nextSelection: OrbitMapSelection = { id: selection.id, kind: selection.kind };
+  setCurrentSelectionState(nextSelection);
   updateNodeStyles();
   postToMain({
     type: MainMessageType.SELECTION_CHANGED,
     protocolVersion: 1,
-    selection: currentSelection,
+    selection: nextSelection,
   });
 
-  frameSelection(currentSelection);
+  frameSelection(nextSelection);
 }
 
 self.onmessage = handleMessage;
@@ -2114,6 +2970,7 @@ function applyCameraTransform() {
   const scale = camera.zoom;
 
   for (const container of [
+    nebulaContainer,
     linksContainer,
     glowContainer,
     nodesContainer,
@@ -2126,12 +2983,10 @@ function applyCameraTransform() {
     container.scale.set(scale);
   }
 
-  // Distant stars follow the camera at a fraction of its speed for depth.
+  // Each starfield depth layer follows the camera at its own fraction of
+  // camera speed, so pans read as dimensional.
   if (starfieldContainer) {
-    starfieldContainer.position.set(
-      tx * STARFIELD_PARALLAX,
-      ty * STARFIELD_PARALLAX
-    );
+    applyOrbitMapStarfieldParallax(starfieldContainer, tx, ty);
   }
 }
 

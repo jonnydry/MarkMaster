@@ -49,7 +49,7 @@ export default function CollectionDetailClient({
   const [gridOverlayBookmarkId, setGridOverlayBookmarkId] = useState<string | null>(
     null
   );
-  const page = useCollectionDetailPage(collectionId);
+  const page = useCollectionDetailPage(collectionId, viewMode);
   const {
     collection,
     isPending,

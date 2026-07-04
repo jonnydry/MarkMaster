@@ -5,6 +5,7 @@ import {
   getOrbitMapNodeRadius,
   getOrbitMapNodeVisualStyle,
   mixOrbitMapColors,
+  saturateOrbitMapColor,
   shouldShowOrbitMapLabel,
   ORBIT_MAP_BOOKMARK_LABEL_ZOOM,
   ORBIT_MAP_TOP_HUB_LABEL_COUNT,
@@ -29,16 +30,36 @@ describe("getOrbitMapNodeVisualStyle", () => {
     };
 
     expect(getOrbitMapNodeVisualStyle(looseBookmark)).toMatchObject({
-      color: 0x2f6fed,
       isHub: false,
     });
+    expect(getOrbitMapNodeVisualStyle(looseBookmark).color).toBe(0x1671ff);
     expect(getOrbitMapNodeVisualStyle(assignedBookmark)).toMatchObject({
       color: 0x737373,
       isHub: false,
     });
   });
 
-  it("marks tags and collections as hub nodes", () => {
+  it("brightens recent bookmarks with a cyan-hot edge", () => {
+    const stale: OrbitGraphNode = {
+      kind: "bookmark",
+      id: "stale",
+      title: "Stale",
+      authorUsername: "author",
+      authorDisplayName: "Author",
+      affiliated: true,
+      recent: false,
+    };
+    const fresh: OrbitGraphNode = { ...stale, id: "fresh", recent: true };
+
+    const staleStyle = getOrbitMapNodeVisualStyle(stale);
+    const freshStyle = getOrbitMapNodeVisualStyle(fresh);
+    expect(freshStyle.color).toBe(
+      mixOrbitMapColors(staleStyle.color, 0x67e8f9, 0.14)
+    );
+    expect(freshStyle.strokeWidth).toBeGreaterThan(staleStyle.strokeWidth);
+  });
+
+  it("boosts tag and collection hub colors for a neon read", () => {
     const tag: OrbitGraphNode = {
       kind: "tag",
       id: "tag",
@@ -55,13 +76,14 @@ describe("getOrbitMapNodeVisualStyle", () => {
     };
 
     expect(getOrbitMapNodeVisualStyle(tag)).toMatchObject({
-      color: 0x1569cb,
+      color: 0x006ffa,
       isHub: true,
     });
+    expect(getOrbitMapNodeVisualStyle(tag).strokeColor).not.toBe(0x1569cb);
     expect(getOrbitMapNodeVisualStyle(collection)).toMatchObject({
-      color: 0xf472b6,
       isHub: true,
     });
+    expect(getOrbitMapNodeVisualStyle(collection).color).toBe(16724131);
   });
 
   it("scales hubs by count while keeping bookmarks compact", () => {
@@ -181,5 +203,14 @@ describe("mixOrbitMapColors", () => {
     expect(mixOrbitMapColors(0x000000, 0xffffff, 0.5)).toBe(0x808080);
     expect(mixOrbitMapColors(0x000000, 0xffffff, 2)).toBe(0xffffff);
     expect(mixOrbitMapColors(0xff0000, 0x0000ff, 0.5)).toBe(0x800080);
+  });
+});
+
+describe("saturateOrbitMapColor", () => {
+  it("increases chroma away from gray", () => {
+    const gray = 0x808080;
+    const blue = 0x2563eb;
+    expect(saturateOrbitMapColor(gray, 1.4)).toBe(0x808080);
+    expect(saturateOrbitMapColor(blue, 1.4)).not.toBe(blue);
   });
 });

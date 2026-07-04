@@ -349,5 +349,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     },
     getHover: () => currentHover,
     getDropTargetId: () => dropTargetId,
+    /** Node currently being dragged (living-map orbits skip it). */
+    getDraggingNodeId: () => draggingNodeId,
   };
 }

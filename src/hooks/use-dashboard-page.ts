@@ -361,6 +361,7 @@ export function useDashboardPage() {
   useKeyboardShortcuts({
     activeBookmarkId: selectionMode ? null : activeBookmarkIdForView,
     bookmarks: selectionMode ? [] : bookmarks,
+    navigationLayout: viewMode === "grid" ? "grid" : "list",
     onNavigate: setActiveBookmarkId,
     onOpen: handleExpandedBookmarkOpen,
     onSearch: () => requestCompactSearchFocus(searchInputRef),

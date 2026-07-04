@@ -14,50 +14,97 @@ function parseHexColor(value: string | undefined, fallback: number) {
   return Number.parseInt(normalized, 16);
 }
 
+/** Push channel values away from luminance for a more electric read. */
+export function saturateOrbitMapColor(color: number, amount: number): number {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  const saturate = (channel: number) =>
+    Math.min(255, Math.max(0, Math.round(lum + (channel - lum) * amount)));
+  return (saturate(r) << 16) | (saturate(g) << 8) | saturate(b);
+}
+
+function enhanceOrbitMapFill(color: number, isLightCanvas: boolean): number {
+  const saturated = saturateOrbitMapColor(color, isLightCanvas ? 1.28 : 1.42);
+  return isLightCanvas
+    ? mixOrbitMapColors(saturated, 0xffffff, 0.06)
+    : saturated;
+}
+
+function getOrbitMapNeonStroke(fill: number, isLightCanvas: boolean): number {
+  const ringMix = isLightCanvas ? 0xffffff : 0x22d3ee;
+  return mixOrbitMapColors(
+    saturateOrbitMapColor(fill, isLightCanvas ? 1.18 : 1.3),
+    ringMix,
+    isLightCanvas ? 0.48 : 0.38
+  );
+}
+
+function styleOrbitMapHub(
+  fill: number,
+  stroke: number,
+  strokeWidth: number,
+  isLightCanvas: boolean
+): OrbitMapNodeVisualStyle {
+  const color = enhanceOrbitMapFill(fill, isLightCanvas);
+  return {
+    color,
+    strokeColor: getOrbitMapNeonStroke(stroke, isLightCanvas),
+    strokeWidth,
+    isHub: true,
+  };
+}
+
 export function getOrbitMapNodeVisualStyle(
   node: OrbitGraphNode,
   palette?: OrbitMapPalette
 ): OrbitMapNodeVisualStyle {
+  const isLightCanvas = (palette?.background ?? 0) > 0x808080;
   switch (node.kind) {
     case "core":
-      return {
-        color: 0xfacc15,
-        strokeColor: 0xfef08a,
-        strokeWidth: 2.2,
-        isHub: true,
-      };
+      return styleOrbitMapHub(0xfde047, 0xfef9c3, 2.3, isLightCanvas);
     case "tag": {
-      const color = parseHexColor(node.color, 0x34d399);
-      return {
-        color,
-        strokeColor: color,
-        strokeWidth: 2.1,
-        isHub: true,
-      };
+      const color = parseHexColor(node.color, 0x06d6a0);
+      return styleOrbitMapHub(color, color, 2.2, isLightCanvas);
     }
     case "collection":
-      return {
-        color: node.variant === "x_folder" ? 0xa78bfa : 0xf472b6,
-        strokeColor: node.variant === "x_folder" ? 0xc4b5fd : 0xf9a8d4,
-        strokeWidth: 2.1,
-        isHub: true,
-      };
+      return node.variant === "x_folder"
+        ? styleOrbitMapHub(0xa855f7, 0xf0abfc, 2.2, isLightCanvas)
+        : styleOrbitMapHub(0xec4899, 0xfda4af, 2.2, isLightCanvas);
     case "bookmark": {
       const accent = palette?.accent ?? 0x2f6fed;
-      const accentSoft = palette?.accentSoft ?? 0xbfdbfe;
-      const color = node.affiliated ? 0x737373 : accent;
+      const color = node.affiliated
+        ? isLightCanvas
+          ? saturateOrbitMapColor(0x475569, 1.12)
+          : 0x737373
+        : enhanceOrbitMapFill(accent, isLightCanvas);
+      const strokeColor = node.affiliated
+        ? isLightCanvas
+          ? saturateOrbitMapColor(0x64748b, 1.1)
+          : 0xa3a3a3
+        : getOrbitMapNeonStroke(color, isLightCanvas);
+      // Fresh bookmarks pick up a cyan-hot edge instead of washing toward white.
+      if (node.recent) {
+        return {
+          color: mixOrbitMapColors(color, 0x67e8f9, 0.14),
+          strokeColor: mixOrbitMapColors(strokeColor, 0x67e8f9, 0.28),
+          strokeWidth: (node.affiliated ? 0.9 : 1.2) + 0.25,
+          isHub: false,
+        };
+      }
       return {
         color,
-        strokeColor: node.affiliated ? 0xa3a3a3 : accentSoft,
-        strokeWidth: node.affiliated ? 0.9 : 1.2,
+        strokeColor,
+        strokeWidth: node.affiliated ? 0.9 : 1.25,
         isHub: false,
       };
     }
     case "overflow":
       return {
-        color: 0xf97316,
-        strokeColor: 0xfdba74,
-        strokeWidth: 1.4,
+        color: enhanceOrbitMapFill(0xfb923c, isLightCanvas),
+        strokeColor: getOrbitMapNeonStroke(0xfb923c, isLightCanvas),
+        strokeWidth: 1.5,
         isHub: false,
       };
   }

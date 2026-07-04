@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeOrbitMapClusterLayout,
+  getOrbitMapClusterRingRadii,
   type OrbitMapLayoutNodeInput,
 } from "./orbit-map-cluster-layout";
 import type { OrbitGraphEdge } from "@/types";
@@ -169,5 +170,99 @@ describe("computeOrbitMapClusterLayout", () => {
     }
 
     expect(minDistance).toBeGreaterThan(10);
+  });
+});
+
+describe("orbit geometry", () => {
+  it("reproduces every ring position exactly at t = 0", () => {
+    const { nodes, edges } = buildFixture();
+    const { positions, orbits } = computeOrbitMapClusterLayout(nodes, edges);
+
+    for (let i = 0; i < 20; i++) {
+      const orbit = orbits.get(`a-${i}`)!;
+      expect(orbit).toBeDefined();
+      expect(orbit.anchorId).toBe("tag-a");
+      expect(orbit.ringIndex).toBeGreaterThanOrEqual(0);
+      const position = positions.get(`a-${i}`)!;
+      expect(orbit.centerX + Math.cos(orbit.theta) * orbit.radius).toBeCloseTo(
+        position.x,
+        6
+      );
+      expect(orbit.centerY + Math.sin(orbit.theta) * orbit.radius).toBeCloseTo(
+        position.y,
+        6
+      );
+    }
+  });
+
+  it("gives loose bookmarks a belt orbit through their relaxed position", () => {
+    const { nodes, edges } = buildFixture();
+    const { positions, orbits } = computeOrbitMapClusterLayout(nodes, edges);
+
+    for (let i = 0; i < 6; i++) {
+      const orbit = orbits.get(`loose-${i}`)!;
+      expect(orbit).toBeDefined();
+      expect(orbit.ringIndex).toBe(-1);
+      expect(orbit.anchorId).toBeNull();
+      expect(orbit.centerX).toBe(0);
+      const position = positions.get(`loose-${i}`)!;
+      expect(Math.cos(orbit.theta) * orbit.radius).toBeCloseTo(position.x, 6);
+      expect(Math.sin(orbit.theta) * orbit.radius).toBeCloseTo(position.y, 6);
+    }
+  });
+
+  it("gives multi-anchor bookmarks no orbit", () => {
+    const { nodes, edges } = buildFixture();
+    const { orbits } = computeOrbitMapClusterLayout(nodes, edges);
+    for (let i = 0; i < 3; i++) {
+      expect(orbits.has(`shared-${i}`)).toBe(false);
+    }
+  });
+
+  it("places recent bookmarks on the innermost shells", () => {
+    const { nodes, edges } = buildFixture();
+    // Mark a scattered handful of tag-a members recent (fewer than one ring).
+    const recentIds = new Set(["a-3", "a-8", "a-13", "a-17", "a-19"]);
+    const withRecency = nodes.map((node) =>
+      recentIds.has(node.id) ? { ...node, recent: true } : node
+    );
+    const { orbits } = computeOrbitMapClusterLayout(withRecency, edges);
+
+    const allRadii = [];
+    for (let i = 0; i < 20; i++) {
+      allRadii.push(orbits.get(`a-${i}`)!.radius);
+    }
+    const innermost = Math.min(...allRadii);
+    for (const id of recentIds) {
+      expect(orbits.get(id)!.radius).toBe(innermost);
+    }
+  });
+});
+
+describe("getOrbitMapClusterRingRadii", () => {
+  it("matches the shells bookmarks are actually placed on", () => {
+    const { nodes, edges } = buildFixture();
+    const { positions, clusters } = computeOrbitMapClusterLayout(nodes, edges);
+
+    const cluster = clusters.get("tag-a")!;
+    const radii = getOrbitMapClusterRingRadii(9, cluster.radius);
+    expect(radii.length).toBeGreaterThan(0);
+
+    // Every single-anchor bookmark of the cluster sits on one of the shells.
+    const anchorPos = positions.get("tag-a")!;
+    for (let i = 0; i < 20; i++) {
+      const bookmarkPos = positions.get(`a-${i}`)!;
+      const distance = dist(bookmarkPos, anchorPos);
+      const onShell = radii.some((radius) => Math.abs(distance - radius) < 0.5);
+      expect(onShell).toBe(true);
+    }
+  });
+
+  it("returns no shells for clusters too small to hold a ring", () => {
+    expect(getOrbitMapClusterRingRadii(8, 20)).toEqual([]);
+  });
+
+  it("caps the shell count for degenerate radii", () => {
+    expect(getOrbitMapClusterRingRadii(8, 100000).length).toBeLessThanOrEqual(12);
   });
 });
