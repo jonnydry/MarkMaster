@@ -148,6 +148,8 @@ export const WorkerMessageType = {
   SET_THEME: "SET_THEME",
   /** Page visibility — pauses the living-map motion loop while hidden. */
   SET_VISIBILITY: "SET_VISIBILITY",
+  /** Play the radar sweep effect (optionally glinting specific nodes). */
+  PLAY_SCAN_SWEEP: "PLAY_SCAN_SWEEP",
 
   // Lifecycle
   DESTROY: "DESTROY",
@@ -487,6 +489,17 @@ export interface SetVisibilityMessage {
   visible: boolean;
 }
 
+/**
+ * Plays a radar sweep across the sky: a beam rotates once around the core
+ * and the given nodes glint as it passes them (all bookmarks when omitted).
+ * Used by scan/triage flows to visualize the AI pass over the library.
+ */
+export interface PlayScanSweepMessage {
+  type: typeof WorkerMessageType.PLAY_SCAN_SWEEP;
+  protocolVersion: number;
+  nodeIds?: string[] | null;
+}
+
 export type WorkerMessage =
   | InitMessage
   | SetGraphMessage
@@ -514,7 +527,8 @@ export type WorkerMessage =
   | DestroyMessage
   | FocusPulseMessage
   | SetThemeMessage
-  | SetVisibilityMessage;
+  | SetVisibilityMessage
+  | PlayScanSweepMessage;
 
 // Grouped unions for handler typing
 export type CameraControlMessage =
@@ -859,6 +873,13 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
       return typeof msg.visible === "boolean"
         ? null
         : "SET_VISIBILITY.visible must be a boolean";
+
+    case WorkerMessageType.PLAY_SCAN_SWEEP:
+      return msg.nodeIds === undefined ||
+        msg.nodeIds === null ||
+        isStringArray(msg.nodeIds)
+        ? null
+        : "PLAY_SCAN_SWEEP.nodeIds must be a string array or null";
 
     default:
       return `Unknown worker message type: ${msg.type}`;

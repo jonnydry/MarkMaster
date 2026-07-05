@@ -319,7 +319,7 @@ function SelectedClusterBody({
             <Button
               size="sm"
               variant="highlight"
-              className="h-9 min-w-0 justify-center gap-1.5 px-2 text-primary"
+              className="col-span-2 h-9 w-full justify-center gap-1.5 px-2 text-primary"
               onClick={() => onCopyAsCollection(node.id)}
               disabled={isCopying}
             >

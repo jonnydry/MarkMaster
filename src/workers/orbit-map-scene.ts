@@ -73,14 +73,14 @@ export function createOrbitMapVignetteSprite(
   } else if (typeof accent === "number") {
     const [r, g, b] = pixiColorToRgb(accent);
     stops = [
-      [0, `rgba(${r},${g},${b},0.08)`],
-      [0.55, `rgba(${r},${g},${b},0.03)`],
+      [0, `rgba(${r},${g},${b},0.04)`],
+      [0.55, `rgba(${r},${g},${b},0.015)`],
       [1, "rgba(0,0,0,0)"],
     ];
   } else {
     stops = [
-      [0, "rgba(30,41,59,0.14)"],
-      [0.55, "rgba(15,23,42,0.05)"],
+      [0, "rgba(30,41,59,0.07)"],
+      [0.55, "rgba(15,23,42,0.025)"],
       [1, "rgba(0,0,0,0)"],
     ];
   }

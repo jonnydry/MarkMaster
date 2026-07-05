@@ -37,6 +37,7 @@ import {
   type FocusPulseMessage,
   type SetThemeMessage,
   type SetVisibilityMessage,
+  type PlayScanSweepMessage,
   type FocusOnMessage,
   type SetSelectionMessage,
   type SetHighlightMessage,
@@ -239,6 +240,22 @@ const CONSTELLATION_MIN_SHARED = 2;
 /** Cap on constellation lines (strongest pairs win). */
 const CONSTELLATION_MAX_LINES = 40;
 
+// === Cosmic events (meteors + radar sweep) ===
+/** Max new bookmarks that fly in as meteors on a refetch; more than this
+ * reads as navigation (scope switch, first load), not arrivals. */
+const METEOR_MAX_ARRIVALS = 12;
+/** Stagger between consecutive meteor launches. */
+const METEOR_STAGGER_MS = 140;
+/** Meteor flight duration (before per-meteor jitter). */
+const METEOR_DURATION_MS = 950;
+/** A meteor batch at least this big also plays the radar sweep. */
+const SWEEP_METEOR_THRESHOLD = 3;
+/** Radar sweep: one full revolution duration and trailing glow width. */
+const SWEEP_DURATION_MS = 2600;
+const SWEEP_TRAIL_RAD = 0.7;
+/** Cap on per-sweep node glints. */
+const SWEEP_MAX_GLINTS = 400;
+
 // Labels
 const labelMap = new Map<string, BitmapText>();
 
@@ -296,7 +313,7 @@ const VIEW_CULL_MARGIN = 0.3;
 // === Animation System (runs in worker) ===
 interface MapAnimation {
   id: string;
-  type: 'assign' | 'pulse' | 'return';
+  type: 'assign' | 'pulse' | 'return' | 'meteor';
   nodeId: string;
   startTime: number;
   duration: number;
@@ -328,6 +345,23 @@ const focusedEdgeCurves: FocusedEdgeCurve[] = [];
 let edgeRevealStartedAt: number | null = null;
 /** Timestamp of the last ambient frame (30fps cap). */
 let lastAmbientFrameAt = 0;
+
+// === Cosmic event state ===
+/** Bookmark ids present in the previous graph payload (meteor detection). */
+let knownBookmarkIds: Set<string> | null = null;
+/** Scope of the previous graph payload (scope switches don't rain meteors). */
+let lastGraphScope: string | null = null;
+/** Active radar sweep, or null. Glint sky positions are fixed at start. */
+let activeSweep: {
+  startTime: number;
+  duration: number;
+  maxRadius: number;
+  glints: Array<{ id: string; angle: number; x: number; y: number }>;
+} | null = null;
+
+function isSweepActive() {
+  return activeSweep !== null;
+}
 
 // === Living map state ===
 /** Per-node orbit: position(t) = center + r·(cos, sin)(θ₀ + ω·t). */
@@ -696,6 +730,10 @@ function handleMessage(event: MessageEvent<unknown>) {
       handleSetVisibility(msg as SetVisibilityMessage);
       break;
 
+    case WorkerMessageType.PLAY_SCAN_SWEEP:
+      startScanSweep((msg as PlayScanSweepMessage).nodeIds);
+      break;
+
     case WorkerMessageType.DESTROY:
       handleDestroy();
       break;
@@ -859,6 +897,9 @@ function reapplyAllNodeVisuals() {
 }
 
 function handleSetGraph(msg: SetGraphMessage) {
+  const previousBookmarkIds = knownBookmarkIds;
+  const previousScope = lastGraphScope;
+
   currentGraph = msg.graph;
   searchIndex = buildOrbitMapSearchIndex(msg.graph.nodes);
   buildAdjacencyMap();
@@ -872,9 +913,94 @@ function handleSetGraph(msg: SetGraphMessage) {
   } else {
     rebuildScene();
     lastStructureKey = structureKey;
+    launchMeteorArrivals(previousBookmarkIds, previousScope);
   }
 
+  knownBookmarkIds = new Set(
+    msg.graph.nodes
+      .filter((node) => node.kind === 'bookmark')
+      .map((node) => node.id)
+  );
+  lastGraphScope = msg.graph.scope ?? 'library';
+
   applyActiveSearch();
+}
+
+/**
+ * New bookmarks in a refetched graph streak in from beyond the belt as
+ * meteors instead of popping into place. Guarded so navigation moments
+ * (first graph, scope switch, bulk changes) stay quiet: this fires for
+ * genuine arrivals — e.g. a sync landing while the map is open.
+ */
+function launchMeteorArrivals(
+  previousBookmarkIds: Set<string> | null,
+  previousScope: string | null
+) {
+  if (!previousBookmarkIds || previousBookmarkIds.size === 0) return;
+  if (!currentGraph || nodeData.length === 0) return;
+  if ((currentGraph.scope ?? 'library') !== previousScope) return;
+
+  const arrivals: MapNode[] = [];
+  for (const datum of nodeData) {
+    if (datum.kind !== 'bookmark') continue;
+    if (previousBookmarkIds.has(datum.id)) continue;
+    if (arrivals.length >= METEOR_MAX_ARRIVALS) break;
+    arrivals.push(datum);
+  }
+  if (arrivals.length === 0) return;
+
+  const bounds = getGraphBounds();
+  const entryDistance = bounds
+    ? Math.max(
+        Math.abs(bounds.minX),
+        Math.abs(bounds.maxX),
+        Math.abs(bounds.minY),
+        Math.abs(bounds.maxY)
+      ) *
+        1.2 +
+      240
+    : 1600;
+
+  const now = Date.now();
+  arrivals.forEach((datum, index) => {
+    // Radial entry roughly from the node's own direction, skewed so the
+    // streak crosses some sky before capture.
+    const seed = hashOrbitMapStringToSeed(datum.id);
+    const targetX = datum.x;
+    const targetY = datum.y;
+    const baseAngle = Math.atan2(targetY, targetX);
+    const entryAngle = baseAngle + (((seed % 1000) / 1000) - 0.5) * 0.9;
+    const fromX = Math.cos(entryAngle) * entryDistance;
+    const fromY = Math.sin(entryAngle) * entryDistance;
+    const dx = targetX - fromX;
+    const dy = targetY - fromY;
+    const len = Math.hypot(dx, dy);
+    const side = seed % 2 === 0 ? 1 : -1;
+    const bend = len * 0.12 * side;
+
+    removeAnimationsFor(datum.id, 'meteor');
+    // Park the node at its entry point until its (staggered) launch.
+    datum.x = fromX;
+    datum.y = fromY;
+    activeAnimations.push({
+      id: `meteor-${datum.id}-${now}`,
+      type: 'meteor',
+      nodeId: datum.id,
+      startTime: now + index * METEOR_STAGGER_MS,
+      duration: METEOR_DURATION_MS + (seed % 400),
+      fromX,
+      fromY,
+      targetX,
+      targetY,
+      controlX: (fromX + targetX) / 2 - (len > 1 ? (dy / len) * bend : 0),
+      controlY: (fromY + targetY) / 2 + (len > 1 ? (dx / len) * bend : 0),
+    });
+  });
+
+  if (arrivals.length >= SWEEP_METEOR_THRESHOLD) {
+    startScanSweep(arrivals.map((datum) => datum.id));
+  }
+  startRenderLoop();
 }
 
 function handleSetSearch(msg: SetSearchMessage) {
@@ -1063,6 +1189,9 @@ function handleDestroy() {
   livingMapEnabled = false;
   pageVisible = true;
   lastLivingRefreshAt = 0;
+  knownBookmarkIds = null;
+  lastGraphScope = null;
+  activeSweep = null;
   app = null;
   isInitialized = false;
 }
@@ -2367,7 +2496,7 @@ function renderEffects() {
     }
 
     if (
-      anim.type === 'assign' &&
+      (anim.type === 'assign' || anim.type === 'meteor') &&
       anim.fromX !== undefined && anim.fromY !== undefined &&
       anim.targetX !== undefined && anim.targetY !== undefined
     ) {
@@ -2377,40 +2506,157 @@ function renderEffects() {
       const controlX = anim.controlX ?? (anim.fromX + anim.targetX) / 2;
       const controlY = anim.controlY ?? (anim.fromY + anim.targetY) / 2;
 
-      // Curved flight path line.
-      effectsGraphics!.moveTo(anim.fromX, anim.fromY);
-      effectsGraphics!.quadraticCurveTo(
-        controlX,
-        controlY,
-        anim.targetX,
-        anim.targetY
-      );
-      effectsGraphics!.stroke({ width: 2, color: 0x64748b, alpha: 0.24 });
+      if (anim.type === 'assign') {
+        // Curved flight path line.
+        effectsGraphics!.moveTo(anim.fromX, anim.fromY);
+        effectsGraphics!.quadraticCurveTo(
+          controlX,
+          controlY,
+          anim.targetX,
+          anim.targetY
+        );
+        effectsGraphics!.stroke({ width: 2, color: 0x64748b, alpha: 0.24 });
 
-      // Faded ghost at the original position.
-      effectsGraphics!.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
-      effectsGraphics!.fill({ color: 0x64748b, alpha: 0.14 });
-      effectsGraphics!.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
+        // Faded ghost at the original position.
+        effectsGraphics!.circle(anim.fromX, anim.fromY, datum.radius * 0.85);
+        effectsGraphics!.fill({ color: 0x64748b, alpha: 0.14 });
+        effectsGraphics!.stroke({ width: 1, color: 0x64748b, alpha: 0.25 });
+      }
 
       // Comet trail behind the flying node. Samples in eased-progress space,
-      // so the trail stretches while fast and tightens on arrival.
-      const eased = easeOrbitMapOutCubic(getOrbitMapAnimationProgress(anim));
-      const trailColor = mixOrbitMapColors(datum.visual.color, 0xffffff, 0.4);
-      for (let k = 1; k <= 7; k++) {
-        const t = eased - k * 0.05;
+      // so the trail stretches while fast and tightens on arrival. Meteors
+      // burn hotter and longer than assign flights.
+      const eased = easeOrbitMapOutCubic(
+        Math.max(0, getOrbitMapAnimationProgress(anim))
+      );
+      const isMeteor = anim.type === 'meteor';
+      const trailColor = mixOrbitMapColors(
+        datum.visual.color,
+        isMeteor ? 0xfff7ed : 0xffffff,
+        isMeteor ? 0.6 : 0.4
+      );
+      const trailSteps = isMeteor ? 10 : 7;
+      const trailSpacing = isMeteor ? 0.035 : 0.05;
+      for (let k = 1; k <= trailSteps; k++) {
+        const t = eased - k * trailSpacing;
         if (t <= 0) break;
         effectsAdditiveGraphics!.circle(
           getQuadraticPoint(anim.fromX, controlX, anim.targetX, t),
           getQuadraticPoint(anim.fromY, controlY, anim.targetY, t),
-          Math.max(0.6, datum.radius * (0.85 - k * 0.1))
+          Math.max(0.6, datum.radius * (0.9 - k * (0.8 / trailSteps)))
         );
         effectsAdditiveGraphics!.fill({
           color: trailColor,
-          alpha: 0.5 * (1 - k / 8),
+          alpha: (isMeteor ? 0.6 : 0.5) * (1 - k / (trailSteps + 1)),
         });
       }
     }
   });
+
+  renderScanSweep();
+}
+
+/**
+ * Radar sweep: an additive beam rotates once around the core; bookmarks
+ * glint as the leading edge passes their sky angle. Draws into the pooled
+ * effects layers — nothing is allocated per frame.
+ */
+function renderScanSweep() {
+  if (!activeSweep || !effectsAdditiveGraphics) return;
+
+  const progress = getOrbitMapAnimationProgress(activeSweep);
+  if (progress >= 1) {
+    activeSweep = null;
+    return;
+  }
+
+  const sweepAngle = progress * Math.PI * 2 - Math.PI / 2;
+  const { maxRadius } = activeSweep;
+  const beamColor = mixOrbitMapColors(getPaletteAccent(), 0xffffff, 0.3);
+
+  // Beam: three nested wedges approximate a falloff behind the leading edge.
+  for (let band = 0; band < 3; band++) {
+    const span = SWEEP_TRAIL_RAD * (1 - band * 0.3);
+    effectsAdditiveGraphics.moveTo(0, 0);
+    effectsAdditiveGraphics.arc(0, 0, maxRadius, sweepAngle - span, sweepAngle);
+    effectsAdditiveGraphics.lineTo(0, 0);
+    effectsAdditiveGraphics.fill({ color: beamColor, alpha: 0.022 });
+  }
+  // Leading edge line.
+  effectsAdditiveGraphics.moveTo(0, 0);
+  effectsAdditiveGraphics.lineTo(
+    Math.cos(sweepAngle) * maxRadius,
+    Math.sin(sweepAngle) * maxRadius
+  );
+  effectsAdditiveGraphics.stroke({ width: 1.5, color: beamColor, alpha: 0.4 });
+
+  // Glints: nodes light up as the beam passes and fade over the trail width.
+  const swept = progress * Math.PI * 2;
+  for (const glint of activeSweep.glints) {
+    const offset = glint.angle - swept;
+    if (offset > 0 || offset < -SWEEP_TRAIL_RAD) continue;
+    const strength = 1 + offset / SWEEP_TRAIL_RAD;
+    const datum = nodeById.get(glint.id);
+    if (!datum) continue;
+    effectsAdditiveGraphics.circle(glint.x, glint.y, datum.radius + 2.5);
+    effectsAdditiveGraphics.fill({ color: beamColor, alpha: 0.55 * strength });
+  }
+}
+
+/** Sky position for sweep glints — meteors use their landing slot, not entry. */
+function resolveSweepGlintPosition(
+  nodeId: string,
+  datum: MapNode
+): { x: number; y: number } {
+  for (const anim of activeAnimations) {
+    if (
+      anim.type === 'meteor' &&
+      anim.nodeId === nodeId &&
+      anim.targetX !== undefined &&
+      anim.targetY !== undefined
+    ) {
+      return { x: anim.targetX, y: anim.targetY };
+    }
+  }
+  return { x: datum.x, y: datum.y };
+}
+
+/** Starts the radar sweep over the given nodes (or all bookmarks). */
+function startScanSweep(nodeIds?: string[] | null) {
+  if (nodeData.length === 0) return;
+
+  const bounds = getGraphBounds();
+  const maxRadius = bounds
+    ? Math.max(
+        Math.abs(bounds.minX),
+        Math.abs(bounds.maxX),
+        Math.abs(bounds.minY),
+        Math.abs(bounds.maxY)
+      ) + 60
+    : 1400;
+
+  // Angles measured from the beam's start position (top, -π/2), normalized
+  // to [0, 2π) so the glint check is a simple window test.
+  const glints: Array<{ id: string; angle: number; x: number; y: number }> = [];
+  const source = nodeIds
+    ? nodeIds.map((id) => nodeById.get(id)).filter(Boolean)
+    : nodeData.filter((datum) => datum.kind === 'bookmark');
+  for (const datum of source) {
+    if (glints.length >= SWEEP_MAX_GLINTS) break;
+    if (!datum) continue;
+    const { x, y } = resolveSweepGlintPosition(datum.id, datum);
+    const angle =
+      (Math.atan2(y, x) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
+    glints.push({ id: datum.id, angle, x, y });
+  }
+
+  activeSweep = {
+    startTime: Date.now(),
+    duration: SWEEP_DURATION_MS,
+    maxRadius,
+    glints,
+  };
+  startRenderLoop();
 }
 
 /* ============================================================
@@ -2527,7 +2773,8 @@ function startRenderLoop() {
     if (
       activeAnimations.length > 0 ||
       entranceStartedAt !== null ||
-      isEdgeRevealActive()
+      isEdgeRevealActive() ||
+      isSweepActive()
     ) {
       updateNodeStyles();
       requestAnimationFrame(tick);
@@ -2589,15 +2836,20 @@ function updateAnimations() {
       return;
     }
 
-    const progress = getOrbitMapAnimationProgress(anim, now);
+    // Staggered starts (meteor batches) park at t = 0 until their turn.
+    const progress = Math.max(0, getOrbitMapAnimationProgress(anim, now));
 
     if (
-      (anim.type === 'assign' || anim.type === 'return') &&
+      (anim.type === 'assign' || anim.type === 'return' || anim.type === 'meteor') &&
       anim.fromX !== undefined && anim.fromY !== undefined &&
       anim.targetX !== undefined && anim.targetY !== undefined
     ) {
       const t = easeOrbitMapOutCubic(progress);
-      if (anim.type === 'assign' && anim.controlX !== undefined && anim.controlY !== undefined) {
+      if (
+        anim.type !== 'return' &&
+        anim.controlX !== undefined &&
+        anim.controlY !== undefined
+      ) {
         datum.x = getQuadraticPoint(anim.fromX, anim.controlX, anim.targetX, t);
         datum.y = getQuadraticPoint(anim.fromY, anim.controlY, anim.targetY, t);
       } else {
@@ -2611,9 +2863,10 @@ function updateAnimations() {
 
       if (progress >= 1) {
         toRemove.push(index);
+        // Living map: continue the orbit from wherever the flight landed
+        // instead of snapping back to a stale angle on the next tick.
+        rebaseOrbitFromPosition(anim.nodeId);
         if (anim.type === 'assign') {
-          // Living map: continue the orbit from wherever the assign landed.
-          rebaseOrbitFromPosition(anim.nodeId);
           delete datum.scale;
           pushPulse(anim.nodeId);
           postToMain({
@@ -2621,6 +2874,8 @@ function updateAnimations() {
             protocolVersion: 1,
             bookmarkId: anim.nodeId,
           });
+        } else if (anim.type === 'meteor') {
+          pushPulse(anim.nodeId, 520);
         }
       }
     }

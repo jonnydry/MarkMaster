@@ -49,6 +49,9 @@ export interface OrbitMapCanvasHandle {
   focusOn: (input: string | { kind: string; id: string } | OrbitMapSelection) => void;
   resetView: () => void;
   animateAssign: (bookmarkId: string, anchorId: string) => Promise<void>;
+  /** Radar sweep across the sky; the given nodes glint as the beam passes
+   * (all bookmarks when omitted). For scan/triage visualizations. */
+  playScanSweep: (nodeIds?: string[]) => void;
 }
 
 // Re-export shared types so pages can import them from this component (for backward compatibility)
@@ -853,6 +856,13 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             protocolVersion: 1,
           });
         }
+      },
+      playScanSweep: (nodeIds?: string[]) => {
+        workerRef.current?.postMessage({
+          type: WorkerMessageType.PLAY_SCAN_SWEEP,
+          protocolVersion: 1,
+          nodeIds: nodeIds ?? null,
+        });
       },
       animateAssign: async (bookmarkId: string, anchorId: string) => {
         if (!workerRef.current) {

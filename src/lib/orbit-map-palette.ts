@@ -56,8 +56,8 @@ const DEFAULT_ACCENT_DARK = 0x2f6fed;
 const DEFAULT_ACCENT_SOFT_DARK = 0xbfdbfe;
 const DEFAULT_ACCENT_LIGHT = 0x2563eb;
 const DEFAULT_ACCENT_SOFT_LIGHT = 0x93c5fd;
-/** Visible but subtle — space-black with a theme wash. */
-const MAP_CANVAS_TINT_DARK = 0.08;
+/** Barely-there theme wash on space-black. */
+const MAP_CANVAS_TINT_DARK = 0.04;
 const MAP_CANVAS_TINT_LIGHT = 0.06;
 
 /** Space-black / soft-gray canvas fill with a slight accent tint. */
