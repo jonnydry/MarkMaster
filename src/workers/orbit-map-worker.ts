@@ -328,6 +328,9 @@ interface MapAnimation {
 
 const activeAnimations: MapAnimation[] = [];
 let renderLoopRunning = false;
+/** Transient render-frame failures tolerated before the loop gives up. */
+const MAX_CONSECUTIVE_FRAME_ERRORS = 30;
+let consecutiveFrameErrors = 0;
 
 /** Focused-edge curves cached by drawLinks for the energy-flow particles. */
 interface FocusedEdgeCurve {
@@ -501,6 +504,10 @@ function refreshCameraDuringGesture() {
   if (!app) return;
   applyCameraTransform();
   app.renderer.render(app.stage);
+  // This render just presented the stage; stamp the capped-frame clock so
+  // a concurrently running ambient/living loop doesn't render again in the
+  // same display frame (pan gestures stay 60fps, total renders don't stack).
+  lastAmbientFrameAt = Date.now();
   postCameraChangedThrottled();
 }
 
@@ -793,6 +800,7 @@ function handleInit(msg: InitMessage) {
         type: MainMessageType.ERROR,
         protocolVersion: 1,
         message: 'Failed to initialize Pixi Application: ' + String(err),
+        fatal: true,
       });
     });
   } catch (err) {
@@ -800,6 +808,7 @@ function handleInit(msg: InitMessage) {
       type: MainMessageType.ERROR,
       protocolVersion: 1,
       message: 'Worker initialization failed: ' + String(err),
+      fatal: true,
     });
   }
 }
@@ -944,7 +953,10 @@ function launchMeteorArrivals(
   for (const datum of nodeData) {
     if (datum.kind !== 'bookmark') continue;
     if (previousBookmarkIds.has(datum.id)) continue;
-    if (arrivals.length >= METEOR_MAX_ARRIVALS) break;
+    // Exceeding the cap means this is a bulk change (import, big sync) —
+    // navigation-scale, not arrivals. Stay quiet entirely rather than
+    // raining a token 12 meteors while the rest pop in place.
+    if (arrivals.length >= METEOR_MAX_ARRIVALS) return;
     arrivals.push(datum);
   }
   if (arrivals.length === 0) return;
@@ -1656,18 +1668,28 @@ function advanceOrbits(now: number) {
 }
 
 /**
- * Continues a node's orbit from wherever an assign flight dropped it, instead
- * of snapping back to the pre-animation angle.
+ * Re-phases a node's orbit so it continues from where a return/meteor flight
+ * landed. Only theta is rebased: the landing point is on (or within wobble
+ * range of) the node's own shell, and keeping the canonical radius prevents
+ * transient wobble offsets from being baked into the orbit.
  */
-function rebaseOrbitFromPosition(nodeId: string) {
+function rebaseOrbitTheta(nodeId: string) {
   const orbit = orbitStates.get(nodeId);
   const datum = nodeById.get(nodeId);
   if (!orbit || !datum) return;
-  const dx = datum.x - orbit.cx;
-  const dy = datum.y - orbit.cy;
-  orbit.r = Math.hypot(dx, dy);
   orbit.theta0 =
-    Math.atan2(dy, dx) - orbit.omega * ((Date.now() - orbitEpoch) / 1000);
+    Math.atan2(datum.y - orbit.cy, datum.x - orbit.cx) -
+    orbit.omega * ((Date.now() - orbitEpoch) / 1000);
+}
+
+/**
+ * Drops a node's orbit entirely. Used when an assign flight docks a bookmark
+ * onto a new hub: its old orbit (center, speed, belt wobble) is meaningless
+ * there, so it holds position until the refetch rebuilds proper orbits —
+ * rather than sliding away around the stale center.
+ */
+function releaseOrbit(nodeId: string) {
+  orbitStates.delete(nodeId);
 }
 
 function applyHubLabelRanks() {
@@ -2664,9 +2686,10 @@ function startScanSweep(nodeIds?: string[] | null) {
    ============================================================ */
 
 /** True while time-based ambient visuals (selection reticle spin + edge
- * particles) should keep the loop alive after one-shot animations finish. */
+ * particles) should keep the loop alive after one-shot animations finish.
+ * Hidden pages have no ambient motion — the loop must wind down. */
 function hasAmbientMotion() {
-  return currentSelection !== null && nodeData.length > 0;
+  return pageVisible && currentSelection !== null && nodeData.length > 0;
 }
 
 /**
@@ -2751,31 +2774,27 @@ function renderAmbientFrame() {
 function startRenderLoop() {
   if (renderLoopRunning || !app) return;
   renderLoopRunning = true;
+  consecutiveFrameErrors = 0;
 
-  const tick = () => {
-    if (!app) {
-      renderLoopRunning = false;
-      return;
-    }
-
+  const tickFrame = () => {
     const now = Date.now();
     const living = isLivingActive();
-    if (living) {
-      // Orbits and corona advance analytically before any branch renders,
-      // so motion never freezes during one-shot animations or entrances.
-      advanceOrbits(now);
-      animateCorona(now);
-    }
 
     const hadAnimations = activeAnimations.length > 0;
     updateAnimations();
 
+    // Heavy path (uncapped): one-shot flights, the entrance, and the edge
+    // trace-in restyle real node/link state every frame. Orbits advance
+    // only on frames that render, so no motion work is discarded.
     if (
       activeAnimations.length > 0 ||
       entranceStartedAt !== null ||
-      isEdgeRevealActive() ||
-      isSweepActive()
+      isEdgeRevealActive()
     ) {
+      if (living) {
+        advanceOrbits(now);
+        animateCorona(now);
+      }
       updateNodeStyles();
       requestAnimationFrame(tick);
       return;
@@ -2784,36 +2803,63 @@ function startRenderLoop() {
     if (hadAnimations) {
       // One-shot animations just finished (possibly with the ambient loop
       // still alive): settle styles and sync moved nodes to the minimap.
+      if (living) {
+        advanceOrbits(now);
+        animateCorona(now);
+      }
       updateNodeStyles();
       sendLayoutUpdate(true);
       requestAnimationFrame(tick);
       return;
     }
 
-    if (living) {
-      // Living-map motion is slow; cap at ~30fps to halve idle GPU work.
+    // Capped path (~30fps): orbital drift, reticle spin, particles, glow
+    // breathing, and the radar sweep only mutate the effects/ring layers
+    // (plus orbit positions when living) — half the GPU work, invisible
+    // for motion this slow. The sweep runs here too instead of forcing
+    // full style passes. All of it pauses while the page is hidden.
+    if (living || hasAmbientMotion() || (pageVisible && isSweepActive())) {
       if (now - lastAmbientFrameAt >= AMBIENT_FRAME_MIN_MS) {
         lastAmbientFrameAt = now;
-        renderLivingFrame(now);
+        if (living) {
+          advanceOrbits(now);
+          animateCorona(now);
+          renderLivingFrame(now);
+        } else {
+          renderAmbientFrame();
+        }
       }
       requestAnimationFrame(tick);
       return;
     }
 
-    if (hasAmbientMotion()) {
-      // Ambient motion is slow; cap it at ~30fps to halve idle GPU work.
-      if (now - lastAmbientFrameAt >= AMBIENT_FRAME_MIN_MS) {
-        lastAmbientFrameAt = now;
-        renderAmbientFrame();
-      }
-      requestAnimationFrame(tick);
-      return;
-    }
-
-    updateNodeStyles();
-    renderLoopRunning = false;
     // Drag returns / assign flights may have moved nodes — sync the minimap.
+    updateNodeStyles();
     sendLayoutUpdate(true);
+    renderLoopRunning = false;
+  };
+
+  const tick = () => {
+    if (!app) {
+      renderLoopRunning = false;
+      return;
+    }
+    try {
+      tickFrame();
+      consecutiveFrameErrors = 0;
+    } catch (error) {
+      // A transient frame error (GPU reset, context loss mid-frame) must
+      // not escape to worker.onerror — the host treats that as fatal and
+      // permanently swaps the map for the unsupported-browser fallback.
+      // Log, retry, and only stop the loop on a persistent failure.
+      consecutiveFrameErrors += 1;
+      console.error('[OrbitWorker] Render frame failed:', error);
+      if (consecutiveFrameErrors >= MAX_CONSECUTIVE_FRAME_ERRORS) {
+        renderLoopRunning = false;
+        return;
+      }
+      requestAnimationFrame(tick);
+    }
   };
 
   tick();
@@ -2863,10 +2909,10 @@ function updateAnimations() {
 
       if (progress >= 1) {
         toRemove.push(index);
-        // Living map: continue the orbit from wherever the flight landed
-        // instead of snapping back to a stale angle on the next tick.
-        rebaseOrbitFromPosition(anim.nodeId);
         if (anim.type === 'assign') {
+          // The node docked onto a different hub; its old orbit no longer
+          // applies — hold position until the refetch rebuilds orbits.
+          releaseOrbit(anim.nodeId);
           delete datum.scale;
           pushPulse(anim.nodeId);
           postToMain({
@@ -2875,6 +2921,10 @@ function updateAnimations() {
             bookmarkId: anim.nodeId,
           });
         } else if (anim.type === 'meteor') {
+          // Meteor landed on the node's shell — re-phase so drift continues
+          // from the capture point. Return flights skip this: orbit state was
+          // never changed during the drag and still matches the cluster.
+          rebaseOrbitTheta(anim.nodeId);
           pushPulse(anim.nodeId, 520);
         }
       }

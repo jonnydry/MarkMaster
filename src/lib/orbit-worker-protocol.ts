@@ -558,6 +558,12 @@ export interface ErrorMessage {
   protocolVersion: number;
   message: string;
   stack?: string;
+  /**
+   * True only for unrecoverable failures (renderer init). The host swaps to
+   * the unsupported-browser fallback ONLY for fatal errors; everything else
+   * (validation rejects, transient frame errors) is logged and survived.
+   */
+  fatal?: boolean;
 }
 
 export interface SelectionChangedMessage {

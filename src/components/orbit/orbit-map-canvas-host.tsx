@@ -340,6 +340,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
               case MainMessageType.ERROR: {
                 console.error('[OrbitMapHost] Worker error:', msg);
+                // Only unrecoverable failures (init) take down the map;
+                // validation rejects and transient frame errors are logged
+                // and survived rather than permanently swapping in the
+                // unsupported-browser fallback.
+                if (!msg.fatal) break;
                 const container = canvas.parentElement;
                 if (container) container.style.cursor = 'default';
                 setUseFallback(true);
