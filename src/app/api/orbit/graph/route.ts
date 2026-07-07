@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rateLimitResult = await checkRateLimit("orbit", user.id);
+  const rateLimitResult = await checkRateLimit("orbit:graph", user.id);
   if (!rateLimitResult.success) {
     return createRateLimitResponse(rateLimitResult);
   }

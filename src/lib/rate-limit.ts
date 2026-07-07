@@ -11,7 +11,13 @@ import { logError } from "@/lib/logger";
  * so it is heavily restricted. Orbit scans are more generous.
  */
 
-export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write" | "csp-report";
+export type RateLimitAction =
+  | "sync"
+  | "orbit"
+  | "orbit:graph"
+  | "api:read"
+  | "api:write"
+  | "csp-report";
 
 /**
  * Actions exposed by the debug reset endpoint.
@@ -20,6 +26,7 @@ export type RateLimitAction = "sync" | "orbit" | "api:read" | "api:write" | "csp
 export const DEBUG_RATE_LIMIT_ACTIONS = [
   "sync",
   "orbit",
+  "orbit:graph",
   "api:read",
   "api:write",
 ] as const satisfies readonly RateLimitAction[];
@@ -46,6 +53,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 10,
     window: "1 d",
     description: "Orbit scans - more generous than syncs",
+  },
+  "orbit:graph": {
+    requests: 120,
+    window: "1 h",
+    description: "Orbit map graph reads - expensive graph generation",
   },
   "api:read": {
     requests: 100,
@@ -101,6 +113,15 @@ function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
         ),
         analytics: true,
         prefix: "ratelimit:orbit",
+      }),
+      "orbit:graph": new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES["orbit:graph"].requests,
+          POLICIES["orbit:graph"].window
+        ),
+        analytics: true,
+        prefix: "ratelimit:orbit-graph",
       }),
       "api:read": new Ratelimit({
         redis: r,

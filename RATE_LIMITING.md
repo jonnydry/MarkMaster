@@ -8,7 +8,8 @@ MarkMaster uses **per-user rate limiting** backed by Upstash Redis to protect ex
 |-----------------|--------------------|-------------|-------|
 | **Sync**        | 1 request          | 30 minutes  | Most expensive operation |
 | **Orbit Scan**  | 10 requests        | 1 day       | More generous than sync |
-| **API Reads**   | 100 requests       | 5 minutes   | General data fetching (bookmarks, analytics, export, orbit/graph) |
+| **Orbit Graph** | 120 requests       | 1 hour      | Orbit map graph reads (GET `/api/orbit/graph`) |
+| **API Reads**   | 100 requests       | 5 minutes   | General data fetching (bookmarks, analytics, export, etc.) |
 | **API Writes**  | 30 requests        | 5 minutes   | Creating/updating tags, collections, notes, etc. |
 
 These limits are **per user**.
@@ -18,6 +19,7 @@ These limits are **per user**.
 **Special expensive operations** (with dedicated tight limits):
 - `POST /api/bookmarks/sync` → `"sync"` + global sync cap
 - `POST /api/orbit/scan` → `"orbit"` + global orbit cap
+- `GET /api/orbit/graph` → `"orbit:graph"` (120 req/hour)
 
 **General API**:
 - Most `GET` routes → `"api:read"`
@@ -31,6 +33,7 @@ These limits are **per user**.
 - `/api/export`
 - `/api/notes` (POST + DELETE)
 - `/api/orbit/scan`
+- `/api/orbit/graph`
 - `/api/tags` (POST/PATCH/DELETE)
 
 **Routes with only global IP protection** (via middleware) — these were added during final review:
@@ -38,7 +41,6 @@ These limits are **per user**.
 - `/api/collections/[id]` (PATCH)
 - `/api/collections/[id]/copy`
 - `/api/collections/[id]/publish`
-- `/api/orbit/graph` (GET)
 
 **Intentionally unprotected or lightly protected**:
 - `/api/auth/*` (OAuth flows)
@@ -100,12 +102,9 @@ Possible enhancements for when the app is public or has more users:
 - More granular per-route or per-action limits (e.g., heavier limits on export)
 - Admin dashboard for monitoring usage (`/debug/rate-limits` is currently internal)
 - Automatic notifications when users frequently hit limits
-- Better reset mechanism for the debug tool (currently uses a timestamp hack)
 
-**Note on Collections & Orbit Graph**: Some collection mutation routes (`/api/collections/[id]/items`, copy, publish, PATCH) and `/api/orbit/graph` currently rely only on the global IP limit rather than per-user limits. These were added during the final review and may be tightened with explicit per-user policies in the future if abuse patterns emerge.
-
-**Debug Reset Mechanism**: The reset functionality in `/api/debug/rate-limits` uses a timestamp-based key trick to force a new bucket. This is documented in the code as a pragmatic solution for the internal tool.
+**Note on Collections**: Some collection mutation routes (`/api/collections/[id]/items`, copy, publish, PATCH) currently rely only on the global IP limit rather than per-user limits. These may be tightened with explicit per-user policies if abuse patterns emerge.
 
 ---
 
-**Last updated**: April 2026 (after full Security Hardening phase)
+**Last updated**: July 2026 (Orbit graph bucket + sync worker cron support)

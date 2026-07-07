@@ -16,6 +16,21 @@ export const runtime = "nodejs";
 
 const ALLOWED_HOSTS = new Set(["video.twimg.com", "pbs.twimg.com"]);
 
+const MAX_MEDIA_PROXY_SIZE_BYTES = 150 * 1024 * 1024; // 150 MB — enough for long videos, bounded
+const MEDIA_PROXY_TIMEOUT_MS = 15_000;
+
+const ALLOWED_CONTENT_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/ogg",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+  "application/octet-stream",
+]);
 /** Headers worth forwarding from the upstream response to the client. */
 const PASSTHROUGH_RESPONSE_HEADERS = [
   "content-type",
@@ -68,8 +83,16 @@ export async function GET(req: NextRequest) {
       // hotlink 403). Do not add one.
       redirect: "follow",
       cache: "no-store",
+      signal: AbortSignal.timeout(MEDIA_PROXY_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    // Node.js fetch aborts throw AbortError; some runtimes use TimeoutError.
+    const isTimeout =
+      error instanceof DOMException &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
+    if (isTimeout) {
+      return NextResponse.json({ error: "Upstream timeout" }, { status: 504 });
+    }
     return NextResponse.json({ error: "Upstream fetch failed" }, { status: 502 });
   }
 
@@ -85,6 +108,28 @@ export async function GET(req: NextRequest) {
       { error: "Upstream error" },
       { status: upstream.status === 404 ? 404 : 502 }
     );
+  }
+
+  const upstreamContentType = upstream.headers.get("content-type");
+  if (upstreamContentType) {
+    const baseType = upstreamContentType.split(";")[0].trim().toLowerCase();
+    if (!ALLOWED_CONTENT_TYPES.has(baseType)) {
+      return NextResponse.json(
+        { error: "Unsupported media type" },
+        { status: 502 }
+      );
+    }
+  }
+
+  const upstreamContentLength = upstream.headers.get("content-length");
+  if (upstreamContentLength) {
+    const length = Number.parseInt(upstreamContentLength, 10);
+    if (Number.isFinite(length) && length > MAX_MEDIA_PROXY_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: "Media too large" },
+        { status: 413 }
+      );
+    }
   }
 
   const headers = new Headers();

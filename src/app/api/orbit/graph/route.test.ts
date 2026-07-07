@@ -7,9 +7,19 @@ const { graphRouteCacheStore } = vi.hoisted(() => ({
   graphRouteCacheStore: new Map<string, unknown>(),
 }));
 
+const checkRateLimitMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1" })),
 }));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    checkRateLimit: checkRateLimitMock,
+  };
+});
 
 vi.mock("@/lib/upstash-cache", () => ({
   getUserCacheVersion: vi.fn(async () => 1),
@@ -44,6 +54,12 @@ describe("/api/orbit/graph", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     graphRouteCacheStore.clear();
+    checkRateLimitMock.mockResolvedValue({
+      success: true,
+      limit: 120,
+      remaining: 119,
+      reset: Date.now() + 3600000,
+    });
   });
 
   it("treats X-folder-only bookmarks as loose while preserving folder edges", async () => {
@@ -333,5 +349,46 @@ describe("/api/orbit/graph", () => {
     expect(response.status).toBe(400);
     expect(payload.error).toBe("Invalid query parameters");
     expect(prisma.bookmark.findMany).not.toHaveBeenCalled();
+  });
+
+  it("uses the orbit:graph rate limit bucket, not the orbit scan bucket", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph")
+    );
+
+    expect(response.status).toBe(200);
+    expect(checkRateLimitMock).toHaveBeenCalledWith("orbit:graph", "user-1");
+    expect(checkRateLimitMock).not.toHaveBeenCalledWith(
+      "orbit",
+      expect.anything()
+    );
+  });
+
+  it("returns 429 when the orbit:graph rate limit is exceeded", async () => {
+    const { GET } = await import("./route");
+    checkRateLimitMock.mockResolvedValue({
+      success: false,
+      limit: 120,
+      remaining: 0,
+      reset: Date.now() + 60000,
+      retryAfter: 60,
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph")
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(payload.error).toBe("Too Many Requests");
+    expect(checkRateLimitMock).toHaveBeenCalledWith("orbit:graph", "user-1");
   });
 });

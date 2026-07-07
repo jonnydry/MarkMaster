@@ -261,18 +261,19 @@ function timingSafeStringEqual(a: string, b: string) {
 }
 
 export function isSyncWorkerAuthorized(request: Request) {
-  const secret = process.env.SYNC_WORKER_SECRET?.trim();
-  if (!secret) {
+  const allowedSecrets = [
+    process.env.SYNC_WORKER_SECRET?.trim(),
+    process.env.CRON_SECRET?.trim(),
+  ].filter((secret): secret is string => Boolean(secret));
+
+  if (allowedSecrets.length === 0) {
     return process.env.NODE_ENV !== "production";
   }
 
   const auth = request.headers.get("authorization");
   if (!auth) return false;
 
-  if (timingSafeStringEqual(auth, `Bearer ${secret}`)) {
-    return true;
-  }
-
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  return Boolean(cronSecret && timingSafeStringEqual(auth, `Bearer ${cronSecret}`));
+  return allowedSecrets.some((secret) =>
+    timingSafeStringEqual(auth, `Bearer ${secret}`)
+  );
 }

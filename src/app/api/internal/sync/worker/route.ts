@@ -9,17 +9,21 @@ import {
 /** Dedicated invocation budget for long-running sync work. */
 export const maxDuration = 300;
 
-export async function POST(req: NextRequest) {
+async function handleWorkerRequest(req: NextRequest) {
   if (!isSyncWorkerAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Vercel Cron invokes this route via GET without a body. Only parse JSON
+  // on POST so callers can target a specific runId; GET always drains pending.
   let runId: string | undefined;
-  try {
-    const body = (await req.json()) as { runId?: string };
-    runId = body.runId;
-  } catch {
-    runId = undefined;
+  if (req.method === "POST") {
+    try {
+      const body = (await req.json()) as { runId?: string };
+      runId = body.runId;
+    } catch {
+      runId = undefined;
+    }
   }
 
   if (runId) {
@@ -32,4 +36,12 @@ export async function POST(req: NextRequest) {
     drained: results.filter((result) => result.processed).length,
     results,
   });
+}
+
+export async function GET(req: NextRequest) {
+  return handleWorkerRequest(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handleWorkerRequest(req);
 }

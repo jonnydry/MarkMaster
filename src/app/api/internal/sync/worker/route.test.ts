@@ -18,7 +18,7 @@ describe("/api/internal/sync/worker", () => {
     processPendingSyncRunsMock.mockResolvedValue([{ processed: true, runId: "run-2" }]);
   });
 
-  it("rejects unauthenticated worker requests", async () => {
+  it("rejects unauthenticated POST worker requests", async () => {
     const { POST } = await import("./route");
 
     const response = await POST(
@@ -32,7 +32,20 @@ describe("/api/internal/sync/worker", () => {
     expect(processSyncRunMock).not.toHaveBeenCalled();
   });
 
-  it("processes a specific queued run", async () => {
+  it("rejects unauthenticated GET cron requests", async () => {
+    const { GET } = await import("./route");
+
+    const response = await GET(
+      new Request("http://localhost/api/internal/sync/worker", {
+        method: "GET",
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(processPendingSyncRunsMock).not.toHaveBeenCalled();
+  });
+
+  it("processes a specific queued run via POST", async () => {
     const { POST } = await import("./route");
 
     const response = await POST(
@@ -51,7 +64,26 @@ describe("/api/internal/sync/worker", () => {
     expect(processSyncRunMock).toHaveBeenCalledWith("run-1");
   });
 
-  it("drains pending runs when no runId is provided", async () => {
+  it("drains pending runs via GET (Vercel Cron) without a body", async () => {
+    const { GET } = await import("./route");
+
+    const response = await GET(
+      new Request("http://localhost/api/internal/sync/worker", {
+        method: "GET",
+        headers: { Authorization: "Bearer test-secret" },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      drained: 1,
+      results: [{ processed: true, runId: "run-2" }],
+    });
+    expect(processPendingSyncRunsMock).toHaveBeenCalledWith(3);
+    expect(processSyncRunMock).not.toHaveBeenCalled();
+  });
+
+  it("drains pending runs via POST when no runId is provided", async () => {
     const { POST } = await import("./route");
 
     const response = await POST(
