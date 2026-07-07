@@ -1,17 +1,16 @@
 "use client";
 
 import { forwardRef, type ReactNode } from "react";
-import Link from "next/link";
 import {
   CheckSquare,
   Loader2,
-  Map as MapIcon,
   RefreshCw,
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitPageIdentity } from "@/components/orbit/orbit-page-identity";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
+import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
@@ -28,7 +27,6 @@ import {
 } from "@/components/feed-toolbar-layout";
 import {
   appContentGutterClassName,
-  appToolbarControlBoxClassName,
   appToolbarControlExpandedClassName,
   appToolbarControlHeightClassName,
   appToolbarSurfaceClassName,
@@ -243,21 +241,12 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
             />
           </div>
         )}
-        <Link
-          href={mapHref}
-          aria-label="Open graph"
-          title="Open graph"
-          className={cn(
-            buttonVariants({
-              variant: "outline",
-              size: compact ? "icon" : "icon-lg",
-            }),
-            appToolbarSurfaceClassName,
-            appToolbarControlBoxClassName(compact)
-          )}
-        >
-          <MapIcon className="size-4 text-primary" aria-hidden />
-        </Link>
+        <OrbitModeSwitch
+          active="queue"
+          size={compact ? "sm" : "md"}
+          mapHref={mapHref}
+          className={appToolbarSurfaceClassName}
+        />
         <ToolbarIconButton
           active={selectionMode}
           pressed={selectionMode}

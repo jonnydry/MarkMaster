@@ -50,7 +50,7 @@ interface OrbitMapRailProps {
   onOpenBookmark: (bookmarkId: string) => void;
   onClearSelection: () => void;
   copyingCollectionId?: string | null;
-  variant?: "rail" | "overlay";
+  variant?: "rail" | "overlay" | "dock";
   className?: string;
 }
 
@@ -96,23 +96,28 @@ export function OrbitMapRail({
       connectedNodeIdsById
     );
   }, [activeNode, connectedNodeIdsById, nodeById]);
-  const isOverlay = variant === "overlay";
+  // Both floating variants (mobile bottom-sheet overlay + desktop right dock)
+  // render on glass, so the inner body drops its own surface.
+  const floating = variant !== "rail";
 
   return (
     <aside
       className={cn(
-        isOverlay
-          ? cn(
-              "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 animate-orbit-slide-in-right backdrop-blur-2xl [scrollbar-width:thin]",
-              appOverlayPanelClassName,
-              orbitHairlineBorder(),
-              "bg-surface-1/90"
-            )
-          : "flex min-w-0 w-full flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin] lg:w-[300px] lg:shrink-0 xl:w-[320px]",
+        variant === "overlay" &&
+          cn(
+            "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 animate-orbit-slide-in-right backdrop-blur-2xl [scrollbar-width:thin]",
+            appOverlayPanelClassName,
+            orbitHairlineBorder(),
+            "bg-surface-1/90"
+          ),
+        variant === "dock" &&
+          "map-glass pointer-events-auto flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-sm p-4 animate-orbit-slide-in-right [scrollbar-width:thin]",
+        variant === "rail" &&
+          "flex min-w-0 w-full flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin] lg:w-[300px] lg:shrink-0 xl:w-[320px]",
         className
       )}
     >
-      <section className={panelClass(isOverlay)}>
+      <section className={panelClass(floating)}>
         <SelectedClusterBody
           node={activeNode}
           stats={data.stats}
@@ -128,7 +133,7 @@ export function OrbitMapRail({
           onOpenBookmark={onOpenBookmark}
           onClearSelection={onClearSelection}
           copyingCollectionId={copyingCollectionId}
-          isOverlay={isOverlay}
+          isOverlay={floating}
 
         />
       </section>

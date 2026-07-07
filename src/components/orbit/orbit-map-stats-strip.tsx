@@ -39,7 +39,7 @@ export function OrbitMapStatsStrip({
       <div
         className={cn(
           orbitMapFloatingShellClass(),
-          "pointer-events-none absolute right-3 top-3 z-10 flex max-w-[calc(100%-7.5rem)] items-center gap-3 overflow-x-auto px-2.5 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:max-w-[calc(100%-14rem)] lg:hidden [&::-webkit-scrollbar]:hidden"
+          "pointer-events-none absolute bottom-4 left-3 z-20 flex max-w-[calc(100%-7.5rem)] items-center gap-3 overflow-x-auto px-2.5 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
         )}
       >
         <CompactMetric label="Loose" value={stats.looseBookmarks} />

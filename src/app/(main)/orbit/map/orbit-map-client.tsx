@@ -10,18 +10,16 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
-import { appContentInsetClassName } from "@/lib/app-chrome";
 import { orbitMapStageClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import { PageWatermark } from "@/components/page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
-import { PageHeader } from "@/components/page-header";
 import {
   ORBIT_MAP_SHORTCUT_GROUPS,
   useOrbitMapPage,
 } from "@/hooks/use-orbit-map-page";
-import { OrbitMapCommandBar } from "@/components/orbit/orbit-map-command-bar";
+import { OrbitMapConsole } from "@/components/orbit/orbit-map-console";
 import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
 import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
@@ -108,7 +106,6 @@ export default function OrbitMapPage() {
     handleSearchResults,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
-    headerDescription,
     lastSyncAt,
     stageRef,
     stageSize,
@@ -163,6 +160,11 @@ export default function OrbitMapPage() {
     copyingCollectionId,
   };
 
+  // The inspector is only present when a node is selected; while it docks on
+  // the right (desktop) or as a bottom sheet (mobile), the zoom cluster shifts
+  // clear of it.
+  const inspectorOpen = Boolean(graph && selection);
+
   return (
     <>
     <AppPageShell
@@ -189,13 +191,77 @@ export default function OrbitMapPage() {
         />
       }
     >
-        <PageHeader
-          sticky
-          feedChrome
-          compactable
-          bodyClassName="px-0 py-0"
+        <div
+          ref={stageRef}
+          className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
         >
-          <OrbitMapCommandBar
+          {isLoading ? (
+            <div className="flex h-full w-full items-center justify-center bg-background">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Charting graph…
+              </div>
+            </div>
+          ) : isError ? (
+            <div className="flex h-full w-full items-center justify-center bg-background p-6">
+              <ErrorState
+                layout="stage"
+                title="Graph could not be loaded"
+                description={
+                  error instanceof Error ? error.message : "Please try again."
+                }
+                action={
+                  <RetryButton context="stage" onClick={() => refetch()} className="mt-0" />
+                }
+              />
+            </div>
+          ) : graphIsEmpty ? (
+            <div className="flex h-full w-full flex-col items-center justify-center bg-background p-8">
+              <EmptyState
+                layout="stage"
+                title="Nothing to chart yet"
+                description={
+                  graphScope === "orbit"
+                    ? "Your Orbit queue is clear. Sync new bookmarks or switch to the full library map."
+                    : "Sync bookmarks from X, then return here to explore how tags and collections connect."
+                }
+                action={
+                  <Link
+                    href="/orbit"
+                    className={cn(
+                      buttonVariants({ size: "sm", variant: "outline" })
+                    )}
+                  >
+                    Open Orbit queue
+                  </Link>
+                }
+              />
+            </div>
+          ) : graph ? (
+            <OrbitMapCanvas
+              ref={canvasRef}
+              data={graph}
+              selection={selection}
+              searchQuery={searchDeferred}
+              onSearchResults={handleSearchResults}
+              onSelectionChange={handleCanvasSelectionChange}
+              onHoverChange={handleHoverChange}
+              onOpenBookmark={handleOpenBookmark}
+              onNodeDropped={handleNodeDropped}
+              focus={focus}
+              className="h-full w-full"
+              filterControlsClassName="left-3 top-[4.25rem] sm:left-4 sm:top-[4.5rem]"
+              zoomControlsClassName={cn(
+                "z-20",
+                inspectorOpen
+                  ? "bottom-[calc(45dvh+1.25rem)] right-4 lg:bottom-4 lg:right-[22.5rem]"
+                  : "bottom-4 right-4"
+              )}
+            />
+          ) : null}
+
+          {/* Chrome dissolved out of the header into floating corner clusters. */}
+          <OrbitMapConsole
             ref={searchInputRef}
             mobileSidebar={
               <MobileSidebar
@@ -211,7 +277,6 @@ export default function OrbitMapPage() {
               />
             }
             user={dbUser ?? undefined}
-            description={headerDescription}
             graphScope={graphScope}
             isLoading={isLoading}
             onScopeChange={handleScopeChange}
@@ -225,116 +290,43 @@ export default function OrbitMapPage() {
             keyboardShortcutsOpen={keyboardShortcutsOpen}
             onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
             shortcutGroups={ORBIT_MAP_SHORTCUT_GROUPS}
+            toolsShifted={inspectorOpen}
           />
-        </PageHeader>
 
-        <div
-          className={cn(
-            "flex min-h-0 min-w-0 flex-1 gap-3",
-            appContentInsetClassName
+          {hoverCard ? (
+            <OrbitMapHoverCard
+              node={hoverCard.node}
+              x={hoverCard.x}
+              y={hoverCard.y}
+              containerWidth={stageSize.width}
+              containerHeight={stageSize.height}
+            />
+          ) : null}
+
+          {stats && (
+            <OrbitMapStatsStrip stats={stats} truncatedCount={truncatedCount} />
           )}
-        >
-          <div
-            ref={stageRef}
-            className={cn(
-              "orbit-map-stage relative flex min-w-0 flex-1 overflow-hidden",
-              orbitMapStageClass()
-            )}
-          >
-            {isLoading ? (
-              <div className="flex h-full w-full items-center justify-center bg-background">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Charting graph…
-                </div>
-              </div>
-            ) : isError ? (
-              <div className="flex h-full w-full items-center justify-center bg-background p-6">
-                <ErrorState
-                  layout="stage"
-                  title="Graph could not be loaded"
-                  description={
-                    error instanceof Error ? error.message : "Please try again."
-                  }
-                  action={
-                    <RetryButton context="stage" onClick={() => refetch()} className="mt-0" />
-                  }
-                />
-              </div>
-            ) : graphIsEmpty ? (
-              <div className="flex h-full w-full flex-col items-center justify-center bg-background p-8">
-                <EmptyState
-                  layout="stage"
-                  title="Nothing to chart yet"
-                  description={
-                    graphScope === "orbit"
-                      ? "Your Orbit queue is clear. Sync new bookmarks or switch to the full library map."
-                      : "Sync bookmarks from X, then return here to explore how tags and collections connect."
-                  }
-                  action={
-                    <Link
-                      href="/orbit"
-                      className={cn(
-                        buttonVariants({ size: "sm", variant: "outline" })
-                      )}
-                    >
-                      Open Orbit queue
-                    </Link>
-                  }
-                />
-              </div>
-            ) : graph ? (
-              <OrbitMapCanvas
-                ref={canvasRef}
-                data={graph}
-                selection={selection}
-                searchQuery={searchDeferred}
-                onSearchResults={handleSearchResults}
-                onSelectionChange={handleCanvasSelectionChange}
-                onHoverChange={handleHoverChange}
-                onOpenBookmark={handleOpenBookmark}
-                onNodeDropped={handleNodeDropped}
-                focus={focus}
-                className="h-full w-full"
-                zoomControlsClassName="bottom-[calc(30dvh+1.25rem)] right-4 lg:bottom-4"
-              />
-            ) : null}
 
-            {hoverCard ? (
-              <OrbitMapHoverCard
-                node={hoverCard.node}
-                x={hoverCard.x}
-                y={hoverCard.y}
-                containerWidth={stageSize.width}
-                containerHeight={stageSize.height}
-              />
-            ) : null}
-
-            {stats && (
-              <OrbitMapStatsStrip
-                stats={stats}
-                truncatedCount={truncatedCount}
-              />
-            )}
-
-            {graph && (
+          {/* Inspector — appears only on selection. Mobile: bottom sheet.
+              Desktop: right-docked glass panel. */}
+          {graph && selection ? (
+            <>
               <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
                 <OrbitMapRail
                   {...railProps}
                   variant="overlay"
-                  className="max-h-[30dvh] w-full"
+                  className="max-h-[45dvh] w-full"
                 />
               </div>
-            )}
-          </div>
-
-          {graph && (
-            <OrbitMapRail
-              {...railProps}
-              variant="rail"
-              className="hidden h-full min-h-0 overflow-y-auto lg:flex lg:w-[300px] xl:w-[320px]"
-            />
-          )}
+              <div className="pointer-events-none absolute bottom-3 right-3 top-[4.5rem] z-30 hidden lg:flex">
+                <OrbitMapRail
+                  {...railProps}
+                  variant="dock"
+                  className="w-[21rem]"
+                />
+              </div>
+            </>
+          ) : null}
         </div>
     </AppPageShell>
 
