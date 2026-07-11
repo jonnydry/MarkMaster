@@ -1,5 +1,3 @@
-@import "./orbital-rings.css";
-
 @layer utilities {
   .auth-splash {
     height: 100vh;
@@ -33,19 +31,6 @@
     }
   }
 
-  .auth-splash__header {
-    position: absolute;
-    inset-inline: 0;
-    top: 0;
-    z-index: 20;
-    pointer-events: none;
-    padding-top: clamp(0.75rem, 2dvh, 1.25rem);
-  }
-
-  .auth-splash__header > * {
-    pointer-events: auto;
-  }
-
   .auth-splash__footer {
     position: absolute;
     inset-inline: 0;
@@ -63,78 +48,60 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
+    justify-content: flex-end;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
-    padding-top: clamp(3.25rem, 8dvh, 4rem);
-    padding-bottom: clamp(2rem, 5dvh, 2.75rem);
+    padding-top: clamp(2rem, 6dvh, 3rem);
+    padding-bottom: clamp(3.25rem, 8dvh, 4.5rem);
   }
 
-  .auth-splash__main-inner {
+  .auth-splash__hero {
     display: flex;
     width: 100%;
+    max-width: 36rem;
     min-width: 0;
-    min-height: 0;
-    flex: 1 1 auto;
     flex-direction: column;
-    justify-content: center;
-  }
-
-  .auth-splash__grid {
-    gap: clamp(1.25rem, 4dvh, 2rem);
-  }
-
-  @media (min-width: 1024px) {
-    .auth-splash__grid {
-      gap: clamp(1rem, 2dvh, 1.5rem);
-      align-items: center;
-    }
+    align-items: flex-start;
   }
 
   .auth-splash__brand-row {
-    gap: clamp(0.875rem, 2.2dvh, 1.25rem);
-  }
-
-  .auth-splash__brand-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: clamp(3.25rem, 9dvh, 4.5rem);
-    height: clamp(3.25rem, 9dvh, 4.5rem);
+    gap: clamp(0.75rem, 2dvh, 1rem);
   }
 
   .auth-splash__brand-logo {
-    width: clamp(2.5rem, 7dvh, 3.5rem);
-    height: clamp(2.5rem, 7dvh, 3.5rem);
-    /* logo.png canvas padding is uneven; artwork reads slightly high-right in a circle */
-    transform: translate(2.03%, -2.03%);
+    width: clamp(2.25rem, 6dvh, 3rem);
+    height: clamp(2.25rem, 6dvh, 3rem);
   }
 
   .auth-splash__wordmark {
-    font-size: clamp(1.85rem, 5.5dvh, 2.85rem);
+    font-size: clamp(1.75rem, 5dvh, 2.5rem);
     letter-spacing: 0;
   }
 
   .auth-splash__headline {
-    margin-top: clamp(0.875rem, 3.5dvh, 2.25rem);
-    font-size: clamp(2rem, 7.2dvh, 3.65rem);
+    margin-top: clamp(0.75rem, 2.5dvh, 1.5rem);
+    max-width: 36rem;
+    font-size: clamp(2.15rem, 7.5dvh, 3.85rem);
     letter-spacing: 0;
     line-height: 0.98;
   }
 
   .auth-splash__lead {
-    margin-top: clamp(0.625rem, 2dvh, 1.125rem);
-    font-size: clamp(0.9375rem, 2dvh, 1.0625rem);
-    line-height: 1.55;
+    margin-top: clamp(0.625rem, 1.8dvh, 1rem);
+    max-width: 28rem;
+    font-size: clamp(0.9375rem, 2dvh, 1.125rem);
+    line-height: 1.5;
   }
 
   .auth-splash__error {
     margin-top: clamp(0.625rem, 2dvh, 1rem);
+    max-width: 32rem;
   }
 
   .auth-splash__cta {
-    margin-top: clamp(0.75rem, 2.4dvh, 1.375rem);
+    margin-top: clamp(0.875rem, 2.4dvh, 1.5rem);
     gap: clamp(0.5rem, 1.4dvh, 0.75rem);
   }
 
@@ -144,119 +111,63 @@
     padding-inline: clamp(1.25rem, 3.2dvh, 1.75rem);
   }
 
-  .auth-splash__aside {
-    padding: clamp(0.875rem, 2.4dvh, 1.375rem);
-  }
-
-  .auth-splash__aside-title {
-    margin-top: clamp(0.5rem, 1.6dvh, 0.875rem);
-    font-size: clamp(1.5rem, 4.2dvh, 2rem);
-    letter-spacing: 0;
-    line-height: 1.08;
-  }
-
-  .auth-splash__aside-copy {
-    margin-top: clamp(0.5rem, 1.5dvh, 0.875rem);
-    font-size: clamp(0.875rem, 1.9dvh, 0.9375rem);
-    line-height: 1.5;
-  }
-
-  .auth-splash__feature-list {
-    margin-top: clamp(0.5rem, 1.5dvh, 0.875rem);
-  }
-
-  .auth-splash__feature-row {
-    padding-top: clamp(0.25rem, 0.85dvh, 0.5rem);
-    padding-bottom: clamp(0.25rem, 0.85dvh, 0.5rem);
-    gap: clamp(0.625rem, 1.4dvh, 0.75rem);
-  }
-
-  .auth-splash__feature-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-    font-size: clamp(0.8125rem, 1.8dvh, 0.875rem);
-    line-height: 1.35;
-  }
-
-  .auth-splash__note {
-    margin-top: clamp(0.5rem, 1.5dvh, 0.875rem);
-    padding: clamp(0.625rem, 1.5dvh, 0.75rem);
-    font-size: clamp(0.75rem, 1.7dvh, 0.8125rem);
-    line-height: 1.45;
-    gap: clamp(0.625rem, 1.4dvh, 0.875rem);
-  }
-
-  .auth-splash__note-icon {
-    width: clamp(1.625rem, 4.2dvh, 2rem);
-    height: clamp(1.625rem, 4.2dvh, 2rem);
-  }
-
-  .auth-splash__aside-rings {
-    top: clamp(1rem, 5dvh, 2rem);
-    width: clamp(12rem, 28dvh, 18rem);
-    height: clamp(8rem, 20dvh, 13rem);
+  .auth-splash__trust {
+    font-size: clamp(0.8125rem, 1.7dvh, 0.875rem);
+    line-height: 1.4;
   }
 
   @media (min-width: 1024px) {
     .auth-splash__headline {
-      margin-top: clamp(0.75rem, 2.8dvh, 1.75rem);
-      font-size: clamp(1.85rem, 6.2dvh, 3.35rem);
+      margin-top: clamp(0.875rem, 2.8dvh, 1.75rem);
+      font-size: clamp(2.5rem, 7dvh, 4rem);
     }
 
     .auth-splash__lead {
-      margin-top: clamp(0.5rem, 1.6dvh, 0.875rem);
+      margin-top: clamp(0.625rem, 1.6dvh, 0.875rem);
     }
 
     .auth-splash__cta {
-      margin-top: clamp(0.625rem, 1.8dvh, 1rem);
-    }
-
-    .auth-splash__feature-row {
-      padding-top: clamp(0.1875rem, 0.65dvh, 0.375rem);
-      padding-bottom: clamp(0.1875rem, 0.65dvh, 0.375rem);
-    }
-
-    .auth-splash__note {
-      margin-top: clamp(0.375rem, 1.1dvh, 0.625rem);
+      margin-top: clamp(1rem, 2.2dvh, 1.5rem);
     }
   }
 
-  /* Short viewports — tighten further; scroll remains available in main. */
+  /* Short viewports — tighten; scroll remains available in main. */
   @media (max-height: 760px) {
     .auth-splash__headline {
-      margin-top: clamp(0.625rem, 2.5dvh, 1.25rem);
-      font-size: clamp(1.75rem, 6dvh, 2.75rem);
+      margin-top: clamp(0.5rem, 2dvh, 1rem);
+      font-size: clamp(1.85rem, 6.5dvh, 2.85rem);
     }
 
-    .auth-splash__aside-rings {
-      opacity: 0.35;
+    .auth-splash__main {
+      padding-bottom: clamp(2.75rem, 7dvh, 3.5rem);
     }
   }
 
   @media (max-height: 640px) {
-    .auth-splash__grid {
-      gap: clamp(0.875rem, 3dvh, 1.25rem);
+    .auth-splash__main {
+      padding-top: clamp(1.5rem, 5dvh, 2rem);
+      padding-bottom: clamp(2.5rem, 8dvh, 3.25rem);
     }
 
-    .auth-splash__aside-rings {
-      display: none;
+    .auth-splash__wordmark {
+      font-size: clamp(1.5rem, 4.5dvh, 2rem);
+    }
+
+    .auth-splash__brand-logo {
+      width: clamp(1.875rem, 5dvh, 2.25rem);
+      height: clamp(1.875rem, 5dvh, 2.25rem);
     }
   }
 
   @media (max-height: 520px) {
-    .auth-splash__header {
-      padding-top: clamp(0.375rem, 1.5dvh, 0.625rem);
-    }
-
     .auth-splash__main {
-      padding-top: clamp(2.75rem, 11dvh, 3.25rem);
-      padding-bottom: clamp(1.5rem, 7dvh, 2rem);
+      padding-top: clamp(1.25rem, 4dvh, 1.75rem);
+      padding-bottom: clamp(2.25rem, 9dvh, 2.75rem);
     }
 
     .auth-splash__headline {
-      margin-top: clamp(0.5rem, 2dvh, 0.875rem);
+      margin-top: clamp(0.375rem, 1.5dvh, 0.75rem);
+      font-size: clamp(1.65rem, 6dvh, 2.25rem);
     }
 
     .auth-splash__cta {
