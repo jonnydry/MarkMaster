@@ -70,7 +70,12 @@ export {
   trimCollectionsForOrbitPrompt,
 } from "@/lib/orbit-grok-normalize";
 
-export { buildOrbitPromptPayload } from "@/lib/orbit-grok-prompt";
+export {
+  buildOrbitPromptPayload,
+  buildOrbitSystemPrompt,
+  ORBIT_STATIC_INSTRUCTIONS,
+  ORBIT_PROMPT_PALETTE_SIZE,
+} from "@/lib/orbit-grok-prompt";
 
 export {
   parseXaiOrbitScanPlanJson,

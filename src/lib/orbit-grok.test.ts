@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { PRESET_COLORS } from "@/lib/constants";
 import {
   buildOrbitPromptPayload,
+  buildOrbitSystemPrompt,
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
   extractXaiResponsesOutputText,
   getOrbitXaiRuntimeStatus,
   normalizeOrbitScanPlan,
+  ORBIT_PROMPT_PALETTE_SIZE,
+  ORBIT_STATIC_INSTRUCTIONS,
   orbitScanPlanSchema,
   parseXaiOrbitScanPlanJson,
 } from "@/lib/orbit-grok";
@@ -632,23 +635,6 @@ describe("buildOrbitPromptPayload", () => {
       existingCollections: [],
     });
 
-    expect(payload.signalPriority[0]).toContain("signals.primaryText");
-    expect(payload.signalPriority).toEqual(
-      expect.arrayContaining([expect.stringContaining("priorDecisions")])
-    );
-    expect(payload.topicExtractionRules).toEqual(
-      expect.arrayContaining([expect.stringContaining("domainHints")])
-    );
-    expect(payload.abstentionTriggers).toEqual(
-      expect.arrayContaining([expect.stringContaining("signals.dataQuality")])
-    );
-    expect(payload.batchConsistencyRules).toEqual(
-      expect.arrayContaining([expect.stringContaining("same tag spellings")])
-    );
-    expect(payload.collectionRules).toEqual(
-      expect.arrayContaining([expect.stringContaining("read-only X folders")])
-    );
-    expect(payload.examples).toHaveLength(2);
     expect(payload.bookmarks[0]).toMatchObject({
       id: "b1",
       sourceFolders: [{ name: "AI Papers" }],
@@ -724,9 +710,6 @@ describe("buildOrbitPromptPayload", () => {
       ],
     });
 
-    expect(payload.signalPriority).toEqual(
-      expect.arrayContaining([expect.stringContaining("signals.localLearning")])
-    );
     expect(payload.bookmarks[0].tweetText).toContain(
       "Full note tweet about AI benchmark evaluation systems."
     );
@@ -927,8 +910,8 @@ describe("buildOrbitPromptPayload", () => {
     });
   });
 
-  it("expands the color palette as the existing tag list grows", () => {
-    const payload = buildOrbitPromptPayload({
+  it("emits a fixed-size, unique color palette regardless of input size", () => {
+    const smallPayload = buildOrbitPromptPayload({
       bookmarks: [
         {
           id: "b1",
@@ -946,15 +929,79 @@ describe("buildOrbitPromptPayload", () => {
           notes: [],
         },
       ],
-      existingTags: Array.from({ length: PRESET_COLORS.length + 5 }, (_, index) => ({
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    const largePayload = buildOrbitPromptPayload({
+      bookmarks: Array.from({ length: 30 }, (_, index) => ({
+        id: `b${index}`,
+        tweetId: `tweet-${index}`,
+        authorUsername: "researcher",
+        authorDisplayName: "Researcher",
+        authorVerified: true,
+        tweetText: "A saved post.",
+        tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+        bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+        publicMetrics: null,
+        media: null,
+        urls: null,
+        quotedTweet: null,
+        notes: [],
+      })),
+      existingTags: Array.from({ length: PRESET_COLORS.length + 60 }, (_, index) => ({
         name: `Existing ${index}`,
         color: PRESET_COLORS[index % PRESET_COLORS.length],
       })),
       existingCollections: [],
     });
 
-    expect(payload.palette.length).toBeGreaterThan(PRESET_COLORS.length);
-    expect(new Set(payload.palette).size).toBe(payload.palette.length);
+    // Palette stays constant so the shared prompt prefix is cacheable.
+    expect(smallPayload.palette).toEqual(largePayload.palette);
+    expect(smallPayload.palette).toHaveLength(ORBIT_PROMPT_PALETTE_SIZE);
+    expect(new Set(smallPayload.palette).size).toBe(smallPayload.palette.length);
+  });
+});
+
+describe("Orbit static instructions", () => {
+  it("holds the tagging rules and few-shot examples once, outside the per-scan payload", () => {
+    expect(ORBIT_STATIC_INSTRUCTIONS.signalPriority[0]).toContain(
+      "signals.primaryText"
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.signalPriority).toEqual(
+      expect.arrayContaining([expect.stringContaining("priorDecisions")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.signalPriority).toEqual(
+      expect.arrayContaining([expect.stringContaining("signals.localLearning")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.topicExtractionRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("domainHints")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.abstentionTriggers).toEqual(
+      expect.arrayContaining([expect.stringContaining("signals.dataQuality")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.batchConsistencyRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("same tag spellings")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.collectionRules).toEqual(
+      expect.arrayContaining([expect.stringContaining("read-only X folders")])
+    );
+    expect(ORBIT_STATIC_INSTRUCTIONS.examples).toHaveLength(2);
+
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [],
+      existingTags: [],
+      existingCollections: [],
+    });
+    // The static blocks no longer bloat every request payload.
+    expect(payload).not.toHaveProperty("signalPriority");
+    expect(payload).not.toHaveProperty("examples");
+  });
+
+  it("embeds the static instructions in the system prompt", () => {
+    const systemPrompt = buildOrbitSystemPrompt();
+    expect(systemPrompt).toContain("Orbit librarian");
+    expect(systemPrompt).toContain(JSON.stringify(ORBIT_STATIC_INSTRUCTIONS));
   });
 });
 
