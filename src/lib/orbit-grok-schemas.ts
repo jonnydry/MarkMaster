@@ -114,6 +114,7 @@ export interface OrbitAuthorPriorHint {
 
 export const orbitConfidenceSchema = z.enum(["high", "medium", "low"]);
 
+/** Normalized tag suggestion — `reuseExisting` is computed locally, not from xAI. */
 export const orbitTagSuggestionSchema = z.object({
   name: z.string().trim().min(1).max(50),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -121,12 +122,45 @@ export const orbitTagSuggestionSchema = z.object({
   reuseExisting: z.boolean(),
 });
 
+/** Normalized collection suggestion — `reuseExisting` is computed locally, not from xAI. */
 export const orbitCollectionSuggestionSchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string().trim().min(1).max(240),
   reason: z.string().trim().min(1).max(180),
   reuseExisting: z.boolean(),
 });
+
+/** xAI response contract — matches `ORBIT_SCAN_PLAN_JSON_SCHEMA` (no `reuseExisting`). */
+export const orbitTagSuggestionFromXaiSchema = z.object({
+  name: z.string(),
+  color: z.string(),
+  reason: z.string(),
+});
+
+export const orbitCollectionSuggestionFromXaiSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  reason: z.string(),
+});
+
+export const orbitBookmarkSuggestionFromXaiSchema = z.object({
+  bookmarkId: z.string(),
+  confidence: orbitConfidenceSchema,
+  reasoning: z.string(),
+  tags: z.array(orbitTagSuggestionFromXaiSchema),
+  collection: z.union([orbitCollectionSuggestionFromXaiSchema, z.null()]),
+});
+
+export const orbitScanPlanFromXaiSchema = z.object({
+  overview: z.object({
+    summary: z.string(),
+    taggingStrategy: z.string(),
+    collectionStrategy: z.string(),
+  }),
+  suggestions: z.array(orbitBookmarkSuggestionFromXaiSchema),
+});
+
+export type OrbitScanPlanFromXai = z.infer<typeof orbitScanPlanFromXaiSchema>;
 
 export const orbitBookmarkSuggestionSchema = z.object({
   bookmarkId: z.string().trim().min(1),

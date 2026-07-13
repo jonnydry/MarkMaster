@@ -5,8 +5,9 @@ import { getTagColorSpectrum } from "@/lib/tag-colors";
 import {
   OrbitGrokError,
   orbitConfidenceSchema,
-  orbitScanPlanSchema,
+  orbitScanPlanFromXaiSchema,
   type OrbitScanPlan,
+  type OrbitScanPlanFromXai,
   type OrbitCollectionContext,
   type OrbitTagContext,
 } from "@/lib/orbit-grok-schemas";
@@ -38,12 +39,6 @@ const looseStringSchema = z.preprocess((value) => {
   return "";
 }, z.string());
 
-const looseBooleanSchema = z.preprocess((value) => {
-  if (value === true || value === 1) return true;
-  if (typeof value === "string") return value.trim().toLowerCase() === "true";
-  return false;
-}, z.boolean());
-
 const looseConfidenceSchema = z.preprocess((value) => {
   const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   return normalized === "high" || normalized === "medium" || normalized === "low"
@@ -51,18 +46,16 @@ const looseConfidenceSchema = z.preprocess((value) => {
     : "low";
 }, orbitConfidenceSchema);
 
-const looseOrbitTagSuggestionSchema = z.object({
+const looseOrbitTagSuggestionFromXaiSchema = z.object({
   name: looseStringSchema,
   color: looseStringSchema,
   reason: looseStringSchema,
-  reuseExisting: looseBooleanSchema,
 });
 
-const looseOrbitCollectionSuggestionSchema = z.object({
+const looseOrbitCollectionSuggestionFromXaiSchema = z.object({
   name: looseStringSchema,
   description: looseStringSchema,
   reason: looseStringSchema,
-  reuseExisting: looseBooleanSchema,
 });
 
 const looseOrbitScanOverviewSchema = z.preprocess(
@@ -74,23 +67,23 @@ const looseOrbitScanOverviewSchema = z.preprocess(
   })
 );
 
-const looseOrbitBookmarkSuggestionSchema = z.object({
+const looseOrbitBookmarkSuggestionFromXaiSchema = z.object({
   bookmarkId: looseStringSchema,
   confidence: looseConfidenceSchema,
   reasoning: looseStringSchema,
   tags: z.preprocess(
     (value) => (Array.isArray(value) ? value : []),
-    z.array(looseOrbitTagSuggestionSchema)
+    z.array(looseOrbitTagSuggestionFromXaiSchema)
   ),
   collection: z.preprocess(
     (value) => (value && typeof value === "object" ? value : null),
-    z.union([looseOrbitCollectionSuggestionSchema, z.null()])
+    z.union([looseOrbitCollectionSuggestionFromXaiSchema, z.null()])
   ),
 });
 
-const looseOrbitScanPlanSchema = z.object({
+const looseOrbitScanPlanFromXaiSchema = z.object({
   overview: looseOrbitScanOverviewSchema,
-  suggestions: z.array(looseOrbitBookmarkSuggestionSchema),
+  suggestions: z.array(looseOrbitBookmarkSuggestionFromXaiSchema),
 });
 
 function unwrapOrbitScanPlanJson(value: unknown) {
@@ -120,14 +113,14 @@ function formatZodIssues(error: z.ZodError) {
     .join("; ");
 }
 
-export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlan {
+export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlanFromXai {
   const candidate = unwrapOrbitScanPlanJson(parsedJson);
-  const parsedPlan = orbitScanPlanSchema.safeParse(candidate);
+  const parsedPlan = orbitScanPlanFromXaiSchema.safeParse(candidate);
   if (parsedPlan.success) {
     return parsedPlan.data;
   }
 
-  const parsedLoosePlan = looseOrbitScanPlanSchema.safeParse(candidate);
+  const parsedLoosePlan = looseOrbitScanPlanFromXaiSchema.safeParse(candidate);
   if (parsedLoosePlan.success) {
     return parsedLoosePlan.data;
   }
@@ -177,7 +170,7 @@ export function extractXaiResponsesOutputText(payload: unknown): string | null {
 }
 
 export function normalizeOrbitScanPlan(
-  rawPlan: OrbitScanPlan,
+  rawPlan: OrbitScanPlanFromXai,
   context: {
     bookmarkIds: string[];
     existingTags: OrbitTagContext[];

@@ -11,6 +11,7 @@ import {
   ORBIT_PROMPT_PALETTE_SIZE,
   ORBIT_STATIC_INSTRUCTIONS,
   orbitScanPlanSchema,
+  orbitScanPlanFromXaiSchema,
   parseXaiOrbitScanPlanJson,
 } from "@/lib/orbit-grok";
 
@@ -104,7 +105,6 @@ describe("parseXaiOrbitScanPlanJson", () => {
               name: "AI",
               color: "blue",
               reason: longReason,
-              reuseExisting: "false",
             },
           ],
           collection: null,
@@ -112,9 +112,11 @@ describe("parseXaiOrbitScanPlanJson", () => {
       ],
     };
 
-    expect(orbitScanPlanSchema.safeParse(raw).success).toBe(false);
+    expect(orbitScanPlanFromXaiSchema.safeParse(raw).success).toBe(false);
 
     const parsed = parseXaiOrbitScanPlanJson(raw);
+    expect(parsed.suggestions[0].tags[0]).not.toHaveProperty("reuseExisting");
+
     const normalized = normalizeOrbitScanPlan(parsed, {
       bookmarkIds: ["b1"],
       existingTags: [],
@@ -137,6 +139,76 @@ describe("parseXaiOrbitScanPlanJson", () => {
     expect(normalized.suggestions[0].tags[0].reason.length).toBeLessThanOrEqual(
       180
     );
+  });
+
+  it("computes reuseExisting locally when xAI omits the field", () => {
+    const raw = {
+      overview: {
+        summary: "Provider pass",
+        taggingStrategy: "Reuse clear tags",
+        collectionStrategy: "Only clear homes",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "Matches library items",
+          tags: [{ name: "AI", color: "#1d9bf0", reason: "Topic match" }],
+          collection: {
+            name: "Research",
+            description: "Deep reads",
+            reason: "Fits the collection",
+          },
+        },
+      ],
+    };
+
+    const parsed = parseXaiOrbitScanPlanJson(raw);
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+      existingCollections: [{ name: "Research", description: "Saved research" }],
+    });
+
+    expect(normalized.suggestions[0].tags[0].reuseExisting).toBe(true);
+    expect(normalized.suggestions[0].collection?.reuseExisting).toBe(true);
+  });
+
+  it("ignores reuseExisting when xAI sends it incorrectly", () => {
+    const raw = {
+      overview: {
+        summary: "Provider pass",
+        taggingStrategy: "Reuse clear tags",
+        collectionStrategy: "Only clear homes",
+      },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "New topic",
+          tags: [
+            {
+              name: "NetNew",
+              color: "#ffffff",
+              reason: "Brand new tag",
+              reuseExisting: true,
+            },
+          ],
+          collection: null,
+        },
+      ],
+    };
+
+    const parsed = parseXaiOrbitScanPlanJson(raw);
+    expect(parsed.suggestions[0].tags[0]).not.toHaveProperty("reuseExisting");
+
+    const normalized = normalizeOrbitScanPlan(parsed, {
+      bookmarkIds: ["b1"],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(normalized.suggestions[0].tags[0].reuseExisting).toBe(false);
   });
 
   it("unwraps common scan plan envelopes from provider output", () => {

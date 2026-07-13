@@ -53,9 +53,11 @@ export {
   orbitBookmarkSuggestionSchema,
   orbitScanOverviewSchema,
   orbitScanPlanSchema,
+  orbitScanPlanFromXaiSchema,
   orbitScanBatchMetadataSchema,
   orbitScanRequestSchema,
   type OrbitScanPlan,
+  type OrbitScanPlanFromXai,
 } from "@/lib/orbit-grok-schemas";
 
 export type {
