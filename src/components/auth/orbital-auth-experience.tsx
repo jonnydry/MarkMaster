@@ -2,7 +2,7 @@
 
 import "@/styles/auth.css";
 
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -12,29 +12,33 @@ import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 const CURRENT_YEAR = new Date().getFullYear();
 const SPLASH_BACKGROUND_IMAGE_URL = "/rocket-launch-background.png";
 
-function handleSignIn() {
-  void signIn(TWITTER_PROVIDER_ID, { callbackUrl: "/dashboard" });
+async function handleSignIn(callbackUrl: string, resetSession: boolean) {
+  if (resetSession) {
+    await signOut({ redirect: false });
+  }
+  await signIn(TWITTER_PROVIDER_ID, { callbackUrl });
 }
 
 export function OrbitalAuthExperience({
+  callbackUrl = "/dashboard",
   errorMessage,
+  resetSession = false,
 }: {
+  callbackUrl?: string;
   errorMessage?: string | null;
+  resetSession?: boolean;
 }) {
   return (
     <div className="auth-splash dark relative isolate flex min-w-0 flex-col bg-background text-foreground selection:bg-primary/30">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+        className="auth-splash__backdrop pointer-events-none absolute inset-0 -z-20"
         style={{
           backgroundImage: [
             "linear-gradient(90deg, rgba(0,4,11,0.82) 0%, rgba(0,4,11,0.62) 34%, rgba(0,4,11,0.16) 52%, rgba(0,4,11,0.62) 100%)",
             "linear-gradient(180deg, rgba(0,4,11,0.30) 0%, rgba(0,4,11,0.08) 40%, rgba(0,4,11,0.78) 100%)",
             `url(${SPLASH_BACKGROUND_IMAGE_URL})`,
           ].join(", "),
-          backgroundPosition: "center bottom, center bottom, center bottom",
-          backgroundRepeat: "no-repeat, no-repeat, no-repeat",
-          backgroundSize: "cover, cover, cover",
         }}
       />
       <div
@@ -58,8 +62,8 @@ export function OrbitalAuthExperience({
           </div>
 
           <h1 className="auth-splash__headline animate-fade-in-up stagger-2 heading-font font-extrabold text-foreground">
-            <span className="block">Put your X bookmarks in</span>
-            <span className="block text-primary">Orbit</span>
+            <span className="block">Put your X bookmarks</span>
+            <span className="block text-primary">in Orbit</span>
           </h1>
 
           <p className="auth-splash__lead animate-fade-in-up stagger-3 font-light text-muted-foreground">
@@ -79,7 +83,7 @@ export function OrbitalAuthExperience({
             <Button
               type="button"
               variant="highlight"
-              onClick={handleSignIn}
+              onClick={() => void handleSignIn(callbackUrl, resetSession)}
               className="auth-splash__primary-button highlight-search-shell group relative w-full gap-2.5 overflow-hidden sm:w-auto"
             >
               <XLogoMark

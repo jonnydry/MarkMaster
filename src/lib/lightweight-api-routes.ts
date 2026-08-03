@@ -19,5 +19,11 @@ export function isLightweightApiRequest(pathname: string, method: string): boole
     return method === "POST";
   }
 
+  // These handlers apply their own purpose-built limits. Media needs a larger
+  // range-request budget; export deliberately has a tighter read limit.
+  if (pathname === "/api/media" || pathname === "/api/export") {
+    return method === "GET" || method === "HEAD";
+  }
+
   return false;
 }

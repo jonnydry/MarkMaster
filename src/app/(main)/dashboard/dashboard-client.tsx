@@ -14,7 +14,10 @@ import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { useDashboardRail } from "@/hooks/use-dashboard-rail";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { DashboardRail } from "@/components/dashboard-rail";
+import { DashboardBookmarkInspector } from "@/components/dashboard-bookmark-inspector";
+import { DashboardBookmarkWorkspace } from "@/components/dashboard-bookmark-workspace";
 import {
+  appDashboardInspectorClassName,
   appDashboardRailClassName,
   appDashboardRailMediaQuery,
 } from "@/lib/app-layout";
@@ -92,6 +95,7 @@ function DashboardContent() {
     tags,
     collections,
     libraryStats,
+    libraryDataUnavailable,
     dbUser,
     viewMode,
     setViewMode,
@@ -176,6 +180,8 @@ function DashboardContent() {
   const railOpen = !railCollapsed;
   // Rail is only mounted (and its authors query only fires) when actually visible.
   const railVisible = railOpen && isWideViewport;
+  const workspaceBookmark = activeBookmark ?? bookmarks[0] ?? null;
+  const workspaceBookmarkId = workspaceBookmark?.id ?? null;
 
   return (
     <>
@@ -205,9 +211,10 @@ function DashboardContent() {
           <PageHeader
             sticky
             feedChrome
-            compactable
+            compactable={viewMode !== "grid"}
             bodyClassName="px-0 py-0"
           >
+                <h1 className="sr-only">Dashboard</h1>
                 <DashboardToolbar
                   mobileSidebar={
                     <MobileSidebar
@@ -253,7 +260,11 @@ function DashboardContent() {
                   onSortFieldChange={filters.setSortField}
                   onViewModeChange={setViewMode}
                   user={dbUser ?? undefined}
-                  discoveryAvailable={discoveryAvailable && !discoveryLoading}
+                  discoveryAvailable={
+                    viewMode !== "grid" &&
+                    discoveryAvailable &&
+                    !discoveryLoading
+                  }
                   discoveryUntouchedCount={discoveryUntouchedCount}
                   railOpen={railOpen}
                   onToggleRail={() => setRailCollapsed(!railCollapsed)}
@@ -277,6 +288,14 @@ function DashboardContent() {
                     onHide={handleBulkHide}
                   />
                 )}
+                {libraryDataUnavailable && !isError ? (
+                  <p
+                    role="status"
+                    className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5"
+                  >
+                    Some library details are temporarily unavailable.
+                  </p>
+                ) : null}
                 {showFilters && (
                   <div id="dashboard-filter-panel" className="animate-slide-down-fade">
                     <FilterPanel
@@ -298,9 +317,16 @@ function DashboardContent() {
                 )}
               </PageHeader>
 
-          <div className="flex min-w-0 items-start gap-4 min-[1152px]:pr-4">
+          <div
+            className={cn(
+              "flex min-w-0 items-start",
+              viewMode === "grid"
+                ? "gap-0"
+                : "gap-4 min-[1152px]:pr-4"
+            )}
+          >
             <div className="min-w-0 flex-1">
-          {!isError && (
+          {!isError && viewMode !== "grid" && (
             <DashboardDiscovery
               feedReady={feedReady}
               activeBookmarkId={activeBookmarkIdForView}
@@ -377,27 +403,45 @@ function DashboardContent() {
                 </div>
               )}
 
-              <BookmarkList
-                scrollRef={scrollRef}
-                bookmarks={bookmarks}
-                viewMode={viewMode}
-                searchQuery={searchQuery}
-                aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
-                selectionMode={selectionMode}
-                selectedBookmarkIdSet={selectedBookmarkIdSet}
-                activeBookmarkId={
-                  selectionMode ? null : activeBookmarkIdForView
-                }
-                onSelect={handleBookmarkSelect}
-                onSelectionChange={toggleBookmarkSelection}
-                onTagClick={filters.toggleTag}
-                onAddTag={handleBookmarkAddTag}
-                onAddToCollection={handleBookmarkAddToCollection}
-                onAddNote={handleBookmarkAddNote}
-                onOpenExpanded={handleExpandedBookmarkOpen}
-                onDelete={actions.handleDeleteBookmark}
-                performanceHighlightId={performanceFocusedId}
-              />
+              {viewMode === "grid" ? (
+                <DashboardBookmarkWorkspace
+                  bookmarks={bookmarks}
+                  activeBookmarkId={
+                    selectionMode ? null : workspaceBookmarkId
+                  }
+                  selectionMode={selectionMode}
+                  selectedBookmarkIdSet={selectedBookmarkIdSet}
+                  onSelect={
+                    isWideViewport
+                      ? handleBookmarkSelect
+                      : handleExpandedBookmarkOpen
+                  }
+                  onSelectionChange={toggleBookmarkSelection}
+                  onTagClick={filters.toggleTag}
+                />
+              ) : (
+                <BookmarkList
+                  scrollRef={scrollRef}
+                  bookmarks={bookmarks}
+                  viewMode={viewMode}
+                  searchQuery={searchQuery}
+                  aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
+                  selectionMode={selectionMode}
+                  selectedBookmarkIdSet={selectedBookmarkIdSet}
+                  activeBookmarkId={
+                    selectionMode ? null : activeBookmarkIdForView
+                  }
+                  onSelect={handleBookmarkSelect}
+                  onSelectionChange={toggleBookmarkSelection}
+                  onTagClick={filters.toggleTag}
+                  onAddTag={handleBookmarkAddTag}
+                  onAddToCollection={handleBookmarkAddToCollection}
+                  onAddNote={handleBookmarkAddNote}
+                  onOpenExpanded={handleExpandedBookmarkOpen}
+                  onDelete={actions.handleDeleteBookmark}
+                  performanceHighlightId={performanceFocusedId}
+                />
+              )}
             </>
           )}
 
@@ -412,7 +456,19 @@ function DashboardContent() {
             </div>
           )}
             </div>
-            {railOpen ? (
+            {viewMode === "grid" && workspaceBookmark ? (
+              <DashboardBookmarkInspector
+                bookmark={workspaceBookmark}
+                bookmarks={bookmarks}
+                onSelect={handleBookmarkSelect}
+                onAddTag={handleBookmarkAddTag}
+                onAddToCollection={handleBookmarkAddToCollection}
+                onAddNote={handleBookmarkAddNote}
+                onReviewInOrbit={handleGridOverlayReviewInOrbit}
+                onDelete={actions.handleDeleteBookmark}
+                className={appDashboardInspectorClassName}
+              />
+            ) : railOpen && viewMode !== "grid" ? (
               <div className={appDashboardRailClassName}>
                 <DashboardRail
                   id="dashboard-rail"
@@ -424,6 +480,7 @@ function DashboardContent() {
                   untouchedCount={discoveryUntouchedCount}
                   collectionCount={collections.length}
                   lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
+                  dataUnavailable={libraryDataUnavailable || isError}
                 />
               </div>
             ) : null}

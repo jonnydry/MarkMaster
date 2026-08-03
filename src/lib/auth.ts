@@ -14,7 +14,23 @@ import {
 
 export type { DbUser, JwtDbUser, SessionWithUser };
 
+function isLoopbackAuthUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Vercel provides a controlled host header. Other reverse-proxy/self-hosted
+  // deployments must opt in after configuring their trusted proxy chain.
+  trustHost:
+    process.env.VERCEL === "1" ||
+    process.env.AUTH_TRUST_HOST === "true" ||
+    isLoopbackAuthUrl(process.env.AUTH_URL ?? process.env.NEXTAUTH_URL),
   providers: [
     Twitter({
       clientId: process.env.AUTH_TWITTER_ID!,

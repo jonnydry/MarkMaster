@@ -94,6 +94,7 @@ import {
   getOrbitMapEdgeLodAlpha,
   getOrbitMapViewBounds,
   isInOrbitMapViewBounds,
+  ORBIT_MAP_LOD_FAR_MAX_ZOOM,
   type OrbitMapViewBounds,
 } from './orbit-map-lod';
 import {
@@ -3336,7 +3337,18 @@ function autoFitCamera(width: number, height: number) {
   const bounds = getGraphBounds();
   if (!bounds) return;
 
-  camera.zoom = getOrbitMapFitZoom(bounds, getCameraConfig());
+  const fitZoom = getOrbitMapFitZoom(bounds, getCameraConfig());
+  // Large libraries contain distant bookmark satellites that make a literal
+  // all-node fit feel undersized. Expand the overview while staying in the
+  // hub-first LOD band, so the initial constellation reads clearly and the
+  // complete graph remains one small zoom-out away.
+  camera.zoom = Math.min(
+    MAX_FIT_ZOOM,
+    Math.max(
+      fitZoom,
+      Math.min(ORBIT_MAP_LOD_FAR_MAX_ZOOM * 0.96, fitZoom * 1.22)
+    )
+  );
   camera.x = (width / 2) - ((bounds.minX + bounds.maxX) / 2) * camera.zoom;
   camera.y = (height / 2) - ((bounds.minY + bounds.maxY) / 2) * camera.zoom;
   constrainCamera();

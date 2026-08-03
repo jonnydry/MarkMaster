@@ -150,7 +150,7 @@ export async function generateMetadata({
 
   if (!collection) {
     return {
-      title: "Collection not found | MarkMaster",
+      title: "Collection not found",
       robots: {
         index: false,
         follow: false,
@@ -161,19 +161,20 @@ export async function generateMetadata({
   const description =
     collection.description ||
     `Public MarkMaster collection from ${collection.user.displayName} with ${collection._count.items} bookmarks.`;
-  const title = `${collection.name} | MarkMaster`;
+  const title = collection.name;
+  const socialTitle = `${collection.name} | MarkMaster`;
 
   return {
     title,
     description,
     openGraph: {
-      title,
+      title: socialTitle,
       description,
       type: "website",
     },
     twitter: {
       card: "summary",
-      title,
+      title: socialTitle,
       description,
     },
   };
@@ -197,6 +198,9 @@ export default async function PublicSharePage({
   }
 
   const { pagination, topTags, authorCount } = collection;
+  const returnToShareHref = `/login?callbackUrl=${encodeURIComponent(
+    `/share/${slug}?page=${pagination.page}`
+  )}`;
 
   return (
     <AppPublicPage className="bg-background">
@@ -212,10 +216,10 @@ export default async function PublicSharePage({
             <span className="font-bold tracking-tight">MarkMaster</span>
           </Link>
           <Link
-            href="/login"
+            href={returnToShareHref}
             className={buttonVariantClassName("outline", "sm")}
           >
-            Save to your MarkMaster
+            Sign in to MarkMaster
           </Link>
         </div>
       </header>
@@ -253,10 +257,10 @@ export default async function PublicSharePage({
               )}
             </div>
             <Link
-              href="/login"
+              href={returnToShareHref}
               className={buttonVariantClassName(undefined, undefined, "gap-2")}
             >
-              Save to your library
+              Sign in to organize yours
               <ExternalLinkIcon className="size-3.5" />
             </Link>
           </div>

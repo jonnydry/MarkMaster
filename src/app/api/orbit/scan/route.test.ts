@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scanOrbitBookmarksWithXaiMock = vi.hoisted(() => vi.fn());
 const applyOrbitScanPlanMock = vi.hoisted(() => vi.fn());
+const checkRateLimitMock = vi.hoisted(() => vi.fn());
+const checkGlobalRateLimitMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1" })),
@@ -25,6 +27,15 @@ const enrichBookmarksForScanMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/orbit-scan-enrichment", () => ({
   enrichBookmarksForScan: enrichBookmarksForScanMock,
 }));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
+  return {
+    ...actual,
+    checkRateLimit: checkRateLimitMock,
+    checkGlobalRateLimit: checkGlobalRateLimitMock,
+  };
+});
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -91,6 +102,18 @@ function createScanRequest() {
 describe("/api/orbit/scan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkRateLimitMock.mockResolvedValue({
+      success: true,
+      limit: 10,
+      remaining: 9,
+      reset: Date.now() + 60_000,
+    });
+    checkGlobalRateLimitMock.mockResolvedValue({
+      success: true,
+      limit: 200,
+      remaining: 199,
+      reset: Date.now() + 60_000,
+    });
     enrichBookmarksForScanMock.mockImplementation(async (_userId, bookmarks) => ({
       bookmarks,
       enrichment: {
@@ -142,6 +165,48 @@ describe("/api/orbit/scan", () => {
         selectionReason: "Test",
       },
     });
+  });
+
+  it("charges Orbit quotas for scans but not for apply requests", async () => {
+    const { POST } = await import("./route");
+
+    await mockScanData();
+    await POST(createScanRequest());
+
+    expect(checkRateLimitMock).toHaveBeenCalledWith("orbit", "user-1");
+    expect(checkGlobalRateLimitMock).toHaveBeenCalledWith("orbit");
+
+    vi.clearAllMocks();
+    applyOrbitScanPlanMock.mockResolvedValueOnce({
+      updatedBookmarks: 1,
+      createdTags: 0,
+      createdCollections: 0,
+      assignedTags: 0,
+      assignedCollections: 0,
+    });
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/orbit/scan", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "apply",
+          createCollections: false,
+          plan: {
+            overview: {
+              summary: "Apply reviewed suggestion",
+              taggingStrategy: "Keep existing tags",
+              collectionStrategy: "No new collection",
+            },
+            suggestions: [],
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(applyOrbitScanPlanMock).toHaveBeenCalled();
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(checkGlobalRateLimitMock).not.toHaveBeenCalled();
   });
 
   it("passes synced X folder names as scan hints, not editable collections", async () => {

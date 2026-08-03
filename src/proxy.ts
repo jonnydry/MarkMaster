@@ -11,41 +11,69 @@ import { logError } from "@/lib/logger";
 // Protects the entire system from abuse (e.g. one IP hammering the API)
 const isGlobalRateLimitingEnabled = isRateLimitingEnabled;
 
+let proxyRedis: ReturnType<typeof Redis.fromEnv> | null = null;
 let globalLimiter: Ratelimit | null = null;
+let authLimiter: Ratelimit | null = null;
 
-if (isGlobalRateLimitingEnabled) {
+function getProxyRedis() {
+  if (!proxyRedis && isGlobalRateLimitingEnabled) {
+    proxyRedis = Redis.fromEnv();
+  }
+  return proxyRedis;
+}
+
+function getProxyLimiters() {
+  if ((globalLimiter && authLimiter) || !isGlobalRateLimitingEnabled) {
+    return { globalLimiter, authLimiter };
+  }
+
   try {
+    const redis = getProxyRedis();
+    if (!redis) return { globalLimiter: null, authLimiter: null };
     globalLimiter = new Ratelimit({
-      redis: Redis.fromEnv(),
+      redis,
       limiter: Ratelimit.slidingWindow(500, "1 m"), // 500 req/min across all IPs
       analytics: true,
       prefix: "ratelimit:global",
     });
+    authLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(60, "5 m"),
+      analytics: true,
+      prefix: "ratelimit:auth",
+    });
   } catch (err) {
     logError("Proxy", "Failed to initialize global rate limiter", err);
     globalLimiter = null;
+    authLimiter = null;
   }
+
+  return { globalLimiter, authLimiter };
 }
 
 // getUserIdFromRequest is imported from the Edge-safe @/lib/auth-edge module (correct JWE decryption, no Node.js dependencies)
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isApiRoute = pathname.startsWith("/api");
+  const isPublicShareRoute = pathname.startsWith("/share/");
 
-  if (!pathname.startsWith("/api")) {
+  if (!isApiRoute && !isPublicShareRoute) {
     return NextResponse.next();
   }
 
-  // Skip auth and internal status routes
-  if (
-    pathname.startsWith("/api/auth") ||
+  const isAuthRoute = pathname.startsWith("/api/auth");
+  const skipsPerUserLimit =
+    isPublicShareRoute ||
+    isAuthRoute ||
     pathname.startsWith("/api/orbit/status") ||
-    pathname.startsWith("/api/internal/sync")
-  ) {
-    return NextResponse.next();
-  }
+    pathname.startsWith("/api/internal/sync");
 
-  if (process.env.NODE_ENV === "production" && !isRateLimitingEnabled) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    !isRateLimitingEnabled &&
+    !skipsPerUserLimit
+  ) {
     logError("Proxy", "UPSTASH_REDIS_REST_URL is required in production");
     return NextResponse.json(
       {
@@ -60,11 +88,35 @@ export async function proxy(request: NextRequest) {
   // Resolve the client IP without trusting client-spoofable x-forwarded-for hops.
   // Tune TRUSTED_PROXY_HOPS to your deployment's proxy chain (see lib/client-ip.ts).
   const ip = getClientIp(request.headers);
+  const limiters = getProxyLimiters();
+
+  // OAuth endpoints stay reachable when the main API is intentionally failing
+  // closed, but receive their own conservative IP budget when Redis is present.
+  if (isAuthRoute && limiters.authLimiter) {
+    try {
+      const authResult = await limiters.authLimiter.limit(ip);
+      if (!authResult.success) {
+        return NextResponse.json(
+          { error: "Too Many Requests", message: "Too many sign-in attempts." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(
+                Math.max(1, Math.ceil((authResult.reset - Date.now()) / 1000))
+              ),
+            },
+          }
+        );
+      }
+    } catch (error) {
+      logError("Proxy", "Auth rate limit check failed (failing open)", error);
+    }
+  }
 
   // Safely check global rate limit. If Redis is down or misconfigured, fail open.
-  if (globalLimiter) {
+  if (limiters.globalLimiter) {
     try {
-      const globalResult = await globalLimiter.limit(ip);
+      const globalResult = await limiters.globalLimiter.limit(ip);
 
       if (!globalResult.success) {
         return NextResponse.json(
@@ -84,6 +136,10 @@ export async function proxy(request: NextRequest) {
       logError("Proxy", "Global rate limit check failed (failing open)", error);
       // Fail open to avoid taking down the entire application
     }
+  }
+
+  if (skipsPerUserLimit) {
+    return NextResponse.next();
   }
 
   // === Per-user rate limiting ===
@@ -119,5 +175,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/api/:path*", "/share/:path*"],
 };

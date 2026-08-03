@@ -288,7 +288,7 @@ function MediaTile({
           src={getMediaPlaybackProxyUrl(playbackUrl)}
           controls={!isGif}
           playsInline
-          preload="metadata"
+          preload="none"
           loop={isGif}
           muted={isGif}
           poster={poster}

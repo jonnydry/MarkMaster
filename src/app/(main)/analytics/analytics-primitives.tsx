@@ -46,9 +46,11 @@ export function parseAnalyticsTab(value: string | null): AnalyticsTab {
 export function AnalyticsRangeSegment({
   value,
   onChange,
+  disabled = false,
 }: {
   value: TimeRange;
   onChange: (value: TimeRange) => void;
+  disabled?: boolean;
 }) {
   return (
     <ToolbarSegmentControl
@@ -60,6 +62,7 @@ export function AnalyticsRangeSegment({
       options={RANGE_OPTIONS.map((option) => ({
         value: option.value,
         label: <span className="tabular-nums">{option.label}</span>,
+        disabled,
       }))}
     />
   );

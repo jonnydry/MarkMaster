@@ -7,6 +7,8 @@ const tx = {
     upsert: vi.fn(),
     createMany: vi.fn(),
     findMany: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
   },
   $executeRaw: vi.fn(),
 };
@@ -49,6 +51,7 @@ describe("/api/collections/[id]/items", () => {
       sortOrder: 3,
     });
     tx.collectionItem.findMany.mockResolvedValue([{ bookmarkId: "bookmark-1" }]);
+    tx.collectionItem.update.mockResolvedValue({});
     tx.$executeRaw.mockResolvedValue(1);
   });
 
@@ -184,5 +187,31 @@ describe("/api/collections/[id]/items", () => {
 
     expect(response.status).toBe(400);
     expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("moves an item across a pagination boundary", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { invalidateUserResponseCache } = await import("@/lib/upstash-cache");
+    const { PATCH } = await import("./route");
+
+    vi.mocked(prisma.collection.findFirst).mockResolvedValue({
+      id: "collection-1",
+      type: "user_collection",
+    });
+    tx.collectionItem.findUnique.mockResolvedValue({ id: "item-21", sortOrder: 20 });
+    tx.collectionItem.findFirst.mockResolvedValue({ id: "item-20", sortOrder: 19 });
+
+    const response = await PATCH(
+      new NextRequest("http://localhost/api/collections/collection-1/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookmarkId: "bookmark-21", direction: "up" }),
+      }),
+      params
+    );
+
+    expect(response.status).toBe(200);
+    expect(tx.collectionItem.update).toHaveBeenCalledTimes(2);
+    expect(invalidateUserResponseCache).toHaveBeenCalledWith("user-1");
   });
 });

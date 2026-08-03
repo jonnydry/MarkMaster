@@ -18,7 +18,7 @@ import {
   BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
-import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
+import { openBookmarkOnX } from "@/lib/bookmark-url";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { GRID_POST_TEXT_MEDIA, GRID_POST_TEXT_ONLY } from "@/lib/typography";
@@ -79,7 +79,6 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
 }: GridBookmarkCardProps) {
   const [imageError, setImageError] = useState<Set<string>>(() => new Set());
   const mediaItems = bookmark.media;
-  const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const metrics = bookmark.publicMetrics;
   const firstMedia = mediaItems?.[0];
   const firstMediaUrl = firstMedia?.url || firstMedia?.preview_image_url;
@@ -297,7 +296,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
           <BookmarkCardActionButton
             icon={ArrowUpRight}
             label="Open on X"
-            onClick={() => window.open(tweetUrl, "_blank")}
+            onClick={() => openBookmarkOnX(bookmark)}
             className="ml-auto"
           />
         </div>

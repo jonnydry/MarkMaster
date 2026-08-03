@@ -124,8 +124,11 @@ export function Sidebar({
   // Distinguish "still loading" from "genuinely empty" so a cold load shows
   // skeletons, not the zero-state copy (which reads as data loss). These
   // subscribe to the same cached queries the page already runs — no extra fetch.
-  const { isLoading: tagsQueryLoading } = useTagsQuery();
-  const { isLoading: collectionsQueryLoading } = useCollectionsQuery();
+  const { isLoading: tagsQueryLoading, isError: tagsQueryError } = useTagsQuery();
+  const {
+    isLoading: collectionsQueryLoading,
+    isError: collectionsQueryError,
+  } = useCollectionsQuery();
   const tagsLoading = tagsQueryLoading && tags.length === 0;
   const collectionsLoading = collectionsQueryLoading && !hasCollections;
 
@@ -221,6 +224,10 @@ export function Sidebar({
                 {tags.length === 0 ? (
                   tagsLoading ? (
                     <SidebarSkeletonRows rows={6} withDot />
+                  ) : tagsQueryError ? (
+                    <p className="px-1 pb-1 text-xs text-muted-foreground" role="status">
+                      Tags are temporarily unavailable
+                    </p>
                   ) : (
                     <p className="px-1 pb-1 text-xs text-muted-foreground">
                       Tags appear as you add them to bookmarks
@@ -297,6 +304,13 @@ export function Sidebar({
                 {!hasCollections ? (
                   collectionsLoading ? (
                     <SidebarSkeletonRows rows={4} />
+                  ) : collectionsQueryError ? (
+                    <p
+                      className="px-1 pb-1 text-xs text-muted-foreground/70"
+                      role="status"
+                    >
+                      Collections are temporarily unavailable
+                    </p>
                   ) : (
                     <p className="px-1 pb-1 text-xs text-muted-foreground/70">
                       Create a collection to start curating

@@ -71,6 +71,7 @@ export function useAnalyticsPage() {
     isError,
     error,
     refetch,
+    isFetching,
   } = useQuery<AnalyticsData>({
     queryKey: ["analytics", range],
     queryFn: () =>
@@ -81,6 +82,7 @@ export function useAnalyticsPage() {
   });
 
   const showAnalyticsSkeleton = isLoading && !analytics;
+  const analyticsUpdating = isFetching && Boolean(analytics) && !isLoading;
 
   const { data: tags = [] } = useTagsQuery();
   const { data: collections = [] } = useCollectionsQuery();
@@ -183,6 +185,7 @@ export function useAnalyticsPage() {
     error,
     refetch,
     showAnalyticsSkeleton,
+    analyticsUpdating,
     tags,
     collections,
     libraryStats,

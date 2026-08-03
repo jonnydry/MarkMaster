@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import CollectionDetailClient from "./collection-detail-client";
+
+export const metadata: Metadata = { title: "Collection" };
 
 export default async function CollectionDetailPage({
   params,

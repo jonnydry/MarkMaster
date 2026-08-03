@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 type CollectionDetailBookmarkListProps = {
   scrollRef: RefObject<HTMLElement | null>;
   sortedItems: CollectionItemRow[];
+  page: number;
+  totalPages: number;
   viewMode: ViewMode;
   isSyncedFromX: boolean;
   canReorder: boolean;
@@ -37,6 +39,8 @@ type CollectionDetailBookmarkListProps = {
 export function CollectionDetailBookmarkList({
   scrollRef,
   sortedItems,
+  page,
+  totalPages,
   viewMode,
   isSyncedFromX,
   canReorder,
@@ -92,7 +96,7 @@ export function CollectionDetailBookmarkList({
                 variant="ghost"
                 size="icon-sm"
                 className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                disabled={reordering || index === 0}
+                disabled={reordering || (page === 1 && index === 0)}
                 onClick={() => onMoveItem(index, -1)}
                 aria-label="Move bookmark up"
               >
@@ -103,7 +107,10 @@ export function CollectionDetailBookmarkList({
                 variant="ghost"
                 size="icon-sm"
                 className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
-                disabled={reordering || index === sortedItems.length - 1}
+                disabled={
+                  reordering ||
+                  (page === totalPages && index === sortedItems.length - 1)
+                }
                 onClick={() => onMoveItem(index, 1)}
                 aria-label="Move bookmark down"
               >

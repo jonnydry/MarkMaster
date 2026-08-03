@@ -203,6 +203,8 @@ export default function CollectionDetailClient({
           <CollectionDetailBookmarkList
             scrollRef={scrollRef}
             sortedItems={sortedItems}
+            page={currentPage}
+            totalPages={totalPages}
             viewMode={viewMode}
             isSyncedFromX={isSyncedFromX}
             canReorder={canReorder}

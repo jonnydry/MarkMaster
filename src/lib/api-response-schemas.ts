@@ -11,6 +11,7 @@ import type {
   OrbitXaiStatusPayload,
   SyncStatusResponse,
   TagWithCount,
+  TopAuthorsResponse,
 } from "@/types";
 
 const collectionTypeSchema = v.picklist(["x_folder", "user_collection"]);
@@ -142,6 +143,18 @@ export const analyticsDataSchema = v.looseObject({
   last30dCount: v.number(),
   previous30dCount: v.number(),
 }) as unknown as v.GenericSchema<unknown, AnalyticsData>;
+
+export const topAuthorsResponseSchema = v.object({
+  topAuthors: v.array(
+    v.object({
+      author: v.string(),
+      displayName: v.nullable(v.string()),
+      profileImage: v.nullable(v.string()),
+      verified: v.boolean(),
+      count: v.number(),
+    })
+  ),
+}) as unknown as v.GenericSchema<unknown, TopAuthorsResponse>;
 
 export const orbitGraphPayloadSchema = v.looseObject({
   nodes: v.array(v.looseObject({ kind: v.string() })),

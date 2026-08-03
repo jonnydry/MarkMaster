@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const required = [
   "DATABASE_URL",
+  "DIRECT_URL",
   "AUTH_SECRET",
   "NEXTAUTH_URL",
   "AUTH_TWITTER_ID",
@@ -11,6 +12,17 @@ const required = [
 ];
 
 let ok = true;
+const isProduction =
+  process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+const configuredAuthUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+let usesLoopbackAuthUrl = false;
+try {
+  const hostname = new URL(configuredAuthUrl).hostname;
+  usesLoopbackAuthUrl =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+} catch {
+  usesLoopbackAuthUrl = false;
+}
 for (const key of required) {
   const v = process.env[key];
   if (v == null || String(v).trim() === "") {
@@ -33,9 +45,32 @@ if (ok) {
   if (process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
     console.log("Production: UPSTASH_REDIS_REST_* vars detected — using distributed rate limiting.");
   } else {
-    console.log(
-      "Rate limiting: Using in-memory fallback (fine for development). For production / multi-instance deploys, set UPSTASH_REDIS_REST_URL + TOKEN (or use Vercel KV)."
+    const message =
+      "Rate limiting: disabled for development. Production requires UPSTASH_REDIS_REST_URL + TOKEN and fails closed without them.";
+    if (isProduction) {
+      console.error(`Missing production configuration: ${message}`);
+      ok = false;
+    } else {
+      console.log(message);
+    }
+  }
+
+  if (
+    isProduction &&
+    process.env.VERCEL !== "1" &&
+    !usesLoopbackAuthUrl &&
+    process.env.AUTH_TRUST_HOST !== "true"
+  ) {
+    console.error(
+      "Missing production configuration: self-hosted Auth.js requires AUTH_TRUST_HOST=true behind a trusted reverse proxy."
     );
+    ok = false;
+  }
+
+  const cspMode = process.env.CSP_MODE?.trim();
+  if (cspMode && cspMode !== "enforce" && cspMode !== "report-only") {
+    console.error('Invalid CSP_MODE: expected "enforce" or "report-only".');
+    ok = false;
   }
 
   // Local security hygiene: warn if .env has overly permissive permissions (Unix/macOS only)

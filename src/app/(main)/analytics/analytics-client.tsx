@@ -46,6 +46,7 @@ export default function AnalyticsPage() {
     error,
     refetch,
     showAnalyticsSkeleton,
+    analyticsUpdating,
     tags,
     collections,
     libraryStats,
@@ -109,13 +110,23 @@ export default function AnalyticsPage() {
                 {analytics && analytics.totalBookmarks > 0 ? (
                   <AnalyticsRangeSegment
                     value={range}
-                    onChange={showAnalyticsSkeleton ? () => {} : setRange}
+                    onChange={setRange}
+                    disabled={showAnalyticsSkeleton || analyticsUpdating}
                   />
                 ) : null}
                 {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
               </div>
             }
           />
+
+          {analyticsUpdating ? (
+            <p
+              role="status"
+              className="px-4 pt-1.5 text-xs text-muted-foreground sm:px-5"
+            >
+              Updating analytics for the selected range…
+            </p>
+          ) : null}
 
           <div className="p-4 sm:p-5">
             <div className="mx-auto w-full max-w-4xl">

@@ -7,7 +7,10 @@ import { defaultFontVariables } from "@/lib/app-fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MarkMaster — X Bookmark Manager",
+  title: {
+    default: "MarkMaster — X Bookmark Manager",
+    template: "%s | MarkMaster",
+  },
   description:
     "Search, tag, annotate, and curate your X bookmarks with a local synced archive.",
 };
@@ -23,12 +26,6 @@ export default async function RootLayout({
       className={`${defaultFontVariables} h-full antialiased`}
       suppressHydrationWarning
     >
-      <head>
-        <link rel="preconnect" href="https://pbs.twimg.com" crossOrigin="" />
-        <link rel="preconnect" href="https://abs.twimg.com" crossOrigin="" />
-        <link rel="preconnect" href="https://video.twimg.com" crossOrigin="" />
-        <link rel="preconnect" href="https://api.x.ai" crossOrigin="" />
-      </head>
       <body className="flex min-h-full min-w-0 flex-col overflow-x-hidden">
         <ThemeInitScript />
         <Providers>

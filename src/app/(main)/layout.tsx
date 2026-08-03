@@ -12,6 +12,7 @@ export default async function MainLayout({
 }) {
   const session = await auth();
   if (!session) redirect("/login");
+  if (!session.dbUser) redirect("/login?error=SessionUnavailable");
   return (
     <div className={cn(appFixedViewportClassName, "flex flex-col")}>
       <QueryProvider>

@@ -94,7 +94,7 @@ export function FeedToolbarRow({
       {progress}
       <div
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-1.5",
+          "flex min-w-8 flex-1 items-center gap-1.5 md:min-w-0",
           feedToolbarScrollClassName
         )}
       >

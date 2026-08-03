@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import {
+  createBoundedMediaStream,
+  getDeclaredMediaSize,
+  isValidMediaRange,
+} from "@/lib/media-proxy";
 
 // Twitter's media CDN (video.twimg.com) applies Referer-based hotlink
 // protection: a cross-origin <video src> load sends the app origin as the
@@ -69,11 +75,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "URL not allowed" }, { status: 400 });
   }
 
+  const rateLimitResult = await checkRateLimit("media", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   // Forward the Range header so the browser can seek and so Safari (which
   // requires byte-range support to play <video>) works.
   const forwardHeaders: HeadersInit = {};
   const range = req.headers.get("range");
-  if (range) forwardHeaders["range"] = range;
+  if (range) {
+    if (!isValidMediaRange(range)) {
+      return NextResponse.json({ error: "Invalid range" }, { status: 416 });
+    }
+    forwardHeaders["range"] = range;
+  }
 
   let upstream: Response;
   try {
@@ -121,15 +137,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const upstreamContentLength = upstream.headers.get("content-length");
-  if (upstreamContentLength) {
-    const length = Number.parseInt(upstreamContentLength, 10);
-    if (Number.isFinite(length) && length > MAX_MEDIA_PROXY_SIZE_BYTES) {
-      return NextResponse.json(
-        { error: "Media too large" },
-        { status: 413 }
-      );
-    }
+  const declaredSize = getDeclaredMediaSize(upstream.headers);
+  if (declaredSize !== null && declaredSize > MAX_MEDIA_PROXY_SIZE_BYTES) {
+    return NextResponse.json(
+      { error: "Media too large" },
+      { status: 413 }
+    );
   }
 
   const headers = new Headers();
@@ -141,7 +154,11 @@ export async function GET(req: NextRequest) {
   // Media bytes are immutable once published; allow private caching.
   headers.set("cache-control", "private, max-age=86400");
 
-  return new NextResponse(upstream.body, {
+  const responseBody = upstream.body
+    ? createBoundedMediaStream(upstream.body, MAX_MEDIA_PROXY_SIZE_BYTES)
+    : null;
+
+  return new NextResponse(responseBody, {
     status: upstream.status,
     headers,
   });

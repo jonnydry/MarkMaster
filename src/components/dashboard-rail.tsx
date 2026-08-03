@@ -8,11 +8,11 @@ import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkTagChip } from "@/components/bookmark-card-chrome";
 import { StatRow } from "@/components/ui/stat-row";
 import { fetchJson } from "@/lib/fetch-json";
-import { analyticsDataSchema } from "@/lib/api-response-schemas";
+import { topAuthorsResponseSchema } from "@/lib/api-response-schemas";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
 import type { LibraryStats } from "@/hooks/use-library-data";
-import type { AnalyticsData, MediaFilter, TagWithCount } from "@/types";
+import type { MediaFilter, TagWithCount, TopAuthorsResponse } from "@/types";
 
 /** The subset of dashboard filter state the rail needs (matches useDashboardPage). */
 export interface DashboardRailFilters {
@@ -41,6 +41,7 @@ interface DashboardRailProps {
   lastSyncAt: Date | null;
   /** Only fetch top authors when the rail is actually visible (open on a wide viewport). */
   active: boolean;
+  dataUnavailable?: boolean;
 }
 
 const TOP_TAG_LIMIT = 8;
@@ -77,6 +78,7 @@ export function DashboardRail({
   collectionCount,
   lastSyncAt,
   active,
+  dataUnavailable = false,
 }: DashboardRailProps) {
   const t = useTypography();
 
@@ -95,14 +97,22 @@ export function DashboardRail({
     [tags]
   );
 
-  const { data: analytics, isLoading: authorsLoading } = useQuery<AnalyticsData>({
-    queryKey: ["analytics", "all"],
+  const {
+    data: authorsPayload,
+    isLoading: authorsLoading,
+    isError: authorsError,
+  } = useQuery<TopAuthorsResponse>({
+    queryKey: ["analytics", "top-authors"],
     queryFn: () =>
-      fetchJson("/api/analytics?range=all", undefined, analyticsDataSchema),
+      fetchJson(
+        "/api/analytics/top-authors",
+        undefined,
+        topAuthorsResponseSchema
+      ),
     staleTime: 5 * 60 * 1000,
     enabled: active,
   });
-  const topAuthors = analytics?.topAuthors.slice(0, TOP_AUTHOR_LIMIT) ?? [];
+  const topAuthors = authorsPayload?.topAuthors.slice(0, TOP_AUTHOR_LIMIT) ?? [];
 
   const statValue = (value: string | number | undefined) =>
     libraryStats === undefined ? (
@@ -117,6 +127,11 @@ export function DashboardRail({
   return (
     <div id={id} className="space-y-3 pt-3 pb-6 pr-1" aria-label="Dashboard rail">
       <RailCard title="Library health">
+        {dataUnavailable ? (
+          <p className="text-xs leading-5 text-muted-foreground" role="status">
+            Library details are temporarily unavailable. Your bookmark feed is unchanged.
+          </p>
+        ) : (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
           <StatRow size="sm" headingFont={false} label="Total" value={statValue(libraryTotal.toLocaleString())} />
           <StatRow
@@ -139,6 +154,7 @@ export function DashboardRail({
             }
           />
         </dl>
+        )}
       </RailCard>
 
       <RailCard title="Filters">
@@ -185,6 +201,10 @@ export function DashboardRail({
               <div key={i} className="skeleton-shimmer h-6 rounded-[2px]" />
             ))}
           </div>
+        ) : authorsError ? (
+          <p className="px-2 text-xs text-muted-foreground" role="status">
+            Authors are temporarily unavailable.
+          </p>
         ) : topAuthors.length > 0 ? (
           <ul className="space-y-0.5">
             {topAuthors.map((author) => (

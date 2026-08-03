@@ -95,3 +95,10 @@ export const appDashboardRailClassName = cn(
   "sticky top-[var(--header-height)] max-h-[calc(100dvh-var(--header-height))]",
   "overflow-y-auto overscroll-contain scrollbar-thin"
 );
+
+/** Persistent bookmark preview used by the dashboard workspace at wide widths. */
+export const appDashboardInspectorClassName = cn(
+  "hidden w-[min(38vw,34rem)] min-w-[22rem] shrink-0 self-start min-[1152px]:block",
+  "sticky top-[var(--header-height)] max-h-[calc(100dvh-var(--header-height))]",
+  "overflow-y-auto overscroll-contain scrollbar-thin"
+);

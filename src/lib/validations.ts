@@ -163,6 +163,16 @@ export const reorderCollectionItemsSchema = z.object({
   }
 });
 
+export const moveCollectionItemSchema = z.object({
+  bookmarkId: idSchema,
+  direction: z.enum(["up", "down"]),
+});
+
+export const updateCollectionItemsOrderSchema = z.union([
+  reorderCollectionItemsSchema,
+  moveCollectionItemSchema,
+]);
+
 export const deleteBookmarkSchema = bookmarkTargetSchema;
 
 export const bookmarksQuerySchema = z

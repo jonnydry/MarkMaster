@@ -40,19 +40,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit Orbit scans (more generous than syncs). Run both checks in
-  // parallel — they're independent Redis round-trips.
-  const [rateLimitResult, globalResult] = await Promise.all([
-    checkRateLimit("orbit", user.id),
-    checkGlobalRateLimit("orbit"),
-  ]);
-  if (!rateLimitResult.success) {
-    return createRateLimitResponse(rateLimitResult);
-  }
-  if (!globalResult.success) {
-    return createRateLimitResponse(globalResult);
-  }
-
   const body = await readJsonBody(req);
   if (!body.ok) {
     return NextResponse.json({ error: body.error }, { status: body.status });
@@ -70,6 +57,20 @@ export async function POST(req: NextRequest) {
 
   try {
     if (parsed.data.mode === "scan") {
+      // Only AI scans consume the scarce per-user and system-wide Orbit
+      // budgets. Applying an already-reviewed plan is a normal write and is
+      // protected by the proxy's api:write limiter instead.
+      const [rateLimitResult, globalResult] = await Promise.all([
+        checkRateLimit("orbit", user.id),
+        checkGlobalRateLimit("orbit"),
+      ]);
+      if (!rateLimitResult.success) {
+        return createRateLimitResponse(rateLimitResult);
+      }
+      if (!globalResult.success) {
+        return createRateLimitResponse(globalResult);
+      }
+
       const [bookmarks, tags, collections] = await Promise.all([
         prisma.bookmark.findMany({
           where: {

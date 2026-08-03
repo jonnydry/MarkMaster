@@ -27,4 +27,11 @@ describe("isLightweightApiRequest", () => {
     expect(isLightweightApiRequest("/api/bookmarks", "GET")).toBe(false);
     expect(isLightweightApiRequest("/api/tags", "GET")).toBe(false);
   });
+
+  it("lets media and export handlers own their specialized limits", () => {
+    expect(isLightweightApiRequest("/api/media", "GET")).toBe(true);
+    expect(isLightweightApiRequest("/api/media", "POST")).toBe(false);
+    expect(isLightweightApiRequest("/api/export", "GET")).toBe(true);
+    expect(isLightweightApiRequest("/api/export", "POST")).toBe(false);
+  });
 });

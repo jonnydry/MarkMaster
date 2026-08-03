@@ -159,7 +159,7 @@ export function useCollectionDetailPage(
   const isUserCollection = collection?.type === "user_collection";
   const totalItems = collection?.total ?? sortedItems.length;
   const totalPages = collection?.totalPages ?? 1;
-  const canReorder = isUserCollection && totalPages <= 1;
+  const canReorder = isUserCollection;
   const itemCountLabel = bookmarkLabel(totalItems);
   const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
 
@@ -308,21 +308,24 @@ export function useCollectionDetailPage(
   const moveItem = useCallback(
     async (fromIndex: number, direction: -1 | 1) => {
       if (!collection || reordering || !canReorder) return;
-      const toIndex = fromIndex + direction;
-      if (toIndex < 0 || toIndex >= sortedItems.length) return;
+      const item = sortedItems[fromIndex];
+      if (!item) return;
+
+      const atCollectionStart = page === 1 && fromIndex === 0;
+      const atCollectionEnd =
+        page === totalPages && fromIndex === sortedItems.length - 1;
+      if ((direction === -1 && atCollectionStart) || (direction === 1 && atCollectionEnd)) {
+        return;
+      }
 
       setReordering(true);
       try {
-        const next = [...sortedItems];
-        [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-        const payload = next.map((item, index) => ({
-          bookmarkId: item.bookmark.id,
-          sortOrder: index,
-        }));
-
         await sendJson(`/api/collections/${collectionId}/items`, {
           method: "PATCH",
-          body: { items: payload },
+          body: {
+            bookmarkId: item.bookmark.id,
+            direction: direction === -1 ? "up" : "down",
+          },
         });
         await invalidateCollectionMembershipQueries(queryClient, collectionId);
       } catch (reorderError) {
@@ -335,7 +338,16 @@ export function useCollectionDetailPage(
         setReordering(false);
       }
     },
-    [canReorder, collection, collectionId, queryClient, reordering, sortedItems]
+    [
+      canReorder,
+      collection,
+      collectionId,
+      page,
+      queryClient,
+      reordering,
+      sortedItems,
+      totalPages,
+    ]
   );
 
   const goToCollections = useCallback(() => {

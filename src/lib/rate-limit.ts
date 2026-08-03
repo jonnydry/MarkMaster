@@ -15,6 +15,7 @@ export type RateLimitAction =
   | "sync"
   | "orbit"
   | "orbit:graph"
+  | "media"
   | "api:read"
   | "api:write"
   | "csp-report";
@@ -27,6 +28,7 @@ export const DEBUG_RATE_LIMIT_ACTIONS = [
   "sync",
   "orbit",
   "orbit:graph",
+  "media",
   "api:read",
   "api:write",
 ] as const satisfies readonly RateLimitAction[];
@@ -58,6 +60,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 120,
     window: "1 h",
     description: "Orbit map graph reads - expensive graph generation",
+  },
+  media: {
+    requests: 600,
+    window: "5 m",
+    description: "Authenticated media proxy range requests",
   },
   "api:read": {
     requests: 100,
@@ -122,6 +129,15 @@ function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
         ),
         analytics: true,
         prefix: "ratelimit:orbit-graph",
+      }),
+      media: new Ratelimit({
+        redis: r,
+        limiter: Ratelimit.slidingWindow(
+          POLICIES.media.requests,
+          POLICIES.media.window
+        ),
+        analytics: true,
+        prefix: "ratelimit:media",
       }),
       "api:read": new Ratelimit({
         redis: r,

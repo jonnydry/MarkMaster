@@ -8,9 +8,8 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import {
   FeedCompactToolbarShell,
   FeedSearchFieldShell,
-  FeedToolbarControlsRow,
   FeedToolbarRow,
-  FeedToolbarSearchRow,
+  feedToolbarScrollClassName,
   withCompactToolbarSidebar,
 } from "@/components/feed-toolbar-layout";
 import {
@@ -87,7 +86,8 @@ export function DashboardToolbar({
   railOpen,
   onToggleRail,
 }: DashboardToolbarProps) {
-  const { compact } = usePageHeaderCompact();
+  const { compact: compactPreference } = usePageHeaderCompact();
+  const compact = compactPreference && viewMode !== "grid";
   const { hidden: discoveryHidden, setHidden: setDiscoveryHidden } =
     useDiscoveryHidden();
   const showDiscovery = !discoveryHidden;
@@ -171,7 +171,7 @@ export function DashboardToolbar({
         />
       </div>
 
-      {discoveryAvailable ? (
+      {discoveryAvailable && viewMode !== "grid" ? (
         <ToolbarIconButton
           active={showDiscovery}
           label={
@@ -189,13 +189,15 @@ export function DashboardToolbar({
         />
       ) : null}
 
-      <ToolbarIconButton
-        label="Keyboard shortcuts"
-        icon={Keyboard}
-        onClick={onOpenKeyboardShortcuts}
-        size={compact ? "compact" : "default"}
-        className={appToolbarSurfaceClassName}
-      />
+      {viewMode !== "grid" ? (
+        <ToolbarIconButton
+          label="Keyboard shortcuts"
+          icon={Keyboard}
+          onClick={onOpenKeyboardShortcuts}
+          size={compact ? "compact" : "default"}
+          className={appToolbarSurfaceClassName}
+        />
+      ) : null}
 
       <ToolbarIconButton
         active={selectionMode}
@@ -207,16 +209,18 @@ export function DashboardToolbar({
         className={appToolbarSurfaceClassName}
       />
 
-      <ToolbarIconButton
-        active={railOpen}
-        label={railOpen ? "Hide rail" : "Show rail"}
-        icon={PanelRight}
-        onClick={onToggleRail}
-        pressed={railOpen}
-        aria-controls="dashboard-rail"
-        size={compact ? "compact" : "default"}
-        className={cn(appToolbarSurfaceClassName, "hidden min-[1152px]:inline-flex")}
-      />
+      {viewMode !== "grid" ? (
+        <ToolbarIconButton
+          active={railOpen}
+          label={railOpen ? "Hide rail" : "Show rail"}
+          icon={PanelRight}
+          onClick={onToggleRail}
+          pressed={railOpen}
+          aria-controls="dashboard-rail"
+          size={compact ? "compact" : "default"}
+          className={cn(appToolbarSurfaceClassName, "hidden min-[1152px]:inline-flex")}
+        />
+      ) : null}
 
       <SortControls
         compact
@@ -224,14 +228,18 @@ export function DashboardToolbar({
         viewMode={viewMode}
         onSortFieldChange={onSortFieldChange}
         onViewModeChange={onViewModeChange}
+        gridLabel="Workspace"
+        gridIcon={PanelRight}
       />
 
-      <PageHeaderCompactToggle
-        className={cn(
-          appToolbarSurfaceClassName,
-          !compact && appToolbarControlExpandedClassName
-        )}
-      />
+      {viewMode !== "grid" || compact ? (
+        <PageHeaderCompactToggle
+          className={cn(
+            appToolbarSurfaceClassName,
+            !compact && appToolbarControlExpandedClassName
+          )}
+        />
+      ) : null}
     </>
   );
 
@@ -242,7 +250,7 @@ export function DashboardToolbar({
   if (compact) {
     return (
       <>
-        <FeedCompactToolbarShell>
+      <FeedCompactToolbarShell>
           <FeedToolbarRow
             leading={
               <>
@@ -263,20 +271,43 @@ export function DashboardToolbar({
 
   return (
     <div className={cn("feed-toolbar py-2", appContentGutterClassName)}>
-      <FeedToolbarSearchRow
-        leading={
+      <div className="hidden min-w-0 items-center gap-2 lg:flex">
+        {primaryFilterChip}
+        <div className="min-w-0 flex-1">{searchField}</div>
+        <div className="flex shrink-0 items-center gap-1.5">{toolbarActions}</div>
+        {userNav ? <div className="shrink-0">{userNav}</div> : null}
+      </div>
+
+      <div className="lg:hidden">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="shrink-0 md:hidden">
             {withCompactToolbarSidebar(mobileSidebar, compact)}
           </div>
-        }
-        search={searchField}
-        userNav={userNav}
-      />
-      <FeedToolbarControlsRow
-        leading={filterChips}
-        actions={toolbarActions}
-        mobileUserNav={userNav}
-      />
+          {primaryFilterChip}
+          <div className="min-w-0 flex-1">{searchField}</div>
+          {userNav ? <div className="hidden shrink-0 sm:block">{userNav}</div> : null}
+        </div>
+        <div
+          className={cn(
+            "mt-2 flex min-w-0 items-center gap-1.5",
+            feedToolbarScrollClassName
+          )}
+        >
+          {toolbarActions}
+          {userNav ? <div className="shrink-0 sm:hidden">{userNav}</div> : null}
+        </div>
+      </div>
+
+      {tagFilterChips.length > 0 ? (
+        <div
+          className={cn(
+            "mt-2 flex min-w-0 items-center gap-1.5",
+            feedToolbarScrollClassName
+          )}
+        >
+          {tagFilterChips}
+        </div>
+      ) : null}
     </div>
   );
 }

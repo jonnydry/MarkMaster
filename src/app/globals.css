@@ -1043,6 +1043,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-fade-in-up {
+      animation: none !important;
+      opacity: 1;
+      transform: none;
+    }
     .animate-slide-down-fade {
       animation: none;
     }

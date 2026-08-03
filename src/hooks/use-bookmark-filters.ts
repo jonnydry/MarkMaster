@@ -6,18 +6,27 @@ import type { SortField, SortDirection, MediaFilter } from "@/types";
 const PAGE_LIMIT = "20";
 const DEBOUNCE_MS = 300;
 
-export function useBookmarkFilters() {
+type BookmarkFilterInitialState = {
+  selectedTags?: string[];
+  authorFilter?: string;
+  collectionId?: string;
+  bookmarkId?: string;
+};
+
+export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
   const [search, setSearchImmediate] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("tweetCreatedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
-  const [authorFilter, setAuthorFilter] = useState("");
+  const [authorFilter, setAuthorFilter] = useState(initial.authorFilter ?? "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [collectionId, setCollectionId] = useState("");
-  const [bookmarkId, setBookmarkId] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    initial.selectedTags ?? []
+  );
+  const [collectionId, setCollectionId] = useState(initial.collectionId ?? "");
+  const [bookmarkId, setBookmarkId] = useState(initial.bookmarkId ?? "");
   const [page, setPage] = useState(1);
   const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

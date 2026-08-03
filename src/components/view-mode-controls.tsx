@@ -1,5 +1,6 @@
 "use client";
 
+import type { ElementType } from "react";
 import { AlignJustify, Grid3x3, LayoutList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,8 @@ type ViewModeControlsProps = {
   onViewModeChange: (mode: ViewMode) => void;
   className?: string;
   compact?: boolean;
+  gridLabel?: string;
+  gridIcon?: ElementType;
 };
 
 /** Feed / compact / grid toggle — shared by dashboard and collection detail. */
@@ -30,7 +33,19 @@ export function ViewModeControls({
   onViewModeChange,
   className,
   compact = false,
+  gridLabel,
+  gridIcon,
 }: ViewModeControlsProps) {
+  const viewModes = VIEW_MODES.map((mode) =>
+    mode.value === "grid"
+      ? {
+          ...mode,
+          label: gridLabel ?? mode.label,
+          icon: gridIcon ?? mode.icon,
+        }
+      : mode
+  );
+
   return (
     <div
       className={cn(
@@ -42,7 +57,7 @@ export function ViewModeControls({
         className
       )}
     >
-      {VIEW_MODES.map(({ value, label, icon: Icon }) => {
+      {viewModes.map(({ value, label, icon: Icon }) => {
         const selected = viewMode === value;
         return (
           <Button

@@ -32,16 +32,21 @@
   }
 
   .auth-splash__footer {
-    position: absolute;
-    inset-inline: 0;
-    bottom: 0;
+    position: relative;
     z-index: 20;
     pointer-events: none;
+    flex: 0 0 auto;
     padding-top: clamp(0.375rem, 1dvh, 0.625rem);
     padding-bottom: max(
       clamp(0.625rem, 1.6dvh, 1rem),
       env(safe-area-inset-bottom, 0px)
     );
+  }
+
+  .auth-splash__backdrop {
+    background-position: center bottom, center bottom, center bottom;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: cover, cover, cover;
   }
 
   .auth-splash__main {
@@ -54,7 +59,7 @@
     overflow-y: auto;
     overscroll-behavior-y: contain;
     padding-top: clamp(2rem, 6dvh, 3rem);
-    padding-bottom: clamp(3.25rem, 8dvh, 4.5rem);
+    padding-bottom: clamp(1rem, 3dvh, 2rem);
   }
 
   .auth-splash__hero {
@@ -131,6 +136,24 @@
     }
   }
 
+  @media (max-width: 639px) {
+    .auth-splash__backdrop {
+      /* `cover` crops the wide artwork heavily here; a slightly leftward
+         image anchor keeps the centered rocket clear of the copy column. */
+      background-position: center bottom, center bottom, 32% bottom;
+    }
+
+    .auth-splash__headline {
+      max-width: 20rem;
+      font-size: clamp(2rem, 10vw, 2.75rem);
+      line-height: 1;
+    }
+
+    .auth-splash__lead {
+      max-width: 20rem;
+    }
+  }
+
   /* Short viewports — tighten; scroll remains available in main. */
   @media (max-height: 760px) {
     .auth-splash__headline {
@@ -139,14 +162,14 @@
     }
 
     .auth-splash__main {
-      padding-bottom: clamp(2.75rem, 7dvh, 3.5rem);
+      padding-bottom: clamp(0.75rem, 2.5dvh, 1.5rem);
     }
   }
 
   @media (max-height: 640px) {
     .auth-splash__main {
       padding-top: clamp(1.5rem, 5dvh, 2rem);
-      padding-bottom: clamp(2.5rem, 8dvh, 3.25rem);
+      padding-bottom: clamp(0.75rem, 2.5dvh, 1.25rem);
     }
 
     .auth-splash__wordmark {
@@ -162,7 +185,7 @@
   @media (max-height: 520px) {
     .auth-splash__main {
       padding-top: clamp(1.25rem, 4dvh, 1.75rem);
-      padding-bottom: clamp(2.25rem, 9dvh, 2.75rem);
+      padding-bottom: clamp(0.5rem, 2dvh, 1rem);
     }
 
     .auth-splash__headline {

@@ -20,6 +20,10 @@ export default defineConfig({
         "src/**/*.test.{ts,tsx}",
         "src/test/**",
         "src/types/**",
+        // Browser-only Pixi export shims are exercised by the Orbit map build
+        // and browser smoke test. Rolldown's coverage parser cannot instrument
+        // the type-only optional parameters in this module reliably.
+        "src/lib/pixi-imports.ts",
         "**/*.d.ts",
       ],
       thresholds: {

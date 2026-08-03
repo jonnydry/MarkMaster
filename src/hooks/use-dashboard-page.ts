@@ -25,7 +25,12 @@ import { requestCompactSearchFocus } from "@/lib/compact-floating-search";
 import { getAboveFoldMediaBookmarkIds } from "@/lib/bookmark-feed-layout";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { saveGemsAsCollection } from "@/lib/save-gems-as-collection";
-import type { BookmarkWithRelations, MediaFilter } from "@/types";
+import type {
+  BookmarkWithRelations,
+  CollectionWithCount,
+  MediaFilter,
+  TagWithCount,
+} from "@/types";
 
 export type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
@@ -43,6 +48,8 @@ const MEDIA_FILTER_LABELS: Record<string, string> = {
   links: "Links",
   "text-only": "Text",
 };
+const EMPTY_TAGS: TagWithCount[] = [];
+const EMPTY_COLLECTIONS: CollectionWithCount[] = [];
 
 export function useDashboardPage() {
   const searchParams = useSearchParams();
@@ -50,7 +57,19 @@ export function useDashboardPage() {
   const queryClient = useQueryClient();
   const { data: session, update: updateSession } = useSession();
 
-  const filters = useBookmarkFilters();
+  const tagFromUrl = searchParams.get("tag");
+  const tagsFromUrl = searchParams.get("tags");
+  const authorFromUrl = searchParams.get("author");
+  const collectionFromUrl = searchParams.get("collection");
+  const bookmarkFromUrl = searchParams.get("bookmark");
+  const initialTags = (tagsFromUrl ?? tagFromUrl ?? "").split(",").filter(Boolean);
+
+  const filters = useBookmarkFilters({
+    selectedTags: initialTags,
+    authorFilter: authorFromUrl?.replace(/^@/, "") ?? "",
+    collectionId: collectionFromUrl ?? "",
+    bookmarkId: bookmarkFromUrl ?? "",
+  });
   const { resetPage } = filters;
   const actions = useBookmarkActions();
   const { createCollectionQuick, createCollection } = useCreateCollection();
@@ -104,11 +123,19 @@ export function useDashboardPage() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: tags = [] } = useTagsQuery();
-
-  const { data: collections = [] } = useCollectionsQuery();
-  const { data: libraryStats } = useLibraryStatsQuery();
-  const { data: syncStatus } = useSyncStatus();
+  const tagsQuery = useTagsQuery();
+  const collectionsQuery = useCollectionsQuery();
+  const libraryStatsQuery = useLibraryStatsQuery();
+  const syncStatusQuery = useSyncStatus();
+  const tags = tagsQuery.data ?? EMPTY_TAGS;
+  const collections = collectionsQuery.data ?? EMPTY_COLLECTIONS;
+  const libraryStats = libraryStatsQuery.data;
+  const syncStatus = syncStatusQuery.data;
+  const libraryDataUnavailable =
+    tagsQuery.isError ||
+    collectionsQuery.isError ||
+    libraryStatsQuery.isError ||
+    syncStatusQuery.isError;
 
   const feedReady = !isLoading && !isError;
 
@@ -209,16 +236,11 @@ export function useDashboardPage() {
     onOpenCollection: setActiveBookmarkId,
   });
 
-  const tagFromUrl = searchParams.get("tag");
-  const tagsFromUrl = searchParams.get("tags");
-  const authorFromUrl = searchParams.get("author");
-  const collectionFromUrl = searchParams.get("collection");
-  const bookmarkFromUrl = searchParams.get("bookmark");
-  const tagFromUrlRef = useRef<string | null>(null);
-  const tagsFromUrlRef = useRef<string | null>(null);
-  const authorFromUrlRef = useRef<string | null>(null);
-  const collectionFromUrlRef = useRef<string | null>(null);
-  const bookmarkFromUrlRef = useRef<string | null>(null);
+  const tagFromUrlRef = useRef<string | null>(tagFromUrl);
+  const tagsFromUrlRef = useRef<string | null>(tagsFromUrl);
+  const authorFromUrlRef = useRef<string | null>(authorFromUrl);
+  const collectionFromUrlRef = useRef<string | null>(collectionFromUrl);
+  const bookmarkFromUrlRef = useRef<string | null>(bookmarkFromUrl);
   useEffect(() => {
     if (tagsFromUrl && tagsFromUrl !== tagsFromUrlRef.current) {
       const next = tagsFromUrl.split(",").filter(Boolean);
@@ -313,15 +335,9 @@ export function useDashboardPage() {
     setGridOverlayBookmarkId(id);
   }, []);
 
-  const handleBookmarkSelect = useCallback(
-    (id: string) => {
-      setActiveBookmarkId(id);
-      if (viewMode === "grid") {
-        setGridOverlayBookmarkId(id);
-      }
-    },
-    [viewMode]
-  );
+  const handleBookmarkSelect = useCallback((id: string) => {
+    setActiveBookmarkId(id);
+  }, []);
 
   const handleGridOverlayOpenChange = useCallback((open: boolean) => {
     if (!open) {
@@ -361,7 +377,7 @@ export function useDashboardPage() {
   useKeyboardShortcuts({
     activeBookmarkId: selectionMode ? null : activeBookmarkIdForView,
     bookmarks: selectionMode ? [] : bookmarks,
-    navigationLayout: viewMode === "grid" ? "grid" : "list",
+    navigationLayout: "list",
     onNavigate: setActiveBookmarkId,
     onOpen: handleExpandedBookmarkOpen,
     onSearch: () => requestCompactSearchFocus(searchInputRef),
@@ -446,6 +462,7 @@ export function useDashboardPage() {
       tags,
       collections,
       libraryStats,
+      libraryDataUnavailable,
       dbUser,
       viewMode,
       setViewMode,
@@ -530,6 +547,7 @@ export function useDashboardPage() {
       tags,
       collections,
       libraryStats,
+      libraryDataUnavailable,
       dbUser,
       viewMode,
       setViewMode,

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ElementType } from "react";
 import { ArrowDownUp } from "lucide-react";
 import {
   Select,
@@ -23,6 +24,8 @@ interface SortControlsProps {
   onViewModeChange: (mode: ViewMode) => void;
   className?: string;
   compact?: boolean;
+  gridLabel?: string;
+  gridIcon?: ElementType;
 }
 
 export function SortControls({
@@ -32,6 +35,8 @@ export function SortControls({
   onViewModeChange,
   className,
   compact = false,
+  gridLabel,
+  gridIcon,
 }: SortControlsProps) {
   return (
     <div
@@ -46,6 +51,7 @@ export function SortControls({
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
         <SelectTrigger
+          aria-label="Sort bookmarks"
           size="default"
           className={cn(
             "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong font-semibold hover:border-primary/30",
@@ -75,6 +81,8 @@ export function SortControls({
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
         compact={compact}
+        gridLabel={gridLabel}
+        gridIcon={gridIcon}
       />
     </div>
   );

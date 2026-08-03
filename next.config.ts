@@ -10,6 +10,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 // Avoid wrong workspace root when a parent directory also has a lockfile.
 const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
+const isProduction = process.env.NODE_ENV === "production";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -21,30 +22,26 @@ const contentSecurityPolicy = [
   "img-src 'self' blob: data: https://pbs.twimg.com https://abs.twimg.com",
   "media-src 'self' https://video.twimg.com https://pbs.twimg.com",
   "font-src 'self' data:",
-  // API connections needed for X (Twitter) and xAI (Grok/Orbit)
-  `connect-src 'self' https://api.x.ai https://api.twitter.com https://x.com https://twitter.com${
-    isDev ? " http: ws:" : ""
-  }`,
+  // Browser traffic stays first-party. X and xAI calls are server-side only.
+  `connect-src 'self'${isDev ? " http: ws:" : ""}`,
   // Required for the high-performance PixiJS Orbit Map Web Worker (blob: workers)
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://x.com https://twitter.com",
+  "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
+  ...(isProduction ? ["upgrade-insecure-requests"] : []),
   // Report violations to our endpoint (see /api/csp-report)
   "report-to default",
 ].join("; ");
 
 // === CSP Strategy ===
 //
-// We default to Report-Only so we can observe real violation data (via the
-// protected /api/csp-report and /debug/rate-limits tools) without breaking the
-// app. Flip to enforcing mode per-environment by setting CSP_MODE=enforce
-// (e.g. in Vercel project env vars) once violation reports are clean. This is a
-// pure config toggle with instant rollback — no code change or redeploy of the
-// app logic required.
-const cspEnforce = process.env.CSP_MODE === "enforce";
+// Production enforces CSP unless an operator explicitly selects report-only
+// for a short rollback/diagnostic window. Development remains report-only.
+const cspEnforce =
+  process.env.CSP_MODE === "enforce" ||
+  (isProduction && process.env.CSP_MODE !== "report-only");
 const cspHeaderKey = cspEnforce
   ? "Content-Security-Policy"
   : "Content-Security-Policy-Report-Only";
@@ -115,6 +112,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 14_400,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 80, 96, 128, 256, 384],
     remotePatterns: [
@@ -167,30 +165,6 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
-      // Long-lived cache for hashed static assets — production only. In dev,
-      // Next.js manages these routes and custom Cache-Control breaks HMR.
-      ...(process.env.NODE_ENV === "production"
-        ? [
-            {
-              source: "/_next/static/:path*",
-              headers: [
-                {
-                  key: "Cache-Control",
-                  value: "public, max-age=31536000, immutable",
-                },
-              ],
-            },
-            {
-              source: "/_next/image/:path*",
-              headers: [
-                {
-                  key: "Cache-Control",
-                  value: "public, max-age=31536000, immutable",
-                },
-              ],
-            },
-          ]
-        : []),
     ];
   },
 };

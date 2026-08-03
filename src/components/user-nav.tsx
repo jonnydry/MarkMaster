@@ -58,7 +58,13 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => window.open(`https://x.com/${user.username}`, "_blank")}
+          onClick={() =>
+            window.open(
+              `https://x.com/${user.username}`,
+              "_blank",
+              "noopener,noreferrer"
+            )
+          }
         >
           <User />
           View X Profile
@@ -118,7 +124,13 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuItem
-          onClick={() => window.open("/api/export?format=json")}
+          onClick={() =>
+            window.open(
+              "/api/export?format=json",
+              "_blank",
+              "noopener,noreferrer"
+            )
+          }
         >
           <Download />
           Export Bookmarks

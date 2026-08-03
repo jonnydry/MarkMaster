@@ -24,7 +24,7 @@ import {
   BookmarkCardSelectionToggle,
   BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
-import { getBookmarkTweetUrl } from "@/lib/bookmark-url";
+import { openBookmarkOnX } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
 import { FEED_POST_TEXT } from "@/lib/typography";
 import { formatCompactCount } from "@/lib/format-metrics";
@@ -114,7 +114,6 @@ export const BookmarkCard = memo(function BookmarkCard({
   const t = useTypography();
   const metrics = bookmark.publicMetrics;
   const mediaItems = bookmark.media as BookmarkWithRelations["media"];
-  const tweetUrl = getBookmarkTweetUrl(bookmark) ?? "";
   const canExpandCompact = viewMode === "compact" && Boolean(onCompactExpandedChange);
   const canPostAreaExpand =
     viewMode !== "compact" && Boolean(onOpenExpanded) && !selectionMode;
@@ -500,7 +499,7 @@ export const BookmarkCard = memo(function BookmarkCard({
               <BookmarkCardActionButton
                 icon={ArrowUpRight}
                 label="Open on X"
-                onClick={() => window.open(tweetUrl, "_blank")}
+                onClick={() => openBookmarkOnX(bookmark)}
                 shortcut="O"
               />
               {onDelete && (

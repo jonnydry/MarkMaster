@@ -84,7 +84,7 @@ MarkMaster is a **bookmark manager built for people who save a lot on X** and ne
 
 ### Prerequisites
 
-- **Node.js 20+** (CI uses 20; 18+ may work locally)
+- **Node.js 20.9+** (required by Next.js 16)
 - **PostgreSQL** — local Docker, [Neon](https://neon.tech), or Supabase
 - **X Developer App** with OAuth 2.0 (`bookmark.read` scope)
 - **(Optional)** [xAI API key](https://console.x.ai/) for Orbit Grok scans
@@ -116,13 +116,14 @@ npm run env:check
 | `AUTH_SECRET` | Yes | Session signing (`openssl rand -base64 32`) |
 | `AUTH_TWITTER_ID` / `AUTH_TWITTER_SECRET` | Yes | X OAuth 2.0 credentials |
 | `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
+| `AUTH_TRUST_HOST` | Self-hosted production | Set `true` only behind a trusted reverse proxy that replaces forwarded Host headers; Vercel is detected automatically |
 | `ENCRYPTION_KEY` | Yes | 64-char hex for token encryption (`openssl rand -hex 32`) |
 | `XAI_API_KEY` | No | Enables Grok Orbit scans |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | **Yes in production** | Distributed rate limiting; proxy returns 503 if absent in production |
 | `SYNC_WORKER_SECRET` | **Yes in production** | Authorizes sync-worker dispatch and `/api/internal/sync/worker` |
 | `CRON_SECRET` | **Yes in production** | Authorizes Vercel Cron queue draining (and can authorize worker route as fallback) |
 | `OWNER_USER_ID` | **Yes in production** | Prisma User.id allowed to access debug tools; endpoints fail closed if unset in production |
-| `CSP_MODE` | No | `report-only` (default) or `enforce` for CSP header mode |
+| `CSP_MODE` | No | Production defaults to `enforce`; set `report-only` only for a temporary diagnostics/rollback window |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 

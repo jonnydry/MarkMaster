@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -22,6 +23,10 @@ function getFocusableElements(container: HTMLElement | null) {
   );
 }
 
+const subscribeToHydration = () => () => {};
+const getHydratedSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 interface MobileSidebarProps {
   tags: TagWithCount[];
   collections: CollectionWithCount[];
@@ -41,6 +46,12 @@ export function MobileSidebar({
   ...props
 }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerSnapshot
+  );
+  const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -106,6 +117,54 @@ export function MobileSidebar({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
+  const portal = hydrated
+    ? createPortal(
+        <>
+          <div
+            className={cn(
+              appFixedViewportClassName,
+              appOverlayBackdropClassName,
+              "fixed inset-x-0 top-0 z-40 transition-opacity duration-300 motion-reduce:transition-none md:hidden",
+              open ? "opacity-100" : "pointer-events-none opacity-0"
+            )}
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            ref={panelRef}
+            id={panelId}
+            className={cn(
+              appFixedViewportClassName,
+              "fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border bg-sidebar/95 backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden dark:bg-sidebar/80",
+              open ? "translate-x-0" : "-translate-x-full"
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sidebar navigation"
+            aria-hidden={!open}
+            inert={!open}
+          >
+            <div className="absolute right-3 top-3 z-10">
+              <Button
+                ref={closeButtonRef}
+                variant="ghost"
+                size="icon"
+                onClick={() => setOpen(false)}
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden pt-10">
+              <Sidebar {...props} forceExpanded />
+            </div>
+          </div>
+        </>,
+        document.body
+      )
+    : null;
+
   return (
     <>
       <Button
@@ -118,47 +177,12 @@ export function MobileSidebar({
         )}
         onClick={() => setOpen(true)}
         aria-label="Open menu"
+        aria-controls={panelId}
+        aria-expanded={open}
       >
         <Menu className={compactToolbar ? "size-4" : "size-5"} />
       </Button>
-
-      <div
-        className={cn(
-          appFixedViewportClassName,
-          appOverlayBackdropClassName,
-          "fixed inset-x-0 top-0 z-40 transition-opacity duration-300 motion-reduce:transition-none md:hidden",
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        )}
-        onClick={() => setOpen(false)}
-        aria-hidden="true"
-      />
-
-      <div
-        ref={panelRef}
-        className={cn(
-          appFixedViewportClassName,
-          "fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border bg-sidebar/95 backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden dark:bg-sidebar/80",
-          open ? "translate-x-0" : "-translate-x-full"
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Sidebar navigation"
-      >
-        <div className="absolute right-3 top-3 z-10">
-          <Button
-            ref={closeButtonRef}
-            variant="ghost"
-            size="icon"
-            onClick={() => setOpen(false)}
-            aria-label="Close menu"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-        <div className="flex h-full min-h-0 flex-col overflow-hidden pt-10">
-          <Sidebar {...props} forceExpanded />
-        </div>
-      </div>
+      {portal}
     </>
   );
 }

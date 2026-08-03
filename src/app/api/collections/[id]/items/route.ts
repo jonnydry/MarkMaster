@@ -6,7 +6,7 @@ import { readJsonBody } from "@/lib/request-body";
 import {
   addCollectionItemSchema,
   deleteCollectionItemSchema,
-  reorderCollectionItemsSchema,
+  updateCollectionItemsOrderSchema,
 } from "@/lib/validations";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
@@ -201,7 +201,7 @@ export async function PATCH(
   if (!body.ok) {
     return NextResponse.json({ error: body.error }, { status: body.status });
   }
-  const parsed = reorderCollectionItemsSchema.safeParse(body.data);
+  const parsed = updateCollectionItemsOrderSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
@@ -209,17 +209,77 @@ export async function PATCH(
     );
   }
 
+  const orderUpdate = parsed.data;
+
+  if ("direction" in orderUpdate) {
+    const { bookmarkId, direction } = orderUpdate;
+    const moveResult = await prisma.$transaction(async (tx) => {
+      const current = await tx.collectionItem.findUnique({
+        where: {
+          collectionId_bookmarkId: {
+            collectionId,
+            bookmarkId,
+          },
+        },
+        select: { id: true, sortOrder: true },
+      });
+      if (!current) return { moved: false, missing: true } as const;
+
+      const movingUp = direction === "up";
+      const neighbor = await tx.collectionItem.findFirst({
+        where: {
+          collectionId,
+          OR: movingUp
+            ? [
+                { sortOrder: { lt: current.sortOrder } },
+                { sortOrder: current.sortOrder, id: { lt: current.id } },
+              ]
+            : [
+                { sortOrder: { gt: current.sortOrder } },
+                { sortOrder: current.sortOrder, id: { gt: current.id } },
+              ],
+        },
+        orderBy: movingUp
+          ? [{ sortOrder: "desc" }, { id: "desc" }]
+          : [{ sortOrder: "asc" }, { id: "asc" }],
+        select: { id: true, sortOrder: true },
+      });
+      if (!neighbor) return { moved: false, missing: false } as const;
+
+      await Promise.all([
+        tx.collectionItem.update({
+          where: { id: current.id },
+          data: { sortOrder: neighbor.sortOrder },
+        }),
+        tx.collectionItem.update({
+          where: { id: neighbor.id },
+          data: { sortOrder: current.sortOrder },
+        }),
+      ]);
+
+      return { moved: true, missing: false } as const;
+    });
+
+    if (moveResult.missing) {
+      return NextResponse.json({ error: "Bookmark not found" }, { status: 404 });
+    }
+
+    await invalidateUserResponseCache(user.id);
+    return NextResponse.json({ success: true, moved: moveResult.moved });
+  }
+
+  const reorderItems = orderUpdate.items;
   const reorderResult = await prisma.$transaction(async (tx) => {
     const existingItems = await tx.collectionItem.findMany({
       where: {
         collectionId,
-        bookmarkId: { in: parsed.data.items.map((item) => item.bookmarkId) },
+        bookmarkId: { in: reorderItems.map((item) => item.bookmarkId) },
       },
       select: { bookmarkId: true },
     });
 
     const existingIds = new Set(existingItems.map((item) => item.bookmarkId));
-    const missingIds = parsed.data.items
+    const missingIds = reorderItems
       .map((item) => item.bookmarkId)
       .filter((id) => !existingIds.has(id));
 
@@ -229,7 +289,7 @@ export async function PATCH(
 
     // Single bulk UPDATE instead of up to MAX_REORDER_ITEMS individual round-trips.
     // Scoped to collectionId so it can only touch rows already validated above.
-    const valueTuples = parsed.data.items.map(
+    const valueTuples = reorderItems.map(
       (item) => Prisma.sql`(${item.bookmarkId}, ${item.sortOrder}::int)`
     );
 
@@ -254,5 +314,6 @@ export async function PATCH(
     );
   }
 
+  await invalidateUserResponseCache(user.id);
   return NextResponse.json({ success: true });
 }

@@ -149,6 +149,10 @@ export interface AnalyticsData {
   orbitHighConfidenceAcceptRate: number;
 }
 
+export interface TopAuthorsResponse {
+  topAuthors: AnalyticsData["topAuthors"];
+}
+
 export type SyncRunStatus =
   | "PENDING"
   | "RUNNING"

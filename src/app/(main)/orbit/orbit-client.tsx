@@ -241,6 +241,7 @@ export default function OrbitPage() {
             compactable
             bodyClassName="px-0 py-0"
           >
+            <h1 className="sr-only">Orbit review</h1>
             <OrbitCommandBar
               ref={searchInputRef}
               mobileSidebar={

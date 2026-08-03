@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { AppPageShell } from "@/components/app-page-shell";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, MousePointer2 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
@@ -191,6 +191,7 @@ export default function OrbitMapPage() {
         />
       }
     >
+        <h1 className="sr-only">Orbit map</h1>
         <div
           ref={stageRef}
           className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
@@ -306,6 +307,17 @@ export default function OrbitMapPage() {
           {stats && (
             <OrbitMapStatsStrip stats={stats} truncatedCount={truncatedCount} />
           )}
+
+          {graph && !selection ? (
+            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-sm px-3 py-2 text-2xs font-medium text-white/70 sm:flex">
+              <MousePointer2 className="size-3.5 text-primary" aria-hidden="true" />
+              <span>Select a node to inspect</span>
+              <span className="text-white/30" aria-hidden="true">·</span>
+              <span>Scroll to zoom</span>
+              <span className="text-white/30" aria-hidden="true">·</span>
+              <span>Drag to pan</span>
+            </div>
+          ) : null}
 
           {/* Inspector — appears only on selection. Mobile: bottom sheet.
               Desktop: right-docked glass panel. */}

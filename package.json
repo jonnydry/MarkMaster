@@ -4,6 +4,9 @@
   "description": "Search, tag, annotate, and curate your X bookmarks with collections, analytics, and local sync.",
   "license": "MIT",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "postinstall": "prisma generate",
     "predev": "node scripts/check-db-migrations.mjs",
