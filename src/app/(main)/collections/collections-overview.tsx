@@ -31,6 +31,7 @@ type CollectionsOverviewProps = {
   largestCollection: CollectionWithCount | null;
   maxItems: number;
   onCreateCollection: () => void;
+  onOrganizeUnshelved: () => void;
   onOpenCollection: (id: string) => void;
 };
 
@@ -46,8 +47,13 @@ export function CollectionsOverview({
   largestCollection,
   maxItems,
   onCreateCollection,
+  onOrganizeUnshelved,
   onOpenCollection,
 }: CollectionsOverviewProps) {
+  const unshelvedCount = Math.max(
+    0,
+    (libraryBookmarkCount ?? organizedBookmarkCount) - organizedBookmarkCount
+  );
   const largestCount = largestCollection
     ? getCollectionItemCount(largestCollection)
     : 0;
@@ -98,6 +104,18 @@ export function CollectionsOverview({
                   </>
                 )}
               </p>
+              {!isLibraryStatsLoading && unshelvedCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 h-8 gap-1.5 px-2 text-xs text-primary"
+                  onClick={onOrganizeUnshelved}
+                >
+                  Organize unshelved in Orbit
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Button>
+              ) : null}
             </div>
           </div>
           <Button

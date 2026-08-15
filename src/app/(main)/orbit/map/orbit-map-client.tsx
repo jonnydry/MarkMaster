@@ -38,7 +38,7 @@ const OrbitMapCanvas = dynamic(
       >
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Charting graph…
+          Charting map…
         </div>
       </div>
     ),
@@ -200,14 +200,14 @@ export default function OrbitMapPage() {
             <div className="flex h-full w-full items-center justify-center bg-background">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                Charting graph…
+                Charting map…
               </div>
             </div>
           ) : isError ? (
             <div className="flex h-full w-full items-center justify-center bg-background p-6">
               <ErrorState
                 layout="stage"
-                title="Graph could not be loaded"
+                title="Map could not be loaded"
                 description={
                   error instanceof Error ? error.message : "Please try again."
                 }

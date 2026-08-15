@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
@@ -69,16 +69,22 @@ export type CollectionDetail = {
 };
 
 const COLLECTION_PAGE_LIMIT = 20;
+const EMPTY_COLLECTION_ITEMS: CollectionItemRow[] = [];
+export type CollectionDetailSort = "custom" | "newest" | "oldest";
 
 function buildCollectionQueryString(
   page: number,
-  pageCursors: Record<number, string>
+  pageCursors: Record<number, string>,
+  search: string,
+  sort: CollectionDetailSort
 ) {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: COLLECTION_PAGE_LIMIT.toString(),
+    sort,
   });
-  const cursor = page > 1 ? pageCursors[page] : undefined;
+  if (search) params.set("q", search);
+  const cursor = sort === "custom" && !search && page > 1 ? pageCursors[page] : undefined;
   if (cursor) {
     params.set("cursor", cursor);
   }
@@ -100,10 +106,13 @@ export function useCollectionDetailPage(
   const [shareContent, setShareContent] = useState<ShareContent | null>(null);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<CollectionDetailSort>("custom");
+  const deferredSearch = useDeferredValue(searchQuery.trim());
 
   const queryString = useMemo(
-    () => buildCollectionQueryString(page, pageCursors),
-    [page, pageCursors]
+    () => buildCollectionQueryString(page, pageCursors, deferredSearch, sortMode),
+    [deferredSearch, page, pageCursors, sortMode]
   );
 
   const preparePageCursor = useCallback((forPage: number, cursor: string) => {
@@ -115,6 +124,7 @@ export function useCollectionDetailPage(
   const {
     data: collection,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
@@ -137,13 +147,7 @@ export function useCollectionDetailPage(
     placeholderData: keepPreviousData,
   });
 
-  const sortedItems = useMemo(
-    () =>
-      collection
-        ? [...collection.items].sort((a, b) => a.sortOrder - b.sortOrder)
-        : [],
-    [collection]
-  );
+  const sortedItems = collection?.items ?? EMPTY_COLLECTION_ITEMS;
 
   const sortedBookmarkIds = useMemo(
     () => sortedItems.map((item) => item.bookmark.id),
@@ -159,8 +163,10 @@ export function useCollectionDetailPage(
   const isUserCollection = collection?.type === "user_collection";
   const totalItems = collection?.total ?? sortedItems.length;
   const totalPages = collection?.totalPages ?? 1;
-  const canReorder = isUserCollection;
-  const itemCountLabel = bookmarkLabel(totalItems);
+  const canReorder = isUserCollection && sortMode === "custom" && !deferredSearch;
+  const itemCountLabel = deferredSearch
+    ? `${bookmarkLabel(totalItems)} matching “${deferredSearch}”`
+    : bookmarkLabel(totalItems);
   const isNotFound = error instanceof Error && error.message === "NOT_FOUND";
 
   const selectBookmarkByOffset = useCallback(
@@ -358,29 +364,39 @@ export function useCollectionDetailPage(
     router.push("/dashboard");
   }, [router]);
 
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+    setPageCursors({});
+  }, []);
+
+  const handleSortModeChange = useCallback((value: CollectionDetailSort) => {
+    setSortMode(value);
+    setPage(1);
+    setPageCursors({});
+  }, []);
+
   const prefetchCollectionPage = useCallback(
     (targetPage: number) => {
       if (targetPage < 1 || targetPage > totalPages) return;
       if (targetPage === page + 1 && collection?.nextCursor) {
         preparePageCursor(targetPage, collection.nextCursor);
       }
-      const params = new URLSearchParams(queryString);
-      params.set("page", targetPage.toString());
-      if (targetPage > 1) {
-        const cursor =
-          targetPage === page + 1
-            ? collection?.nextCursor
-            : pageCursors[targetPage];
-        if (!cursor) return;
-        params.set("cursor", cursor);
-      } else {
-        params.delete("cursor");
+      const nextCursors = { ...pageCursors };
+      if (targetPage === page + 1 && collection?.nextCursor) {
+        nextCursors[targetPage] = collection.nextCursor;
       }
+      const targetQueryString = buildCollectionQueryString(
+        targetPage,
+        nextCursors,
+        deferredSearch,
+        sortMode
+      );
       void queryClient.prefetchQuery({
-        queryKey: ["collection", collectionId, params.toString()],
+        queryKey: ["collection", collectionId, targetQueryString],
         queryFn: () =>
           fetchJson(
-            `/api/collections/${collectionId}?${params.toString()}`,
+            `/api/collections/${collectionId}?${targetQueryString}`,
             undefined,
             collectionDetailSchema
           ),
@@ -389,11 +405,12 @@ export function useCollectionDetailPage(
     [
       collection,
       collectionId,
+      deferredSearch,
       page,
       pageCursors,
       preparePageCursor,
       queryClient,
-      queryString,
+      sortMode,
       totalPages,
     ]
   );
@@ -436,6 +453,7 @@ export function useCollectionDetailPage(
   return {
     collection,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
@@ -463,6 +481,10 @@ export function useCollectionDetailPage(
     setActiveBookmarkId,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
+    searchQuery,
+    handleSearchChange,
+    sortMode,
+    handleSortModeChange,
     cancelEditingName,
     startEditingName,
     handleCopyAsCollection,

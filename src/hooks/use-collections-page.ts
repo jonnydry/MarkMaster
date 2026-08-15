@@ -138,6 +138,10 @@ export function useCollectionsPage() {
     [router]
   );
 
+  const handleOrganizeUnshelved = useCallback(() => {
+    router.push("/orbit?view=all&intent=oldest");
+  }, [router]);
+
   const selectCollectionByOffset = useCallback(
     (offset: -1 | 1) => {
       if (visibleCollectionIds.length === 0) return;
@@ -265,6 +269,7 @@ export function useCollectionsPage() {
       lastSyncAt,
       goToTagOnDashboard,
       handleNavigate,
+      handleOrganizeUnshelved,
       handleCopy,
       handleDelete,
       clearCollectionFilters,
@@ -303,6 +308,7 @@ export function useCollectionsPage() {
       lastSyncAt,
       goToTagOnDashboard,
       handleNavigate,
+      handleOrganizeUnshelved,
       handleCopy,
       handleDelete,
       clearCollectionFilters,

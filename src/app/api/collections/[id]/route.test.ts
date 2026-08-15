@@ -101,6 +101,75 @@ describe("/api/collections/[id]", () => {
     expect(prisma.collectionItem.findMany).not.toHaveBeenCalled();
   });
 
+  it("searches the full collection and sorts by newest saved", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.collection.findUnique).mockResolvedValue({
+      id: "collection-1",
+      name: "Test",
+      description: null,
+      type: "user_collection",
+      isPublic: false,
+      shareSlug: null,
+      externalSource: null,
+      externalSourceId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+    vi.mocked(prisma.collectionItem.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collectionItem.count).mockResolvedValue(0);
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost/api/collections/collection-1?page=2&q=design&sort=newest"
+      ),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.collectionItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          collectionId: "collection-1",
+          bookmark: expect.objectContaining({ OR: expect.any(Array) }),
+        }),
+        orderBy: [{ bookmark: { bookmarkedAt: "desc" } }, { id: "desc" }],
+        skip: 20,
+        take: 20,
+      })
+    );
+    expect(prisma.collectionItem.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        collectionId: "collection-1",
+        bookmark: expect.objectContaining({ OR: expect.any(Array) }),
+      }),
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      total: 0,
+      totalPages: 1,
+    });
+  });
+
+  it("rejects custom-order cursors for search or date sorting", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+    const cursor = encodeCollectionItemListCursor({
+      sortOrder: 3,
+      id: "item-3",
+    });
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/collections/collection-1?sort=oldest&cursor=${encodeURIComponent(cursor)}`
+      ),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+
+    expect(response.status).toBe(400);
+    expect(prisma.collection.findUnique).not.toHaveBeenCalled();
+  });
+
   it("updates a user collection and invalidates cache", async () => {
     const { prisma } = await import("@/lib/prisma");
     const { invalidateUserResponseCache } = await import("@/lib/upstash-cache");

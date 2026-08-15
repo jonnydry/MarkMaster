@@ -52,6 +52,20 @@ export interface UseOrbitReviewSessionArgs {
   onOpenChange: (open: boolean) => void;
 }
 
+export interface OrbitReviewCompletion {
+  reviewedCount: number;
+  tagAssignments: number;
+  collectionAssignments: number;
+  keptCount: number;
+  createdTags: number;
+  createdCollections: number;
+}
+
+type OrbitReviewProgressState = OrbitReviewCompletion & {
+  key: string;
+  complete: boolean;
+};
+
 function draftHasChanges(
   draft: OrbitReviewSuggestionDraft,
   original: OrbitBookmarkSuggestion | null
@@ -125,6 +139,16 @@ export function useOrbitReviewSession({
     key: string;
     id: string | null;
   }>(() => ({ key: "empty", id: null }));
+  const [progressState, setProgressState] = useState<OrbitReviewProgressState>(() => ({
+    key: "empty",
+    complete: false,
+    reviewedCount: 0,
+    tagAssignments: 0,
+    collectionAssignments: 0,
+    keptCount: 0,
+    createdTags: 0,
+    createdCollections: 0,
+  }));
 
   const bookmarkById = useMemo(
     () => new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark])),
@@ -296,8 +320,18 @@ export function useOrbitReviewSession({
 
   const isDigestReview =
     source === "weekly-gems" ||
+    source === "organization-sprint" ||
     Boolean(digestBookmarkIds && digestBookmarkIds.length > 0);
-  const title = isDigestReview ? "Weekly Gems review" : "Orbit review";
+  const title = isDigestReview ? "Organization Sprint" : "Orbit review";
+  const progressKey = [
+    reviewSessionId,
+    focusBookmarkId ?? "all",
+    digestBookmarkIds?.join("|") ?? "standard",
+  ].join(":");
+  const completion =
+    progressState.key === progressKey && progressState.complete
+      ? progressState
+      : null;
   const activePositionLabel =
     activeDraftIndex >= 0
       ? `${activeDraftIndex + 1} / ${effectiveDrafts.length}`
@@ -407,13 +441,51 @@ export function useOrbitReviewSession({
     [bookmarkById, originalSuggestionById, queryClient, updateDraft]
   );
 
+  const recordProgress = useCallback(
+    (
+      applied: OrbitApplyResult,
+      reviewedCount: number,
+      keptCount: number,
+      complete: boolean
+    ) => {
+      setProgressState((current) => {
+        const active =
+          current.key === progressKey
+            ? current
+            : {
+                key: progressKey,
+                complete: false,
+                reviewedCount: 0,
+                tagAssignments: 0,
+                collectionAssignments: 0,
+                keptCount: 0,
+                createdTags: 0,
+                createdCollections: 0,
+              };
+        return {
+          key: progressKey,
+          complete: active.complete || complete,
+          reviewedCount: active.reviewedCount + reviewedCount,
+          tagAssignments: active.tagAssignments + applied.tagAssignments,
+          collectionAssignments:
+            active.collectionAssignments + applied.collectionAssignments,
+          keptCount: active.keptCount + keptCount,
+          createdTags: active.createdTags + applied.createdTags,
+          createdCollections:
+            active.createdCollections + applied.createdCollections,
+        };
+      });
+    },
+    [progressKey]
+  );
+
   const advanceAfterResolve = useCallback((resolvedBookmarkId: string) => {
     const remainingDrafts = effectiveDrafts.filter(
       (draft) => draft.bookmarkId !== resolvedBookmarkId
     );
 
     if (remainingDrafts.length === 0) {
-      onOpenChange(false);
+      if (!isDigestReview) onOpenChange(false);
       return;
     }
 
@@ -426,6 +498,7 @@ export function useOrbitReviewSession({
   }, [
     activeDraftIndex,
     effectiveDrafts,
+    isDigestReview,
     onOpenChange,
     setActiveDraftId,
   ]);
@@ -444,13 +517,24 @@ export function useOrbitReviewSession({
       decisionEvents,
     });
 
-    if (applied) onOpenChange(false);
+    if (applied) {
+      recordProgress(
+        applied,
+        effectiveDrafts.length,
+        keptBookmarkIds.length,
+        isDigestReview
+      );
+      if (!isDigestReview) onOpenChange(false);
+    }
   }, [
     createCollections,
     decisionEvents,
+    effectiveDrafts.length,
+    isDigestReview,
     keptBookmarkIds,
     onApply,
     onOpenChange,
+    recordProgress,
     reviewedPlan,
   ]);
 
@@ -475,15 +559,21 @@ export function useOrbitReviewSession({
       decisionEvents: singleEvents,
     });
 
-    if (applied) advanceAfterResolve(activeDraft.bookmarkId);
+    if (applied) {
+      recordProgress(applied, 1, singleKept.length, isDigestReview && effectiveDrafts.length === 1);
+      advanceAfterResolve(activeDraft.bookmarkId);
+    }
   }, [
     activeDraft,
     advanceAfterResolve,
     createCollections,
     decisionEvents,
+    effectiveDrafts.length,
     existingCollections,
     existingTags,
+    isDigestReview,
     onApply,
+    recordProgress,
     sourcePlan,
   ]);
 
@@ -518,16 +608,22 @@ export function useOrbitReviewSession({
       keptBookmarkIds: [activeDraft.bookmarkId],
       decisionEvents: [keptEvent],
     });
-    if (applied) advanceAfterResolve(activeDraft.bookmarkId);
+    if (applied) {
+      recordProgress(applied, 1, 1, isDigestReview && effectiveDrafts.length === 1);
+      advanceAfterResolve(activeDraft.bookmarkId);
+    }
   }, [
     activeDraft,
     advanceAfterResolve,
     createCollections,
     digestBookmarkIds,
+    effectiveDrafts.length,
     existingCollections,
     existingTags,
+    isDigestReview,
     onApply,
     originalSuggestionById,
+    recordProgress,
     source,
     sourcePlan,
     updateDraft,
@@ -536,9 +632,10 @@ export function useOrbitReviewSession({
   useEffect(() => {
     if (!open) return;
     if (effectiveDrafts.length === 0) {
+      if (isDigestReview) return;
       onOpenChange(false);
     }
-  }, [open, effectiveDrafts.length, onOpenChange]);
+  }, [open, effectiveDrafts.length, isDigestReview, onOpenChange]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -574,12 +671,25 @@ export function useOrbitReviewSession({
       } else if (key === "a") {
         event.preventDefault();
         void handleApplyCurrent();
+      } else if (key === "s" && activeDraft) {
+        event.preventDefault();
+        handleAcceptOrbitSuggestion(activeDraft.bookmarkId);
+      } else if (key === "x") {
+        event.preventDefault();
+        void handleKeepCurrent();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleApplyCurrent, moveActiveDraft, open]);
+  }, [
+    activeDraft,
+    handleAcceptOrbitSuggestion,
+    handleApplyCurrent,
+    handleKeepCurrent,
+    moveActiveDraft,
+    open,
+  ]);
 
   const pendingApplyCount =
     reviewedPlan?.suggestions.length ?? 0;
@@ -587,6 +697,7 @@ export function useOrbitReviewSession({
   return {
     title,
     isDigestReview,
+    completion,
     plan,
     sourcePlan,
     effectiveDrafts,

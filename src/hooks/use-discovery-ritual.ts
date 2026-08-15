@@ -26,7 +26,8 @@ export interface UseDiscoveryRitualReturn {
  * Centralizes:
  * - nurturedCount persistence (localStorage)
  * - celebration banner state
- * - handleReviewInOrbit (fires cta.digest_review_together, increments nurture, navigates with digestIds + source=weekly-gems)
+ * - handleReviewInOrbit (fires the existing analytics event, increments nurture,
+ *   and navigates with digestIds + source=organization-sprint)
  * - handleSaveAsCollection
  *
  * Used by both the unified Discovery carousel (dashboard-discovery.tsx)
@@ -77,7 +78,7 @@ export function useDiscoveryRitual({
     setTimeout(() => {
       setCelebration(null);
       const ids = batch.map((b) => b.id).join(",");
-      router.push(`/orbit?digestIds=${ids}&source=weekly-gems`);
+      router.push(`/orbit?digestIds=${ids}&source=organization-sprint`);
     }, 400);
   };
 

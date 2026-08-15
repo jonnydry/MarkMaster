@@ -151,7 +151,7 @@ export function OrbitActionPill({
             onAction?.(bookmarkId, action.key);
           }}
           className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-sm transition-all",
+            "flex h-9 w-9 items-center justify-center rounded-sm transition-all",
             "hover:bg-primary/10 active:bg-primary/15",
             action.tone === "accept" &&
               "text-emerald-600 hover:bg-emerald-500/15 active:bg-emerald-500/20 dark:text-emerald-300",

@@ -11,7 +11,6 @@ import {
   FolderInput,
   ImageIcon,
   MoreHorizontal,
-  NotebookPen,
   Orbit,
   Tags,
 } from "lucide-react";
@@ -251,7 +250,7 @@ export function DashboardBookmarkInspector({
           />
           <InspectorAction
             icon={FolderInput}
-            label="Move"
+            label={bookmark.collectionItems.length > 0 ? "Collections" : "Add to shelf"}
             active={bookmark.collectionItems.length > 0}
             onClick={() => onAddToCollection(bookmark.id)}
           />
@@ -264,10 +263,6 @@ export function DashboardBookmarkInspector({
               <span>More</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => onAddNote(bookmark.id)}>
-                <NotebookPen />
-                {bookmark.notes.length > 0 ? "Edit note" : "Add note"}
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onReviewInOrbit(bookmark.id)}>
                 <Orbit />
                 Review in Orbit
@@ -291,9 +286,23 @@ export function DashboardBookmarkInspector({
           </div>
         ) : null}
 
-        <BookmarkOverlayTagsSection tags={bookmark.tags} />
-        <BookmarkOverlayCollectionsSection collections={bookmark.collectionItems} />
-        <BookmarkOverlayNotesSection notes={bookmark.notes} />
+        <BookmarkOverlayTagsSection
+          tags={bookmark.tags}
+          actionLabel={bookmark.tags.length > 0 ? "Edit tags" : "Add tag"}
+          onAction={() => onAddTag(bookmark.id)}
+        />
+        <BookmarkOverlayCollectionsSection
+          collections={bookmark.collectionItems}
+          actionLabel={
+            bookmark.collectionItems.length > 0 ? "Edit shelves" : "Add to shelf"
+          }
+          onAction={() => onAddToCollection(bookmark.id)}
+        />
+        <BookmarkOverlayNotesSection
+          notes={bookmark.notes}
+          actionLabel={bookmark.notes.length > 0 ? "Edit note" : "Add note"}
+          onAction={() => onAddNote(bookmark.id)}
+        />
       </div>
     </aside>
   );

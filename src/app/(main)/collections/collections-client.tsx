@@ -66,6 +66,7 @@ export default function CollectionsPage() {
     lastSyncAt,
     goToTagOnDashboard,
     handleNavigate,
+    handleOrganizeUnshelved,
     handleCopy,
     handleDelete,
     clearCollectionFilters,
@@ -185,6 +186,7 @@ export default function CollectionsPage() {
                   largestCollection={collectionStats.largestCollection}
                   maxItems={collectionStats.maxItems}
                   onCreateCollection={handleCreateCollectionOpen}
+                  onOrganizeUnshelved={handleOrganizeUnshelved}
                   onOpenCollection={handleNavigate}
                 />
 
@@ -212,6 +214,7 @@ export default function CollectionsPage() {
                         icon={Layers}
                         title="My Collections"
                         count={visibleUserCollections.length}
+                        meta="Bars compare shelf size"
                       >
                         {visibleUserCollections.map((col) => (
                           <UserCollectionCard
@@ -231,6 +234,7 @@ export default function CollectionsPage() {
                         icon={FolderOpen}
                         title="X Folders"
                         count={visibleXFolders.length}
+                        meta="Bars compare shelf size"
                       >
                         {visibleXFolders.map((col) => (
                           <XFolderCard

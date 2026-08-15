@@ -104,7 +104,8 @@ export function filterDigestDisplayGems(
 /**
  * Discovery carousel data builder (Unified High-Engagement Discovery Carousel).
  * Returns a flat, ordered list of items (raw high-performers front-loaded, then resurfaced + strong library)
- * plus the full ritualBatch (with exact overlap logic for batch CTA "N" count, digestIds, and source=weekly-gems).
+ * plus the full ritualBatch (with exact overlap logic for the batch CTA count
+ * and Organization Sprint digestIds payload).
  * Visual distinction via context + existing itemLabels (for "Resurfaced" badges).
  *
  * This centralizes curation for the single carousel in DashboardDiscovery (default + flush).

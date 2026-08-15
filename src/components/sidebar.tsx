@@ -83,7 +83,7 @@ export interface SidebarProps {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
   { href: "/orbit", icon: OrbitLogoMark, label: "Orbit" },
-  { href: "/orbit/map", icon: Network, label: "Graph" },
+  { href: "/orbit/map", icon: Network, label: "Map" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },

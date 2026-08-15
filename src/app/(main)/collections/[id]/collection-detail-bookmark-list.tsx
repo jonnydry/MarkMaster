@@ -18,6 +18,8 @@ import type { CollectionItemRow } from "@/hooks/use-collection-detail-page";
 import type { ViewMode } from "@/types";
 import { cn } from "@/lib/utils";
 
+const EMPTY_BOOKMARK_ID_SET = new Set<string>();
+
 type CollectionDetailBookmarkListProps = {
   scrollRef: RefObject<HTMLElement | null>;
   sortedItems: CollectionItemRow[];
@@ -34,6 +36,8 @@ type CollectionDetailBookmarkListProps = {
   onRemoveItem: (bookmarkId: string) => void;
   onMoveItem: (fromIndex: number, direction: -1 | 1) => void;
   onGoToDashboard: () => void;
+  searchQuery: string;
+  onClearSearch: () => void;
 };
 
 export function CollectionDetailBookmarkList({
@@ -52,6 +56,8 @@ export function CollectionDetailBookmarkList({
   onRemoveItem,
   onMoveItem,
   onGoToDashboard,
+  searchQuery,
+  onClearSearch,
 }: CollectionDetailBookmarkListProps) {
   const bookmarks = useMemo(
     () => sortedItems.map((item) => item.bookmark),
@@ -60,15 +66,28 @@ export function CollectionDetailBookmarkList({
   const showReorderControls = canReorder && !isSyncedFromX && viewMode === "feed";
 
   if (sortedItems.length === 0) {
+    const hasSearch = searchQuery.trim().length > 0;
     return (
       <div className="py-20">
         <EmptyState
           layout="panel"
           icon={isSyncedFromX ? FolderOpen : Layers}
-          title="No bookmarks in this collection yet"
-          description="Add bookmarks from the dashboard."
+          title={
+            hasSearch
+              ? `No bookmarks match “${searchQuery.trim()}”`
+              : "No bookmarks in this collection yet"
+          }
+          description={
+            hasSearch
+              ? "Try a broader term or clear the collection search."
+              : "Add bookmarks from the dashboard."
+          }
           action={
-            !isSyncedFromX ? (
+            hasSearch ? (
+              <Button variant="outline" size="sm" onClick={onClearSearch}>
+                Clear search
+              </Button>
+            ) : !isSyncedFromX ? (
               <Button variant="outline" size="sm" onClick={onGoToDashboard}>
                 Go to dashboard
               </Button>
@@ -143,7 +162,7 @@ export function CollectionDetailBookmarkList({
         viewMode={viewMode}
         aboveFoldMediaBookmarkIds={aboveFoldMediaBookmarkIds}
         selectionMode={false}
-        selectedBookmarkIdSet={new Set()}
+        selectedBookmarkIdSet={EMPTY_BOOKMARK_ID_SET}
         activeBookmarkId={activeBookmarkId}
       onSelect={onSelectBookmark}
       onSelectionChange={() => {}}

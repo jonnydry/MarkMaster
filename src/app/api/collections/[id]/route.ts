@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
@@ -33,7 +34,16 @@ export async function GET(
     );
   }
 
-  const { page, limit, cursor: rawCursor } = parsedQuery.data;
+  const { page, limit, cursor: rawCursor, q, sort } = parsedQuery.data;
+  const search = q?.trim() || null;
+  const keysetEligible = sort === "custom" && !search;
+
+  if (rawCursor && !keysetEligible) {
+    return NextResponse.json(
+      { error: "Cursor pagination is only available for custom order." },
+      { status: 400 }
+    );
+  }
 
   const decodedCursor = rawCursor ? decodeCollectionItemListCursor(rawCursor) : null;
   if (rawCursor && !decodedCursor) {
@@ -63,12 +73,34 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const itemWhere = {
+  const baseItemWhere: Prisma.CollectionItemWhereInput = {
     collectionId: id,
+    ...(search
+      ? {
+          bookmark: {
+            OR: [
+              { tweetText: { contains: search, mode: "insensitive" } },
+              { authorUsername: { contains: search, mode: "insensitive" } },
+              { authorDisplayName: { contains: search, mode: "insensitive" } },
+              { notes: { some: { content: { contains: search, mode: "insensitive" } } } },
+              { tags: { some: { tag: { name: { contains: search, mode: "insensitive" } } } } },
+            ],
+          },
+        }
+      : {}),
+  };
+  const itemWhere: Prisma.CollectionItemWhereInput = {
+    ...baseItemWhere,
     ...(decodedCursor
       ? buildPrismaCollectionItemKeysetFilter(decodedCursor)
       : {}),
   };
+  const itemOrderBy: Prisma.CollectionItemOrderByWithRelationInput[] =
+    sort === "newest"
+      ? [{ bookmark: { bookmarkedAt: "desc" } }, { id: "desc" }]
+      : sort === "oldest"
+        ? [{ bookmark: { bookmarkedAt: "asc" } }, { id: "asc" }]
+        : [{ sortOrder: "asc" }, { id: "asc" }];
 
   const [items, total] = await Promise.all([
     prisma.collectionItem.findMany({
@@ -78,14 +110,16 @@ export async function GET(
         sortOrder: true,
         bookmark: bookmarkListQueryOptions({ compact: true }),
       },
-      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      orderBy: itemOrderBy,
       ...(useKeyset || !useOffset ? {} : { skip: (page - 1) * limit }),
       take: limit,
     }),
-    prisma.collectionItem.count({ where: { collectionId: id } }),
+    prisma.collectionItem.count({ where: baseItemWhere }),
   ]);
 
-  const nextCursor = buildCollectionItemListNextCursor(items, limit);
+  const nextCursor = keysetEligible
+    ? buildCollectionItemListNextCursor(items, limit)
+    : undefined;
 
   return NextResponse.json(
     {

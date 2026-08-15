@@ -22,6 +22,7 @@ type HighlightProgressProps = {
   percent: number;
   tone?: HighlightProgressTone;
   size?: HighlightProgressSize;
+  label?: string;
   className?: string;
   durationClass?: "duration-300" | "duration-500" | "duration-700";
 };
@@ -30,6 +31,7 @@ export function HighlightProgress({
   percent,
   tone = "primary",
   size = "sm",
+  label,
   className,
   durationClass = "duration-700",
 }: HighlightProgressProps) {
@@ -44,6 +46,7 @@ export function HighlightProgress({
         className
       )}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={clamped}
       aria-valuemin={0}
       aria-valuemax={100}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,6 +34,7 @@ import {
   OrbitReviewQueueProposalChips,
 } from "@/components/orbit/orbit-review-proposal";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +74,7 @@ export function OrbitReviewOverlay({
 
   const {
     title,
+    completion,
     plan,
     effectiveDrafts,
     activeBookmark,
@@ -114,7 +117,65 @@ export function OrbitReviewOverlay({
           Review Grok suggestions with full bookmark context.
         </DialogDescription>
 
-        {activeBookmark && activeDraft ? (
+        {completion ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center p-5 sm:p-8">
+            <div className="w-full max-w-xl surface-solid p-5 text-center sm:p-7">
+              <span className="mx-auto flex size-12 items-center justify-center rounded-full border border-success/25 bg-success/10 text-success">
+                <CheckCircle2 className="size-6" aria-hidden="true" />
+              </span>
+              <p className="mt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-primary">
+                Organization Sprint
+              </p>
+              <h2 className="mt-1 heading-font text-2xl font-bold text-foreground">
+                Sprint complete
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                You reviewed {completion.reviewedCount} bookmark
+                {completion.reviewedCount === 1 ? "" : "s"}. Your library is clearer,
+                and the next resurfacing mix can use these decisions.
+              </p>
+
+              <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <CompletionMetric label="Reviewed" value={completion.reviewedCount} />
+                <CompletionMetric label="Tag assignments" value={completion.tagAssignments} />
+                <CompletionMetric
+                  label="Collection moves"
+                  value={completion.collectionAssignments}
+                />
+                <CompletionMetric label="Kept in Orbit" value={completion.keptCount} />
+              </dl>
+
+              {completion.createdTags > 0 || completion.createdCollections > 0 ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {completion.createdTags > 0
+                    ? `${completion.createdTags} new tag${completion.createdTags === 1 ? "" : "s"}`
+                    : ""}
+                  {completion.createdTags > 0 && completion.createdCollections > 0
+                    ? " · "
+                    : ""}
+                  {completion.createdCollections > 0
+                    ? `${completion.createdCollections} new collection${
+                        completion.createdCollections === 1 ? "" : "s"
+                      }`
+                    : ""}
+                </p>
+              ) : null}
+
+              <div className="mt-6 flex flex-col-reverse justify-center gap-2 sm:flex-row">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Back to Orbit
+                </Button>
+                <Link
+                  href="/collections"
+                  onClick={() => onOpenChange(false)}
+                  className={buttonVariants({ variant: "highlight" })}
+                >
+                  See improved collections
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : activeBookmark && activeDraft ? (
           <div
             data-orbit-review-overlay
             className={appOverlayDialogGridReviewClassName}
@@ -473,6 +534,9 @@ export function OrbitReviewOverlay({
                     onCheckedChange={setCreateCollections}
                   />
                 </div>
+                <p className="text-center text-2xs text-muted-foreground/70">
+                  J/K move · S use suggestion · A apply · X keep
+                </p>
               </div>
             </aside>
           </div>
@@ -485,5 +549,18 @@ export function OrbitReviewOverlay({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CompletionMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col surface-inset-strong px-2 py-3">
+      <dt className="order-2 mt-1 text-2xs uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="order-1 heading-font text-xl font-bold tabular-nums text-foreground">
+        {value.toLocaleString()}
+      </dd>
+    </div>
   );
 }

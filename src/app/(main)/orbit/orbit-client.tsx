@@ -503,7 +503,7 @@ export default function OrbitPage() {
                           )}
                         >
                           <MapIcon className="size-3.5" aria-hidden />
-                          Inspect graph
+                          Open map
                         </Link>
                         <Button
                           size="sm"

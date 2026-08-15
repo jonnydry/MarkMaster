@@ -51,19 +51,24 @@ export const OrbitListRow = memo(function OrbitListRow({
   const author = bookmark.authorDisplayName || bookmark.authorUsername || "Unknown";
   const handle = bookmark.authorUsername ? `@${bookmark.authorUsername}` : "";
 
-  const timeAgo = (() => {
-    const at = bookmark.bookmarkedAt ?? bookmark.tweetCreatedAt;
+  const savedLabel = (() => {
+    const savedAt = bookmark.bookmarkedAt;
+    const at = savedAt ?? bookmark.tweetCreatedAt;
     if (!at) return "";
     const date = new Date(at);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
+    const prefix = savedAt ? "Saved" : "Posted";
 
-    if (diffHours < 1) return "now";
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    if (diffHours < 1) return `${prefix} now`;
+    if (diffHours < 24) return `${prefix} ${diffHours}h ago`;
+    if (diffDays < 7) return `${prefix} ${diffDays}d ago`;
+    return `${prefix} ${date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    })}`;
   })();
 
   const likes = bookmark.publicMetrics?.like_count ?? 0;
@@ -96,13 +101,6 @@ export const OrbitListRow = memo(function OrbitListRow({
     onSelect?.(bookmark.id);
   };
 
-  const handleRowKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      handleRowClick();
-    }
-  };
-
   const excerpt = bookmark.tweetText?.trim() || "Untitled bookmark";
   const checkboxLabel = `${author}: ${excerpt.slice(0, 80)}`;
   const mediaItems = bookmark.media;
@@ -112,15 +110,10 @@ export const OrbitListRow = memo(function OrbitListRow({
     tweetId: bookmark.tweetId};
 
   return (
-    <div
+    <article
       data-orbit-row-id={bookmark.id}
-      role="button"
-      tabIndex={selectionMode ? -1 : 0}
-      aria-pressed={selected}
-      onClick={handleRowClick}
-      onKeyDown={handleRowKeyDown}
       className={cn(
-        "group flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all",
+        "group relative flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all",
         orbitHairlineBorder(),
         orbitHoverRowClass(),
         !selectionMode &&
@@ -131,8 +124,25 @@ export const OrbitListRow = memo(function OrbitListRow({
         queueStatus === "applied" && "opacity-70"
       )}
     >
+      <button
+        type="button"
+        onClick={handleRowClick}
+        aria-label={
+          selectionMode
+            ? `${bulkSelected ? "Remove" : "Add"} ${checkboxLabel} ${
+                bulkSelected ? "from" : "to"
+              } selection`
+            : `Review ${checkboxLabel}`
+        }
+        aria-pressed={selectionMode ? bulkSelected : undefined}
+        aria-current={!selectionMode && selected ? "true" : undefined}
+        className="absolute inset-0 z-0 rounded-none border border-transparent focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
+      />
       {selectionMode ? (
-        <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="relative z-10 shrink-0 pt-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Checkbox
             checked={bulkSelected}
             onCheckedChange={() => onToggleSelect?.(bookmark.id)}
@@ -143,7 +153,7 @@ export const OrbitListRow = memo(function OrbitListRow({
 
       <div
         className={cn(
-          "mt-1 w-[3px] shrink-0 self-stretch rounded-none transition-all",
+          "pointer-events-none relative z-10 mt-1 w-[3px] shrink-0 self-stretch rounded-none transition-all",
           selected
             ? "bg-primary"
             : "bg-transparent group-hover:bg-primary/25",
@@ -151,7 +161,7 @@ export const OrbitListRow = memo(function OrbitListRow({
         )}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-1.5">
         <div
           className={cn(
             "flex min-w-0 items-center gap-1.5 truncate text-2xs",
@@ -178,13 +188,13 @@ export const OrbitListRow = memo(function OrbitListRow({
               </span>
             </>
           ) : null}
-          {timeAgo ? (
+          {savedLabel ? (
             <>
               <span className={"text-muted-foreground/50"}>
                 ·
               </span>
               <span className={cn(orbitDataClass(), "shrink-0 tabular-nums")}>
-                {timeAgo}
+                {savedLabel}
               </span>
             </>
           ) : null}
@@ -206,21 +216,25 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
         </div>
 
-        <BookmarkPostPreview
-          tweetText={excerpt}
-          authorUsername={bookmark.authorUsername}
-          media={hasMedia ? mediaItems : null}
-          tweetLink={tweetLink}
-          bookmarkKey={bookmark.id}
-          variant="compact"
-          stopClickPropagation
-          textClassName={cn(
-            "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
-            "text-foreground",
-            queueStatus === "dismissed" &&
-              "line-through decoration-foreground/30"
-          )}
-        />
+        <div>
+          <BookmarkPostPreview
+            tweetText={excerpt}
+            authorUsername={bookmark.authorUsername}
+            media={hasMedia ? mediaItems : null}
+            tweetLink={tweetLink}
+            bookmarkKey={bookmark.id}
+            variant="compact"
+            stopClickPropagation
+            className="pointer-events-none"
+            galleryClassName="pointer-events-auto"
+            textClassName={cn(
+              "line-clamp-4 normal-case text-[13px] font-medium leading-snug tracking-normal",
+              "text-foreground",
+              queueStatus === "dismissed" &&
+                "line-through decoration-foreground/30"
+            )}
+          />
+        </div>
 
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -277,7 +291,7 @@ export const OrbitListRow = memo(function OrbitListRow({
 
           <div
             className={cn(
-              "flex shrink-0 items-center gap-1 transition-opacity",
+              "pointer-events-auto flex shrink-0 items-center gap-1 transition-opacity",
               selected || selectionMode
                 ? "opacity-100"
                 : "opacity-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
@@ -296,7 +310,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                 onQuickAction?.(bookmark.id, "menu", e);
               }}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-sm border border-transparent transition-colors",
+                "flex h-9 w-9 items-center justify-center rounded-sm border border-transparent transition-colors",
                 "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 orbitMetaMuted()
               )}
@@ -308,6 +322,6 @@ export const OrbitListRow = memo(function OrbitListRow({
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 });

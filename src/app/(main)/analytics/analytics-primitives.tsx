@@ -172,6 +172,10 @@ export function AnalyticsHero({
     ? `Synced ${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`
     : "Not synced yet";
   const oldestLabel = oldestAt ? relativeOldest(new Date(oldestAt)) : null;
+  const primaryOrganizeHref =
+    rawHighlightsCount > 0
+      ? "/dashboard?discovery=1#dashboard-discovery-panel"
+      : orbitHref;
 
   return (
     <section className="border-b border-hairline-soft pb-5">
@@ -201,13 +205,13 @@ export function AnalyticsHero({
         </dl>
         {!allTriaged && orbitQueueCount > 0 ? (
           <Link
-            href={orbitHref}
+            href={primaryOrganizeHref}
             className={cn(
               buttonVariants({ variant: "highlight", size: "sm" }),
               "shrink-0 gap-1"
             )}
           >
-            Triage now
+            {rawHighlightsCount > 0 ? "Start Organization Sprint" : "Organize in Orbit"}
             <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         ) : null}
@@ -246,7 +250,7 @@ export function AnalyticsHero({
             <>
               <span className="text-muted-foreground/50"> · </span>
               <Link href={orbitHref} className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline">
-                Review Orbit
+                Organize in Orbit
               </Link>
             </>
           ) : null}
@@ -275,9 +279,10 @@ export const analyticsListSurfaceCardClass =
 const SOURCE_LABELS: Record<string, string> = {
   highlights: "Highlights",
   library_highlights: "Library",
-  library_control: "Control",
-  digest: "Digest",
-  "weekly-gems": "Gems",
+  library_control: "Library health",
+  digest: "Discovery",
+  "weekly-gems": "Discovery",
+  "organization-sprint": "Organization Sprint",
   direct: "Direct",
 };
 
@@ -314,7 +319,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
         role="status"
         className="surface-inset flex items-center justify-center border-dashed py-16 text-sm text-muted-foreground"
       >
-        No flywheel activity in this range yet.
+        No Orbit review activity in this range yet.
       </div>
     );
   }
@@ -322,20 +327,19 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
   return (
     <div className="space-y-4 py-6 first:pt-4">
       <p className="text-xs text-muted-foreground">
-        Product telemetry for Orbit rituals and digest flows in the selected time range.
+        How often Orbit suggestions helped and where focused review sessions began.
       </p>
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatRow size="base" label="Highlights → Orbit" value={cta.toLocaleString()} />
-        <StatRow size="base" label="Digest review together" value={digestCta.toLocaleString()} />
-        <StatRow size="base" label="Good feedback" value={good.toLocaleString()} />
-        <StatRow size="base" label="Not relevant feedback" value={notRel.toLocaleString()} />
-        <StatRow size="base" label="Quick Pass toggles" value={quick.toLocaleString()} />
-        <StatRow size="base" label="Deep Review toggles" value={deep.toLocaleString()} />
-        <StatRow size="base" label="Digest sessions" value={sessions.toLocaleString()} />
-        <StatRow size="base" label="Orbit accepted" value={orbitAccepted.toLocaleString()} />
-        <StatRow size="base" label="Orbit edited" value={orbitEdited.toLocaleString()} />
-        <StatRow size="base" label="Orbit kept" value={orbitKept.toLocaleString()} />
-        <StatRow size="base" label="Orbit rejected" value={orbitRejected.toLocaleString()} />
+        <StatRow size="base" label="Bookmarks opened in Orbit" value={cta.toLocaleString()} />
+        <StatRow size="base" label="Organization Sprint starts" value={digestCta.toLocaleString()} />
+        <StatRow size="base" label="Sprint sessions" value={sessions.toLocaleString()} />
+        <StatRow size="base" label="Suggestions reviewed" value={orbitTotal.toLocaleString()} />
+        <StatRow size="base" label="Accepted as suggested" value={orbitAccepted.toLocaleString()} />
+        <StatRow size="base" label="Edited before applying" value={orbitEdited.toLocaleString()} />
+        <StatRow size="base" label="Kept for later" value={orbitKept.toLocaleString()} />
+        <StatRow size="base" label="Rejected" value={orbitRejected.toLocaleString()} />
+        <StatRow size="base" label="Helpful resurfacing" value={good.toLocaleString()} />
+        <StatRow size="base" label="Not useful" value={notRel.toLocaleString()} />
       </dl>
       {(digestCta > 0 ||
         quick + deep > 0 ||
@@ -346,7 +350,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {digestCta > 0 ? (
               <span>
-                Digest CTA → session{" "}
+                Sprint launch rate{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(digestRate * 100)}%
                 </span>
@@ -354,7 +358,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {quick + deep > 0 ? (
               <span>
-                Quick Pass share{" "}
+                Quick review usage{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(quickShare * 100)}%
                 </span>
@@ -362,7 +366,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {topEntrySources.length > 0 ? (
               <span>
-                Top sources{" "}
+                Top entry points{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {topEntrySources
                     .map((s) => `${sourceLabel(s.source)} ${Math.round(s.pct * 100)}%`)
@@ -372,7 +376,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {quickKeeps > 0 ? (
               <span>
-                Quick Pass keep rate{" "}
+                Quick review keep rate{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(quickKeepRate * 100)}%
                 </span>
@@ -380,7 +384,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {orbitTotal > 0 ? (
               <span>
-                Orbit accept rate{" "}
+                Accepted unchanged{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(orbitAcceptRate * 100)}%
                 </span>
@@ -388,7 +392,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {orbitTotal > 0 ? (
               <span>
-                Orbit edit rate{" "}
+                Edited before applying{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(orbitEditRate * 100)}%
                 </span>
@@ -396,7 +400,7 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
             ) : null}
             {orbitTotal > 0 ? (
               <span>
-                High-confidence accept{" "}
+                High-confidence accepted{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {Math.round(orbitHighConfidenceAcceptRate * 100)}%
                 </span>

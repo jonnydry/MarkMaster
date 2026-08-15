@@ -41,7 +41,7 @@ export function DiscoveryBatchBar({
       {celebration ? (
         <DiscoveryCelebration
           celebration={celebration}
-          prefix="Ritual reinforced —"
+          prefix="Sprint ready —"
           className="px-4 py-3"
         />
       ) : null}
@@ -49,7 +49,7 @@ export function DiscoveryBatchBar({
       <div className="surface-veil p-4">
         <div className="space-y-1">
           <p className="text-sm font-semibold text-foreground">
-            Batch review this week&apos;s mix
+            Organization Sprint
           </p>
           <p className="text-xs text-muted-foreground">
             {gemCount} curated gem{gemCount === 1 ? "" : "s"}
@@ -58,7 +58,7 @@ export function DiscoveryBatchBar({
             {resurfacedCount > 0 && ` · ${resurfacedCount} resurfaced`}
             {totalEngagement > 0 &&
               ` · ~${totalEngagement.toLocaleString()} engagements on X`}
-            {nurturedCount > 0 && ` · ${nurturedCount} nurtured`}
+            {nurturedCount > 0 && ` · ${nurturedCount} sent to Orbit`}
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export function DiscoveryBatchBar({
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="ghost" onClick={onReviewTogether} className="gap-1.5">
               <RotateCcw className="h-4 w-4" />
-              Review all {gemCount} together
+              Organize {gemCount} together
             </Button>
             {onSaveAsCollection ? (
               <Button

@@ -30,7 +30,7 @@ export function DiscoveryCelebration({
               {prefix}{" "}
             </>
           ) : null}
-          nurtured{" "}
+          queued{" "}
           <span className="font-medium tabular-nums">{celebration.gems}</span> gems
           {celebration.engagement > 0 && (
             <>
@@ -39,7 +39,7 @@ export function DiscoveryCelebration({
               <span className="font-medium tabular-nums">
                 {celebration.engagement.toLocaleString()}
               </span>{" "}
-              engagement
+              engagements represented
             </>
           )}
         </span>

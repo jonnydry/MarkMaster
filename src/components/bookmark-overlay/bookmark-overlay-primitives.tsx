@@ -2,7 +2,7 @@
 
 import type { ElementType, ReactNode } from "react";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
@@ -105,10 +105,49 @@ export function BookmarkOverlayMetricsGrid({
   );
 }
 
-export function BookmarkOverlaySectionLabel({ children }: { children: ReactNode }) {
+export function BookmarkOverlaySectionLabel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <div
+      className={cn(
+        "mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+        className
+      )}
+    >
       {children}
+    </div>
+  );
+}
+
+function BookmarkOverlaySectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <BookmarkOverlaySectionLabel className="mb-0">{title}</BookmarkOverlaySectionLabel>
+      {actionLabel && onAction ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onAction}
+          className="h-7 gap-1 px-2 text-2xs text-muted-foreground"
+        >
+          <Plus className="size-3" aria-hidden="true" />
+          {actionLabel}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -130,14 +169,22 @@ export function BookmarkOverlayTagsSection({
   tags,
   title = "Tags",
   emptyLabel = "No tags yet",
+  actionLabel,
+  onAction,
 }: {
   tags: BookmarkWithRelations["tags"];
   title?: string;
   emptyLabel?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="mt-5 border-t border-hairline-soft pt-4">
-      <BookmarkOverlaySectionLabel>{title}</BookmarkOverlaySectionLabel>
+      <BookmarkOverlaySectionHeader
+        title={title}
+        actionLabel={actionLabel}
+        onAction={onAction}
+      />
       <div className="flex flex-wrap gap-1.5">
         {tags.length > 0 ? (
           tags.map(({ tag }) => (
@@ -153,12 +200,20 @@ export function BookmarkOverlayTagsSection({
 
 export function BookmarkOverlayCollectionsSection({
   collections,
+  actionLabel,
+  onAction,
 }: {
   collections: BookmarkWithRelations["collectionItems"];
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="mt-5 border-t border-hairline-soft pt-4">
-      <BookmarkOverlaySectionLabel>Collections</BookmarkOverlaySectionLabel>
+      <BookmarkOverlaySectionHeader
+        title="Collections"
+        actionLabel={actionLabel}
+        onAction={onAction}
+      />
       <div className="flex flex-wrap gap-1.5">
         {collections.length > 0 ? (
           collections.map(({ collection }) => (
@@ -179,12 +234,20 @@ export function BookmarkOverlayCollectionsSection({
 
 export function BookmarkOverlayNotesSection({
   notes,
+  actionLabel,
+  onAction,
 }: {
   notes: BookmarkWithRelations["notes"];
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="mt-5 border-t border-hairline-soft pt-4">
-      <BookmarkOverlaySectionLabel>Notes</BookmarkOverlaySectionLabel>
+      <BookmarkOverlaySectionHeader
+        title="Notes"
+        actionLabel={actionLabel}
+        onAction={onAction}
+      />
       {notes.length > 0 ? (
         <div className="rounded-sm border-l-2 border-l-note bg-surface-1/45 px-3 py-2 text-sm leading-6 text-muted-foreground">
           {notes[0]?.content}

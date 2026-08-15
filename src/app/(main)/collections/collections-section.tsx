@@ -5,6 +5,7 @@ type CollectionsSectionProps = {
   icon: LucideIcon;
   title: string;
   count: number;
+  meta?: string;
   children: ReactNode;
 };
 
@@ -12,6 +13,7 @@ export function CollectionsSection({
   icon: Icon,
   title,
   count,
+  meta,
   children,
 }: CollectionsSectionProps) {
   return (
@@ -21,9 +23,10 @@ export function CollectionsSection({
           <Icon className="h-3.5 w-3.5" aria-hidden="true" />
           {title}
         </h2>
-        <span className="text-xs tabular-nums text-muted-foreground/60">
-          {count}
-        </span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+          {meta ? <span className="hidden sm:inline">{meta}</span> : null}
+          <span className="tabular-nums">{count}</span>
+        </div>
       </div>
       <div className="grid gap-2 xl:grid-cols-2">{children}</div>
     </section>

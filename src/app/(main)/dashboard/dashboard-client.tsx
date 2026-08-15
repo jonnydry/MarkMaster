@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { AppPageCenter, AppPageShell } from "@/components/app-page-shell";
 import { DashboardToolbar } from "@/components/dashboard-toolbar";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -87,6 +88,7 @@ const KeyboardShortcutsDialog = dynamic(
 
 function DashboardContent() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
   const {
     filters,
     actions,
@@ -167,6 +169,13 @@ function DashboardContent() {
     syncProgressVisible,
     selectedTagEntries,
   } = useDashboardPage();
+
+  const discoveryRequested = searchParams.get("discovery") === "1";
+  useEffect(() => {
+    if (discoveryRequested && viewMode === "grid") {
+      setViewMode("feed");
+    }
+  }, [discoveryRequested, setViewMode, viewMode]);
 
   const {
     hasMixContent: discoveryAvailable,

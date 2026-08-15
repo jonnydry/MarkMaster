@@ -298,4 +298,6 @@ export const collectionDetailQuerySchema = z.object({
     .max(100)
     .default(COLLECTION_DETAIL_PAGE_LIMIT),
   cursor: z.string().trim().max(512).optional(),
+  q: z.string().trim().max(200).optional(),
+  sort: z.enum(["custom", "newest", "oldest"]).default("custom"),
 });

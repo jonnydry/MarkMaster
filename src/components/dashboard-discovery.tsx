@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
@@ -26,6 +27,7 @@ import type { BookmarkWithRelations } from "@/types";
 import type { ViewMode } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
 import { useDiscoveryRitual } from "@/hooks/use-discovery-ritual";
+import { OrganizationSprintDialog } from "@/components/organization-sprint-dialog";
 
 export interface DashboardDiscoveryProps {
   feedReady?: boolean;
@@ -95,10 +97,10 @@ function DiscoveryHeaderActions({
             size="sm"
             onClick={onReview}
             className={btnClass}
-            aria-label={`Review all ${ritualTotal} in Orbit`}
+            aria-label={`Start an Organization Sprint with ${ritualTotal} bookmarks`}
           >
             <RotateCcw className="h-3 w-3" />
-            Review{dense ? ` (${ritualTotal})` : ` all (${ritualTotal})`}
+            Organize{dense ? ` (${ritualTotal})` : ` ${ritualTotal}`}
           </Button>
           {showSave && onSave ? (
             <Button
@@ -133,6 +135,7 @@ export function DashboardDiscovery({
 }: DashboardDiscoveryProps) {
   const router = useRouter();
   const t = useTypography();
+  const [sprintOpen, setSprintOpen] = useState(false);
 
   const {
     rawTotal = 0,
@@ -184,8 +187,13 @@ export function DashboardDiscovery({
     refreshMix();
   };
 
+  const handleStartSprint = () => {
+    setSprintOpen(false);
+    handleReviewInOrbit();
+  };
+
   const defaultExplainer =
-    "Popular untouched saves — tag or collect them to clear the queue.";
+    "A focused mix of untouched and resurfaced saves to organize in a few minutes.";
   const moduleMetaLine =
     rawTotal > 0
       ? `${rawTotal.toLocaleString()} waiting for triage${
@@ -236,7 +244,7 @@ export function DashboardDiscovery({
       hasRitual={hasRitual}
       ritualTotal={ritualTotal}
       onRefresh={handleRefreshMix}
-      onReview={handleReviewInOrbit}
+      onReview={() => setSprintOpen(true)}
       onSave={handleSaveAsCollection}
       showSave={Boolean(onSaveAsCollection)}
       dense={isFeedIntegrated}
@@ -290,11 +298,11 @@ export function DashboardDiscovery({
                 t.monoNative && t.label
               )}
             >
-              Weekly Ritual
+              Organization Sprint
             </span>
           </div>
           <p className="mt-2 line-clamp-2 max-w-md text-sm font-semibold text-foreground">
-            Review full mix together in Orbit
+            Organize this mix together in Orbit
           </p>
           <p
             className={cn(
@@ -307,17 +315,17 @@ export function DashboardDiscovery({
             {discoveryEngagement > 0
               ? ` · ~${discoveryEngagement.toLocaleString()} engagements`
               : ""}
-            {nurturedCount > 0 ? ` · ${nurturedCount} nurtured` : ""}
+            {nurturedCount > 0 ? ` · ${nurturedCount} sent to Orbit` : ""}
           </p>
           <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft pt-2.5">
             <Button
               size="sm"
               variant="highlight"
               className="h-7 gap-1 px-2.5 text-2xs text-primary"
-              onClick={handleReviewInOrbit}
+              onClick={() => setSprintOpen(true)}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Review all
+              Start sprint
             </Button>
             {onSaveAsCollection ? (
               <Button
@@ -340,66 +348,84 @@ export function DashboardDiscovery({
 
   if (isFeedIntegrated) {
     return (
-      <section
-        id="dashboard-discovery-panel"
-        className={cn(shellClass, "w-full", className)}
-        aria-label="Discovery"
-        title={explainer ?? defaultExplainer}
-      >
-        <div className="mb-1.5 flex justify-end">{headerActions}</div>
-        {celebration ? (
-          <DiscoveryCelebration celebration={celebration} className="mb-1.5" />
-        ) : null}
-        {discoveryCarouselItems.length > 0 ? (
-          <HighlightScrollStrip
-            ariaLabel="Untouched high-engagement saves"
-            itemCount={discoveryCarouselItems.length}
-          >
-            {carouselSlides}
-          </HighlightScrollStrip>
-        ) : null}
-      </section>
+      <>
+        <section
+          id="dashboard-discovery-panel"
+          className={cn(shellClass, "w-full", className)}
+          aria-label="Discovery"
+          title={explainer ?? defaultExplainer}
+        >
+          <div className="mb-1.5 flex justify-end">{headerActions}</div>
+          {celebration ? (
+            <DiscoveryCelebration celebration={celebration} className="mb-1.5" />
+          ) : null}
+          {discoveryCarouselItems.length > 0 ? (
+            <HighlightScrollStrip
+              ariaLabel="Untouched high-engagement saves"
+              itemCount={discoveryCarouselItems.length}
+            >
+              {carouselSlides}
+            </HighlightScrollStrip>
+          ) : null}
+        </section>
+        <OrganizationSprintDialog
+          open={sprintOpen}
+          onOpenChange={setSprintOpen}
+          bookmarkCount={ritualTotal}
+          resurfacedCount={resurfacedCount}
+          onStart={handleStartSprint}
+        />
+      </>
     );
   }
 
   return (
-    <section
-      className={cn(shellClass, "w-full", className)}
-      aria-label="Discovery"
-    >
-      <div
-        className={cn(
-          "overflow-hidden rounded-sm border border-hairline-strong pb-4",
-          appChromeFrostedClassName
-        )}
+    <>
+      <section
+        className={cn(shellClass, "w-full", className)}
+        aria-label="Discovery"
       >
-        <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
-          <ModuleHeader
-            icon={Compass}
-            eyebrow="Discovery"
-            className="flex-col gap-2 sm:flex-row sm:gap-3"
-            description={explainer ?? defaultExplainer}
-            meta={moduleMetaLine}
-            action={headerActions}
-          />
-        </div>
+        <div
+          className={cn(
+            "overflow-hidden rounded-sm border border-hairline-strong pb-4",
+            appChromeFrostedClassName
+          )}
+        >
+          <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">
+            <ModuleHeader
+              icon={Compass}
+              eyebrow="Discovery"
+              className="flex-col gap-2 sm:flex-row sm:gap-3"
+              description={explainer ?? defaultExplainer}
+              meta={moduleMetaLine}
+              action={headerActions}
+            />
+          </div>
 
-        <div className="px-4 pt-3 sm:px-5">
-          {celebration ? (
-            <DiscoveryCelebration celebration={celebration} className="mb-3" />
-          ) : null}
+          <div className="px-4 pt-3 sm:px-5">
+            {celebration ? (
+              <DiscoveryCelebration celebration={celebration} className="mb-3" />
+            ) : null}
 
-          {stripItemCount > 0 ? (
-            <HighlightScrollStrip
-              ariaLabel="High-engagement discovery mix"
-              itemCount={stripItemCount}
-            >
-              {carouselSlides}
-              {flushRitualAnchor}
-            </HighlightScrollStrip>
-          ) : null}
+            {stripItemCount > 0 ? (
+              <HighlightScrollStrip
+                ariaLabel="High-engagement discovery mix"
+                itemCount={stripItemCount}
+              >
+                {carouselSlides}
+                {flushRitualAnchor}
+              </HighlightScrollStrip>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+      <OrganizationSprintDialog
+        open={sprintOpen}
+        onOpenChange={setSprintOpen}
+        bookmarkCount={ritualTotal}
+        resurfacedCount={resurfacedCount}
+        onStart={handleStartSprint}
+      />
+    </>
   );
 }

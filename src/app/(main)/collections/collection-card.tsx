@@ -40,23 +40,17 @@ function itemLabel(count: number) {
 }
 
 const compactCardClassName =
-  "group relative flex min-h-[5.4rem] cursor-pointer items-center gap-3 overflow-hidden surface-card px-3.5 py-3 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 [content-visibility:auto] [contain-intrinsic-size:88px]";
+  "group relative flex min-h-[5.4rem] items-stretch gap-1 overflow-hidden surface-card p-1.5 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 [content-visibility:auto] [contain-intrinsic-size:88px]";
+
+const collectionCardMainButtonClassName =
+  "absolute inset-1.5 z-0 cursor-pointer rounded-sm border border-transparent focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45";
+
+const collectionCardContentClassName =
+  "pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-3 rounded-sm px-2 py-1.5";
 
 function getScaleWidth(itemCount: number, maxItems: number) {
   if (itemCount <= 0 || maxItems <= 0) return 0;
   return Math.max(8, Math.round((itemCount / maxItems) * 100));
-}
-
-function handleRowKeyDown(
-  event: React.KeyboardEvent<HTMLElement>,
-  collectionId: string,
-  onNavigate: (id: string) => void
-) {
-  if (event.target !== event.currentTarget) return;
-  if (event.key !== "Enter" && event.key !== " ") return;
-
-  event.preventDefault();
-  onNavigate(collectionId);
 }
 
 export const UserCollectionCard = React.memo(function UserCollectionCard({
@@ -77,79 +71,86 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
         compactCardClassName,
         selected && highlightSurfaceActiveClass
       )}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`Open collection ${collection.name}`}
-      onClick={() => onNavigate(collection.id)}
-      onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
-        <Layers2 className="h-4 w-4" aria-hidden="true" />
-      </div>
+      <button
+        type="button"
+        className={collectionCardMainButtonClassName}
+        aria-label={`Open collection ${collection.name}`}
+        aria-current={selected ? "page" : undefined}
+        onClick={() => onNavigate(collection.id)}
+      />
+      <div className={collectionCardContentClassName}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
+          <Layers2 className="h-4 w-4" aria-hidden="true" />
+        </div>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 className="truncate text-sm font-semibold text-foreground">
-            {collection.name}
-          </h3>
-          <span
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate text-sm font-semibold text-foreground">
+              {collection.name}
+            </h3>
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-semibold",
+                "border border-hairline-soft bg-transparent text-muted-foreground"
+              )}
+              title={collection.isPublic ? "Public collection" : "Private collection"}
+            >
+              {collection.isPublic ? (
+                <Globe2 className="h-3 w-3 text-success" aria-hidden="true" />
+              ) : (
+                <LockKeyhole className="h-3 w-3" aria-hidden="true" />
+              )}
+              {collection.isPublic ? "Public" : "Private"}
+            </span>
+          </div>
+
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>{itemLabel(itemCount)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{createdAt}</span>
+            {collection.description ? (
+              <>
+                <span aria-hidden="true" className="hidden sm:inline">
+                  ·
+                </span>
+                <span className="hidden min-w-0 max-w-[26rem] truncate sm:inline">
+                  {collection.description}
+                </span>
+              </>
+            ) : null}
+          </div>
+          <HighlightProgress
+            className="mt-2"
+            percent={scaleWidth}
+            label={`${collection.name} size relative to the largest shelf`}
+          />
+        </div>
+
+        <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
+          <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
+            {itemCount.toLocaleString()}
+          </p>
+          <p
             className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-semibold",
-              "border border-hairline-soft bg-transparent text-muted-foreground"
+              "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
+              "text-muted-foreground/70"
             )}
-            title={collection.isPublic ? "Public collection" : "Private collection"}
           >
-            {collection.isPublic ? (
-              <Globe2 className="h-3 w-3 text-success" aria-hidden="true" />
-            ) : (
-              <LockKeyhole className="h-3 w-3" aria-hidden="true" />
-            )}
-            {collection.isPublic ? "Public" : "Private"}
-          </span>
+            saved
+          </p>
         </div>
 
-        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>{itemLabel(itemCount)}</span>
-          <span aria-hidden="true">·</span>
-          <span>{createdAt}</span>
-          {collection.description ? (
-            <>
-              <span aria-hidden="true" className="hidden sm:inline">
-                ·
-              </span>
-              <span className="hidden min-w-0 max-w-[26rem] truncate sm:inline">
-                {collection.description}
-              </span>
-            </>
-          ) : null}
-        </div>
-        <HighlightProgress className="mt-2" percent={scaleWidth} />
+        <ArrowRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
       </div>
 
-      <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
-        <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
-          {itemCount.toLocaleString()}
-        </p>
-        <p className={cn(
-          "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
-          "text-muted-foreground/70"
-        )}>
-          saved
-        </p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1">
-        <ArrowRight className="hidden h-4 w-4 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
+      <div className="relative z-20 flex shrink-0 items-center">
         <Button
           variant="ghost"
-          size="icon-sm"
-          className="text-muted-foreground opacity-100 transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+          size="icon"
+          className="h-full w-10 text-muted-foreground opacity-100 transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
           aria-label={`Delete collection ${collection.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(collection.id);
-          }}
+          onClick={() => onDelete(collection.id)}
         >
           <ArchiveX className="w-3.5 h-3.5" />
         </Button>
@@ -184,66 +185,75 @@ export const XFolderCard = React.memo(function XFolderCard({
         compactCardClassName,
         selected && highlightSurfaceActiveClass
       )}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`Open collection ${collection.name}`}
-      onClick={() => onNavigate(collection.id)}
-      onKeyDown={(event) => handleRowKeyDown(event, collection.id, onNavigate)}
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-note/15 bg-note/10 text-note">
-        <FolderOpen className="h-4 w-4" aria-hidden="true" />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 className="truncate text-sm font-semibold text-foreground">
-            {collection.name}
-          </h3>
-          <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-2xs font-semibold text-primary">
-            X Folder
-          </span>
+      <button
+        type="button"
+        className={collectionCardMainButtonClassName}
+        aria-label={`Open X folder ${collection.name}`}
+        aria-current={selected ? "page" : undefined}
+        onClick={() => onNavigate(collection.id)}
+      />
+      <div className={collectionCardContentClassName}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-note/15 bg-note/10 text-note">
+          <FolderOpen className="h-4 w-4" aria-hidden="true" />
         </div>
 
-        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>{itemLabel(itemCount)}</span>
-          <span aria-hidden="true">·</span>
-          <span>{createdAt}</span>
-          {collection.description ? (
-            <>
-              <span aria-hidden="true" className="hidden sm:inline">
-                ·
-              </span>
-              <span className="hidden min-w-0 max-w-[26rem] truncate sm:inline">
-                {collection.description}
-              </span>
-            </>
-          ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate text-sm font-semibold text-foreground">
+              {collection.name}
+            </h3>
+            <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-2xs font-semibold text-primary">
+              X Folder
+            </span>
+          </div>
+
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>{itemLabel(itemCount)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{createdAt}</span>
+            {collection.description ? (
+              <>
+                <span aria-hidden="true" className="hidden sm:inline">
+                  ·
+                </span>
+                <span className="hidden min-w-0 max-w-[26rem] truncate sm:inline">
+                  {collection.description}
+                </span>
+              </>
+            ) : null}
+          </div>
+          <HighlightProgress
+            className="mt-2"
+            percent={scaleWidth}
+            tone="note"
+            label={`${collection.name} size relative to the largest shelf`}
+          />
         </div>
-        <HighlightProgress className="mt-2" percent={scaleWidth} tone="note" />
+
+        <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
+          <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
+            {itemCount.toLocaleString()}
+          </p>
+          <p
+            className={cn(
+              "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
+              "text-muted-foreground/70"
+            )}
+          >
+            synced
+          </p>
+        </div>
+
+        <ArrowRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
       </div>
 
-      <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
-        <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
-          {itemCount.toLocaleString()}
-        </p>
-        <p className={cn(
-          "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
-          "text-muted-foreground/70"
-        )}>
-          synced
-        </p>
-      </div>
-
-      <div className="shrink-0">
+      <div className="relative z-20 flex shrink-0 items-center">
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCopy(collection.id);
-          }}
+          className="h-full gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => onCopy(collection.id)}
         >
           <Copy className="w-3.5 h-3.5" />
           Copy

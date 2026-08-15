@@ -4,6 +4,7 @@ import { forwardRef, type ReactNode } from "react";
 import {
   CheckSquare,
   Loader2,
+  MoreHorizontal,
   RefreshCw,
 } from "lucide-react";
 
@@ -48,6 +49,12 @@ import { CompactFloatingSearchBubble } from "@/components/compact-floating-searc
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import type { DbUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export interface OrbitCommandBarProps {
   mobileSidebar?: ReactNode;
@@ -247,30 +254,53 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           mapHref={mapHref}
           className={appToolbarSurfaceClassName}
         />
-        <ToolbarIconButton
-          active={selectionMode}
-          pressed={selectionMode}
-          label={
-            selectionMode ? "Exit selection mode" : "Enter selection mode"
-          }
-          icon={CheckSquare}
-          onClick={onToggleSelectionMode}
-          size={compact ? "compact" : "default"}
-          className={appToolbarSurfaceClassName}
-        />
-        <KeyboardShortcutsHelpButton
-          open={keyboardShortcutsOpen}
-          onOpenChange={onKeyboardShortcutsOpenChange}
-          groups={shortcutGroups}
-          description="Orbit queue navigation and review actions."
-          toolbarSize={compact ? "compact" : "default"}
-        />
-        <PageHeaderCompactToggle
-          className={cn(
-            appToolbarSurfaceClassName,
-            !compact && appToolbarControlExpandedClassName
-          )}
-        />
+        <div className="hidden sm:contents">
+          <ToolbarIconButton
+            active={selectionMode}
+            pressed={selectionMode}
+            label={
+              selectionMode ? "Exit selection mode" : "Enter selection mode"
+            }
+            icon={CheckSquare}
+            onClick={onToggleSelectionMode}
+            size={compact ? "compact" : "default"}
+            className={appToolbarSurfaceClassName}
+          />
+          <KeyboardShortcutsHelpButton
+            open={keyboardShortcutsOpen}
+            onOpenChange={onKeyboardShortcutsOpenChange}
+            groups={shortcutGroups}
+            description="Orbit queue navigation and review actions."
+            toolbarSize={compact ? "compact" : "default"}
+          />
+          <PageHeaderCompactToggle
+            className={cn(
+              appToolbarSurfaceClassName,
+              !compact && appToolbarControlExpandedClassName
+            )}
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="More Orbit tools"
+            className={cn(
+              "inline-flex items-center justify-center rounded-sm border border-hairline-strong bg-background/35 text-muted-foreground hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 sm:hidden",
+              compact ? "size-8" : "size-9",
+              appToolbarSurfaceClassName
+            )}
+          >
+            <MoreHorizontal className="size-4" aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={onToggleSelectionMode}>
+              <CheckSquare />
+              {selectionMode ? "Exit selection mode" : "Select bookmarks"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onKeyboardShortcutsOpenChange(true)}>
+              Keyboard shortcuts
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </>
     ) : null;
 

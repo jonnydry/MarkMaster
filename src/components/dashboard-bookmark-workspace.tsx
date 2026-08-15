@@ -115,30 +115,26 @@ function WorkspaceBookmarkRow({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Preview bookmark from ${displayName}: ${bookmark.tweetText.slice(0, 90)}`}
-      aria-pressed={selectionMode ? selected : active}
+    <article
       data-dashboard-bookmark-id={bookmark.id}
       data-workspace-bookmark-row={bookmark.id}
-      onClick={activate}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          activate();
-        }
-      }}
       className={cn(
-        "group grid min-w-0 cursor-pointer grid-cols-1 gap-3 surface-solid px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/45 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem] min-[860px]:items-center",
+        "group relative grid min-w-0 cursor-pointer grid-cols-1 gap-3 surface-solid px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/45 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem] min-[860px]:items-center",
         active && !selectionMode && "border-primary/60 bg-primary/10",
         selected && selectionMode && "border-primary/60 bg-primary/10"
       )}
     >
-      <div className="flex min-w-0 items-start gap-3">
+      <button
+        type="button"
+        onClick={activate}
+        aria-label={`Preview bookmark from ${displayName}: ${bookmark.tweetText.slice(0, 90)}`}
+        aria-pressed={selectionMode ? selected : undefined}
+        aria-current={!selectionMode && active ? "true" : undefined}
+        className="absolute inset-0 z-0 rounded-none border border-transparent focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
+      />
+      <div className="pointer-events-none relative z-10 flex min-w-0 items-start gap-3">
         {selectionMode ? (
-          <div className="pt-1">
+          <div className="pointer-events-auto pt-1">
             <BookmarkCardSelectionToggle
               selected={selected}
               onToggle={() => onSelectionChange(bookmark.id, !selected)}
@@ -166,7 +162,7 @@ function WorkspaceBookmarkRow({
                 density="strong"
                 uppercase={false}
                 onClick={() => onTagClick(primaryTag.id)}
-                className="max-w-[9rem]"
+                className="pointer-events-auto max-w-[9rem]"
               />
             ) : (
               <span className="text-2xs text-muted-foreground/65">Untagged</span>
@@ -175,9 +171,11 @@ function WorkspaceBookmarkRow({
         </div>
       </div>
 
-      <WorkspaceAuthor bookmark={bookmark} />
+      <div className="pointer-events-none relative z-10">
+        <WorkspaceAuthor bookmark={bookmark} />
+      </div>
 
-      <div className="hidden min-[860px]:block">
+      <div className="pointer-events-none relative z-10 hidden min-[860px]:block">
         <span className="block text-xs tabular-nums text-muted-foreground">
           {formatPostDate(bookmark.tweetCreatedAt)}
         </span>
@@ -185,7 +183,7 @@ function WorkspaceBookmarkRow({
           Saved {formatPostDate(bookmark.bookmarkedAt)}
         </span>
       </div>
-    </div>
+    </article>
   );
 }
 

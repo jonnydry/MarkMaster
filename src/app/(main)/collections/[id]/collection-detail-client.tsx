@@ -26,6 +26,7 @@ import {
   CollectionDetailHeaderActions,
   CollectionDetailTitle,
 } from "./collection-detail-header";
+import { CollectionDetailControlBar } from "./collection-detail-control-bar";
 
 const ShareDialog = dynamic(
   () => import("@/components/share-dialog").then((m) => m.ShareDialog),
@@ -53,6 +54,7 @@ export default function CollectionDetailClient({
   const {
     collection,
     isPending,
+    isFetching,
     isError,
     refetch,
     isNotFound,
@@ -78,6 +80,10 @@ export default function CollectionDetailClient({
     setActiveBookmarkId,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
+    searchQuery,
+    handleSearchChange,
+    sortMode,
+    handleSortModeChange,
     cancelEditingName,
     startEditingName,
     handleCopyAsCollection,
@@ -200,6 +206,16 @@ export default function CollectionDetailClient({
             </div>
           ) : null}
 
+          <div className={bookmarkFeedColumnClassName}>
+            <CollectionDetailControlBar
+              search={searchQuery}
+              sort={sortMode}
+              isUpdating={isFetching && !isPending}
+              onSearchChange={handleSearchChange}
+              onSortChange={handleSortModeChange}
+            />
+          </div>
+
           <CollectionDetailBookmarkList
             scrollRef={scrollRef}
             sortedItems={sortedItems}
@@ -216,6 +232,8 @@ export default function CollectionDetailClient({
             onRemoveItem={handleRemoveItem}
             onMoveItem={moveItem}
             onGoToDashboard={goToDashboard}
+            searchQuery={searchQuery}
+            onClearSearch={() => handleSearchChange("")}
           />
 
           {sortedItems.length > 0 ? (

@@ -79,12 +79,15 @@ export function OrbitBookmarkOverlay({
   suggestionDismissed = false,
 }: OrbitBookmarkOverlayProps) {
   const tweetUrl = bookmark ? getBookmarkTweetUrl(bookmark) : undefined;
+  const hasDecision = Boolean(decision);
   const hasPrimarySuggestion = Boolean(decision?.primary);
   const suggestionStateLabel = suggestionDismissed
     ? "Suggestion skipped"
     : hasPrimarySuggestion
       ? "Suggestion ready"
-      : "No suggestion";
+      : hasDecision
+        ? "No confident match"
+        : "Not scanned";
   const applyLabel =
     decision?.primary?.kind === "collection"
       ? `Add to ${decision.primary.label}`
@@ -112,7 +115,11 @@ export function OrbitBookmarkOverlay({
       bookmark={bookmark}
       dataAttributeName="data-orbit-expanded-overlay"
       title={bookmark ? `Orbit review for ${bookmark.authorDisplayName}` : "Orbit review"}
-      description="Review a bookmark and apply Orbit suggestions."
+      description={
+        hasDecision
+          ? "Review a bookmark and apply Orbit suggestions."
+          : "Inspect a bookmark, then run a scan when you want Orbit suggestions."
+      }
     >
       {bookmark ? (
         <>
@@ -130,13 +137,17 @@ export function OrbitBookmarkOverlay({
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
                       Orbit
                     </span>
-                    {hasPrimarySuggestion || suggestionDismissed ? (
-                      <SuggestionBadge
-                        tone={suggestionDismissed ? "primary" : "success"}
-                      >
-                        {suggestionStateLabel}
-                      </SuggestionBadge>
-                    ) : null}
+                    <SuggestionBadge
+                      tone={
+                        suggestionDismissed
+                          ? "primary"
+                          : hasPrimarySuggestion
+                            ? "success"
+                            : "neutral"
+                      }
+                    >
+                      {suggestionStateLabel}
+                    </SuggestionBadge>
                   </>
                 }
               />
@@ -188,7 +199,20 @@ export function OrbitBookmarkOverlay({
                   ) : null}
                 </div>
               </div>
-            ) : null}
+            ) : (
+              <div className="mt-5 surface-inset p-3">
+                <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  <GrokMark className="size-3.5" />
+                  {hasDecision ? "Orbit abstained" : "Not scanned yet"}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {hasDecision
+                    ? decision?.reasoning ||
+                      "Orbit did not find a confident tag or collection match. Keep it here or organize it manually."
+                    : "Run Scan from the Orbit toolbar or start an Organization Sprint from Discovery. Nothing changes without your approval."}
+                </p>
+              </div>
+            )}
 
             <div className="mt-5">
               <BookmarkOverlaySectionLabel>Orbit actions</BookmarkOverlaySectionLabel>
@@ -280,8 +304,22 @@ export function OrbitBookmarkOverlay({
             <BookmarkOverlayTagsSection
               tags={bookmark.tags}
               title="Current tags"
+              actionLabel={bookmark.tags.length > 0 ? "Edit tags" : "Add tag"}
+              onAction={
+                onAddTag ? () => closeAndRun(() => onAddTag(bookmark.id)) : undefined
+              }
             />
-            <BookmarkOverlayCollectionsSection collections={bookmark.collectionItems} />
+            <BookmarkOverlayCollectionsSection
+              collections={bookmark.collectionItems}
+              actionLabel={
+                bookmark.collectionItems.length > 0 ? "Edit shelves" : "Add to shelf"
+              }
+              onAction={
+                onAddToCollection
+                  ? () => closeAndRun(() => onAddToCollection(bookmark.id))
+                  : undefined
+              }
+            />
           </BookmarkOverlaySidebar>
         </>
       ) : null}
