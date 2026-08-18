@@ -9,7 +9,7 @@ import type { OrbitScanResponsePayload } from "@/types";
 
 const payload = {
   scanRunId: "run-1",
-  model: "grok-4.3",
+  model: "grok-4.6",
   scannedAt: "2026-06-22T00:00:00.000Z",
   privacy: { storeDisabled: true, zeroDataRetention: false },
   batch: {

@@ -94,6 +94,7 @@ export function buildOrbitPromptPayload(args: {
   });
 
   return {
+    bookmarkIds: bookmarkPayloads.map((bookmark) => bookmark.id),
     palette,
 
     existingTags: finalTags.map((tag) => ({
@@ -122,32 +123,23 @@ export function buildOrbitPromptPayload(args: {
  * dynamic palette, existing vocabulary, and bookmarks.
  */
 export const ORBIT_STATIC_INSTRUCTIONS = {
-  goal: "For each bookmark, (1) assign up to 3 tags and (2) if and only if it clearly fits, assign one collection home. Optimize so the user can later re-find these posts by topic.",
+  goal: "For each bookmark, assign up to 3 tags and, only when it clearly fits, one collection home so the user can re-find the post by topic.",
 
   signalPriority: [
-    "Start with bookmarks[].signals: read signals.primaryText first — it is the best available tweet text (note_tweet when present).",
-    "Use signals.xTopics, signals.articleContext, signals.linkContext, signals.domainHints, and signals.contentTypeHints as strong structured context.",
-    "Use signals.existingVocabularyMatches, signals.neighborHints, signals.localLearning, and signals.sourceFolders as deterministic preference hints.",
-    "Use signals.authorContext.bio and signals.threadContext when tweet text is sparse.",
-    "Read quotedTweet.text, note, and urls[].title/description after signals.primaryText.",
-    "When a bookmark includes priorDecisions, treat frequentTags/frequentCollections as strong hints for that author — but never override explicit tweet/quote/note topic.",
-    "When signals.localLearning appears, treat matchingTags/matchingCollections as strong local preference signals and avoidTags/avoidCollections as negative examples.",
-    "When signals.neighborHints appears, treat its tags/collections as soft recall hints from similar tagged bookmarks (same author or domain).",
-    "Use signals.existingVocabularyMatches as preferred candidates when they fit the content; do not copy them if the bookmark topic does not support them.",
-    "Use signals.xTopics and signals.visualContext.altTexts as strong context when tweet text is sparse.",
-    "Use sourceFolders as weak-but-useful context because they are synced X folder names for that bookmark.",
-    "If tweetText references a link (e.g. 'paper in replies', 'link below'), treat the urls[] entries as authoritative context.",
-    "Sparse titles, bare URLs, previews, engagement copy, and boilerplate excerpts are weak signals. Do not tag from metadata noise alone.",
-    "When title and excerpt disagree, prefer the explicit tweet/quoted text and choose the narrower topic, or return low confidence if no topic is clear.",
-    "Use author.username and mediaTypes only as weak secondary signals.",
-    "Use metrics only as the weakest signal — never tag from engagement counts alone.",
+    "Read signals.primaryText first — it is the best available tweet text (note_tweet when present).",
+    "Then read quotedTweet, note, and urls[].title/description. If the text points at a link, treat urls[] as authoritative.",
+    "Use signals.xTopics, articleContext, linkContext, domainHints, contentTypeHints, and visualContext.altTexts as structured context, especially when text is sparse.",
+    "Prefer signals.existingVocabularyMatches, localLearning, neighborHints, and priorDecisions when they fit. Honor avoidTags/avoidCollections. Never override an explicit tweet/quote/note topic.",
+    "sourceFolders are read-only synced X folders — weak hints only. authorContext.bio and threadContext only disambiguate sparse posts.",
+    "author.username, mediaTypes, and metrics are weakest. Never tag from engagement counts or metadata noise alone.",
+    "When title and excerpt disagree, prefer explicit tweet/quoted text and the narrower topic, or abstain.",
   ],
 
   topicExtractionRules: [
-    "Prefer the narrowest specific topic supported by signals.primaryText, articleContext, linkContext, and xTopics.",
-    "Use domainHints and contentTypeHints to choose format labels (Paper, Code, Video) only when the content clearly matches.",
-    "When threadContext.isThread is true, Thread may be used as a content-type tag if the post is clearly a thread — not as a default.",
-    "Do not invent topics from author bio alone; use authorContext only to disambiguate sparse posts.",
+    "Prefer the narrowest topic supported by signals.primaryText, articleContext, linkContext, and xTopics.",
+    "Use domainHints and contentTypeHints for format labels (Paper, Code, Video) only when the content clearly matches.",
+    "Thread may be a content-type tag only when threadContext.isThread is true and the post is clearly a thread.",
+    "Do not invent topics from author bio alone.",
   ],
 
   abstentionTriggers: [
@@ -158,51 +150,49 @@ export const ORBIT_STATIC_INSTRUCTIONS = {
   ],
 
   batchConsistencyRules: [
-    "Before finalizing, scan all bookmarks in this batch and reuse the same tag spellings for the same topic.",
-    "Prefer tags you already assigned to earlier bookmarks in this batch when the topic matches.",
+    "Before finalizing, scan the whole batch and reuse the same tag spellings for the same topic.",
+    "Prefer tags already assigned earlier in this batch when the topic matches.",
     "Align new collection names across bookmarks that share a theme.",
   ],
 
   taggingRules: [
     "Strongly prefer existingTags with high bookmarkCount when they fit — use the exact name and color.",
-    "For existing tags/collections, use the exact name; the server determines whether it is reused.",
-    "Otherwise create a new tag: a short, reusable topic or content-type label, 1-3 words, Title Case (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
-    "Prefer abstention over weak tags: only tag when tweet/quote/note/url context supports a specific topic.",
-    "If you propose any collection, also include at least one tag that captures the same topic or content type.",
-    "For new tags pick a color from the palette. Use the SAME color for semantically related new tags when reasonable.",
-    "Max 3 tags per bookmark. No near-duplicates or parent/child duplicates (e.g. don't pair 'LLM' and 'LLMs', 'AI' and 'Artificial Intelligence', or 'TypeScript' and 'Programming' unless both add clear recall value).",
+    "The server decides reuseExisting; send the exact existing name when reusing.",
+    "New tags: 1-3 words, Title Case, reusable topic or content-type (e.g. 'Machine Learning', 'TypeScript', 'Recipe').",
+    "Prefer abstention over weak tags. Only tag when tweet/quote/note/url context supports a specific topic.",
+    "If you propose a collection, also include at least one tag for the same topic or content type.",
+    "Pick new-tag colors from the palette. Use the same color for related new tags when reasonable.",
+    "Max 3 tags. No near-duplicates (LLM/LLMs, AI/Artificial Intelligence) unless both add recall value.",
     "Prefer topic or content-type tags over stylistic or sentiment tags.",
-    "Never use generic or source labels: General, Misc, Other, Interesting, Saved, Bookmark, Post, Tweet, X, Link, Article, Resource, Thread (unless Thread is a content type used on purpose), domain names, or URL fragments.",
-    "For sparse bookmarks, return at most one precise tag; if the topic is only guessed from an excerpt or title, use confidence medium or low.",
+    "Never use generic or source labels: General, Misc, Other, Interesting, Saved, Bookmark, Post, Tweet, X, Link, Article, Resource, domain names, or URL fragments. Thread only as an intentional content-type tag.",
+    "Sparse bookmarks: at most one precise tag. If the topic is only guessed from a title or excerpt, use medium or low confidence.",
   ],
 
   collectionRules: [
-    "A collection is a durable, themed home for multiple related bookmarks — not a tag alias.",
+    "A collection is a durable themed home for related bookmarks — not a tag alias.",
     "sourceFolders are read-only X folders, not editable existingCollections. Use them as hints only.",
-    "Reuse an existingCollection for any bookmark that clearly belongs there, even if it is the only one in this batch.",
-    "Only propose a NEW collection when at least 2 bookmarks in THIS batch clearly share the same theme. Otherwise set collection to null.",
-    "Do not create a collection from overlapping but different topics. If bookmarks only share a broad parent theme, use tags and leave collection null.",
-    "Collection name: 2-4 words, Title Case, specific (not 'Interesting Posts', 'Saved Stuff').",
-    "Collection description: one short sentence describing what belongs here.",
-    "It is expected and correct that many bookmarks have collection=null. Only suggest when the fit is obvious.",
+    "Reuse an existingCollection when the bookmark clearly belongs there, even if it is the only one in this batch.",
+    "Propose a NEW collection only when at least 2 bookmarks in THIS batch share the same theme. Otherwise collection=null.",
+    "Do not create a collection from a broad parent theme. Use tags and leave collection null.",
+    "New collection name: 2-4 words, Title Case, specific. Description: one short sentence.",
+    "Many bookmarks should have collection=null. Only suggest when the fit is obvious.",
   ],
 
   confidenceRubric: {
     high: "Content explicitly signals a specific topic; an obvious reusable tag applies.",
     medium: "Topic is inferable but not explicit; tags are reasonable defaults.",
-    low: "Content is weakly inferable or ambiguous. Return empty tags and null collection unless one specific topic is clearly supported. When all signals.dataQuality flags are false, confidence must be low.",
+    low: "Weak or ambiguous. Empty tags and null collection unless one specific topic is clearly supported. If all signals.dataQuality flags are false, confidence must be low.",
   },
 
   outputContract: [
-    "For every bookmark id in `bookmarks`, return exactly one suggestion with the same id.",
-    "Never invent bookmark ids that were not provided.",
-    "Return { confidence: 'low', tags: [], collection: null } when tweetText, quotedTweet, note, and url context do not support any clean topic — do not guess.",
-    "Keep `reason` and `reasoning` strings short and practical (under 180 characters).",
+    "Return exactly one suggestion for every id in bookmarkIds. Never invent ids.",
+    "Abstain with { confidence: 'low', tags: [], collection: null } when no clean topic is supported.",
+    "Keep reason and reasoning under 180 characters.",
   ],
 
   examples: [
     {
-      note: "Two bookmarks in one batch share a new collection — a NEW collection needs at least 2 bookmarks in the batch.",
+      note: "Two bookmarks share a new collection — a NEW collection needs at least 2 bookmarks in the batch.",
       bookmarks: [
         {
           id: "example-1",
@@ -259,6 +249,34 @@ export const ORBIT_STATIC_INSTRUCTIONS = {
       ],
     },
     {
+      note: "Reuse an existing collection for a singleton. Do not invent a new one-off collection.",
+      existingCollections: [{ name: "AI Papers", bookmarkCount: 12 }],
+      bookmark: {
+        id: "example-existing",
+        tweetText: "Good overview of eval harnesses for LLM judges. arxiv below.",
+        urls: [
+          {
+            displayUrl: "arxiv.org/abs/2501.22222",
+            title: "LLM-as-judge evaluation harnesses",
+          },
+        ],
+      },
+      expectedSuggestion: {
+        bookmarkId: "example-existing",
+        confidence: "high",
+        reasoning: "Fits the existing AI Papers collection.",
+        tags: [
+          { name: "AI", color: "#1d9bf0", reason: "AI research topic" },
+          { name: "Paper", color: "#a855f7", reason: "Academic paper format" },
+        ],
+        collection: {
+          name: "AI Papers",
+          description: "Academic papers and preprints on AI and ML.",
+          reason: "Reuse the existing collection even though this is the only match in the batch.",
+        },
+      },
+    },
+    {
       note: "Sparse bookmark — abstain instead of guessing.",
       bookmark: {
         id: "example-sparse",
@@ -276,18 +294,57 @@ export const ORBIT_STATIC_INSTRUCTIONS = {
   ],
 } as const;
 
+function renderInstructionList(items: readonly string[]) {
+  return items.map((item) => `- ${item}`).join("\n");
+}
+
 export function buildOrbitSystemPrompt() {
+  const instructions = ORBIT_STATIC_INSTRUCTIONS;
+
   return [
     "You are MarkMaster's Orbit librarian.",
-    "Orbit is an inbox of bookmarked X posts that have no tags and are not in any user collection.",
-    "Your job: for each bookmark, propose up to 3 concise tags and, only when it clearly fits, a single collection home — so the user can retrieve these posts later by topic.",
-    "Optimize for reuse and recall, not novelty: always prefer high-usage existing tags and collections when they fit.",
-    "Keep tag vocabulary consistent across the entire batch.",
-    "Never invent bookmark ids. Return exactly one suggestion per provided id.",
-    "When content is ambiguous, prefer confidence 'low' with empty tags and null collection over guessing.",
-    "Use only hex colors from the provided palette for new tags. Return strict JSON matching the provided schema.",
+    "Orbit is an inbox of untagged X bookmarks that are not in a user collection.",
+    instructions.goal,
+    "Optimize for reuse and recall, not novelty. Keep tag spelling consistent across the batch.",
+    "The JSON schema already constrains the response shape. Focus on correct ids, abstention, and vocabulary reuse.",
     "",
-    "Follow these instructions and few-shot examples (JSON). The user message carries only the dynamic palette, existing vocabulary, and bookmarks for this scan:",
-    JSON.stringify(ORBIT_STATIC_INSTRUCTIONS),
+    "## Signal priority",
+    renderInstructionList(instructions.signalPriority),
+    "",
+    "## Topic extraction",
+    renderInstructionList(instructions.topicExtractionRules),
+    "",
+    "## Abstain when",
+    renderInstructionList(instructions.abstentionTriggers),
+    "",
+    "## Tagging",
+    renderInstructionList(instructions.taggingRules),
+    "",
+    "## Collections",
+    renderInstructionList(instructions.collectionRules),
+    "",
+    "## Batch consistency",
+    renderInstructionList(instructions.batchConsistencyRules),
+    "",
+    "## Confidence",
+    `- high: ${instructions.confidenceRubric.high}`,
+    `- medium: ${instructions.confidenceRubric.medium}`,
+    `- low: ${instructions.confidenceRubric.low}`,
+    "",
+    "## Output",
+    renderInstructionList(instructions.outputContract),
+    "",
+    "## Examples",
+    JSON.stringify(instructions.examples),
+  ].join("\n");
+}
+
+export function buildOrbitUserPrompt(
+  payload: ReturnType<typeof buildOrbitPromptPayload>
+) {
+  const count = payload.bookmarkIds.length;
+  return [
+    `Sort this Orbit batch. Return exactly one suggestion for each id in bookmarkIds (${count} bookmark${count === 1 ? "" : "s"}).`,
+    JSON.stringify(payload),
   ].join("\n");
 }

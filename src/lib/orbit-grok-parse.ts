@@ -141,32 +141,44 @@ export function parseXaiOrbitScanPlanJson(parsedJson: unknown): OrbitScanPlanFro
   );
 }
 
+function readOutputTextPart(part: unknown): string | null {
+  if (!part || typeof part !== "object") return null;
+
+  const type = (part as { type?: string }).type;
+  if (type !== "output_text" && type !== "text") return null;
+
+  const text = (part as { text?: unknown }).text;
+  return typeof text === "string" && text.trim() ? text : null;
+}
+
 /** Parses xAI Responses API JSON bodies (message / output_text shape). Exported for tests. */
 export function extractXaiResponsesOutputText(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
 
-  const output = (payload as { output?: unknown[] }).output;
-  if (!Array.isArray(output)) return null;
+  const record = payload as {
+    output?: unknown[];
+    output_text?: unknown;
+  };
 
-  for (const item of output) {
-    if (!item || typeof item !== "object") continue;
-    if ((item as { type?: string }).type !== "message") continue;
+  const output = record.output;
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      if (!item || typeof item !== "object") continue;
+      if ((item as { type?: string }).type === "reasoning") continue;
 
-    const content = (item as { content?: unknown[] }).content;
-    if (!Array.isArray(content)) continue;
+      const content = (item as { content?: unknown[] }).content;
+      if (!Array.isArray(content)) continue;
 
-    for (const part of content) {
-      if (!part || typeof part !== "object") continue;
-      if ((part as { type?: string }).type === "output_text") {
-        const text = (part as { text?: unknown }).text;
-        if (typeof text === "string" && text.trim()) {
-          return text;
-        }
+      for (const part of content) {
+        const text = readOutputTextPart(part);
+        if (text) return text;
       }
     }
   }
 
-  return null;
+  return typeof record.output_text === "string" && record.output_text.trim()
+    ? record.output_text
+    : null;
 }
 
 export function normalizeOrbitScanPlan(

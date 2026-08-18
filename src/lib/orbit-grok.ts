@@ -18,6 +18,7 @@ import {
 import {
   buildOrbitPromptPayload,
   buildOrbitSystemPrompt,
+  buildOrbitUserPrompt,
 } from "@/lib/orbit-grok-prompt";
 import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import {
@@ -30,7 +31,10 @@ import {
 } from "@/lib/orbit-grok-parse";
 import {
   getOrbitXaiRuntimeStatus,
+  DEFAULT_XAI_MODEL,
   ORBIT_SCAN_PLAN_JSON_SCHEMA,
+  ORBIT_XAI_PROMPT_CACHE_KEY,
+  ORBIT_XAI_REASONING_EFFORT,
   OrbitGrokError,
   type OrbitAuthorPriorHint,
   type OrbitBookmarkForScan,
@@ -46,6 +50,9 @@ import type {
 
 export {
   OrbitGrokError,
+  DEFAULT_XAI_MODEL,
+  ORBIT_XAI_PROMPT_CACHE_KEY,
+  ORBIT_XAI_REASONING_EFFORT,
   getOrbitXaiRuntimeStatus,
   orbitConfidenceSchema,
   orbitTagSuggestionSchema,
@@ -75,6 +82,7 @@ export {
 export {
   buildOrbitPromptPayload,
   buildOrbitSystemPrompt,
+  buildOrbitUserPrompt,
   ORBIT_STATIC_INSTRUCTIONS,
   ORBIT_PROMPT_PALETTE_SIZE,
 } from "@/lib/orbit-grok-prompt";
@@ -179,6 +187,48 @@ export async function scanOrbitBookmarksWithXai(args: {
   );
 }
 
+export function resolveOrbitXaiReasoningEffort(
+  bookmarkCount: number
+): "low" | "medium" {
+  return bookmarkCount > ORBIT_SCAN_BATCH_PROFILES.quick.size
+    ? "medium"
+    : ORBIT_XAI_REASONING_EFFORT;
+}
+
+export function buildOrbitXaiResponsesRequestBody(args: {
+  model: string;
+  systemPrompt: string;
+  userContent: string;
+  reasoningEffort?: "low" | "medium";
+}) {
+  return {
+    model: args.model,
+    input: [
+      {
+        role: "system",
+        content: args.systemPrompt,
+      },
+      {
+        role: "user",
+        content: args.userContent,
+      },
+    ],
+    store: false,
+    prompt_cache_key: ORBIT_XAI_PROMPT_CACHE_KEY,
+    reasoning: {
+      effort: args.reasoningEffort ?? ORBIT_XAI_REASONING_EFFORT,
+    },
+    text: {
+      format: {
+        type: "json_schema",
+        name: "orbit_scan_plan",
+        schema: ORBIT_SCAN_PLAN_JSON_SCHEMA,
+        strict: true,
+      },
+    },
+  };
+}
+
 async function fetchOrbitScanFromXai(
   args: Omit<
     Parameters<typeof scanOrbitBookmarksWithXai>[0],
@@ -199,30 +249,15 @@ async function fetchOrbitScanFromXai(
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.3,
-        input: [
-          {
-            role: "system",
-            content: buildOrbitSystemPrompt(),
-          },
-          {
-            role: "user",
-            content: JSON.stringify(promptPayload),
-          },
-        ],
-        store: false,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "orbit_scan_plan",
-            schema: ORBIT_SCAN_PLAN_JSON_SCHEMA,
-            strict: true,
-          },
-        },
-      }),
-      signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify(
+        buildOrbitXaiResponsesRequestBody({
+          model,
+          systemPrompt: buildOrbitSystemPrompt(),
+          userContent: buildOrbitUserPrompt(promptPayload),
+          reasoningEffort: resolveOrbitXaiReasoningEffort(args.bookmarks.length),
+        })
+      ),
+      signal: AbortSignal.timeout(180_000),
     });
   } catch {
     throw new OrbitGrokError(
@@ -247,7 +282,10 @@ async function fetchOrbitScanFromXai(
       );
     }
 
-    if (response.status === 404) {
+    if (
+      response.status === 404 ||
+      (response.status === 400 && /model/i.test(message))
+    ) {
       throw new OrbitGrokError(
         "xAI could not find the configured Grok model.",
         502,
@@ -272,6 +310,17 @@ async function fetchOrbitScanFromXai(
   }
 
   const payload = await response.json().catch(() => null);
+  if (payload && typeof payload === "object") {
+    const status = (payload as { status?: unknown }).status;
+    if (status === "incomplete") {
+      throw new OrbitGrokError(
+        "xAI stopped before finishing the Orbit scan. Try a smaller batch.",
+        502,
+        "xai_response"
+      );
+    }
+  }
+
   const rawText = extractXaiResponsesOutputText(payload);
 
   if (!rawText) {

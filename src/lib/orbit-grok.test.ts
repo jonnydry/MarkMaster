@@ -6,6 +6,9 @@ import {
   buildOrbitCollectionRollups,
   buildOrbitScanSummary,
   extractXaiResponsesOutputText,
+  buildOrbitXaiResponsesRequestBody,
+  buildOrbitUserPrompt,
+  resolveOrbitXaiReasoningEffort,
   getOrbitXaiRuntimeStatus,
   normalizeOrbitScanPlan,
   ORBIT_PROMPT_PALETTE_SIZE,
@@ -48,7 +51,7 @@ describe("getOrbitXaiRuntimeStatus", () => {
     expect(status).toMatchObject({
       state: "misconfigured",
       apiKeyConfigured: false,
-      model: "grok-4.3",
+      model: "grok-4.6",
       modelSource: "default",
       baseUrl: "https://api.x.ai/v1",
       baseUrlSource: "default",
@@ -1044,7 +1047,7 @@ describe("Orbit static instructions", () => {
       expect.arrayContaining([expect.stringContaining("priorDecisions")])
     );
     expect(ORBIT_STATIC_INSTRUCTIONS.signalPriority).toEqual(
-      expect.arrayContaining([expect.stringContaining("signals.localLearning")])
+      expect.arrayContaining([expect.stringContaining("localLearning")])
     );
     expect(ORBIT_STATIC_INSTRUCTIONS.topicExtractionRules).toEqual(
       expect.arrayContaining([expect.stringContaining("domainHints")])
@@ -1058,7 +1061,7 @@ describe("Orbit static instructions", () => {
     expect(ORBIT_STATIC_INSTRUCTIONS.collectionRules).toEqual(
       expect.arrayContaining([expect.stringContaining("read-only X folders")])
     );
-    expect(ORBIT_STATIC_INSTRUCTIONS.examples).toHaveLength(2);
+    expect(ORBIT_STATIC_INSTRUCTIONS.examples).toHaveLength(3);
 
     const payload = buildOrbitPromptPayload({
       bookmarks: [],
@@ -1068,12 +1071,46 @@ describe("Orbit static instructions", () => {
     // The static blocks no longer bloat every request payload.
     expect(payload).not.toHaveProperty("signalPriority");
     expect(payload).not.toHaveProperty("examples");
+    expect(payload.bookmarkIds).toEqual([]);
   });
 
-  it("embeds the static instructions in the system prompt", () => {
+  it("embeds librarian rules as a Grok 4.6 system spec, not a duplicated JSON dump", () => {
     const systemPrompt = buildOrbitSystemPrompt();
     expect(systemPrompt).toContain("Orbit librarian");
-    expect(systemPrompt).toContain(JSON.stringify(ORBIT_STATIC_INSTRUCTIONS));
+    expect(systemPrompt).toContain("## Signal priority");
+    expect(systemPrompt).toContain("signals.primaryText");
+    expect(systemPrompt).toContain("read-only X folders");
+    expect(systemPrompt).toContain("example-existing");
+    expect(systemPrompt).not.toContain(JSON.stringify(ORBIT_STATIC_INSTRUCTIONS));
+  });
+
+  it("lists bookmark ids in the user prompt so coverage is explicit", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "tweet-1",
+          authorUsername: "researcher",
+          authorDisplayName: "Researcher",
+          authorVerified: true,
+          tweetText: "A saved post.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(payload.bookmarkIds).toEqual(["b1"]);
+    expect(buildOrbitUserPrompt(payload)).toContain(
+      "Return exactly one suggestion for each id in bookmarkIds (1 bookmark)."
+    );
   });
 });
 
@@ -1166,6 +1203,33 @@ describe("extractXaiResponsesOutputText", () => {
     );
   });
 
+  it("skips reasoning traces and still reads the assistant message", () => {
+    const payload = {
+      output: [
+        {
+          type: "reasoning",
+          summary: [{ type: "summary_text", text: "thinking" }],
+        },
+        {
+          type: "message",
+          content: [{ type: "output_text", text: '{"overview":{"summary":"ok"}}' }],
+        },
+      ],
+    };
+    expect(extractXaiResponsesOutputText(payload)).toBe(
+      '{"overview":{"summary":"ok"}}'
+    );
+  });
+
+  it("falls back to the Responses convenience output_text field", () => {
+    expect(
+      extractXaiResponsesOutputText({
+        output: [{ type: "reasoning" }],
+        output_text: '{"overview":{"summary":"ok"}}',
+      })
+    ).toBe('{"overview":{"summary":"ok"}}');
+  });
+
   it("returns null when no output_text is present", () => {
     expect(extractXaiResponsesOutputText(null)).toBeNull();
     expect(extractXaiResponsesOutputText(undefined)).toBeNull();
@@ -1176,5 +1240,43 @@ describe("extractXaiResponsesOutputText", () => {
         output: [{ type: "message", content: [{ type: "other", text: "x" }] }],
       })
     ).toBeNull();
+  });
+});
+
+describe("buildOrbitXaiResponsesRequestBody", () => {
+  it("targets Grok 4.6 Responses settings without temperature", () => {
+    const body = buildOrbitXaiResponsesRequestBody({
+      model: "grok-4.6",
+      systemPrompt: "system",
+      userContent: "{}",
+    });
+
+    expect(body).toMatchObject({
+      model: "grok-4.6",
+      store: false,
+      prompt_cache_key: "markmaster-orbit-scan",
+      reasoning: { effort: "low" },
+      text: {
+        format: {
+          type: "json_schema",
+          name: "orbit_scan_plan",
+          strict: true,
+        },
+      },
+    });
+    expect(body).not.toHaveProperty("temperature");
+  });
+
+  it("raises reasoning effort for larger Orbit batches", () => {
+    expect(resolveOrbitXaiReasoningEffort(12)).toBe("low");
+    expect(resolveOrbitXaiReasoningEffort(13)).toBe("medium");
+    expect(
+      buildOrbitXaiResponsesRequestBody({
+        model: "grok-4.6",
+        systemPrompt: "system",
+        userContent: "{}",
+        reasoningEffort: "medium",
+      }).reasoning
+    ).toEqual({ effort: "medium" });
   });
 });

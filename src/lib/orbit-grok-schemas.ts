@@ -3,7 +3,9 @@ import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
-const DEFAULT_XAI_MODEL = "grok-4.3";
+export const DEFAULT_XAI_MODEL = "grok-4.6";
+export const ORBIT_XAI_PROMPT_CACHE_KEY = "markmaster-orbit-scan";
+export const ORBIT_XAI_REASONING_EFFORT = "low";
 
 
 export class OrbitGrokError extends Error {
