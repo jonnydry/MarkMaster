@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type {
   OrbitMapCanvasHandle,
@@ -170,11 +170,17 @@ export function useOrbitMapPage() {
     return bookmarks;
   }, [expandedBookmark, focusedBookmark]);
 
+  const livingHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [livingEnabled, setLivingEnabled] = useState(true);
-
-  useEffect(() => {
+  const [livingRead, setLivingRead] = useState(false);
+  if (livingHydrated && !livingRead) {
+    setLivingRead(true);
     setLivingEnabled(getOrbitMapLivingEnabled());
-  }, []);
+  }
 
   const handleLivingEnabledChange = useCallback((enabled: boolean) => {
     setOrbitMapLivingEnabled(enabled);

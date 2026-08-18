@@ -134,78 +134,64 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const graph = props.graph;
     const filter = props.filter;
     const propsRef = useRef(props);
-    propsRef.current = props;
     const { theme } = useTheme();
     const { colorTheme } = useColorTheme();
     const themeRef = useRef(theme);
     const colorThemeRef = useRef(colorTheme);
-    themeRef.current = theme;
-    colorThemeRef.current = colorTheme;
+    useEffect(() => {
+      propsRef.current = props;
+      themeRef.current = theme;
+      colorThemeRef.current = colorTheme;
+    });
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const stageFocusRef = useRef<HTMLDivElement>(null);
     const didFocusStageRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
     const canvasTransferRetryRef = useRef(0);
     const [canvasInstance, setCanvasInstance] = useState(0);
-    const [useFallback, setUseFallback] = useState(false);
+    const workerSupported = useSyncExternalStore(
+      () => () => {},
+      () => typeof OffscreenCanvas !== "undefined" && typeof Worker !== "undefined",
+      () => true
+    );
+    const [fallbackRequested, setUseFallback] = useState(false);
+    const useFallback = fallbackRequested || !workerSupported;
     const [workerGeneration, setWorkerGeneration] = useState(0);
     const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
     // Camera stays off React state so CAMERA_CHANGED (~15 Hz while panning)
     // only redraws the minimap. Keyboard pan/jump read the store snapshot.
-    const cameraStoreRef = useRef<OrbitMapCameraStore | null>(null);
-    if (cameraStoreRef.current === null) {
-      cameraStoreRef.current = createOrbitMapCameraStore();
-    }
-    const cameraStore = cameraStoreRef.current;
+    const [cameraStore] = useState(createOrbitMapCameraStore);
     const [layoutVersion, setLayoutVersion] = useState(0);
+    const [latestPositions, setLatestPositions] = useState<Record<string, { x: number; y: number }>>({});
     // LAYOUT_UPDATED arrives per simulation tick; coalesce minimap redraws to
     // one per frame so the simulation doesn't trigger per-message repaints.
     const minimapRafRef = useRef<number | null>(null);
+    const pendingPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
     const bumpLayoutVersion = useCallback(() => {
       if (minimapRafRef.current !== null) return;
       minimapRafRef.current = requestAnimationFrame(() => {
         minimapRafRef.current = null;
+        setLatestPositions(pendingPositionsRef.current);
         setLayoutVersion((version) => version + 1);
       });
     }, []);
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
-    const activeFilter = filter ?? internalFilter;
-
-    const themeColorsRef = useRef(resolveOrbitMapCanvasTheme(theme, colorTheme));
-    const [themeColorsVersion, setThemeColorsVersion] = useState(0);
-
-    const syncThemeColors = useCallback(() => {
-      const resolved = resolveOrbitMapCanvasTheme(theme, colorTheme);
-      themeColorsRef.current = resolved;
-      return resolved;
-    }, [theme, colorTheme]);
-
-    useEffect(() => {
-      syncThemeColors();
-      setThemeColorsVersion((version) => version + 1);
-    }, [syncThemeColors]);
-
-    useEffect(() => {
-      if (filter) setInternalFilter(filter);
-    }, [filter]);
+    const requestedFilter = filter ?? internalFilter;
+    const activeFilter =
+      props.hideLooseFilter && requestedFilter === "loose" ? "all" : requestedFilter;
 
     const postToWorker = useCallback((msg: WorkerMessage) => {
       workerRef.current?.postMessage(msg);
     }, []);
-
-    // Most recent node positions from the worker's deterministic layout
-    // (drives the minimap; nothing is persisted).
-    const latestPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
 
     // Check for OffscreenCanvas support + create worker
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      // Feature detection
+      // Feature detection (fallback is derived from workerSupported)
       if (typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined') {
         console.warn('[OrbitMap] OffscreenCanvas or Worker not supported. Using fallback.');
-        setUseFallback(true);
         return;
       }
 
@@ -263,7 +249,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     graph: propsRef.current.graph,
                   };
                   workerRef.current?.postMessage(graphMessage);
-                  lastGraphKey.current = buildOrbitMapStructureKey(propsRef.current.graph);
 
                   // Then send the current filter
                   const readyFilter = propsRef.current.filter ?? 'all';
@@ -273,7 +258,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     filter: readyFilter,
                   };
                   workerRef.current?.postMessage(filterMessage);
-                  lastFilterRef.current = readyFilter;
                 }
                 if (propsRef.current.selection) {
                   workerRef.current?.postMessage({
@@ -341,7 +325,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     };
                   }
 
-                  latestPositionsRef.current = updated;
+                  pendingPositionsRef.current = updated;
 
                   // Let the minimap redraw with the fresh positions
                   bumpLayoutVersion();
@@ -419,7 +403,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
-      const { accentHex, backgroundHex } = themeColorsRef.current;
+      const { accentHex, backgroundHex } = resolveOrbitMapCanvasTheme(theme, colorTheme);
       workerRef.current.postMessage({
         type: WorkerMessageType.SET_THEME,
         protocolVersion: 1,
@@ -428,24 +412,14 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         backgroundHex,
         colorTheme,
       });
-    }, [theme, colorTheme, useFallback, workerGeneration, themeColorsVersion]);
+    }, [theme, colorTheme, useFallback, workerGeneration]);
 
-    // Send graph data + filter to worker whenever they change
-    const lastGraphKey = useRef<string>("");
-    const lastFilterRef = useRef<GraphFilter | null>(null);
+    const graphKey = graph ? buildOrbitMapStructureKey(graph) : "";
 
     useEffect(() => {
-      if (props.hideLooseFilter && activeFilter === "loose") {
-        lastFilterRef.current = "all";
-        if (filter === undefined) setInternalFilter("all");
-        props.onFilterChange?.("all");
-        postToWorker({
-          type: WorkerMessageType.SET_FILTER,
-          protocolVersion: 1,
-          filter: "all",
-        });
-      }
-    }, [activeFilter, filter, postToWorker, props.hideLooseFilter, props.onFilterChange]);
+      if (!props.hideLooseFilter || requestedFilter !== "loose") return;
+      props.onFilterChange?.("all");
+    }, [requestedFilter, props.hideLooseFilter, props.onFilterChange]);
 
     useEffect(() => {
       if (!graph || useFallback || didFocusStageRef.current) return;
@@ -454,30 +428,24 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }, [graph, useFallback]);
 
     useEffect(() => {
-      if (!workerRef.current || useFallback || !graph) return;
+      const currentGraph = propsRef.current.graph;
+      if (!workerRef.current || useFallback || !currentGraph || !graphKey) return;
+      const graphMessage: SetGraphMessage = {
+        type: WorkerMessageType.SET_GRAPH,
+        protocolVersion: 1,
+        graph: currentGraph,
+      };
+      workerRef.current.postMessage(graphMessage);
+    }, [graphKey, useFallback, workerGeneration]);
 
-      const graphKey = buildOrbitMapStructureKey(graph);
-
-      if (lastGraphKey.current !== graphKey) {
-        const graphMessage: SetGraphMessage = {
-          type: WorkerMessageType.SET_GRAPH,
-          protocolVersion: 1,
-          graph,
-        };
-
-        workerRef.current.postMessage(graphMessage);
-        lastGraphKey.current = graphKey;
-      }
-
-      if (lastFilterRef.current !== activeFilter) {
-        workerRef.current.postMessage({
-          type: WorkerMessageType.SET_FILTER,
-          protocolVersion: 1,
-          filter: activeFilter,
-        });
-        lastFilterRef.current = activeFilter;
-      }
-    }, [graph, activeFilter, filter, useFallback, workerGeneration]);
+    useEffect(() => {
+      if (!workerRef.current || useFallback) return;
+      workerRef.current.postMessage({
+        type: WorkerMessageType.SET_FILTER,
+        protocolVersion: 1,
+        filter: activeFilter,
+      });
+    }, [activeFilter, useFallback, workerGeneration]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
@@ -795,7 +763,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }, [useFallback, workerGeneration]);
 
     const handleFilterChange = (next: GraphFilter) => {
-      lastFilterRef.current = next;
       if (filter === undefined) setInternalFilter(next);
       props.onFilterChange?.(next);
       postToWorker({
@@ -1034,7 +1001,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           <OrbitMapMinimapBound
             cameraStore={cameraStore}
             graph={graph}
-            positions={latestPositionsRef.current}
+            positions={latestPositions}
             layoutVersion={layoutVersion}
             viewport={viewportSize}
             onJump={handleMinimapJump}

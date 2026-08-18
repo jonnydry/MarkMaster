@@ -38,10 +38,12 @@ export function OrbitMapHoverOwner({
     node: OrbitGraphNode;
     x: number;
     y: number;
+    epoch: string;
   } | null>(null);
   const hoverIntentTimerRef = useRef<number | null>(null);
   const hoverClearTimerRef = useRef<number | null>(null);
 
+  const graphEpoch = `${graph?.scope ?? ""}:${graph?.generatedAt ?? ""}`;
   const graphIndexes = useMemo(
     () => buildOrbitMapGraphIndexes(graph),
     [graph]
@@ -77,18 +79,11 @@ export function OrbitMapHoverOwner({
     }
   }, []);
 
-  const resetHover = useCallback(() => {
-    clearHoverTimers();
-    setHoverCard(null);
-  }, [clearHoverTimers]);
-
   useEffect(() => {
     return () => clearHoverTimers();
-  }, [clearHoverTimers]);
+  }, [clearHoverTimers, graphEpoch]);
 
-  useEffect(() => {
-    resetHover();
-  }, [graph?.scope, graph?.generatedAt, resetHover]);
+  const visibleHoverCard = hoverCard?.epoch === graphEpoch ? hoverCard : null;
 
   const handleHoverChange = useCallback<OrbitMapHoverHandler>(
     (next, position) => {
@@ -98,7 +93,7 @@ export function OrbitMapHoverOwner({
         const node = graphIndexes.nodesById.get(next.id);
         if (node) {
           hoverIntentTimerRef.current = window.setTimeout(() => {
-            setHoverCard({ node, x: position.x, y: position.y });
+            setHoverCard({ node, x: position.x, y: position.y, epoch: graphEpoch });
             hoverIntentTimerRef.current = null;
           }, 140);
           return;
@@ -110,7 +105,7 @@ export function OrbitMapHoverOwner({
         hoverClearTimerRef.current = null;
       }, 140);
     },
-    [clearHoverTimers, graphIndexes]
+    [clearHoverTimers, graphEpoch, graphIndexes]
   );
 
   useEffect(() => {
@@ -124,11 +119,11 @@ export function OrbitMapHoverOwner({
 
   return (
     <div ref={wrapRef} className="pointer-events-none absolute inset-0 z-20">
-      {hoverCard ? (
+      {visibleHoverCard ? (
         <OrbitMapHoverCard
-          node={hoverCard.node}
-          x={hoverCard.x}
-          y={hoverCard.y}
+          node={visibleHoverCard.node}
+          x={visibleHoverCard.x}
+          y={visibleHoverCard.y}
           containerWidth={stageSize.width}
           containerHeight={stageSize.height}
         />

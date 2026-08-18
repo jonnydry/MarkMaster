@@ -31,7 +31,6 @@ export function useOrbitGraphQuery(
 ) {
   const queryClient = useQueryClient();
   const anchorsRef = useRef(expandedAnchors);
-  anchorsRef.current = expandedAnchors;
   const expandKey = expandedAnchors.join(",");
   const previousRef = useRef({ scope, expandKey });
 
@@ -50,6 +49,7 @@ export function useOrbitGraphQuery(
   });
 
   useEffect(() => {
+    anchorsRef.current = expandedAnchors;
     const scopeChanged = previousRef.current.scope !== scope;
     const expandChanged = previousRef.current.expandKey !== expandKey;
     previousRef.current = { scope, expandKey };
@@ -63,7 +63,7 @@ export function useOrbitGraphQuery(
           requestKey: orbitGraphRequestKey(scope, anchorsRef.current),
         }),
     });
-  }, [expandKey, queryClient, scope]);
+  }, [expandKey, expandedAnchors, queryClient, scope]);
 
   return query;
 }

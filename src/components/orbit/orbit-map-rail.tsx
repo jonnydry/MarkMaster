@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Copy,
@@ -669,11 +669,13 @@ function ConnectedList({
 
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
+  const listKey = `${title}:${bookmarks.length}:${bookmarks[0]?.id ?? ""}`;
   const [visibleCount, setVisibleCount] = useState(CONNECTED_LIST_PAGE);
-
-  useEffect(() => {
+  const [prevListKey, setPrevListKey] = useState(listKey);
+  if (prevListKey !== listKey) {
+    setPrevListKey(listKey);
     setVisibleCount(CONNECTED_LIST_PAGE);
-  }, [title, bookmarks.length, bookmarks[0]?.id]);
+  }
 
   if (bookmarks.length === 0) return null;
 

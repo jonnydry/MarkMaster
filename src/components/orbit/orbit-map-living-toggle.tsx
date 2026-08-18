@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Orbit } from "lucide-react";
 
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 interface OrbitMapLivingToggleProps {
@@ -16,17 +17,12 @@ export function OrbitMapLivingToggle({
   onEnabledChange,
   className,
 }: OrbitMapLivingToggleProps) {
-  const [ready, setReady] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReducedMotion(media.matches);
-    sync();
-    setReady(true);
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+  const ready = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   if (!ready || reducedMotion) {
     return null;
