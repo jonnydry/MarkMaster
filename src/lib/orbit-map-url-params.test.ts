@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyOrbitMapFilterToParams,
   applyOrbitMapSelectionToParams,
   clearOrbitMapSelectionParams,
+  parseOrbitMapFilterFromParams,
   parseOrbitMapSelectionFromParams,
 } from "@/lib/orbit-map-url-params";
 
@@ -52,6 +54,24 @@ describe("applyOrbitMapSelectionToParams", () => {
     expect(params.has("kind")).toBe(false);
     expect(params.has("bookmark")).toBe(false);
     expect(params.has("focus")).toBe(false);
+  });
+});
+
+describe("orbit map filter params", () => {
+  it("defaults unknown values to all", () => {
+    expect(parseOrbitMapFilterFromParams(null)).toBe("all");
+    expect(parseOrbitMapFilterFromParams("recent")).toBe("recent");
+    expect(parseOrbitMapFilterFromParams("loose")).toBe("loose");
+    expect(parseOrbitMapFilterFromParams("starred")).toBe("all");
+  });
+
+  it("omits the default all filter from the URL", () => {
+    const params = new URLSearchParams({ filter: "loose" });
+    applyOrbitMapFilterToParams(params, "all");
+    expect(params.has("filter")).toBe(false);
+
+    applyOrbitMapFilterToParams(params, "recent");
+    expect(params.get("filter")).toBe("recent");
   });
 });
 

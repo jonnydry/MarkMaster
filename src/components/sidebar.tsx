@@ -74,6 +74,11 @@ export interface SidebarProps {
   onCreateCollection: () => void;
   /** Mobile drawer: full layout and hide collapse control. */
   forceExpanded?: boolean;
+  /**
+   * Start as the 60px icon rail without writing the global sidebar
+   * preference (Orbit map). The logo still expands locally.
+   */
+  preferCollapsed?: boolean;
   lastSyncAt?: Date | null;
   totalBookmarks?: number;
   onSyncComplete?: () => void;
@@ -96,6 +101,7 @@ export function Sidebar({
   onTagToggle,
   onCreateCollection,
   forceExpanded = false,
+  preferCollapsed = false,
   lastSyncAt,
   totalBookmarks,
   onSyncComplete,
@@ -108,8 +114,16 @@ export function Sidebar({
     prefetchOrbitGraph(queryClient);
   }, [queryClient]);
   const glassSidebar = hasFeedPageWatermark(pathname);
-  const { expanded: ctxExpanded, toggle } = useSidebar();
-  const expanded = forceExpanded ? true : ctxExpanded;
+  const { expanded: ctxExpanded, toggle: ctxToggle } = useSidebar();
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const expanded = forceExpanded
+    ? true
+    : preferCollapsed
+      ? localExpanded
+      : ctxExpanded;
+  const toggle = preferCollapsed
+    ? () => setLocalExpanded((value) => !value)
+    : ctxToggle;
   const showToggle = !forceExpanded;
   const userCollections = useMemo(
     () => collections.filter((collection) => collection.type !== "x_folder"),

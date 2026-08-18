@@ -37,6 +37,7 @@ import {
   type FocusPulseMessage,
   type SetThemeMessage,
   type SetVisibilityMessage,
+  type SetLivingMapMessage,
   type PlayScanSweepMessage,
   type FocusOnMessage,
   type SetSelectionMessage,
@@ -48,7 +49,9 @@ import {
   type CameraState,
   collectTransferables,
   getSafeDpr,
+  getHotPathWorkerMessageError,
   getWorkerMessageValidationError,
+  isHotPathWorkerMessageType,
 } from '@/lib/orbit-worker-protocol';
 
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
@@ -86,7 +89,6 @@ import {
   computeOrbitMapClusterLayout,
   getOrbitMapClusterRingRadii,
   type OrbitMapCluster,
-  type OrbitMapOrbitGeometry,
 } from './orbit-map-cluster-layout';
 import {
   getOrbitMapBookmarkLodAlpha,
@@ -103,7 +105,7 @@ import {
   ORBIT_MAP_LABEL_CELL_SIZE,
   type OrbitMapLabelCandidate,
 } from './orbit-map-labels';
-import { findClosestOrbitMapNode, getOrbitMapHitPadding } from './orbit-map-hit-test';
+import { createOrbitMapSpatialIndex } from './orbit-map-hit-test';
 import { createOrbitMapInteractions } from './orbit-map-interactions';
 import { createOrbitMapPerfLogger } from './orbit-map-perf';
 import {
@@ -127,6 +129,8 @@ import {
   createOrbitMapVignetteSprite,
   hashOrbitMapStringToSeed,
 } from './orbit-map-scene';
+import { createOrbitMapLivingRuntime } from './orbit-map-living-runtime';
+import { createOrbitMapScanSweep } from './orbit-map-scan-sweep';
 
 /** Internal node type: original graph node + layout position + visuals. */
 interface MapNode {
@@ -220,22 +224,6 @@ const ENTRANCE_SCALE_START = 0.62;
 /** Instant scale applied to the hovered node (no selection active). */
 const HOVER_POP_SCALE = 1.06;
 
-// === Living map (analytic orbital motion, behind the host-side flag) ===
-/** Tangential speed of ring bookmarks (px/s); ω = speed / radius, so outer
- * shells revolve slower — night-sky pace, clearly alive but never busy. */
-const ORBIT_RING_LINEAR_SPEED = 2.2;
-/** Loose-belt angular velocity: one revolution ≈ 8 minutes. */
-const ORBIT_BELT_OMEGA = (Math.PI * 2) / 480;
-/** Radial wobble of belt bookmarks (px) — untriaged chaos reads restless. */
-const BELT_WOBBLE_AMPLITUDE = 2.5;
-/** Wobble oscillation speed (radians/second). */
-const BELT_WOBBLE_SPEED = 0.35;
-/** Cadence of the full style/declutter/minimap refresh while alive. */
-const LIVING_REFRESH_MS = 2000;
-/** Sun corona rotation speed (radians/second). */
-const CORONA_SPIN = 0.06;
-/** Sun corona alpha breathing period. */
-const CORONA_BREATH_PERIOD_MS = 3700;
 /** Hubs must share at least this many bookmarks to be constellation-linked. */
 const CONSTELLATION_MIN_SHARED = 2;
 /** Cap on constellation lines (strongest pairs win). */
@@ -251,12 +239,6 @@ const METEOR_STAGGER_MS = 140;
 const METEOR_DURATION_MS = 950;
 /** A meteor batch at least this big also plays the radar sweep. */
 const SWEEP_METEOR_THRESHOLD = 3;
-/** Radar sweep: one full revolution duration and trailing glow width. */
-const SWEEP_DURATION_MS = 2600;
-const SWEEP_TRAIL_RAD = 0.7;
-/** Cap on per-sweep node glints. */
-const SWEEP_MAX_GLINTS = 400;
-
 // Labels
 const labelMap = new Map<string, BitmapText>();
 
@@ -267,6 +249,7 @@ let linkData: MapLink[] = [];
 let clusters = new Map<string, OrbitMapCluster>();
 /** Nodes currently visible under filter + LOD (the hit-testable set). */
 let hitTestNodes: MapNode[] = [];
+const hitIndex = createOrbitMapSpatialIndex<MapNode>();
 
 // Camera state (position + zoom)
 let camera = { x: 0, y: 0, zoom: 1 };
@@ -355,46 +338,6 @@ let lastAmbientFrameAt = 0;
 let knownBookmarkIds: Set<string> | null = null;
 /** Scope of the previous graph payload (scope switches don't rain meteors). */
 let lastGraphScope: string | null = null;
-/** Active radar sweep, or null. Glint sky positions are fixed at start. */
-let activeSweep: {
-  startTime: number;
-  duration: number;
-  maxRadius: number;
-  glints: Array<{ id: string; angle: number; x: number; y: number }>;
-} | null = null;
-
-function isSweepActive() {
-  return activeSweep !== null;
-}
-
-// === Living map state ===
-/** Per-node orbit: position(t) = center + r·(cos, sin)(θ₀ + ω·t). */
-interface OrbitMotionState {
-  cx: number;
-  cy: number;
-  r: number;
-  theta0: number;
-  omega: number;
-  /** Belt members wobble radially; ring members hold their shell. */
-  belt: boolean;
-  /** Deterministic per-node wobble phase (belt only). */
-  wobblePhase: number;
-}
-const orbitStates = new Map<string, OrbitMotionState>();
-/** Wall-clock epoch for orbit angles (reset per scene rebuild). */
-let orbitEpoch = 0;
-let livingMapEnabled = false;
-let pageVisible = true;
-/** Timestamp of the last full style/declutter/minimap refresh while alive. */
-let lastLivingRefreshAt = 0;
-/** Sun corona flare sprites (living map only). */
-let coronaFlares: Array<{ sprite: Sprite; spin: number; baseAlpha: number }> = [];
-
-/** True while the analytic orbital motion should run. */
-function isLivingActive() {
-  return livingMapEnabled && pageVisible && nodeData.length > 0 && app !== null;
-}
-
 /**
  * Central selection setter: a changed selection restarts the edge trace-in;
  * clearing the selection cancels it.
@@ -586,6 +529,7 @@ function pushPulse(nodeId: string, duration = 420) {
 const interactions = createOrbitMapInteractions<MapNode>({
   hasScene: () => Boolean(app && currentGraph && nodeData.length > 0),
   getNodeData: () => hitTestNodes,
+  findHit: (point, padding) => hitIndex.query(point, padding),
   getNodeById: () => nodeById,
   getCamera: () => camera,
   panBy: (dx, dy) => {
@@ -631,9 +575,58 @@ const interactions = createOrbitMapInteractions<MapNode>({
   pulseNode: (nodeId) => pushPulse(nodeId),
 });
 
+const living = createOrbitMapLivingRuntime({
+  getNodeById: () => nodeById,
+  getNodeData: () => nodeData,
+  getDraggingNodeId: () => interactions.getDraggingNodeId(),
+  getAnimatedNodeIds: () =>
+    activeAnimations.length > 0
+      ? new Set(activeAnimations.map((anim) => anim.nodeId))
+      : null,
+  getGlowContainer: () => glowContainer,
+  getGlowTexture: () => glowTexture,
+  getAdditiveBlendMode,
+  hasApp: () => app !== null,
+});
+
+const sweep = createOrbitMapScanSweep({
+  getNodeById: () => nodeById,
+  getNodeData: () => nodeData,
+  getGraphBounds,
+  getMeteorLanding: (nodeId) => {
+    for (const anim of activeAnimations) {
+      if (
+        anim.type === 'meteor' &&
+        anim.nodeId === nodeId &&
+        anim.targetX !== undefined &&
+        anim.targetY !== undefined
+      ) {
+        return { x: anim.targetX, y: anim.targetY };
+      }
+    }
+    return null;
+  },
+  onStart: () => startRenderLoop(),
+});
+
+function isLivingActive() {
+  return living.isActive();
+}
+
+function isSweepActive() {
+  return sweep.isActive();
+}
+
 /** Handle incoming messages from the main thread. */
 function handleMessage(event: MessageEvent<unknown>) {
-  const validationError = getWorkerMessageValidationError(event.data);
+  const raw = event.data;
+  const rawType =
+    raw && typeof raw === "object" && "type" in raw && typeof raw.type === "string"
+      ? raw.type
+      : null;
+  const validationError = rawType && isHotPathWorkerMessageType(rawType)
+    ? getHotPathWorkerMessageError(raw)
+    : getWorkerMessageValidationError(raw);
   if (validationError) {
     postToMain({
       type: MainMessageType.ERROR,
@@ -738,8 +731,12 @@ function handleMessage(event: MessageEvent<unknown>) {
       handleSetVisibility(msg as SetVisibilityMessage);
       break;
 
+    case WorkerMessageType.SET_LIVING_MAP:
+      handleSetLivingMap(msg as SetLivingMapMessage);
+      break;
+
     case WorkerMessageType.PLAY_SCAN_SWEEP:
-      startScanSweep((msg as PlayScanSweepMessage).nodeIds);
+      sweep.start((msg as PlayScanSweepMessage).nodeIds);
       break;
 
     case WorkerMessageType.DESTROY:
@@ -762,7 +759,7 @@ function handleInit(msg: InitMessage) {
   accentHex = msg.accentHex;
   backgroundHex = msg.backgroundHex;
   colorThemeId = msg.colorTheme;
-  livingMapEnabled = Boolean(msg.livingMap);
+  living.setEnabled(Boolean(msg.livingMap));
   const palette = getPalette();
 
   try {
@@ -827,16 +824,28 @@ function handleResize(msg: ResizeMessage) {
 }
 
 function handleSetVisibility(msg: SetVisibilityMessage) {
-  if (pageVisible === msg.visible) return;
-  pageVisible = msg.visible;
+  if (living.isPageVisible() === msg.visible) return;
+  living.setPageVisible(msg.visible);
   if (msg.visible) {
     // Orbits are pure functions of wall-clock time, so after a long hidden
     // stretch the sky simply resumes at its current configuration — like a
     // real sky. One style pass re-culls and restarts the loop.
-    advanceOrbits(Date.now());
+    living.advanceOrbits(Date.now());
     updateNodeStyles();
   }
   // When hidden, the loop's continue-condition goes false and it winds down.
+}
+
+function handleSetLivingMap(msg: SetLivingMapMessage) {
+  if (living.isEnabled() === msg.enabled) return;
+  living.setEnabled(msg.enabled);
+  if (msg.enabled) {
+    living.buildSunCorona();
+    startRenderLoop();
+  } else {
+    living.clearSunCorona();
+  }
+  updateNodeStyles();
 }
 
 function handleSetTheme(msg: SetThemeMessage) {
@@ -866,7 +875,7 @@ function applyColorMode() {
   const blendMode = getAdditiveBlendMode();
   for (const glow of glowSpriteMap.values()) glow.blendMode = blendMode;
   for (const halo of haloSpriteMap.values()) halo.blendMode = blendMode;
-  for (const flare of coronaFlares) flare.sprite.blendMode = blendMode;
+  living.setFlareBlendMode(blendMode);
   if (effectsAdditiveGraphics) effectsAdditiveGraphics.blendMode = blendMode;
   buildNebulaField();
   if (currentGraph) {
@@ -1011,7 +1020,7 @@ function launchMeteorArrivals(
   });
 
   if (arrivals.length >= SWEEP_METEOR_THRESHOLD) {
-    startScanSweep(arrivals.map((datum) => datum.id));
+    sweep.start(arrivals.map((datum) => datum.id));
   }
   startRenderLoop();
 }
@@ -1029,7 +1038,7 @@ function applyActiveSearch() {
       type: MainMessageType.SEARCH_RESULTS,
       protocolVersion: 1,
       query: '',
-      results: [],
+      resultIds: [],
     });
     return;
   }
@@ -1045,7 +1054,7 @@ function applyActiveSearch() {
     type: MainMessageType.SEARCH_RESULTS,
     protocolVersion: 1,
     query: activeSearchQuery,
-    results,
+    resultIds: results.map((node) => node.id),
   });
 }
 
@@ -1160,6 +1169,7 @@ function handleDestroy() {
   linkData = [];
   clusters.clear();
   hitTestNodes = [];
+  hitIndex.rebuild([]);
   adjacency.clear();
   searchIndex = [];
   activeSearchQuery = '';
@@ -1194,17 +1204,12 @@ function handleDestroy() {
   nebulaTexture = null;
   effectsGraphics = null;
   effectsAdditiveGraphics = null;
-  coronaFlares = [];
+  living.reset();
+  sweep.reset();
   focusedEdgeCurves.length = 0;
   edgeRevealStartedAt = null;
-  orbitStates.clear();
-  orbitEpoch = 0;
-  livingMapEnabled = false;
-  pageVisible = true;
-  lastLivingRefreshAt = 0;
   knownBookmarkIds = null;
   lastGraphScope = null;
-  activeSweep = null;
   app = null;
   isInitialized = false;
 }
@@ -1310,7 +1315,7 @@ function rebuildScene() {
   constellationGraphics = null;
   effectsGraphics = null;
   effectsAdditiveGraphics = null;
-  coronaFlares = [];
+  living.discardCoronaSprites();
   nodeGraphicsMap.clear();
   nodeById.clear();
   activeAnimations.length = 0;
@@ -1386,7 +1391,7 @@ function rebuildScene() {
       datum.y = position.y;
     }
   }
-  buildOrbitStates(layout.orbits);
+  living.buildOrbitStates(layout.orbits);
 
   nodeById = new Map(nodeData.map((datum) => [datum.id, datum]));
   applyHubLabelRanks();
@@ -1502,14 +1507,9 @@ function buildScene() {
     }
   }
 
-  buildSunCorona();
+  living.buildSunCorona();
 }
 
-/**
- * Living map only: the core node gets a sun corona — two elongated,
- * counter-rotating warm flares whose slow undulation reads as a burning
- * star. Radially asymmetric sprites, so the rotation is actually visible.
- */
 /**
  * Star-chart lines between hubs that share bookmarks, drawn once per scene
  * (hubs never move). updateNodeStyles fades the whole layer in only at far
@@ -1565,132 +1565,6 @@ function buildConstellations() {
         Math.min(colorMode === 'light' ? 0.22 : 0.16, weight * 0.03),
     });
   }
-}
-
-function buildSunCorona() {
-  coronaFlares = [];
-  if (!livingMapEnabled || !glowTexture || !glowContainer) return;
-  const coreDatum = nodeData.find((datum) => datum.kind === 'core');
-  if (!coreDatum) return;
-
-  const blendMode = getAdditiveBlendMode();
-  const configs = [
-    { width: 9, height: 4, tint: 0xfacc15, alpha: 0.3, spin: CORONA_SPIN },
-    { width: 6.5, height: 3, tint: 0xf97316, alpha: 0.24, spin: -CORONA_SPIN * 0.7 },
-  ];
-  for (const config of configs) {
-    const sprite = new Sprite(glowTexture);
-    sprite.anchor.set(0.5);
-    sprite.tint = config.tint;
-    sprite.blendMode = blendMode;
-    sprite.alpha = config.alpha;
-    sprite.width = coreDatum.radius * config.width;
-    sprite.height = coreDatum.radius * config.height;
-    sprite.position.set(coreDatum.x, coreDatum.y);
-    glowContainer.addChild(sprite);
-    coronaFlares.push({ sprite, spin: config.spin, baseAlpha: config.alpha });
-  }
-}
-
-/** Rotates and breathes the corona flares (living map frames only). */
-function animateCorona(now: number) {
-  if (coronaFlares.length === 0) return;
-  const t = (now - orbitEpoch) / 1000;
-  const breath =
-    Math.sin(((now % CORONA_BREATH_PERIOD_MS) / CORONA_BREATH_PERIOD_MS) * Math.PI * 2);
-  for (let i = 0; i < coronaFlares.length; i++) {
-    const flare = coronaFlares[i];
-    flare.sprite.rotation = flare.spin * t;
-    flare.sprite.alpha = flare.baseAlpha * (1 + 0.12 * (i === 0 ? breath : -breath));
-  }
-}
-
-/**
- * Converts layout orbit geometry into motion states. Angular velocity policy:
- * ring shells keep a constant tangential speed (outer shells slower, like a
- * real system) with a deterministic per-cluster direction; the loose belt
- * revolves as one rigid, very slow band.
- */
-function buildOrbitStates(orbits: Map<string, OrbitMapOrbitGeometry>) {
-  orbitStates.clear();
-  orbitEpoch = Date.now();
-  for (const [nodeId, orbit] of orbits) {
-    const direction = orbit.anchorId
-      ? hashOrbitMapStringToSeed(orbit.anchorId) % 2 === 0
-        ? 1
-        : -1
-      : 1;
-    const belt = orbit.ringIndex < 0;
-    const omega = belt
-      ? ORBIT_BELT_OMEGA
-      : (ORBIT_RING_LINEAR_SPEED / Math.max(20, orbit.radius)) * direction;
-    orbitStates.set(nodeId, {
-      cx: orbit.centerX,
-      cy: orbit.centerY,
-      r: orbit.radius,
-      theta0: orbit.theta,
-      omega,
-      belt,
-      wobblePhase: belt
-        ? (hashOrbitMapStringToSeed(nodeId) % 6283) / 1000
-        : 0,
-    });
-  }
-}
-
-/**
- * Advances every orbiting node to its analytic position at `now`. Nodes being
- * dragged or driven by one-shot animations are skipped so the two systems
- * never fight over datum.x/y.
- */
-function advanceOrbits(now: number) {
-  if (!isLivingActive() || orbitStates.size === 0) return;
-  const t = (now - orbitEpoch) / 1000;
-  const draggingId = interactions.getDraggingNodeId();
-  const animatedIds =
-    activeAnimations.length > 0
-      ? new Set(activeAnimations.map((anim) => anim.nodeId))
-      : null;
-
-  for (const [nodeId, orbit] of orbitStates) {
-    if (nodeId === draggingId || animatedIds?.has(nodeId)) continue;
-    const datum = nodeById.get(nodeId);
-    if (!datum) continue;
-    const angle = orbit.theta0 + orbit.omega * t;
-    // Belt bookmarks breathe radially — the untriaged band reads restless
-    // next to the calm, ordered cluster shells.
-    const radius = orbit.belt
-      ? orbit.r +
-        BELT_WOBBLE_AMPLITUDE * Math.sin(t * BELT_WOBBLE_SPEED + orbit.wobblePhase)
-      : orbit.r;
-    datum.x = orbit.cx + Math.cos(angle) * radius;
-    datum.y = orbit.cy + Math.sin(angle) * radius;
-  }
-}
-
-/**
- * Re-phases a node's orbit so it continues from where a return/meteor flight
- * landed. Only theta is rebased: the landing point is on (or within wobble
- * range of) the node's own shell, and keeping the canonical radius prevents
- * transient wobble offsets from being baked into the orbit.
- */
-function rebaseOrbitTheta(nodeId: string) {
-  const orbit = orbitStates.get(nodeId);
-  const datum = nodeById.get(nodeId);
-  if (!orbit || !datum) return;
-  orbit.theta0 =
-    Math.atan2(datum.y - orbit.cy, datum.x - orbit.cx) -
-    orbit.omega * ((Date.now() - orbitEpoch) / 1000);
-}
-
-/**
- * Drops a node's orbit entirely. Used when an assign flight docks a bookmark
- * onto a new hub: its old orbit (center, speed, belt wobble) is meaningless
- * there, so it holds position until the refetch rebuilds proper orbits —
- * rather than sliding away around the stale center.
- */
-function releaseOrbit(nodeId: string) {
-  orbitStates.delete(nodeId);
 }
 
 function applyHubLabelRanks() {
@@ -2031,6 +1905,7 @@ function updateNodeStyles() {
       }
     }
   }
+  hitIndex.rebuild(hitTestNodes);
 
   // Cluster halos: the far-zoom stand-in for each hub's bookmarks.
   for (const [anchorId, halo] of haloSpriteMap) {
@@ -2576,110 +2451,13 @@ function renderEffects() {
     }
   });
 
-  renderScanSweep();
-}
-
-/**
- * Radar sweep: an additive beam rotates once around the core; bookmarks
- * glint as the leading edge passes their sky angle. Draws into the pooled
- * effects layers — nothing is allocated per frame.
- */
-function renderScanSweep() {
-  if (!activeSweep || !effectsAdditiveGraphics) return;
-
-  const progress = getOrbitMapAnimationProgress(activeSweep);
-  if (progress >= 1) {
-    activeSweep = null;
-    return;
+  if (effectsAdditiveGraphics) {
+    sweep.render(
+      effectsAdditiveGraphics,
+      getPaletteAccent(),
+      mixOrbitMapColors
+    );
   }
-
-  const sweepAngle = progress * Math.PI * 2 - Math.PI / 2;
-  const { maxRadius } = activeSweep;
-  const beamColor = mixOrbitMapColors(getPaletteAccent(), 0xffffff, 0.3);
-
-  // Beam: three nested wedges approximate a falloff behind the leading edge.
-  for (let band = 0; band < 3; band++) {
-    const span = SWEEP_TRAIL_RAD * (1 - band * 0.3);
-    effectsAdditiveGraphics.moveTo(0, 0);
-    effectsAdditiveGraphics.arc(0, 0, maxRadius, sweepAngle - span, sweepAngle);
-    effectsAdditiveGraphics.lineTo(0, 0);
-    effectsAdditiveGraphics.fill({ color: beamColor, alpha: 0.022 });
-  }
-  // Leading edge line.
-  effectsAdditiveGraphics.moveTo(0, 0);
-  effectsAdditiveGraphics.lineTo(
-    Math.cos(sweepAngle) * maxRadius,
-    Math.sin(sweepAngle) * maxRadius
-  );
-  effectsAdditiveGraphics.stroke({ width: 1.5, color: beamColor, alpha: 0.4 });
-
-  // Glints: nodes light up as the beam passes and fade over the trail width.
-  const swept = progress * Math.PI * 2;
-  for (const glint of activeSweep.glints) {
-    const offset = glint.angle - swept;
-    if (offset > 0 || offset < -SWEEP_TRAIL_RAD) continue;
-    const strength = 1 + offset / SWEEP_TRAIL_RAD;
-    const datum = nodeById.get(glint.id);
-    if (!datum) continue;
-    effectsAdditiveGraphics.circle(glint.x, glint.y, datum.radius + 2.5);
-    effectsAdditiveGraphics.fill({ color: beamColor, alpha: 0.55 * strength });
-  }
-}
-
-/** Sky position for sweep glints — meteors use their landing slot, not entry. */
-function resolveSweepGlintPosition(
-  nodeId: string,
-  datum: MapNode
-): { x: number; y: number } {
-  for (const anim of activeAnimations) {
-    if (
-      anim.type === 'meteor' &&
-      anim.nodeId === nodeId &&
-      anim.targetX !== undefined &&
-      anim.targetY !== undefined
-    ) {
-      return { x: anim.targetX, y: anim.targetY };
-    }
-  }
-  return { x: datum.x, y: datum.y };
-}
-
-/** Starts the radar sweep over the given nodes (or all bookmarks). */
-function startScanSweep(nodeIds?: string[] | null) {
-  if (nodeData.length === 0) return;
-
-  const bounds = getGraphBounds();
-  const maxRadius = bounds
-    ? Math.max(
-        Math.abs(bounds.minX),
-        Math.abs(bounds.maxX),
-        Math.abs(bounds.minY),
-        Math.abs(bounds.maxY)
-      ) + 60
-    : 1400;
-
-  // Angles measured from the beam's start position (top, -π/2), normalized
-  // to [0, 2π) so the glint check is a simple window test.
-  const glints: Array<{ id: string; angle: number; x: number; y: number }> = [];
-  const source = nodeIds
-    ? nodeIds.map((id) => nodeById.get(id)).filter(Boolean)
-    : nodeData.filter((datum) => datum.kind === 'bookmark');
-  for (const datum of source) {
-    if (glints.length >= SWEEP_MAX_GLINTS) break;
-    if (!datum) continue;
-    const { x, y } = resolveSweepGlintPosition(datum.id, datum);
-    const angle =
-      (Math.atan2(y, x) + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
-    glints.push({ id: datum.id, angle, x, y });
-  }
-
-  activeSweep = {
-    startTime: Date.now(),
-    duration: SWEEP_DURATION_MS,
-    maxRadius,
-    glints,
-  };
-  startRenderLoop();
 }
 
 /* ============================================================
@@ -2690,28 +2468,27 @@ function startScanSweep(nodeIds?: string[] | null) {
  * particles) should keep the loop alive after one-shot animations finish.
  * Hidden pages have no ambient motion — the loop must wind down. */
 function hasAmbientMotion() {
-  return pageVisible && currentSelection !== null && nodeData.length > 0;
+  return living.isPageVisible() && currentSelection !== null && nodeData.length > 0;
 }
 
 /**
  * Living-map frame: everything the ambient frame does, plus orbital node and
  * label position sync and an edge redraw that tracks the moving bookmarks.
- * Every LIVING_REFRESH_MS a full style pass re-culls, re-declutters labels,
- * and syncs the minimap; between refreshes this path allocates nothing.
+ * Every LIVING_REFRESH_MS a full style pass re-culls and re-declutters labels;
+ * between refreshes this path allocates nothing. Layout is not posted here —
+ * hubs barely move, and a full LAYOUT_UPDATED would rebuild React + minimap.
  */
 function renderLivingFrame(now: number) {
   if (!app) return;
 
-  if (now - lastLivingRefreshAt >= LIVING_REFRESH_MS) {
-    lastLivingRefreshAt = now;
+  if (living.shouldRefreshStyles(now)) {
     updateNodeStyles();
-    sendLayoutUpdate(true);
     return;
   }
 
   const focusContext = getFocusContext();
 
-  for (const nodeId of orbitStates.keys()) {
+  for (const nodeId of living.orbitingIds()) {
     const g = nodeGraphicsMap.get(nodeId);
     if (!g || !g.visible) continue;
     const datum = nodeById.get(nodeId);
@@ -2719,7 +2496,7 @@ function renderLivingFrame(now: number) {
   }
 
   for (const [nodeId, label] of labelMap) {
-    if (!label.visible || !orbitStates.has(nodeId)) continue;
+    if (!label.visible || !living.hasOrbit(nodeId)) continue;
     const datum = nodeById.get(nodeId);
     if (datum) positionLabel(label, datum, focusContext);
   }
@@ -2779,7 +2556,7 @@ function startRenderLoop() {
 
   const tickFrame = () => {
     const now = Date.now();
-    const living = isLivingActive();
+    const livingActive = isLivingActive();
 
     const hadAnimations = activeAnimations.length > 0;
     updateAnimations();
@@ -2792,9 +2569,9 @@ function startRenderLoop() {
       entranceStartedAt !== null ||
       isEdgeRevealActive()
     ) {
-      if (living) {
-        advanceOrbits(now);
-        animateCorona(now);
+      if (livingActive) {
+        living.advanceOrbits(now);
+        living.animateCorona(now);
       }
       updateNodeStyles();
       requestAnimationFrame(tick);
@@ -2804,9 +2581,9 @@ function startRenderLoop() {
     if (hadAnimations) {
       // One-shot animations just finished (possibly with the ambient loop
       // still alive): settle styles and sync moved nodes to the minimap.
-      if (living) {
-        advanceOrbits(now);
-        animateCorona(now);
+      if (livingActive) {
+        living.advanceOrbits(now);
+        living.animateCorona(now);
       }
       updateNodeStyles();
       sendLayoutUpdate(true);
@@ -2819,12 +2596,12 @@ function startRenderLoop() {
     // (plus orbit positions when living) — half the GPU work, invisible
     // for motion this slow. The sweep runs here too instead of forcing
     // full style passes. All of it pauses while the page is hidden.
-    if (living || hasAmbientMotion() || (pageVisible && isSweepActive())) {
+    if (livingActive || hasAmbientMotion() || (living.isPageVisible() && isSweepActive())) {
       if (now - lastAmbientFrameAt >= AMBIENT_FRAME_MIN_MS) {
         lastAmbientFrameAt = now;
-        if (living) {
-          advanceOrbits(now);
-          animateCorona(now);
+        if (livingActive) {
+          living.advanceOrbits(now);
+          living.animateCorona(now);
           renderLivingFrame(now);
         } else {
           renderAmbientFrame();
@@ -2913,7 +2690,7 @@ function updateAnimations() {
         if (anim.type === 'assign') {
           // The node docked onto a different hub; its old orbit no longer
           // applies — hold position until the refetch rebuilds orbits.
-          releaseOrbit(anim.nodeId);
+          living.releaseOrbit(anim.nodeId);
           delete datum.scale;
           pushPulse(anim.nodeId);
           postToMain({
@@ -2925,7 +2702,7 @@ function updateAnimations() {
           // Meteor landed on the node's shell — re-phase so drift continues
           // from the capture point. Return flights skip this: orbit state was
           // never changed during the drag and still matches the cluster.
-          rebaseOrbitTheta(anim.nodeId);
+          living.rebaseOrbitTheta(anim.nodeId);
           pushPulse(anim.nodeId, 520);
         }
       }
@@ -3150,10 +2927,9 @@ function handleDoubleClick(msg: DoubleClickMessage) {
   const worldX = (msg.x - camera.x) / camera.zoom;
   const worldY = (msg.y - camera.y) / camera.zoom;
 
-  const closest = findClosestOrbitMapNode(
-    hitTestNodes,
+  const closest = hitIndex.query(
     { x: worldX, y: worldY },
-    getOrbitMapHitPadding(camera.zoom)
+    Math.max(10, 14 / camera.zoom)
   );
 
   if (closest?.node.kind === 'bookmark') {

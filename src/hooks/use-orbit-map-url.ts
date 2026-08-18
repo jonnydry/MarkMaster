@@ -5,10 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import {
+  applyOrbitMapFilterToParams,
   applyOrbitMapSelectionToParams,
   clearOrbitMapSelectionParams,
+  parseOrbitMapFilterFromParams,
   parseOrbitMapSelectionFromParams,
 } from "@/lib/orbit-map-url-params";
+import type { GraphFilter } from "@/lib/orbit-worker-protocol";
 import type { OrbitGraphScope } from "@/types";
 
 export { MAP_SELECTION_KINDS } from "@/lib/orbit-map-url-params";
@@ -23,9 +26,13 @@ export function useOrbitMapUrl() {
   const scopeParam = searchParams?.get("scope");
   const selectIdParam = searchParams?.get("select") ?? null;
   const selectKindParam = searchParams?.get("kind") ?? null;
+  const filterParam = searchParams?.get("filter") ?? null;
 
   const graphScope: OrbitGraphScope =
     scopeParam === "orbit" ? "orbit" : "library";
+  const graphFilter = parseOrbitMapFilterFromParams(
+    graphScope === "orbit" && filterParam === "loose" ? "all" : filterParam
+  );
 
   const selection = useMemo<OrbitMapSelection | null>(
     () =>
@@ -64,10 +71,22 @@ export function useOrbitMapUrl() {
       replaceMapUrl((params) => {
         if (next === "orbit") {
           params.set("scope", "orbit");
+          if (params.get("filter") === "loose") {
+            params.delete("filter");
+          }
         } else {
           params.delete("scope");
         }
         clearOrbitMapSelectionParams(params);
+      });
+    },
+    [replaceMapUrl]
+  );
+
+  const handleFilterChange = useCallback(
+    (next: GraphFilter) => {
+      replaceMapUrl((params) => {
+        applyOrbitMapFilterToParams(params, next);
       });
     },
     [replaceMapUrl]
@@ -78,8 +97,10 @@ export function useOrbitMapUrl() {
     focusAnchorIdParam,
     assignmentBookmarkIdParam,
     graphScope,
+    graphFilter,
     selection,
     handleSelectionChange,
     handleScopeChange,
+    handleFilterChange,
   };
 }

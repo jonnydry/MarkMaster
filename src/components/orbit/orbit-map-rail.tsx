@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Copy,
@@ -49,7 +49,10 @@ interface OrbitMapRailProps {
   onAddToCollection: () => void;
   onCopyAsCollection: (collectionId: string) => void;
   onOpenBookmark: (bookmarkId: string) => void;
+  onSelectNode?: (bookmarkId: string) => void;
   onClearSelection: () => void;
+  nodeById?: Map<string, OrbitGraphNode>;
+  connectionIndex?: Map<string, string[]> | null;
   copyingCollectionId?: string | null;
   variant?: "rail" | "overlay" | "dock";
   className?: string;
@@ -76,19 +79,28 @@ export function OrbitMapRail({
   onAddToCollection,
   onCopyAsCollection,
   onOpenBookmark,
+  onSelectNode,
   onClearSelection,
+  nodeById: nodeByIdProp,
+  connectionIndex: connectionIndexProp,
   copyingCollectionId,
   variant = "rail",
   className}: OrbitMapRailProps) {
-  const nodeById = useMemo(
-    () => new Map(data.nodes.map((node) => [node.id, node])),
-    [data.nodes]
+  const fallbackNodeById = useMemo(
+    () => (nodeByIdProp ? null : new Map(data.nodes.map((node) => [node.id, node]))),
+    [data.nodes, nodeByIdProp]
   );
+  const nodeById = nodeByIdProp ?? fallbackNodeById ?? new Map();
   const activeNode = selection ? nodeById.get(selection.id) ?? null : null;
-  const connectedNodeIdsById = useMemo(
-    () => buildOrbitMapConnectionIndex(data.edges),
-    [data.edges]
+  const fallbackConnectionIndex = useMemo(
+    () =>
+      connectionIndexProp
+        ? null
+        : buildOrbitMapConnectionIndex(data.edges),
+    [connectionIndexProp, data.edges]
   );
+  const connectedNodeIdsById =
+    connectionIndexProp ?? fallbackConnectionIndex ?? new Map();
   const connected = useMemo(() => {
     if (!activeNode) return [];
     return getConnectedOrbitMapNodes(
@@ -132,6 +144,7 @@ export function OrbitMapRail({
           onAddToCollection={onAddToCollection}
           onCopyAsCollection={onCopyAsCollection}
           onOpenBookmark={onOpenBookmark}
+          onSelectNode={onSelectNode}
           onClearSelection={onClearSelection}
           copyingCollectionId={copyingCollectionId}
           isOverlay={floating}
@@ -155,6 +168,7 @@ interface SelectedClusterBodyProps {
   onAddToCollection: () => void;
   onCopyAsCollection: (collectionId: string) => void;
   onOpenBookmark: (bookmarkId: string) => void;
+  onSelectNode?: (bookmarkId: string) => void;
   onClearSelection: () => void;
   copyingCollectionId?: string | null;
   isOverlay: boolean;
@@ -174,6 +188,7 @@ function SelectedClusterBody({
   onAddToCollection,
   onCopyAsCollection,
   onOpenBookmark,
+  onSelectNode,
   onClearSelection,
   copyingCollectionId,
   isOverlay}: SelectedClusterBodyProps) {
@@ -218,14 +233,22 @@ function SelectedClusterBody({
 
           />
         </div>
+        {stats.truncatedBookmarks > 0 && (
+          <p className={cn("text-xs", orbitMetaMuted())}>
+            Some loose bookmarks are hidden by the map cap.
+          </p>
+        )}
         {connected.length > 0 && (
           <ConnectedList
             title="Loose bookmarks"
             nodes={connected}
-            onOpenBookmark={onOpenBookmark}
+            onOpenBookmark={onSelectNode ?? onOpenBookmark}
             isOverlay={isOverlay}
 
           />
+        )}
+        {hasExplicitSelection && (
+          <ClearSelectionControl onClear={onClearSelection} />
         )}
       </div>
     );
@@ -282,14 +305,22 @@ function SelectedClusterBody({
 
           />
         </div>
+        {!selectedBookmarkId && (
+          <p className={cn("text-xs", orbitMetaMuted())}>
+            Select a bookmark on the map, or drag one onto this hub.
+          </p>
+        )}
         {connected.length > 0 && (
           <ConnectedList
             title="Connected bookmarks"
             nodes={connected}
-            onOpenBookmark={onOpenBookmark}
+            onOpenBookmark={onSelectNode ?? onOpenBookmark}
             isOverlay={isOverlay}
 
           />
+        )}
+        {hasExplicitSelection && (
+          <ClearSelectionControl onClear={onClearSelection} />
         )}
       </div>
     );
@@ -372,14 +403,22 @@ function SelectedClusterBody({
             />
           )}
         </div>
+        {!selectedBookmarkId && !actionState.readOnlyReason && (
+          <p className={cn("text-xs", orbitMetaMuted())}>
+            Select a bookmark on the map, or drag one onto this hub.
+          </p>
+        )}
         {connected.length > 0 && (
           <ConnectedList
             title="Connected bookmarks"
             nodes={connected}
-            onOpenBookmark={onOpenBookmark}
+            onOpenBookmark={onSelectNode ?? onOpenBookmark}
             isOverlay={isOverlay}
 
           />
+        )}
+        {hasExplicitSelection && (
+          <ClearSelectionControl onClear={onClearSelection} />
         )}
       </div>
     );
@@ -531,17 +570,7 @@ function SelectedClusterBody({
           <p className={bodyText}>{node.title}</p>
         )}
         {hasExplicitSelection && (
-            <button
-              type="button"
-              className={cn(
-                "text-xs underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
-                orbitMetaSoft(),
-                "hover:text-foreground"
-              )}
-              onClick={onClearSelection}
-            >
-            Clear selection
-          </button>
+          <ClearSelectionControl onClear={onClearSelection} />
         )}
       </div>
     );
@@ -552,6 +581,22 @@ function SelectedClusterBody({
   }
 
   return null;
+}
+
+function ClearSelectionControl({ onClear }: { onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "text-xs underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        orbitMetaSoft(),
+        "hover:text-foreground"
+      )}
+      onClick={onClear}
+    >
+      Clear selection
+    </button>
+  );
 }
 
 function DashboardLink({ href}: { href: string;  }) {
@@ -610,6 +655,8 @@ function BookmarkInspectorStatus({
   );
 }
 
+const CONNECTED_LIST_PAGE = 50;
+
 function ConnectedList({
   title,
   nodes,
@@ -622,12 +669,24 @@ function ConnectedList({
 
 }) {
   const bookmarks = nodes.filter((n) => n.kind === "bookmark");
+  const [visibleCount, setVisibleCount] = useState(CONNECTED_LIST_PAGE);
+
+  useEffect(() => {
+    setVisibleCount(CONNECTED_LIST_PAGE);
+  }, [title, bookmarks.length, bookmarks[0]?.id]);
+
   if (bookmarks.length === 0) return null;
+
+  const visible = bookmarks.slice(0, visibleCount);
+  const remaining = bookmarks.length - visible.length;
 
   return (
     <div className="min-w-0 space-y-2 pt-1">
       <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
-        {title} · {bookmarks.length}
+        {title} ·{" "}
+        {visible.length < bookmarks.length
+          ? `${visible.length} of ${bookmarks.length}`
+          : bookmarks.length}
       </p>
       <ScrollArea
         className={cn(
@@ -637,7 +696,7 @@ function ConnectedList({
         )}
       >
         <ul className="space-y-0.5 p-2">
-          {bookmarks.slice(0, 50).map((b) =>
+          {visible.map((b) =>
             b.kind === "bookmark" ? (
               <li key={b.id}>
                 <button
@@ -657,6 +716,17 @@ function ConnectedList({
             ) : null
           )}
         </ul>
+        {remaining > 0 ? (
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((count) => count + CONNECTED_LIST_PAGE)
+            }
+            className="flex w-full items-center justify-center border-t border-hairline-soft px-2 py-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+          >
+            Show {Math.min(CONNECTED_LIST_PAGE, remaining)} more
+          </button>
+        ) : null}
       </ScrollArea>
     </div>
   );

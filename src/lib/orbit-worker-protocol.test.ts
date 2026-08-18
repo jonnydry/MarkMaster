@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   WorkerMessageType,
+  getHotPathWorkerMessageError,
   getSafeDpr,
   getWorkerMessageValidationError,
+  isHotPathWorkerMessageType,
   subscribeToDevicePixelRatioChanges,
 } from "./orbit-worker-protocol";
 
@@ -47,6 +49,33 @@ describe("orbit worker protocol validation", () => {
     })).toMatch(/SET_THEME.colorMode/);
 
     expect(getWorkerMessageValidationError(null)).toMatch(/object/);
+  });
+
+  it("treats pointer traffic as a hot-path envelope check", () => {
+    expect(isHotPathWorkerMessageType(WorkerMessageType.POINTER_MOVE)).toBe(true);
+    expect(isHotPathWorkerMessageType(WorkerMessageType.SET_GRAPH)).toBe(false);
+    expect(getHotPathWorkerMessageError({
+      type: WorkerMessageType.POINTER_MOVE,
+      protocolVersion: 1,
+    })).toBeNull();
+    expect(getHotPathWorkerMessageError({
+      type: WorkerMessageType.POINTER_MOVE,
+      protocolVersion: 2,
+    })).toMatch(/protocolVersion/);
+  });
+
+  it("accepts a living-map toggle after init", () => {
+    expect(getWorkerMessageValidationError({
+      type: WorkerMessageType.SET_LIVING_MAP,
+      protocolVersion: 1,
+      enabled: false,
+    })).toBeNull();
+
+    expect(getWorkerMessageValidationError({
+      type: WorkerMessageType.SET_LIVING_MAP,
+      protocolVersion: 1,
+      enabled: "false",
+    })).toMatch(/SET_LIVING_MAP.enabled/);
   });
 });
 

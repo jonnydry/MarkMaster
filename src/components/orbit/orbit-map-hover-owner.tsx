@@ -3,29 +3,52 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  type MutableRefObject,
 } from "react";
 
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
-import {
-  type BookmarkGraphNode,
-  type OrbitMapGraphIndexes,
-} from "@/lib/orbit-map-graph-indexes";
+import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
+import { buildOrbitMapGraphIndexes } from "@/lib/orbit-map-graph-indexes";
+import type { OrbitGraphNode, OrbitGraphPayload } from "@/types";
 
-export function useOrbitMapLayout() {
-  const stageRef = useRef<HTMLDivElement | null>(null);
+export type OrbitMapHoverHandler = (
+  next: OrbitMapSelection | null,
+  position?: { x: number; y: number }
+) => void;
+
+interface OrbitMapHoverOwnerProps {
+  graph: OrbitGraphPayload | null | undefined;
+  handlerRef: MutableRefObject<OrbitMapHoverHandler | null>;
+}
+
+/**
+ * Bookmark hover card + intent timers. Owns its own state so pointer travel
+ * does not re-render the map page facade.
+ */
+export function OrbitMapHoverOwner({
+  graph,
+  handlerRef,
+}: OrbitMapHoverOwnerProps) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const [stageSize, setStageSize] = useState({ width: 960, height: 640 });
   const [hoverCard, setHoverCard] = useState<{
-    node: BookmarkGraphNode;
+    node: OrbitGraphNode;
     x: number;
     y: number;
   } | null>(null);
   const hoverIntentTimerRef = useRef<number | null>(null);
   const hoverClearTimerRef = useRef<number | null>(null);
 
+  const graphIndexes = useMemo(
+    () => buildOrbitMapGraphIndexes(graph),
+    [graph]
+  );
+
   useEffect(() => {
-    const stage = stageRef.current;
+    const stage = wrapRef.current?.parentElement;
     if (!stage) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -54,25 +77,25 @@ export function useOrbitMapLayout() {
     }
   }, []);
 
-  useEffect(() => {
-    return () => clearHoverTimers();
-  }, [clearHoverTimers]);
-
   const resetHover = useCallback(() => {
     clearHoverTimers();
     setHoverCard(null);
   }, [clearHoverTimers]);
 
-  const handleHoverChange = useCallback(
-    (
-      next: OrbitMapSelection | null,
-      position: { x: number; y: number } | undefined,
-      graphIndexes: OrbitMapGraphIndexes | null
-    ) => {
+  useEffect(() => {
+    return () => clearHoverTimers();
+  }, [clearHoverTimers]);
+
+  useEffect(() => {
+    resetHover();
+  }, [graph?.scope, graph?.generatedAt, resetHover]);
+
+  const handleHoverChange = useCallback<OrbitMapHoverHandler>(
+    (next, position) => {
       clearHoverTimers();
 
-      if (next?.kind === "bookmark" && position && graphIndexes) {
-        const node = graphIndexes.bookmarksById.get(next.id);
+      if (next && position && graphIndexes) {
+        const node = graphIndexes.nodesById.get(next.id);
         if (node) {
           hoverIntentTimerRef.current = window.setTimeout(() => {
             setHoverCard({ node, x: position.x, y: position.y });
@@ -87,14 +110,29 @@ export function useOrbitMapLayout() {
         hoverClearTimerRef.current = null;
       }, 140);
     },
-    [clearHoverTimers]
+    [clearHoverTimers, graphIndexes]
   );
 
-  return {
-    stageRef,
-    stageSize,
-    hoverCard,
-    handleHoverChange,
-    resetHover,
-  };
+  useEffect(() => {
+    handlerRef.current = handleHoverChange;
+    return () => {
+      if (handlerRef.current === handleHoverChange) {
+        handlerRef.current = null;
+      }
+    };
+  }, [handleHoverChange, handlerRef]);
+
+  return (
+    <div ref={wrapRef} className="pointer-events-none absolute inset-0 z-20">
+      {hoverCard ? (
+        <OrbitMapHoverCard
+          node={hoverCard.node}
+          x={hoverCard.x}
+          y={hoverCard.y}
+          containerWidth={stageSize.width}
+          containerHeight={stageSize.height}
+        />
+      ) : null}
+    </div>
+  );
 }

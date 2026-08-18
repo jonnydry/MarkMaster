@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback, useSyncExternalStore } from 'react';
 import { useTheme, useColorTheme } from '@/components/providers';
 import { resolveOrbitMapCanvasTheme } from '@/lib/orbit-map-theme-colors';
-import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
+import { getOrbitMapLivingEnabled } from '@/lib/orbit-map-living';
+import { buildOrbitMapStructureKey } from '@/lib/orbit-map-structure-key';
+import type { OrbitGraphPayload } from '@/types';
 import { OrbitMapCanvasControls } from './orbit-map-canvas-controls';
-import { OrbitMapMinimap } from './orbit-map-minimap';
+import { OrbitMapMinimap, type OrbitMapMinimapProps } from './orbit-map-minimap';
 import { OrbitMapUnsupportedState } from './orbit-map-unsupported-state';
 
 // Import protocol types (including shared UI types)
@@ -26,11 +28,12 @@ interface OrbitMapCanvasHostProps {
   graph?: OrbitGraphPayload;
   data?: OrbitGraphPayload; // legacy prop support
   filter?: GraphFilter;
+  onFilterChange?: (filter: GraphFilter) => void;
   selection?: OrbitMapSelection | null;
   focus?: OrbitMapFocus | null;
   /** Lowercased search query; worker builds index and highlights matches. */
   searchQuery?: string;
-  onSearchResults?: (query: string, results: OrbitGraphNode[]) => void;
+  onSearchResults?: (query: string, resultIds: string[]) => void;
   onSelectionChange?: (selection: OrbitMapSelection | null) => void;
   onHoverChange?: (hover: OrbitMapSelection | null, position?: { x: number; y: number }) => void;
   onOpenBookmark?: (bookmarkId: string) => void;
@@ -43,6 +46,8 @@ interface OrbitMapCanvasHostProps {
   className?: string;
   filterControlsClassName?: string;
   zoomControlsClassName?: string;
+  /** Hide the Loose filter when the fetched graph is already the queue. */
+  hideLooseFilter?: boolean;
 }
 
 export interface OrbitMapCanvasHandle {
@@ -52,29 +57,12 @@ export interface OrbitMapCanvasHandle {
   /** Radar sweep across the sky; the given nodes glint as the beam passes
    * (all bookmarks when omitted). For scan/triage visualizations. */
   playScanSweep: (nodeIds?: string[]) => void;
+  /** Toggle living-map orbital motion after the worker is ready. */
+  setLivingMap: (enabled: boolean) => void;
 }
 
 // Re-export shared types so pages can import them from this component (for backward compatibility)
 export type { OrbitMapSelection, OrbitMapFocus, GraphFilter } from '@/lib/orbit-worker-protocol';
-
-function getOrbitMapGraphKey(graph: OrbitGraphPayload) {
-  const stats = graph.stats;
-  return [
-    graph.scope ?? 'library',
-    graph.generatedAt,
-    graph.nodeCap,
-    graph.nodes.length,
-    graph.edges.length,
-    stats.totalBookmarks,
-    stats.affiliatedBookmarks,
-    stats.looseBookmarks,
-    stats.renderedBookmarks,
-    stats.truncatedBookmarks,
-    stats.tagCount,
-    stats.userCollectionCount,
-    stats.xFolderCount,
-  ].join(':');
-}
 
 function getOrbitMapDebugPerfEnabled() {
   if (process.env.NODE_ENV === 'production') return false;
@@ -85,26 +73,46 @@ function getOrbitMapDebugPerfEnabled() {
   }
 }
 
-/**
- * Living map (analytic orbital motion + sun corona in the worker) — on by
- * default. Opt out via localStorage (`orbit-map-living` = "0") or a
- * `?living=0` URL param (which persists the choice); `?living=1` re-enables.
- * Always off for users who prefer reduced motion.
- */
-function getOrbitMapLivingEnabled() {
-  try {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      return false;
-    }
-    const param = new URLSearchParams(window.location.search).get('living');
-    if (param === '1' || param === '0') {
-      window.localStorage.setItem('orbit-map-living', param);
-      return param === '1';
-    }
-    return window.localStorage.getItem('orbit-map-living') !== '0';
-  } catch {
-    return false;
-  }
+function createOrbitMapCameraStore() {
+  let camera: CameraState | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    getSnapshot: () => camera,
+    getServerSnapshot: () => null,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set: (next: CameraState) => {
+      const previous = camera;
+      if (
+        previous &&
+        previous.x === next.x &&
+        previous.y === next.y &&
+        previous.zoom === next.zoom
+      ) {
+        return;
+      }
+      camera = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+}
+
+type OrbitMapCameraStore = ReturnType<typeof createOrbitMapCameraStore>;
+
+function OrbitMapMinimapBound({
+  cameraStore,
+  ...props
+}: Omit<OrbitMapMinimapProps, "camera"> & { cameraStore: OrbitMapCameraStore }) {
+  const camera = useSyncExternalStore(
+    cameraStore.subscribe,
+    cameraStore.getSnapshot,
+    cameraStore.getServerSnapshot
+  );
+  return <OrbitMapMinimap {...props} camera={camera} />;
 }
 
 function isCanvasTransferReuseError(error: unknown) {
@@ -134,15 +142,21 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     themeRef.current = theme;
     colorThemeRef.current = colorTheme;
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const stageFocusRef = useRef<HTMLDivElement>(null);
+    const didFocusStageRef = useRef(false);
     const workerRef = useRef<Worker | null>(null);
     const canvasTransferRetryRef = useRef(0);
     const [canvasInstance, setCanvasInstance] = useState(0);
     const [useFallback, setUseFallback] = useState(false);
     const [workerGeneration, setWorkerGeneration] = useState(0);
     const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
-    // Minimap inputs: live camera, viewport size, and a version counter that
-    // bumps when fresh node positions arrive.
-    const [minimapCamera, setMinimapCamera] = useState<CameraState | null>(null);
+    // Camera stays off React state so CAMERA_CHANGED (~15 Hz while panning)
+    // only redraws the minimap. Keyboard pan/jump read the store snapshot.
+    const cameraStoreRef = useRef<OrbitMapCameraStore | null>(null);
+    if (cameraStoreRef.current === null) {
+      cameraStoreRef.current = createOrbitMapCameraStore();
+    }
+    const cameraStore = cameraStoreRef.current;
     const [layoutVersion, setLayoutVersion] = useState(0);
     // LAYOUT_UPDATED arrives per simulation tick; coalesce minimap redraws to
     // one per frame so the simulation doesn't trigger per-message repaints.
@@ -249,15 +263,17 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                     graph: propsRef.current.graph,
                   };
                   workerRef.current?.postMessage(graphMessage);
-                  lastGraphKey.current = getOrbitMapGraphKey(propsRef.current.graph);
+                  lastGraphKey.current = buildOrbitMapStructureKey(propsRef.current.graph);
 
                   // Then send the current filter
+                  const readyFilter = propsRef.current.filter ?? 'all';
                   const filterMessage = {
                     type: WorkerMessageType.SET_FILTER,
                     protocolVersion: 1,
-                    filter: propsRef.current.filter ?? 'all',
+                    filter: readyFilter,
                   };
                   workerRef.current?.postMessage(filterMessage);
+                  lastFilterRef.current = readyFilter;
                 }
                 if (propsRef.current.selection) {
                   workerRef.current?.postMessage({
@@ -270,7 +286,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
               case MainMessageType.CAMERA_CHANGED:
                 if (msg.camera) {
-                  setMinimapCamera(msg.camera);
+                  cameraStore.set(msg.camera);
                 }
                 break;
 
@@ -308,7 +324,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
                 break;
 
               case MainMessageType.SEARCH_RESULTS:
-                propsRef.current.onSearchResults?.(msg.query ?? '', msg.results ?? []);
+                propsRef.current.onSearchResults?.(
+                  msg.query ?? '',
+                  msg.resultIds ?? []
+                );
                 break;
 
               case MainMessageType.LAYOUT_UPDATED:
@@ -413,15 +432,33 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
     // Send graph data + filter to worker whenever they change
     const lastGraphKey = useRef<string>("");
+    const lastFilterRef = useRef<GraphFilter | null>(null);
+
+    useEffect(() => {
+      if (props.hideLooseFilter && activeFilter === "loose") {
+        lastFilterRef.current = "all";
+        if (filter === undefined) setInternalFilter("all");
+        props.onFilterChange?.("all");
+        postToWorker({
+          type: WorkerMessageType.SET_FILTER,
+          protocolVersion: 1,
+          filter: "all",
+        });
+      }
+    }, [activeFilter, filter, postToWorker, props.hideLooseFilter, props.onFilterChange]);
+
+    useEffect(() => {
+      if (!graph || useFallback || didFocusStageRef.current) return;
+      didFocusStageRef.current = true;
+      stageFocusRef.current?.focus({ preventScroll: true });
+    }, [graph, useFallback]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback || !graph) return;
 
-      const graphKey = getOrbitMapGraphKey(graph);
+      const graphKey = buildOrbitMapStructureKey(graph);
 
-      const graphChanged = lastGraphKey.current !== graphKey;
-
-      if (graphChanged) {
+      if (lastGraphKey.current !== graphKey) {
         const graphMessage: SetGraphMessage = {
           type: WorkerMessageType.SET_GRAPH,
           protocolVersion: 1,
@@ -432,17 +469,14 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         lastGraphKey.current = graphKey;
       }
 
-      // Always send (or re-send) the current filter after graph is set
-      const filterMessage = {
-        type: WorkerMessageType.SET_FILTER,
-        protocolVersion: 1,
-        filter,
-      };
-
-      workerRef.current.postMessage({
-        ...filterMessage,
-        filter: activeFilter,
-      });
+      if (lastFilterRef.current !== activeFilter) {
+        workerRef.current.postMessage({
+          type: WorkerMessageType.SET_FILTER,
+          protocolVersion: 1,
+          filter: activeFilter,
+        });
+        lastFilterRef.current = activeFilter;
+      }
     }, [graph, activeFilter, filter, useFallback, workerGeneration]);
 
     useEffect(() => {
@@ -570,6 +604,75 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         pendingWheel = null;
       };
 
+      const queuePointerMove = (e: PointerEvent) => {
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        pendingPointerMove = {
+          type: WorkerMessageType.POINTER_MOVE,
+          protocolVersion: 1,
+          x,
+          y,
+          buttons: e.buttons,
+        };
+        if (pointerMoveFrame === null) {
+          pointerMoveFrame = window.requestAnimationFrame(flushPointerMove);
+        }
+      };
+
+      // Canvas hover. Capture already retargets drag moves here, so the
+      // window listener below must ignore events whose target is the canvas.
+      const handleCanvasPointerMove = (e: PointerEvent) => {
+        queuePointerMove(e);
+      };
+
+      // Fallback for a drag that leaves the canvas if capture is lost.
+      // Idle travel over sidebar/search must not hit-test.
+      const handleWindowPointerMove = (e: PointerEvent) => {
+        if (e.buttons === 0) return;
+        if (e.target === canvas || (e.target instanceof Node && canvas.contains(e.target))) {
+          return;
+        }
+        queuePointerMove(e);
+      };
+
+      let windowGestureListenersAttached = false;
+
+      const handlePointerUp = (e: PointerEvent) => {
+        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        send({
+          type: WorkerMessageType.POINTER_UP,
+          protocolVersion: 1,
+          x,
+          y,
+          button: e.button,
+        });
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          /* capture may already be released */
+        }
+        if (!windowGestureListenersAttached) return;
+        window.removeEventListener('pointermove', handleWindowPointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        windowGestureListenersAttached = false;
+      };
+
+      const attachWindowGestureListeners = () => {
+        if (windowGestureListenersAttached) return;
+        window.addEventListener('pointermove', handleWindowPointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp);
+        windowGestureListenersAttached = true;
+      };
+
+      const detachWindowGestureListeners = () => {
+        if (!windowGestureListenersAttached) return;
+        window.removeEventListener('pointermove', handleWindowPointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        windowGestureListenersAttached = false;
+      };
+
       const handlePointerDown = (e: PointerEvent) => {
         if (e.button !== 0) return;
         e.preventDefault();
@@ -587,39 +690,13 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           y,
           button: e.button,
         });
-      };
-
-      const handlePointerMove = (e: PointerEvent) => {
-        const { x, y } = canvasPoint(e.clientX, e.clientY);
-        pendingPointerMove = {
-          type: WorkerMessageType.POINTER_MOVE,
-          protocolVersion: 1,
-          x,
-          y,
-          buttons: e.buttons,
-        };
-        if (pointerMoveFrame === null) {
-          pointerMoveFrame = window.requestAnimationFrame(flushPointerMove);
-        }
-      };
-
-      const handlePointerUp = (e: PointerEvent) => {
-        const { x, y } = canvasPoint(e.clientX, e.clientY);
-        send({
-          type: WorkerMessageType.POINTER_UP,
-          protocolVersion: 1,
-          x,
-          y,
-          button: e.button,
-        });
-        try {
-          canvas.releasePointerCapture(e.pointerId);
-        } catch {
-          /* capture may already be released */
-        }
+        attachWindowGestureListeners();
       };
 
       const handlePointerLeave = () => {
+        // Capture does not suppress pointerleave. During an active drag the
+        // worker treats LEAVE as "cancel gesture" — skip it until pointerup.
+        if (windowGestureListenersAttached) return;
         if (pointerMoveFrame !== null) {
           window.cancelAnimationFrame(pointerMoveFrame);
           pointerMoveFrame = null;
@@ -692,8 +769,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       };
 
       canvas.addEventListener('pointerdown', handlePointerDown);
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
+      canvas.addEventListener('pointermove', handleCanvasPointerMove);
       canvas.addEventListener('pointerleave', handlePointerLeave);
       canvas.addEventListener('wheel', handleWheel, { passive: false });
       canvas.addEventListener('dblclick', handleDoubleClick);
@@ -707,9 +783,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         if (wheelFrame !== null) {
           window.cancelAnimationFrame(wheelFrame);
         }
+        detachWindowGestureListeners();
         canvas.removeEventListener('pointerdown', handlePointerDown);
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
+        canvas.removeEventListener('pointermove', handleCanvasPointerMove);
         canvas.removeEventListener('pointerleave', handlePointerLeave);
         canvas.removeEventListener('wheel', handleWheel);
         canvas.removeEventListener('dblclick', handleDoubleClick);
@@ -719,7 +795,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     }, [useFallback, workerGeneration]);
 
     const handleFilterChange = (next: GraphFilter) => {
-      setInternalFilter(next);
+      lastFilterRef.current = next;
+      if (filter === undefined) setInternalFilter(next);
+      props.onFilterChange?.(next);
       postToWorker({
         type: WorkerMessageType.SET_FILTER,
         protocolVersion: 1,
@@ -801,7 +879,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       }
 
       // Pan via SET_CAMERA, offset from the current camera.
-      const camera = minimapCamera;
+      const camera = cameraStore.getSnapshot();
       const viewport = viewportSize;
       if (!camera || !viewport) return;
       const stepX = Math.max(40, viewport.width * 0.2);
@@ -820,7 +898,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
     const handleMinimapJump = (worldX: number, worldY: number) => {
       if (!viewportSize) return;
-      const zoom = minimapCamera?.zoom ?? 1;
+      const zoom = cameraStore.getSnapshot()?.zoom ?? 1;
       postToWorker({
         type: WorkerMessageType.SET_CAMERA,
         protocolVersion: 1,
@@ -867,6 +945,13 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           type: WorkerMessageType.PLAY_SCAN_SWEEP,
           protocolVersion: 1,
           nodeIds: nodeIds ?? null,
+        });
+      },
+      setLivingMap: (enabled: boolean) => {
+        workerRef.current?.postMessage({
+          type: WorkerMessageType.SET_LIVING_MAP,
+          protocolVersion: 1,
+          enabled,
         });
       },
       animateAssign: async (bookmarkId: string, anchorId: string) => {
@@ -917,6 +1002,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
 
     return (
       <div
+        ref={stageFocusRef}
         className={`${props.className ?? ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-inset`}
         role="application"
         aria-label="Orbit graph map — use arrow keys to pan, plus and minus to zoom, 0 to reset, Escape to clear selection"
@@ -940,15 +1026,16 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onResetView={handleResetView}
+          hideLooseFilter={props.hideLooseFilter}
           filterControlsClassName={props.filterControlsClassName}
           zoomControlsClassName={props.zoomControlsClassName}
         />
         {graph && layoutVersion > 0 ? (
-          <OrbitMapMinimap
+          <OrbitMapMinimapBound
+            cameraStore={cameraStore}
             graph={graph}
             positions={latestPositionsRef.current}
             layoutVersion={layoutVersion}
-            camera={minimapCamera}
             viewport={viewportSize}
             onJump={handleMinimapJump}
             className="absolute bottom-[4.25rem] left-4 z-10 hidden lg:block"

@@ -39,3 +39,15 @@ export function orbitMapZoomButtonClass() {
 export function orbitMapZoomDividerClass() {
   return "h-px w-full bg-hairline-soft";
 }
+
+/** Inspector width: full on the mobile sheet, 21rem when docked. */
+export const orbitMapInspectorDockWidthClass = "w-full lg:w-[21rem]";
+
+/** Shift floating tools left of the docked inspector (`21rem` + gutter). */
+export const orbitMapInspectorToolsShiftClass =
+  "right-3 sm:right-4 lg:right-[22.5rem]";
+
+/** Mobile inspector sheet height + zoom lift so controls sit above it. */
+export const orbitMapInspectorOverlayMaxClass = "max-h-[45dvh]";
+export const orbitMapInspectorOverlayZoomClass =
+  "bottom-[calc(45dvh+1.25rem)] right-4 lg:bottom-4 lg:right-[22.5rem]";

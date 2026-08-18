@@ -12,6 +12,7 @@ import type { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import type { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { sendJson } from "@/lib/fetch-json";
+import { patchOrbitGraphAssignment } from "@/lib/orbit-graph-assign";
 import {
   invalidateBookmarkCollectionSideEffects,
   invalidateBookmarkListQueries,
@@ -33,6 +34,16 @@ interface UseOrbitMapAssignmentsOptions {
   selectedBookmarkId: string | null;
   refetch: () => Promise<unknown>;
   onSelectionChange: (selection: OrbitMapSelection | null) => void;
+}
+
+function applyAssignmentOrRefetch(
+  queryClient: QueryClient,
+  refetch: () => Promise<unknown>,
+  assignment: Parameters<typeof patchOrbitGraphAssignment>[1]
+) {
+  if (!patchOrbitGraphAssignment(queryClient, assignment)) {
+    void refetch();
+  }
 }
 
 /**
@@ -73,7 +84,12 @@ export function useOrbitMapAssignments({
         activeSelectionNode.name,
         activeSelectionNode.color
       );
-      await refetch();
+      applyAssignmentOrRefetch(queryClient, refetch, {
+        action: "add",
+        bookmarkId: selectedBookmarkId,
+        anchorKind: "tag",
+        anchorId: activeSelectionNode.id,
+      });
       return;
     }
 
@@ -87,8 +103,20 @@ export function useOrbitMapAssignments({
       selectedBookmarkId,
       activeSelectionNode.id
     );
-    await refetch();
-  }, [actions, activeSelectionNode, canvasRef, refetch, selectedBookmarkId]);
+    applyAssignmentOrRefetch(queryClient, refetch, {
+      action: "add",
+      bookmarkId: selectedBookmarkId,
+      anchorKind: "collection",
+      anchorId: activeSelectionNode.id,
+    });
+  }, [
+    actions,
+    activeSelectionNode,
+    canvasRef,
+    queryClient,
+    refetch,
+    selectedBookmarkId,
+  ]);
 
   const handleNodeDropped = useCallback(
     async (
@@ -105,17 +133,31 @@ export function useOrbitMapAssignments({
       try {
         if (anchor.kind === "tag") {
           await actions.handleAddTag(bookmarkId, anchor.name, anchor.color);
+          applyAssignmentOrRefetch(queryClient, refetch, {
+            action: "add",
+            bookmarkId,
+            anchorKind: "tag",
+            anchorId,
+          });
           toast.success(`Tagged #${anchor.name}`, {
             action: {
               label: "Undo",
               onClick: () => {
-                void actions
-                  .handleRemoveTag(bookmarkId, anchorId)
-                  .then(() => refetch());
+                void actions.handleRemoveTag(bookmarkId, anchorId).then(() => {
+                  applyAssignmentOrRefetch(queryClient, refetch, {
+                    action: "remove",
+                    bookmarkId,
+                    anchorKind: "tag",
+                    anchorId,
+                  });
+                });
               },
             },
           });
-        } else if (anchor.kind === "collection") {
+          return;
+        }
+
+        if (anchor.kind === "collection") {
           if (anchor.variant === "x_folder") {
             toast.info(
               "X folders are synced from X and can't be edited. Copy it as a collection first."
@@ -123,6 +165,12 @@ export function useOrbitMapAssignments({
             return;
           }
           await actions.handleAddToCollection(bookmarkId, anchor.id);
+          applyAssignmentOrRefetch(queryClient, refetch, {
+            action: "add",
+            bookmarkId,
+            anchorKind: "collection",
+            anchorId: anchor.id,
+          });
           toast.success(`Added to ${anchor.name}`, {
             action: {
               label: "Undo",
@@ -136,13 +184,17 @@ export function useOrbitMapAssignments({
                     queryClient,
                     anchor.id
                   );
-                  void refetch();
+                  applyAssignmentOrRefetch(queryClient, refetch, {
+                    action: "remove",
+                    bookmarkId,
+                    anchorKind: "collection",
+                    anchorId: anchor.id,
+                  });
                 });
               },
             },
           });
         }
-        await refetch();
       } catch {
         // Failure toasts come from the underlying mutations in useBookmarkActions.
       }
@@ -170,7 +222,6 @@ export function useOrbitMapAssignments({
           collectionId,
           queryClient
         );
-        await refetch();
 
         const nextSelection: OrbitMapSelection = {
           kind: "collection",
@@ -191,7 +242,7 @@ export function useOrbitMapAssignments({
         setCopyingCollectionId(null);
       }
     },
-    [canvasRef, onSelectionChange, queryClient, refetch]
+    [canvasRef, onSelectionChange, queryClient]
   );
 
   return {

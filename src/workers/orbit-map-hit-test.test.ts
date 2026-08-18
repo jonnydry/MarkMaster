@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createOrbitMapSpatialIndex,
   findClosestOrbitMapNode,
   getOrbitMapHitPadding,
 } from "./orbit-map-hit-test";
@@ -24,6 +25,25 @@ describe("findClosestOrbitMapNode", () => {
         y: 0,
       }, 8)
     ).toBeNull();
+  });
+});
+
+describe("createOrbitMapSpatialIndex", () => {
+  it("matches the linear scan on a crowded sky", () => {
+    const nodes = Array.from({ length: 80 }, (_, index) => ({
+      id: `n-${index}`,
+      x: (index % 10) * 40,
+      y: Math.floor(index / 10) * 40,
+      radius: 4,
+    }));
+    const index = createOrbitMapSpatialIndex<typeof nodes[number]>();
+    index.rebuild(nodes);
+
+    const point = { x: 122, y: 81 };
+    expect(index.query(point, 8)?.id).toBe(
+      findClosestOrbitMapNode(nodes, point, 8)?.id
+    );
+    expect(index.query({ x: -200, y: -200 }, 8)).toBeNull();
   });
 });
 

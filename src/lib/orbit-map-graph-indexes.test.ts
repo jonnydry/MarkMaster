@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
+  resolveOrbitMapOverflowSelection,
   resolveOrbitMapSelectionNode,
 } from "@/lib/orbit-map-graph-indexes";
-import type { OrbitGraphPayload } from "@/types";
+import type { OrbitGraphNode, OrbitGraphPayload } from "@/types";
 
 const graph: OrbitGraphPayload = {
   nodes: [
@@ -66,6 +67,62 @@ describe("resolveOrbitMapSelectionNode", () => {
     expect(
       resolveOrbitMapSelectionNode({ kind: "bookmark", id: "tag-1" }, indexes)
     ).toBeNull();
+  });
+});
+
+describe("resolveOrbitMapOverflowSelection", () => {
+  it("selects and expands a tag overflow hub", () => {
+    const node: OrbitGraphNode = {
+      kind: "overflow",
+      id: "tag-overflow-tag-1",
+      anchorId: "tag-1",
+      anchorKind: "tag",
+      remaining: 12,
+    };
+    expect(resolveOrbitMapOverflowSelection(node)).toEqual({
+      selection: { kind: "tag", id: "tag-1" },
+      expand: true,
+    });
+  });
+
+  it("selects and expands a collection overflow hub", () => {
+    const node: OrbitGraphNode = {
+      kind: "overflow",
+      id: "collection-overflow-collection-1",
+      anchorId: "collection-1",
+      anchorKind: "collection",
+      remaining: 8,
+    };
+    expect(resolveOrbitMapOverflowSelection(node)).toEqual({
+      selection: { kind: "collection", id: "collection-1" },
+      expand: true,
+    });
+  });
+
+  it("selects the core hub without expanding", () => {
+    const node: OrbitGraphNode = {
+      kind: "overflow",
+      id: "core-overflow",
+      anchorId: "orbit-index",
+      anchorKind: "core",
+      remaining: 40,
+    };
+    expect(resolveOrbitMapOverflowSelection(node)).toEqual({
+      selection: { kind: "core", id: "orbit-index" },
+      expand: false,
+    });
+  });
+
+  it("returns null for non-overflow nodes", () => {
+    expect(
+      resolveOrbitMapOverflowSelection({
+        kind: "core",
+        id: "orbit-index",
+        totalBookmarks: 1,
+        looseBookmarks: 1,
+      })
+    ).toBeNull();
+    expect(resolveOrbitMapOverflowSelection(null)).toBeNull();
   });
 });
 

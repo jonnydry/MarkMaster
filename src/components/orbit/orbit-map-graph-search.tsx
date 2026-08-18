@@ -1,6 +1,6 @@
 "use client";
 
-import type { Ref } from "react";
+import { useState, type KeyboardEvent, type Ref } from "react";
 import { Folder, Loader2 } from "lucide-react";
 
 import { SearchBar } from "@/components/search-bar";
@@ -64,6 +64,47 @@ export function OrbitMapGraphSearch({
   placeholder = "Search graph by tag, collection, or author…",
   embedded = false,
 }: OrbitMapGraphSearchProps) {
+  const visibleResults = searchResults.slice(0, ORBIT_MAP_SEARCH_RESULT_LIMIT);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const hasResults = Boolean(searchQuery && visibleResults.length > 0);
+
+  const selectNode = (node: OrbitGraphNode) => {
+    onResultSelect(selectionForNode(node));
+    onSearchChange("");
+    setActiveIndex(0);
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape" && search) {
+      event.preventDefault();
+      event.stopPropagation();
+      onSearchChange("");
+      setActiveIndex(0);
+      return;
+    }
+    if (!hasResults) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((index) =>
+        index + 1 >= visibleResults.length ? 0 : index + 1
+      );
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((index) =>
+        index <= 0 ? visibleResults.length - 1 : index - 1
+      );
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const node = visibleResults[activeIndex] ?? visibleResults[0];
+      if (node) selectNode(node);
+    }
+  };
+
   return (
     <div className={cn("relative min-w-0 flex-1", className)}>
       <div
@@ -77,7 +118,11 @@ export function OrbitMapGraphSearch({
           ref={searchInputRef}
           glass
           value={search}
-          onChange={onSearchChange}
+          onChange={(value) => {
+            onSearchChange(value);
+            setActiveIndex(0);
+          }}
+          onKeyDown={handleSearchKeyDown}
           disabled={!hasGraph}
           placeholder={placeholder}
           inputClassName={cn("h-9", inputClassName)}
@@ -89,22 +134,20 @@ export function OrbitMapGraphSearch({
         ) : null}
       </div>
 
-      {searchQuery && searchResults.length > 0 ? (
+      {hasResults ? (
         <div
           className={cn(
             orbitMapFloatingMenuClass(),
             "absolute left-0 right-0 top-[calc(100%+0.375rem)] z-40 max-h-64 animate-in fade-in-0 zoom-in-95 overflow-auto"
           )}
         >
-          <ul className="py-1">
-            {searchResults.slice(0, ORBIT_MAP_SEARCH_RESULT_LIMIT).map((node) => (
-              <li key={node.id}>
+          <ul className="py-1" role="listbox" aria-label="Graph search results">
+            {visibleResults.map((node, index) => (
+              <li key={node.id} role="option" aria-selected={index === activeIndex}>
                 <SearchResultButton
                   node={node}
-                  onClick={() => {
-                    onResultSelect(selectionForNode(node));
-                    onSearchChange("");
-                  }}
+                  active={index === activeIndex}
+                  onClick={() => selectNode(node)}
                 />
               </li>
             ))}
@@ -129,15 +172,22 @@ export function OrbitMapGraphSearch({
 function SearchResultButton({
   node,
   onClick,
+  active = false,
 }: {
   node: OrbitGraphNode;
   onClick: () => void;
+  active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-foreground/85 transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+      className={cn(
+        "flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        active
+          ? "bg-accent-soft text-foreground"
+          : "text-foreground/85 hover:bg-accent-soft hover:text-foreground"
+      )}
     >
       {node.kind === "tag" && (
         <>

@@ -1,14 +1,55 @@
-import { Clock } from "lucide-react";
+import { Clock, Folder } from "lucide-react";
 import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
+import { TagDot } from "@/components/tag-dot";
 import type { OrbitGraphNode } from "@/types";
 
 export interface OrbitMapHoverCardProps {
-  node: Extract<OrbitGraphNode, { kind: "bookmark" }>;
+  node: OrbitGraphNode;
   x: number;
   y: number;
   containerWidth: number;
   containerHeight: number;
+}
+
+function hoverCopy(node: OrbitGraphNode) {
+  switch (node.kind) {
+    case "bookmark":
+      return {
+        title: `@${node.authorUsername}`,
+        body: node.title,
+        meta: node.recent ? "Recent" : null,
+      };
+    case "tag":
+      return {
+        title: node.name,
+        body: `${node.count} bookmark${node.count === 1 ? "" : "s"}`,
+        meta: "Tag",
+        color: node.color,
+      };
+    case "collection":
+      return {
+        title: node.name,
+        body: `${node.count} bookmark${node.count === 1 ? "" : "s"}`,
+        meta: node.variant === "x_folder" ? "X folder" : "Collection",
+      };
+    case "core":
+      return {
+        title: "Orbit index",
+        body: `${node.looseBookmarks} loose · ${node.totalBookmarks} total`,
+        meta: "Core",
+      };
+    case "overflow":
+      return {
+        title: `+${node.remaining} more`,
+        body: "Hidden by the map cap",
+        meta: "Overflow",
+      };
+    default: {
+      const exhaustive: never = node;
+      return exhaustive;
+    }
+  }
 }
 
 export function OrbitMapHoverCard({
@@ -18,6 +59,7 @@ export function OrbitMapHoverCard({
   containerWidth,
   containerHeight,
 }: OrbitMapHoverCardProps) {
+  const copy = hoverCopy(node);
   const maxLeft = Math.max(8, containerWidth - 272);
   const maxTop = Math.max(8, containerHeight - 140);
   const preferredLeft = x + 14;
@@ -36,23 +78,31 @@ export function OrbitMapHoverCard({
       }}
     >
       <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            "inline-block size-2 rounded-full",
-            node.affiliated ? "bg-muted-foreground/45" : "bg-primary"
-          )}
-        />
+        {node.kind === "tag" ? (
+          <TagDot name={node.name} color={node.color} size={8} />
+        ) : node.kind === "collection" ? (
+          <Folder className="size-3.5 shrink-0 text-primary" aria-hidden />
+        ) : (
+          <span
+            className={cn(
+              "inline-block size-2 rounded-full",
+              node.kind === "bookmark" && node.affiliated
+                ? "bg-muted-foreground/45"
+                : "bg-primary"
+            )}
+          />
+        )}
         <span className="truncate text-xs font-semibold text-foreground">
-          @{node.authorUsername}
+          {copy.title}
         </span>
       </div>
       <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-        {node.title}
+        {copy.body}
       </p>
-      {node.recent ? (
+      {copy.meta ? (
         <span className="mt-1.5 inline-flex items-center gap-1 text-2xs text-primary/80">
-          <Clock className="size-3" />
-          Recent
+          {copy.meta === "Recent" ? <Clock className="size-3" aria-hidden /> : null}
+          {copy.meta}
         </span>
       ) : null}
     </div>

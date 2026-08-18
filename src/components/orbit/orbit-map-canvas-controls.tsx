@@ -24,6 +24,7 @@ export interface OrbitMapCanvasControlsProps {
   onResetView: () => void;
   filterControlsClassName?: string;
   zoomControlsClassName?: string;
+  hideLooseFilter?: boolean;
 }
 
 export function OrbitMapCanvasControls({
@@ -34,7 +35,12 @@ export function OrbitMapCanvasControls({
   onResetView,
   filterControlsClassName,
   zoomControlsClassName,
+  hideLooseFilter = false,
 }: OrbitMapCanvasControlsProps) {
+  const filters = hideLooseFilter
+    ? FILTERS.filter((item) => item.key !== "loose")
+    : FILTERS;
+
   return (
     <>
       <div
@@ -46,7 +52,7 @@ export function OrbitMapCanvasControls({
         onTouchStart={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
       >
-        {FILTERS.map(({ key, label, icon: Icon }) => (
+        {filters.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"

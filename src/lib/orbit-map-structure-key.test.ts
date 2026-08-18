@@ -76,4 +76,15 @@ describe("buildOrbitMapStructureKey", () => {
       buildOrbitMapStructureKey({ ...baseGraph, scope: "orbit" })
     ).not.toBe(buildOrbitMapStructureKey(baseGraph));
   });
+
+  it("is stable when node and edge order changes", () => {
+    const shuffled: OrbitGraphPayload = {
+      ...baseGraph,
+      nodes: [...baseGraph.nodes].reverse(),
+      edges: [...baseGraph.edges].reverse(),
+    };
+    expect(buildOrbitMapStructureKey(shuffled)).toBe(
+      buildOrbitMapStructureKey(baseGraph)
+    );
+  });
 });

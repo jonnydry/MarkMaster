@@ -1,16 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useCallback, useRef } from "react";
 import { AppPageShell } from "@/components/app-page-shell";
 import Link from "next/link";
-import { Loader2, MousePointer2 } from "lucide-react";
+import { MousePointer2 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
-import { orbitMapStageClass } from "@/lib/orbit-map-chrome";
+import {
+  orbitMapInspectorDockWidthClass,
+  orbitMapInspectorOverlayMaxClass,
+  orbitMapInspectorOverlayZoomClass,
+} from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
 import { PageWatermark } from "@/components/page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
@@ -20,30 +25,24 @@ import {
   useOrbitMapPage,
 } from "@/hooks/use-orbit-map-page";
 import { OrbitMapConsole } from "@/components/orbit/orbit-map-console";
-import { OrbitMapHoverCard } from "@/components/orbit/orbit-map-hover-card";
+import {
+  OrbitMapHoverOwner,
+  type OrbitMapHoverHandler,
+} from "@/components/orbit/orbit-map-hover-owner";
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
 import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
+import { OrbitMapChartingPlaceholder } from "@/components/orbit/orbit-map-charting-placeholder";
 
-const OrbitMapCanvas = dynamic(
-  () =>
-    import("@/components/orbit/orbit-map-canvas-host").then((m) => m.default),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className={cn(
-          "flex h-full items-center justify-center",
-          orbitMapStageClass()
-        )}
-      >
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Charting map…
-        </div>
-      </div>
-    ),
-  }
-);
+const loadOrbitMapCanvas = () =>
+  import("@/components/orbit/orbit-map-canvas-host").then((m) => m.default);
+if (typeof window !== "undefined") {
+  void loadOrbitMapCanvas();
+}
+
+const OrbitMapCanvas = dynamic(loadOrbitMapCanvas, {
+  ssr: false,
+  loading: () => <OrbitMapChartingPlaceholder />,
+});
 
 const AddTagDialog = dynamic(
   () => import("@/components/add-tag-dialog").then((m) => m.AddTagDialog),
@@ -88,6 +87,7 @@ export default function OrbitMapPage() {
     libraryStats,
     graph,
     graphScope,
+    graphFilter,
     selection,
     focus,
     isLoading,
@@ -107,9 +107,6 @@ export default function OrbitMapPage() {
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
     lastSyncAt,
-    stageRef,
-    stageSize,
-    hoverCard,
     canvasRef,
     copyingCollectionId,
     selectedBookmarkId,
@@ -126,7 +123,6 @@ export default function OrbitMapPage() {
     syncProgressVisible,
     handleCanvasSelectionChange,
     handleScopeChange,
-    handleHoverChange,
     handleOpenBookmark,
     expandedBookmark,
     handleExpandedBookmarkOpenChange,
@@ -143,6 +139,12 @@ export default function OrbitMapPage() {
     handleCopyAsCollection,
     handleClearSelection,
     handleSearchResultSelect,
+    handleSelectConnectedNode,
+    graphIndexes,
+    connectionIndex,
+    livingEnabled,
+    handleLivingEnabledChange,
+    handleFilterChange,
   } = page;
 
   const railProps = {
@@ -157,6 +159,9 @@ export default function OrbitMapPage() {
     onCopyAsCollection: handleCopyAsCollection,
     onOpenBookmark: handleOpenBookmark,
     onClearSelection: handleClearSelection,
+    onSelectNode: handleSelectConnectedNode,
+    nodeById: graphIndexes?.nodesById,
+    connectionIndex,
     copyingCollectionId,
   };
 
@@ -164,6 +169,13 @@ export default function OrbitMapPage() {
   // the right (desktop) or as a bottom sheet (mobile), the zoom cluster shifts
   // clear of it.
   const inspectorOpen = Boolean(graph && selection);
+  const hoverHandlerRef = useRef<OrbitMapHoverHandler | null>(null);
+  const handleHoverChange = useCallback<OrbitMapHoverHandler>(
+    (next, position) => {
+      hoverHandlerRef.current?.(next, position);
+    },
+    []
+  );
 
   return (
     <>
@@ -188,21 +200,14 @@ export default function OrbitMapPage() {
           totalBookmarks={libraryStats?.libraryBookmarkCount}
           onSyncComplete={handleSyncComplete}
           onSyncStateChange={handleSyncStateChange}
+          preferCollapsed
         />
       }
     >
         <h1 className="sr-only">Orbit map</h1>
-        <div
-          ref={stageRef}
-          className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
-        >
+        <div className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
           {isLoading ? (
-            <div className="flex h-full w-full items-center justify-center bg-background">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Charting map…
-              </div>
-            </div>
+            <OrbitMapChartingPlaceholder />
           ) : isError ? (
             <div className="flex h-full w-full items-center justify-center bg-background p-6">
               <ErrorState
@@ -250,12 +255,15 @@ export default function OrbitMapPage() {
               onOpenBookmark={handleOpenBookmark}
               onNodeDropped={handleNodeDropped}
               focus={focus}
+              filter={graphFilter}
+              onFilterChange={handleFilterChange}
+              hideLooseFilter={graphScope === "orbit"}
               className="h-full w-full"
               filterControlsClassName="left-3 top-[4.25rem] sm:left-4 sm:top-[4.5rem]"
               zoomControlsClassName={cn(
                 "z-20",
                 inspectorOpen
-                  ? "bottom-[calc(45dvh+1.25rem)] right-4 lg:bottom-4 lg:right-[22.5rem]"
+                  ? orbitMapInspectorOverlayZoomClass
                   : "bottom-4 right-4"
               )}
             />
@@ -292,52 +300,42 @@ export default function OrbitMapPage() {
             onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
             shortcutGroups={ORBIT_MAP_SHORTCUT_GROUPS}
             toolsShifted={inspectorOpen}
+            livingEnabled={livingEnabled}
+            onLivingEnabledChange={handleLivingEnabledChange}
           />
 
-          {hoverCard ? (
-            <OrbitMapHoverCard
-              node={hoverCard.node}
-              x={hoverCard.x}
-              y={hoverCard.y}
-              containerWidth={stageSize.width}
-              containerHeight={stageSize.height}
-            />
+          <OrbitMapHoverOwner graph={graph} handlerRef={hoverHandlerRef} />
+
+          {stats && !inspectorOpen ? (
+            <OrbitMapStatsStrip stats={stats} truncatedCount={truncatedCount} />
           ) : null}
 
-          {stats && (
-            <OrbitMapStatsStrip stats={stats} truncatedCount={truncatedCount} />
-          )}
-
           {graph && !selection ? (
-            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-sm px-3 py-2 text-2xs font-medium text-white/70 sm:flex">
+            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-sm px-3 py-2 text-2xs font-medium text-foreground/70 sm:flex">
               <MousePointer2 className="size-3.5 text-primary" aria-hidden="true" />
               <span>Select a node to inspect</span>
-              <span className="text-white/30" aria-hidden="true">·</span>
+              <span className="text-foreground/30" aria-hidden="true">·</span>
               <span>Scroll to zoom</span>
-              <span className="text-white/30" aria-hidden="true">·</span>
+              <span className="text-foreground/30" aria-hidden="true">·</span>
               <span>Drag to pan</span>
             </div>
           ) : null}
 
           {/* Inspector — appears only on selection. Mobile: bottom sheet.
-              Desktop: right-docked glass panel. */}
-          {graph && selection ? (
-            <>
-              <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:hidden">
-                <OrbitMapRail
-                  {...railProps}
-                  variant="overlay"
-                  className="max-h-[45dvh] w-full"
-                />
-              </div>
-              <div className="pointer-events-none absolute bottom-3 right-3 top-[4.5rem] z-30 hidden lg:flex">
-                <OrbitMapRail
-                  {...railProps}
-                  variant="dock"
-                  className="w-[21rem]"
-                />
-              </div>
-            </>
+              Desktop: right-docked glass panel. One rail so graph indexes
+              are not rebuilt twice. */}
+          {inspectorOpen ? (
+            <div className="pointer-events-none absolute inset-x-3 bottom-3 z-30 lg:inset-x-auto lg:right-3 lg:top-[4.5rem]">
+              <OrbitMapRail
+                {...railProps}
+                variant="dock"
+                className={cn(
+                  orbitMapInspectorOverlayMaxClass,
+                  "lg:h-full lg:max-h-none",
+                  orbitMapInspectorDockWidthClass
+                )}
+              />
+            </div>
           ) : null}
         </div>
     </AppPageShell>
