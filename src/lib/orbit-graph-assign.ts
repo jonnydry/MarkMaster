@@ -66,10 +66,21 @@ function syncCoreLoose(
   return { ...node, looseBookmarks };
 }
 
+function edgeTouchesBookmark(
+  edge: OrbitGraphEdge,
+  bookmarkId: string
+): boolean {
+  return edge.kind !== "overflow" && edge.bookmarkId === bookmarkId;
+}
+
 /**
  * Applies a single tag/collection membership change to a cached graph.
  * Returns null when the bookmark or hub is not in this payload (truncated
  * sky, or the assignment raced a rebuild) so the caller can refetch.
+ *
+ * Orbit-scope payloads only include the queue (untagged, no user
+ * collection). After a bookmark becomes affiliated, drop it so the
+ * patched cache matches `/api/orbit/graph?scope=orbit`.
  */
 export function applyOrbitGraphAssignment(
   graph: OrbitGraphPayload,
@@ -125,7 +136,7 @@ export function applyOrbitGraphAssignment(
     graph.stats.affiliatedBookmarks - looseDelta
   );
 
-  return {
+  const next: OrbitGraphPayload = {
     ...graph,
     generatedAt: new Date().toISOString(),
     nodes: graph.nodes.map((node) => {
@@ -142,6 +153,25 @@ export function applyOrbitGraphAssignment(
       ...graph.stats,
       affiliatedBookmarks: nextAffiliatedCount,
       looseBookmarks: nextLooseCount,
+    },
+  };
+
+  if (graph.scope !== "orbit" || !becameAffiliated) {
+    return next;
+  }
+
+  return {
+    ...next,
+    nodes: next.nodes.filter(
+      (node) =>
+        !(node.kind === "bookmark" && node.id === assignment.bookmarkId)
+    ),
+    edges: next.edges.filter(
+      (edge) => !edgeTouchesBookmark(edge, assignment.bookmarkId)
+    ),
+    stats: {
+      ...next.stats,
+      renderedBookmarks: Math.max(0, next.stats.renderedBookmarks - 1),
     },
   };
 }

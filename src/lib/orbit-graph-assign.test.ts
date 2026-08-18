@@ -152,4 +152,30 @@ describe("applyOrbitGraphAssignment", () => {
       })
     ).toBeNull();
   });
+
+  it("drops a just-assigned bookmark from the orbit-scope queue", () => {
+    const next = applyOrbitGraphAssignment(graph({ scope: "orbit" }), {
+      action: "add",
+      bookmarkId: "bookmark-1",
+      anchorKind: "tag",
+      anchorId: "tag-1",
+    });
+
+    expect(next).not.toBeNull();
+    expect(
+      next?.nodes.find((node) => node.kind === "bookmark")
+    ).toBeUndefined();
+    expect(next?.edges).toEqual([]);
+    expect(next?.stats).toMatchObject({
+      affiliatedBookmarks: 1,
+      looseBookmarks: 0,
+      renderedBookmarks: 0,
+    });
+    expect(
+      next?.nodes.find((node) => node.kind === "tag" && node.id === "tag-1")
+    ).toMatchObject({ count: 1 });
+    expect(
+      next?.nodes.find((node) => node.kind === "core")
+    ).toMatchObject({ looseBookmarks: 0 });
+  });
 });
