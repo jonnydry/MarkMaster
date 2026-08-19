@@ -148,6 +148,8 @@ export const WorkerMessageType = {
   SET_THEME: "SET_THEME",
   /** Page visibility — pauses the living-map motion loop while hidden. */
   SET_VISIBILITY: "SET_VISIBILITY",
+  /** Toggle living-map orbital motion after INIT. */
+  SET_LIVING_MAP: "SET_LIVING_MAP",
   /** Play the radar sweep effect (optionally glinting specific nodes). */
   PLAY_SCAN_SWEEP: "PLAY_SCAN_SWEEP",
 
@@ -160,6 +162,21 @@ export const WorkerMessageType = {
 
 export type WorkerMessageType =
   (typeof WorkerMessageType)[keyof typeof WorkerMessageType];
+
+const HOT_PATH_WORKER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
+  WorkerMessageType.POINTER_DOWN,
+  WorkerMessageType.POINTER_MOVE,
+  WorkerMessageType.POINTER_UP,
+  WorkerMessageType.POINTER_LEAVE,
+  WorkerMessageType.WHEEL,
+  WorkerMessageType.TOUCH_START,
+  WorkerMessageType.TOUCH_MOVE,
+  WorkerMessageType.TOUCH_END,
+]);
+
+export function isHotPathWorkerMessageType(type: string) {
+  return HOT_PATH_WORKER_MESSAGE_TYPES.has(type);
+}
 
 /**
  * Message types sent FROM worker TO main thread.
@@ -489,6 +506,12 @@ export interface SetVisibilityMessage {
   visible: boolean;
 }
 
+export interface SetLivingMapMessage {
+  type: typeof WorkerMessageType.SET_LIVING_MAP;
+  protocolVersion: number;
+  enabled: boolean;
+}
+
 /**
  * Plays a radar sweep across the sky: a beam rotates once around the core
  * and the given nodes glint as it passes them (all bookmarks when omitted).
@@ -528,6 +551,7 @@ export type WorkerMessage =
   | FocusPulseMessage
   | SetThemeMessage
   | SetVisibilityMessage
+  | SetLivingMapMessage
   | PlayScanSweepMessage;
 
 // Grouped unions for handler typing
@@ -644,7 +668,8 @@ export interface SearchResultsMessage {
   protocolVersion: number;
   /** Echo of the query this payload was computed for (stale-guard on main). */
   query: string;
-  results: OrbitGraphNode[];
+  /** Ranked match ids — main thread resolves labels from the cached graph. */
+  resultIds: string[];
 }
 
 /** Union of all messages the worker may send to the main thread. */
@@ -758,6 +783,16 @@ function validatePointerMessage(msg: MessageRecord): string | null {
       ? finiteNumberFieldError(msg, "buttons")
       : finiteNumberFieldError(msg, "button"))
   );
+}
+
+/** Cheap envelope check for 60–120 Hz pointer/wheel/touch traffic. */
+export function getHotPathWorkerMessageError(msg: unknown): string | null {
+  if (!isRecord(msg)) return "Worker message must be an object";
+  if (typeof msg.type !== "string") return "Worker message type must be a string";
+  if (!hasProtocolVersion(msg) || msg.protocolVersion !== PROTOCOL_VERSION) {
+    return `${String(msg.type)}.protocolVersion must be ${PROTOCOL_VERSION}`;
+  }
+  return null;
 }
 
 export function getWorkerMessageValidationError(msg: unknown): string | null {
@@ -879,6 +914,11 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
       return typeof msg.visible === "boolean"
         ? null
         : "SET_VISIBILITY.visible must be a boolean";
+
+    case WorkerMessageType.SET_LIVING_MAP:
+      return typeof msg.enabled === "boolean"
+        ? null
+        : "SET_LIVING_MAP.enabled must be a boolean";
 
     case WorkerMessageType.PLAY_SCAN_SWEEP:
       return msg.nodeIds === undefined ||

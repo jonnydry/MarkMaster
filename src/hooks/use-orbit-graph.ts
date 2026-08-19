@@ -1,17 +1,19 @@
 "use client";
 
-import { keepPreviousData, useQuery, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 
-import { orbitGraphPayloadSchema } from "@/lib/api-response-schemas";
+import { readOrbitGraphPayload } from "@/lib/orbit-graph-payload";
 import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
-import * as v from "valibot";
 import type { OrbitGraphPayload, OrbitGraphScope } from "@/types";
 
-export function orbitGraphQueryKey(
-  scope: OrbitGraphScope = "library",
-  expandedAnchors: string[] = []
-) {
-  return [...ORBIT_GRAPH_QUERY_KEY, scope, expandedAnchors.join(",")] as const;
+export function orbitGraphQueryKey(scope: OrbitGraphScope = "library") {
+  return [...ORBIT_GRAPH_QUERY_KEY, scope] as const;
 }
 
 const orbitGraphEtags = new Map<string, string>();
@@ -27,12 +29,17 @@ export function useOrbitGraphQuery(
   scope: OrbitGraphScope = "library",
   expandedAnchors: string[] = []
 ) {
-  return useQuery<OrbitGraphPayload>({
-    queryKey: orbitGraphQueryKey(scope, expandedAnchors),
+  const queryClient = useQueryClient();
+  const anchorsRef = useRef(expandedAnchors);
+  const expandKey = expandedAnchors.join(",");
+  const previousRef = useRef({ scope, expandKey });
+
+  const query = useQuery<OrbitGraphPayload>({
+    queryKey: orbitGraphQueryKey(scope),
     queryFn: ({ client, queryKey }) =>
-      fetchOrbitGraph(scope, expandedAnchors, {
+      fetchOrbitGraph(scope, anchorsRef.current, {
         previous: client.getQueryData<OrbitGraphPayload>(queryKey),
-        requestKey: orbitGraphRequestKey(scope, expandedAnchors),
+        requestKey: orbitGraphRequestKey(scope, anchorsRef.current),
       }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -40,6 +47,25 @@ export function useOrbitGraphQuery(
     refetchOnWindowFocus: false,
     retry: 1,
   });
+
+  useEffect(() => {
+    anchorsRef.current = expandedAnchors;
+    const scopeChanged = previousRef.current.scope !== scope;
+    const expandChanged = previousRef.current.expandKey !== expandKey;
+    previousRef.current = { scope, expandKey };
+    if (scopeChanged || !expandChanged) return;
+
+    void queryClient.fetchQuery({
+      queryKey: orbitGraphQueryKey(scope),
+      queryFn: ({ client, queryKey }) =>
+        fetchOrbitGraph(scope, anchorsRef.current, {
+          previous: client.getQueryData<OrbitGraphPayload>(queryKey),
+          requestKey: orbitGraphRequestKey(scope, anchorsRef.current),
+        }),
+    });
+  }, [expandKey, expandedAnchors, queryClient, scope]);
+
+  return query;
 }
 
 async function fetchOrbitGraph(
@@ -86,12 +112,7 @@ async function fetchOrbitGraph(
     throw new Error(message);
   }
 
-  const parsed = v.safeParse(orbitGraphPayloadSchema, body);
-  if (!parsed.success) {
-    throw new Error("Orbit graph response did not match expected shape");
-  }
-
-  return parsed.output;
+  return readOrbitGraphPayload(body);
 }
 
 export function prefetchOrbitGraph(
@@ -100,7 +121,7 @@ export function prefetchOrbitGraph(
   expandedAnchors: string[] = []
 ) {
   void queryClient.prefetchQuery({
-    queryKey: orbitGraphQueryKey(scope, expandedAnchors),
+    queryKey: orbitGraphQueryKey(scope),
     queryFn: ({ client, queryKey }) =>
       fetchOrbitGraph(scope, expandedAnchors, {
         previous: client.getQueryData<OrbitGraphPayload>(queryKey),

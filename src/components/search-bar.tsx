@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  type KeyboardEventHandler,
+} from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
@@ -16,6 +22,7 @@ interface SearchBarProps {
   glass?: boolean;
   hint?: React.ReactNode;
   disabled?: boolean;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
 }
 
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
@@ -29,6 +36,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
       glass = false,
       hint,
       disabled,
+      onKeyDown,
     },
     forwardedRef
   ) {
@@ -78,6 +86,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           placeholder={placeholder}
           aria-label={placeholder}
           disabled={disabled}
+          onKeyDown={onKeyDown}
           className={cn(
             "h-10 w-full pl-10 pr-10 text-sm transition-all",
             glass

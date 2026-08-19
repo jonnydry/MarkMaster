@@ -8,8 +8,12 @@ import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
 import { OrbitMapGraphSearch } from "@/components/orbit/orbit-map-graph-search";
 import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
+import { OrbitMapLivingToggle } from "@/components/orbit/orbit-map-living-toggle";
 import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
-import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
+import {
+  orbitMapFloatingShellClass,
+  orbitMapInspectorToolsShiftClass,
+} from "@/lib/orbit-map-chrome";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import type { DbUser } from "@/lib/auth";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
@@ -34,6 +38,8 @@ export interface OrbitMapConsoleProps {
   shortcutGroups: KeyboardShortcutGroup[];
   /** Shift the top-right tools left to clear the docked inspector. */
   toolsShifted?: boolean;
+  livingEnabled: boolean;
+  onLivingEnabledChange: (enabled: boolean) => void;
 }
 
 const controlOnGlassClass =
@@ -67,6 +73,8 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
       onKeyboardShortcutsOpenChange,
       shortcutGroups,
       toolsShifted = false,
+      livingEnabled,
+      onLivingEnabledChange,
     },
     searchRef
   ) {
@@ -101,7 +109,7 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
         <div
           className={cn(
             "pointer-events-none absolute top-3 z-40 flex items-center gap-2 sm:top-4",
-            toolsShifted ? "right-3 sm:right-4 lg:right-[22.5rem]" : "right-3 sm:right-4"
+            toolsShifted ? orbitMapInspectorToolsShiftClass : "right-3 sm:right-4"
           )}
         >
           <div
@@ -128,6 +136,11 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
               "pointer-events-auto flex items-center gap-1 px-1.5 py-1"
             )}
           >
+            <OrbitMapLivingToggle
+              enabled={livingEnabled}
+              onEnabledChange={onLivingEnabledChange}
+              className={controlOnGlassClass}
+            />
             <OrbitMapLegendButton className={controlOnGlassClass} />
             <KeyboardShortcutsHelpButton
               open={keyboardShortcutsOpen}

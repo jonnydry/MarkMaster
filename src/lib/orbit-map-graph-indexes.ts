@@ -37,6 +37,32 @@ export function resolveOrbitMapSelectionNode(
   return node?.kind === selection.kind ? node : null;
 }
 
+/** Maps a "+N more" overflow node to the hub the inspector should show. */
+export function resolveOrbitMapOverflowSelection(
+  node: OrbitGraphNode | null | undefined
+): {
+  selection: { kind: "tag" | "collection" | "core"; id: string };
+  expand: boolean;
+} | null {
+  if (!node || node.kind !== "overflow") return null;
+
+  if (node.anchorKind === "tag" || node.anchorKind === "collection") {
+    return {
+      selection: { kind: node.anchorKind, id: node.anchorId },
+      expand: true,
+    };
+  }
+
+  if (node.anchorKind === "core") {
+    return {
+      selection: { kind: "core", id: node.anchorId },
+      expand: false,
+    };
+  }
+
+  return null;
+}
+
 export function buildOrbitMapFocus(
   focusBookmarkId: string | null,
   focusAnchorId: string | null,

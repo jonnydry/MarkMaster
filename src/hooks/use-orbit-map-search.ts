@@ -17,12 +17,14 @@ import type { OrbitGraphNode } from "@/types";
 interface UseOrbitMapSearchOptions {
   canvasRef: RefObject<OrbitMapCanvasHandle | null>;
   onSelect: (selection: OrbitMapSelection) => void;
+  resolveNodes: (ids: string[]) => OrbitGraphNode[];
 }
 
 /** Graph search box state; ranking + canvas highlight run in the map worker. */
 export function useOrbitMapSearch({
   canvasRef,
   onSelect,
+  resolveNodes,
 }: UseOrbitMapSearchOptions) {
   const [search, setSearch] = useState("");
   const [searchDeferred, setSearchDeferred] = useState("");
@@ -42,10 +44,10 @@ export function useOrbitMapSearch({
     return () => window.clearTimeout(handle);
   }, [search]);
 
-  const handleSearchResults = useCallback((query: string, results: OrbitGraphNode[]) => {
+  const handleSearchResults = useCallback((query: string, resultIds: string[]) => {
     if (query !== searchDeferredRef.current) return;
-    setSearchResults(results);
-  }, []);
+    setSearchResults(resolveNodes(resultIds));
+  }, [resolveNodes]);
 
   const handleSearchResultSelect = useCallback(
     (identity: OrbitMapSelection) => {

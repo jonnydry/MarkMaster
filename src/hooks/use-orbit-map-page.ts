@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type {
   OrbitMapCanvasHandle,
@@ -15,16 +15,22 @@ import {
 import { useOrbitLibraryBootstrap } from "@/hooks/use-orbit-library-bootstrap";
 import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { useOrbitMapAssignments } from "@/hooks/use-orbit-map-assignments";
-import { useOrbitMapLayout } from "@/hooks/use-orbit-map-layout";
 import { useOrbitMapSearch } from "@/hooks/use-orbit-map-search";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
 import { useSyncStatus } from "@/hooks/use-sync-status";
+import { buildOrbitMapConnectionIndex } from "@/lib/orbit-map-connections";
 import {
   buildOrbitMapFocus,
   buildOrbitMapGraphIndexes,
+  resolveOrbitMapOverflowSelection,
   resolveOrbitMapSelectionNode,
 } from "@/lib/orbit-map-graph-indexes";
-import type { BookmarkWithRelations, OrbitGraphScope } from "@/types";
+import {
+  getOrbitMapLivingEnabled,
+  setOrbitMapLivingEnabled,
+} from "@/lib/orbit-map-living";
+import { toast } from "@/lib/toast";
+import type { BookmarkWithRelations, OrbitGraphNode, OrbitGraphScope } from "@/types";
 
 export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
@@ -60,7 +66,7 @@ export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 
 /**
  * Facade for the Orbit graph page. Composes URL/scope state, the graph
- * query, layout/hover, search (use-orbit-map-search), and assignment flows
+ * query, search (use-orbit-map-search), and assignment flows
  * (use-orbit-map-assignments) into the single API the page consumes.
  */
 export function useOrbitMapPage() {
@@ -84,19 +90,12 @@ export function useOrbitMapPage() {
     focusAnchorIdParam,
     assignmentBookmarkIdParam,
     graphScope,
+    graphFilter,
     selection,
     handleSelectionChange,
     handleScopeChange: applyScopeChange,
+    handleFilterChange,
   } = url;
-
-  const layout = useOrbitMapLayout();
-  const {
-    stageRef,
-    stageSize,
-    hoverCard,
-    handleHoverChange: applyHoverChange,
-    resetHover,
-  } = layout;
 
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [expandedAnchors, setExpandedAnchors] = useState<string[]>([]);
@@ -123,6 +122,11 @@ export function useOrbitMapPage() {
 
   const graphIndexes = useMemo(
     () => buildOrbitMapGraphIndexes(graph),
+    [graph]
+  );
+
+  const connectionIndex = useMemo(
+    () => (graph ? buildOrbitMapConnectionIndex(graph.edges) : null),
     [graph]
   );
 
@@ -166,11 +170,26 @@ export function useOrbitMapPage() {
     return bookmarks;
   }, [expandedBookmark, focusedBookmark]);
 
+  const livingHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const [livingEnabled, setLivingEnabled] = useState(true);
+  const [livingRead, setLivingRead] = useState(false);
+  if (livingHydrated && !livingRead) {
+    setLivingRead(true);
+    setLivingEnabled(getOrbitMapLivingEnabled());
+  }
+
+  const handleLivingEnabledChange = useCallback((enabled: boolean) => {
+    setOrbitMapLivingEnabled(enabled);
+    setLivingEnabled(enabled);
+    canvasRef.current?.setLivingMap(enabled);
+  }, []);
+
   const dialogs = useBookmarkDialogs({
     externalBookmarks: externalDialogBookmarks,
-    onDialogClose: () => {
-      void refetch();
-    },
   });
 
   const focus = useMemo(
@@ -183,6 +202,16 @@ export function useOrbitMapPage() {
     [focusAnchorIdParam, focusBookmarkIdParam, graphIndexes]
   );
 
+  const resolveSearchNodes = useCallback((ids: string[]) => {
+    if (!graphIndexes) return [];
+    const nodes: OrbitGraphNode[] = [];
+    for (const id of ids) {
+      const node = graphIndexes.nodesById.get(id);
+      if (node) nodes.push(node);
+    }
+    return nodes;
+  }, [graphIndexes]);
+
   const {
     search,
     setSearch,
@@ -194,6 +223,7 @@ export function useOrbitMapPage() {
   } = useOrbitMapSearch({
     canvasRef,
     onSelect: handleSelectionChange,
+    resolveNodes: resolveSearchNodes,
   });
 
   const {
@@ -214,18 +244,6 @@ export function useOrbitMapPage() {
     refetch,
     onSelectionChange: handleSelectionChange,
   });
-
-  useEffect(() => {
-    if (!focusBookmarkIdParam || !graphIndexes) return;
-    if (!graphIndexes.bookmarksById.has(focusBookmarkIdParam)) return;
-    const handle = window.setTimeout(() => {
-      canvasRef.current?.focusOn({
-        kind: "bookmark",
-        id: focusBookmarkIdParam,
-      });
-    }, 60);
-    return () => window.clearTimeout(handle);
-  }, [focusBookmarkIdParam, graphIndexes]);
 
   const lastSyncAtValue = dbUser?.lastSyncAt;
   const lastSyncAt = useMemo(
@@ -276,9 +294,8 @@ export function useOrbitMapPage() {
     async (bookmarkId: string) => {
       setExpandedBookmarkId(null);
       await actions.handleDeleteBookmark(bookmarkId);
-      void refetch();
     },
-    [actions, refetch]
+    [actions]
   );
 
   const stats = graph?.stats;
@@ -304,66 +321,55 @@ export function useOrbitMapPage() {
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
       setExpandedAnchors([]);
-      applyScopeChange(next, () => {
-        resetHover();
-      });
+      applyScopeChange(next);
     },
-    [applyScopeChange, resetHover]
+    [applyScopeChange]
   );
 
-  // Clicking a "+N more" overflow node expands its anchor's cluster in place
-  // (and selects the anchor); everything else flows through as-is.
+  // Clicking a "+N more" overflow node selects its hub. Tag/collection
+  // overflow also expands that cluster in place (silent 10-anchor cap).
+  // Core overflow has no expand API — open the core inspector instead.
   const handleCanvasSelectionChange = useCallback(
     (next: OrbitMapSelection | null) => {
       if (next?.kind === "overflow" && graphIndexes) {
-        const node = graphIndexes.nodesById.get(next.id);
-        if (
-          node?.kind === "overflow" &&
-          (node.anchorKind === "tag" || node.anchorKind === "collection")
-        ) {
-          setExpandedAnchors((prev) =>
-            prev.includes(node.anchorId) || prev.length >= 10
-              ? prev
-              : [...prev, node.anchorId]
-          );
-          handleSelectionChange({ kind: node.anchorKind, id: node.anchorId });
+        const resolved = resolveOrbitMapOverflowSelection(
+          graphIndexes.nodesById.get(next.id)
+        );
+        if (resolved) {
+          if (resolved.expand) {
+            const alreadyExpanded = expandedAnchors.includes(
+              resolved.selection.id
+            );
+            if (!alreadyExpanded && expandedAnchors.length >= 10) {
+              toast.info("At most 10 clusters can be expanded at once.");
+            } else if (!alreadyExpanded) {
+              setExpandedAnchors((prev) =>
+                prev.includes(resolved.selection.id)
+                  ? prev
+                  : [...prev, resolved.selection.id]
+              );
+            }
+          }
+          handleSelectionChange(resolved.selection);
           return;
         }
       }
       handleSelectionChange(next);
     },
-    [graphIndexes, handleSelectionChange]
+    [expandedAnchors, graphIndexes, handleSelectionChange]
   );
 
   const handleClearSelection = useCallback(() => {
     handleSelectionChange(null);
   }, [handleSelectionChange]);
 
-  const handleHoverChange = useCallback(
-    (
-      next: OrbitMapSelection | null,
-      position?: { x: number; y: number }
-    ) => {
-      applyHoverChange(next, position, graphIndexes);
+  const handleSelectConnectedNode = useCallback(
+    (bookmarkId: string) => {
+      handleSelectionChange({ kind: "bookmark", id: bookmarkId });
+      canvasRef.current?.focusOn({ kind: "bookmark", id: bookmarkId });
     },
-    [applyHoverChange, graphIndexes]
+    [handleSelectionChange]
   );
-
-  const headerDescription = useMemo(() => {
-    if (!stats) return "Visualise how tags, collections, and bookmarks connect.";
-    const scopeLabel =
-      graphScope === "orbit" ? "Orbit queue map" : "Full library map";
-    const bookmarkCount =
-      graphScope === "orbit"
-        ? stats.looseBookmarks.toLocaleString()
-        : stats.totalBookmarks.toLocaleString();
-    const bookmarkLabel = graphScope === "orbit" ? "in queue" : "bookmarks";
-    return `${scopeLabel} · ${bookmarkCount} ${bookmarkLabel} · ${stats.tagCount} tags · ${
-      stats.userCollectionCount + stats.xFolderCount
-    } collections${
-      truncatedCount > 0 ? ` · ${truncatedCount.toLocaleString()} hidden` : ""
-    }`;
-  }, [graphScope, stats, truncatedCount]);
 
   useSurfaceKeyboardShortcuts({
     shortcutGroups: ORBIT_MAP_SHORTCUT_GROUPS,
@@ -409,11 +415,7 @@ export function useOrbitMapPage() {
     handleSearchResults,
     keyboardShortcutsOpen,
     setKeyboardShortcutsOpen,
-    headerDescription,
     lastSyncAt,
-    stageRef,
-    stageSize,
-    hoverCard,
     canvasRef,
     copyingCollectionId,
     selectedBookmarkId,
@@ -431,7 +433,6 @@ export function useOrbitMapPage() {
     handleSelectionChange,
     handleCanvasSelectionChange,
     handleScopeChange,
-    handleHoverChange,
     handleOpenBookmark,
     expandedBookmark,
     handleExpandedBookmarkOpenChange,
@@ -448,5 +449,12 @@ export function useOrbitMapPage() {
     handleCopyAsCollection,
     handleClearSelection,
     handleSearchResultSelect,
+    handleSelectConnectedNode,
+    graphIndexes,
+    connectionIndex,
+    livingEnabled,
+    handleLivingEnabledChange,
+    graphFilter,
+    handleFilterChange,
   };
 }

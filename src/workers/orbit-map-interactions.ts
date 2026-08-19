@@ -34,6 +34,11 @@ export interface OrbitMapInteractionDeps<TNode extends OrbitMapInteractionNode> 
   hasScene(): boolean;
   /** Nodes eligible for hit-testing (visible under the current filter/LOD). */
   getNodeData(): TNode[];
+  /** Spatial (or linear) hit-test. Defaults to a linear scan of getNodeData(). */
+  findHit?(
+    point: { x: number; y: number },
+    hitPadding: number
+  ): TNode | null;
   getNodeById(): Map<string, TNode>;
   getCamera(): { x: number; y: number; zoom: number };
   /** Apply a screen-space pan (camera math, render, CAMERA_CHANGED post). */
@@ -47,6 +52,16 @@ export interface OrbitMapInteractionDeps<TNode extends OrbitMapInteractionNode> 
   returnNodeTo(nodeId: string, x: number, y: number): void;
   /** Arrival feedback pulse on a hub after a successful drop. */
   pulseNode(nodeId: string): void;
+}
+
+function hitTest<TNode extends OrbitMapInteractionNode>(
+  deps: OrbitMapInteractionDeps<TNode>,
+  point: { x: number; y: number },
+  hitPadding: number
+) {
+  return deps.findHit
+    ? deps.findHit(point, hitPadding)
+    : findClosestOrbitMapNode(deps.getNodeData(), point, hitPadding);
 }
 
 function isSameHover(
@@ -180,7 +195,6 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
 
     const { type, x, y } = msg;
     const camera = deps.getCamera();
-    const nodeData = deps.getNodeData();
 
     // Convert screen → world
     const worldX = (x - camera.x) / camera.zoom;
@@ -222,8 +236,8 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
         return;
       }
 
-      const closest = findClosestOrbitMapNode(
-        nodeData,
+      const closest = hitTest(
+        deps,
         { x: worldX, y: worldY },
         getOrbitMapHitPadding(camera.zoom)
       );
@@ -258,8 +272,8 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       isPointerDown = true;
       panMoved = false;
 
-      const closest = findClosestOrbitMapNode(
-        nodeData,
+      const closest = hitTest(
+        deps,
         { x: worldX, y: worldY },
         getOrbitMapHitPadding(camera.zoom)
       );
@@ -310,8 +324,8 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
         deps.refreshNodeStyles();
       }
 
-      const closest = findClosestOrbitMapNode(
-        nodeData,
+      const closest = hitTest(
+        deps,
         { x: worldX, y: worldY },
         getOrbitMapHitPadding(camera.zoom)
       );
