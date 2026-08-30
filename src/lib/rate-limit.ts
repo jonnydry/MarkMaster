@@ -1,7 +1,7 @@
-import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { NextResponse } from "next/server";
 import { logError } from "@/lib/logger";
+import { getRedis } from "@/lib/redis";
 
 /**
  * Rate Limiting Configuration
@@ -18,6 +18,7 @@ export type RateLimitAction =
   | "media"
   | "api:read"
   | "api:write"
+  | "flywheel"
   | "csp-report";
 
 /**
@@ -31,6 +32,7 @@ export const DEBUG_RATE_LIMIT_ACTIONS = [
   "media",
   "api:read",
   "api:write",
+  "flywheel",
 ] as const satisfies readonly RateLimitAction[];
 
 export type DebugRateLimitAction = (typeof DEBUG_RATE_LIMIT_ACTIONS)[number];
@@ -76,6 +78,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     window: "5 m",
     description: "General write operations (creating/updating tags, collections, etc.)",
   },
+  flywheel: {
+    requests: 120,
+    window: "5 m",
+    description: "Flywheel event ingest (cheap instrumentation writes, exempt from api:write)",
+  },
   "csp-report": {
     requests: 200,
     window: "5 m",
@@ -86,87 +93,31 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
 // Development safety net: disable rate limiting when Upstash is not configured
 export const isRateLimitingEnabled = !!process.env.UPSTASH_REDIS_REST_URL;
 
-// Lazy Redis + Ratelimit initialization
-// Only created when Upstash credentials are actually present.
-// This prevents noisy "[Upstash Redis] Unable to find environment variable" warnings.
-let _redis: ReturnType<typeof Redis.fromEnv> | null = null;
+// Lazy Ratelimit initialization on top of the shared Redis singleton
+// (see @/lib/redis) — only created when Upstash credentials are present.
 let _ratelimiters: Record<RateLimitAction, Ratelimit> | null = null;
 
-function getRedis() {
-  if (!_redis && isRateLimitingEnabled) {
-    _redis = Redis.fromEnv();
-  }
-  return _redis;
+/** "orbit:graph" → "ratelimit:orbit-graph", "sync" → "ratelimit:sync", etc. */
+function prefixForAction(action: RateLimitAction): string {
+  return `ratelimit:${action.replace(":", "-")}`;
 }
 
 function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
-  if (!_ratelimiters && getRedis()) {
-    const r = getRedis()!;
-    _ratelimiters = {
-      sync: new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES.sync.requests,
-          POLICIES.sync.window
-        ),
-        analytics: true,
-        prefix: "ratelimit:sync",
-      }),
-      orbit: new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES.orbit.requests,
-          POLICIES.orbit.window
-        ),
-        analytics: true,
-        prefix: "ratelimit:orbit",
-      }),
-      "orbit:graph": new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES["orbit:graph"].requests,
-          POLICIES["orbit:graph"].window
-        ),
-        analytics: true,
-        prefix: "ratelimit:orbit-graph",
-      }),
-      media: new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES.media.requests,
-          POLICIES.media.window
-        ),
-        analytics: true,
-        prefix: "ratelimit:media",
-      }),
-      "api:read": new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES["api:read"].requests,
-          POLICIES["api:read"].window
-        ),
-        analytics: true,
-        prefix: "ratelimit:api-read",
-      }),
-      "api:write": new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES["api:write"].requests,
-          POLICIES["api:write"].window
-        ),
-        analytics: true,
-        prefix: "ratelimit:api-write",
-      }),
-      "csp-report": new Ratelimit({
-        redis: r,
-        limiter: Ratelimit.slidingWindow(
-          POLICIES["csp-report"].requests,
-          POLICIES["csp-report"].window
-        ),
-        analytics: true,
-        prefix: "ratelimit:csp-report",
-      }),
-    };
+  const redis = getRedis();
+  if (!_ratelimiters && redis) {
+    _ratelimiters = Object.fromEntries(
+      (Object.entries(POLICIES) as [RateLimitAction, RateLimitPolicy][]).map(
+        ([action, policy]) => [
+          action,
+          new Ratelimit({
+            redis,
+            limiter: Ratelimit.slidingWindow(policy.requests, policy.window),
+            analytics: true,
+            prefix: prefixForAction(action),
+          }),
+        ]
+      )
+    ) as Record<RateLimitAction, Ratelimit>;
   }
   return _ratelimiters;
 }
@@ -277,7 +228,12 @@ export async function checkRateLimit(
 
     return result;
   } catch (error) {
-    logError("RateLimit", `checkRateLimit failed for action "${action}" (failing open)`, error);
+    // "rate-limit-fail-open" is a stable marker for log-based alerting.
+    logError(
+      "RateLimit",
+      `rate-limit-fail-open: checkRateLimit failed for action "${action}", allowing request`,
+      error
+    );
     // Fail open — never let rate limiting break the application
     return {
       success: true,

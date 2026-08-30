@@ -22,6 +22,27 @@ import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
 
+function getPersonalBoostAuthors(userId: string, enabled: boolean) {
+  if (!enabled) return Promise.resolve([] as string[]);
+
+  return prisma.$queryRaw<{ author: string; c: bigint }[]>`
+    SELECT b."authorUsername" AS author, COUNT(*)::bigint AS c
+    FROM "Bookmark" b
+    WHERE b."userId" = ${userId}
+      AND (
+        EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")
+        OR EXISTS (
+          SELECT 1 FROM "CollectionItem" ci
+          INNER JOIN "Collection" c ON c."id" = ci."collectionId"
+          WHERE ci."bookmarkId" = b."id" AND c."type" = 'user_collection'
+        )
+      )
+    GROUP BY b."authorUsername"
+    ORDER BY c DESC
+    LIMIT 8
+  `.then((rows) => rows.map((row) => row.author));
+}
+
 export async function GET(req: NextRequest) {
   const user = await getDbUser();
   if (!user) {
@@ -81,29 +102,12 @@ export async function GET(req: NextRequest) {
   const searchTerms = tokenizeBookmarkSearch(search);
   const hasTextSearch = searchTerms.length > 0 || Boolean(authorFilter);
 
-  let personalBoostAuthors: string[] = [];
   const personalBoostTags: string[] = [];
-  if (personalBoost && limit <= 4 && sortField === "performance") {
-    const orgAuthorRows = await prisma.$queryRaw<
-      { author: string; c: bigint }[]
-    >`
-      SELECT b."authorUsername" AS author, COUNT(*)::bigint AS c
-      FROM "Bookmark" b
-      WHERE b."userId" = ${user.id}
-        AND (
-          EXISTS (SELECT 1 FROM "BookmarkTag" bt WHERE bt."bookmarkId" = b."id")
-          OR EXISTS (
-            SELECT 1 FROM "CollectionItem" ci
-            INNER JOIN "Collection" c ON c."id" = ci."collectionId"
-            WHERE ci."bookmarkId" = b."id" AND c."type" = 'user_collection'
-          )
-        )
-      GROUP BY b."authorUsername"
-      ORDER BY c DESC
-      LIMIT 8
-    `;
-    personalBoostAuthors = orgAuthorRows.map((r) => r.author);
-  }
+  // The personal-boost query only fires with the performance sort, which
+  // always takes the slow path — it joins that path's Promise.all below
+  // instead of running as a serialized round-trip up front.
+  const personalBoostEnabled =
+    personalBoost && limit <= 4 && sortField === "performance";
 
   const where: Prisma.BookmarkWhereInput = { userId: user.id };
   const relationFilters: Prisma.BookmarkWhereInput[] = [];
@@ -137,13 +141,6 @@ export async function GET(req: NextRequest) {
     where.AND = relationFilters;
   }
 
-  if (mediaFilter === "links") {
-    where.urls = { not: Prisma.JsonNull };
-  } else if (mediaFilter === "text-only") {
-    where.media = { equals: Prisma.JsonNull };
-    where.urls = { equals: Prisma.JsonNull };
-  }
-
   const needsSlowPath =
     hasTextSearch ||
     sortField === "likes" ||
@@ -158,6 +155,9 @@ export async function GET(req: NextRequest) {
       compact: !bookmarkId,
     });
 
+    // Cursor pages skip COUNT(*): the keyset filter is part of `where`, so a
+    // count here would both be expensive and shrink as the user pages. The
+    // client carries the page-1 total forward instead.
     const [bookmarks, total] = await Promise.all([
       prisma.bookmark.findMany({
         where,
@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
               : [{ bookmarkedAt: sortDirection }, { id: sortDirection }],
         ...(useKeyset ? { take: limit } : { skip: offset, take: limit }),
       }),
-      prisma.bookmark.count({ where }),
+      useKeyset ? Promise.resolve(null) : prisma.bookmark.count({ where }),
     ]);
 
     const nextCursor = buildBookmarkListNextCursor(
@@ -182,13 +182,13 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       bookmarks,
-      total,
       page,
-      totalPages: Math.ceil(total / limit) || 1,
-      ...(nextCursor ? { nextCursor } : {}),
-      ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
-        ? { personalBoostAuthors, personalBoostTags }
+      ...(total !== null
+        ? { total, totalPages: Math.ceil(total / limit) || 1 }
         : {}),
+      ...(nextCursor ? { nextCursor } : {}),
+      // personalBoost never applies here: it requires the performance sort,
+      // which always routes to the slow path below.
     }, { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } });
   }
 
@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
     ? Prisma.sql`LIMIT ${limit}`
     : Prisma.sql`OFFSET ${offset} LIMIT ${limit}`;
 
-  const [pageRows, totalRows] = await Promise.all([
+  const [pageRows, totalRows, personalBoostAuthors] = await Promise.all([
     prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
       SELECT b."id"
       FROM "Bookmark" b
@@ -220,15 +220,19 @@ export async function GET(req: NextRequest) {
       ORDER BY ${orderSql} ${directionSql}, b."id" ${directionSql}
       ${paginationSql}
     `),
-    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-      SELECT COUNT(*)::bigint AS count
-      FROM "Bookmark" b
-      ${slowWhereSql}
-    `),
+    // Same as the fast path: no COUNT(*) on cursor pages.
+    useKeyset
+      ? Promise.resolve(null)
+      : prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+          SELECT COUNT(*)::bigint AS count
+          FROM "Bookmark" b
+          ${slowWhereSql}
+        `),
+    getPersonalBoostAuthors(user.id, personalBoostEnabled),
   ]);
 
   const pageIds = pageRows.map((row) => row.id);
-  const total = Number(totalRows[0]?.count ?? 0);
+  const total = totalRows === null ? null : Number(totalRows[0]?.count ?? 0);
 
   const bookmarks =
     pageIds.length === 0
@@ -253,9 +257,10 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     bookmarks,
-    total,
     page,
-    totalPages: Math.ceil(total / limit) || 1,
+    ...(total !== null
+      ? { total, totalPages: Math.ceil(total / limit) || 1 }
+      : {}),
     ...(nextCursor ? { nextCursor } : {}),
     ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
       ? { personalBoostAuthors, personalBoostTags }

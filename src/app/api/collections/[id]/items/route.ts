@@ -71,6 +71,9 @@ export async function POST(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Serialize concurrent adds so two POSTs can't read the same max sortOrder.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`collection-items:${collectionId}`}))`;
+
     const maxOrder = await tx.collectionItem.findFirst({
       where: { collectionId },
       orderBy: { sortOrder: "desc" },

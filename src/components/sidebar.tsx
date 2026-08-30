@@ -121,9 +121,15 @@ export function Sidebar({
     : preferCollapsed
       ? localExpanded
       : ctxExpanded;
-  const toggle = preferCollapsed
-    ? () => setLocalExpanded((value) => !value)
-    : ctxToggle;
+  // Stable identity: handleAsideBackgroundClick depends on `toggle`, so an
+  // inline conditional here would recreate it (and the callback) every render.
+  const toggle = useMemo(
+    () =>
+      preferCollapsed
+        ? () => setLocalExpanded((value) => !value)
+        : ctxToggle,
+    [preferCollapsed, ctxToggle]
+  );
   const showToggle = !forceExpanded;
   const userCollections = useMemo(
     () => collections.filter((collection) => collection.type !== "x_folder"),
@@ -274,7 +280,7 @@ export function Sidebar({
                             />
                             <span className="truncate">{tag.name}</span>
                           </span>
-                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", t.data)}>
+                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground", t.data)}>
                             {tag._count.bookmarks}
                           </span>
                         </button>
@@ -284,13 +290,13 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllTags((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllTags ? "Show less" : `Show all ${tags.length}`}
                         </span>
                         {!showAllTags && hiddenTagCount > 0 && (
-                          <span className={cn(t.data, "text-muted-foreground/40")}>
+                          <span className={cn(t.data, "text-muted-foreground")}>
                             +{hiddenTagCount}
                           </span>
                         )}
@@ -320,13 +326,13 @@ export function Sidebar({
                     <SidebarSkeletonRows rows={4} />
                   ) : collectionsQueryError ? (
                     <p
-                      className="px-1 pb-1 text-xs text-muted-foreground/70"
+                      className="px-1 pb-1 text-xs text-muted-foreground"
                       role="status"
                     >
                       Collections are temporarily unavailable
                     </p>
                   ) : (
-                    <p className="px-1 pb-1 text-xs text-muted-foreground/70">
+                    <p className="px-1 pb-1 text-xs text-muted-foreground">
                       Create a collection to start curating
                     </p>
                   )
@@ -349,7 +355,7 @@ export function Sidebar({
                             <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
-                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", t.data)}>
+                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground", t.data)}>
                             {collection._count.items}
                           </span>
                         </Link>
@@ -359,7 +365,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllCollections((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllCollections
@@ -367,7 +373,7 @@ export function Sidebar({
                             : `Show all ${userCollections.length}`}
                         </span>
                         {!showAllCollections && hiddenCollectionCount > 0 && (
-                          <span className={cn(t.data, "text-muted-foreground/40")}>
+                          <span className={cn(t.data, "text-muted-foreground")}>
                             +{hiddenCollectionCount}
                           </span>
                         )}
@@ -401,7 +407,7 @@ export function Sidebar({
                             <FolderOpen className="h-4 w-4 shrink-0" />
                             <span className="truncate">{collection.name}</span>
                           </span>
-                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground/50", t.data)}>
+                          <span className={cn("sidebar-item-count ml-2 text-xs text-muted-foreground", t.data)}>
                             {collection._count.items}
                           </span>
                         </Link>
@@ -411,7 +417,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllFolders((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground/70 transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllFolders
@@ -419,7 +425,7 @@ export function Sidebar({
                             : `Show all ${xFolders.length}`}
                         </span>
                         {!showAllFolders && hiddenFolderCount > 0 && (
-                          <span className={cn(t.data, "text-muted-foreground/40")}>
+                          <span className={cn(t.data, "text-muted-foreground")}>
                             +{hiddenFolderCount}
                           </span>
                         )}

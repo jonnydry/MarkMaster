@@ -88,6 +88,7 @@ export default function CollectionDetailClient({
     startEditingName,
     handleCopyAsCollection,
     handleTogglePublic,
+    handleShareExpiryChange,
     handleCopyShareLink,
     handleRemoveItem,
     handleShareOnX,
@@ -186,6 +187,7 @@ export default function CollectionDetailClient({
                 isUserCollection={isUserCollection}
                 onCopyAsCollection={handleCopyAsCollection}
                 onTogglePublic={handleTogglePublic}
+                onShareExpiryChange={handleShareExpiryChange}
                 onCopyShareLink={handleCopyShareLink}
                 onShareOnX={handleShareOnX}
               />

@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
-import { generateShareContent } from "@/lib/share-content";
+import { generateShareContent, isShareLinkExpired } from "@/lib/share-content";
 
 function getConfiguredShareOrigin(req: NextRequest) {
+  // NEXTAUTH_URL is required config and always the app's public URL, so it is
+  // a safe fallback — APP_URL/NEXT_PUBLIC_APP_URL only exist to override it.
   const configuredUrl =
-    process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+    process.env.APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim();
   if (configuredUrl) {
     try {
       return new URL(configuredUrl).origin;
@@ -63,6 +67,16 @@ export async function POST(
     );
   }
 
+  if (isShareLinkExpired(collection.shareExpiresAt)) {
+    return NextResponse.json(
+      {
+        error:
+          "This share link has expired. Update the link expiry on the collection page to share it again.",
+      },
+      { status: 400 }
+    );
+  }
+
   const bookmarks = collection.items.map((item) => ({
     tweetId: item.bookmark.tweetId,
     authorUsername: item.bookmark.authorUsername,
@@ -83,7 +97,8 @@ export async function POST(
     collection.description,
     bookmarks,
     collection.shareSlug,
-    shareOrigin
+    shareOrigin,
+    collection.shareExpiresAt
   );
 
   return NextResponse.json(shareContent);

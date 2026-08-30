@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       description: description || null,
       type: "user_collection",
       isPublic: isPublic || false,
-      shareSlug: isPublic ? nanoid(10) : null,
+      shareSlug: isPublic ? nanoid(16) : null,
     },
   });
 

@@ -19,6 +19,12 @@ import { computeOrbitScanSignalQuality } from "@/lib/orbit-scan-signal-quality";
 import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
+/**
+ * Deep scans drive an xAI call allowed up to 180 s (see orbit-grok.ts); give
+ * the route enough platform budget so the call isn't killed mid-flight.
+ */
+export const maxDuration = 240;
+
 const orbitScanBookmarkInclude = {
   notes: { select: { id: true, content: true } },
   collectionItems: {

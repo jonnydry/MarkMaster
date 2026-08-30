@@ -27,7 +27,7 @@
  * @see types/index.ts for OrbitGraph* types
  */
 
-import type { OrbitGraphPayload, OrbitGraphNode } from "@/types";
+import type { OrbitGraphPayload } from "@/types";
 
 /* ------------------------------------------------------------------ */
 /* Version & Message Type Constants                                   */

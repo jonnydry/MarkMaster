@@ -11,7 +11,7 @@ const tx = {
   syncRun: {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
-    update: vi.fn(),
+    updateMany: vi.fn(),
   },
 };
 
@@ -32,34 +32,30 @@ describe("processSyncRun", () => {
   });
 
   it("claims a pending run and executes it", async () => {
-    tx.syncRun.findUnique.mockResolvedValue({
-      id: "run-1",
-      userId: "user-1",
-      status: "PENDING",
-      continuationToken: "token-abc",
-      includeFolders: false,
-    });
+    tx.syncRun.findUnique
+      .mockResolvedValueOnce({
+        id: "run-1",
+        userId: "user-1",
+        status: "PENDING",
+        continuationToken: "token-abc",
+        includeFolders: false,
+      })
+      .mockResolvedValueOnce({
+        id: "run-1",
+        userId: "user-1",
+        continuationToken: "token-abc",
+        includeFolders: false,
+      });
     tx.syncRun.findFirst.mockResolvedValue(null);
-    tx.syncRun.update.mockResolvedValue({
-      id: "run-1",
-      userId: "user-1",
-      continuationToken: "token-abc",
-      includeFolders: false,
-    });
+    tx.syncRun.updateMany.mockResolvedValue({ count: 1 });
 
     const { processSyncRun } = await import("./sync-queue");
     const result = await processSyncRun("run-1");
 
     expect(result).toEqual({ processed: true, runId: "run-1" });
-    expect(tx.syncRun.update).toHaveBeenCalledWith({
+    expect(tx.syncRun.updateMany).toHaveBeenCalledWith({
       where: { id: "run-1", status: "PENDING" },
       data: { status: "RUNNING" },
-      select: {
-        id: true,
-        userId: true,
-        continuationToken: true,
-        includeFolders: true,
-      },
     });
     expect(executeSyncRunMock).toHaveBeenCalledWith(
       "run-1",
@@ -67,6 +63,24 @@ describe("processSyncRun", () => {
       "token-abc",
       false
     );
+  });
+
+  it("does not process when the claim loses a concurrent race", async () => {
+    tx.syncRun.findUnique.mockResolvedValue({
+      id: "run-1",
+      userId: "user-1",
+      status: "PENDING",
+      continuationToken: null,
+      includeFolders: false,
+    });
+    tx.syncRun.findFirst.mockResolvedValue(null);
+    tx.syncRun.updateMany.mockResolvedValue({ count: 0 });
+
+    const { processSyncRun } = await import("./sync-queue");
+    const result = await processSyncRun("run-1");
+
+    expect(result).toEqual({ processed: false });
+    expect(executeSyncRunMock).not.toHaveBeenCalled();
   });
 
   it("skips runs that are not pending", async () => {

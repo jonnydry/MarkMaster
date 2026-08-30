@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { sendJson } from "@/lib/fetch-json";
 import { invalidateTagsQuery } from "@/lib/query-invalidation";
 import { assignBalancedTagColors } from "@/lib/tag-colors";
@@ -38,7 +39,13 @@ export function useSettingsTags() {
   }, [tagSearch, tags]);
 
   const handleDeleteTag = useCallback(async (tagId: string) => {
-    if (!window.confirm("Delete this tag? It will be removed from all bookmarks.")) return;
+    const confirmed = await confirmDialog({
+      title: "Delete this tag?",
+      description: "It will be removed from all bookmarks.",
+      confirmLabel: "Delete tag",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       await sendJson("/api/tags", {
         method: "DELETE",

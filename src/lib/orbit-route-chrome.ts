@@ -7,7 +7,7 @@ export function orbitControlRadius() {
 
 export function orbitLabelClass(extra?: string) {
   return cn(
-    "text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-white/55",
+    "text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground",
     extra
   );
 }
@@ -21,15 +21,15 @@ export function orbitSectionLabelClass(extra?: string) {
 }
 
 export function orbitHairlineBorder() {
-  return "border-hairline-soft dark:border-white/10";
+  return "border-hairline-soft";
 }
 
 export function orbitMetaMuted() {
-  return "text-muted-foreground dark:text-white/55";
+  return "text-muted-foreground";
 }
 
 export function orbitMetaSoft() {
-  return "text-muted-foreground dark:text-white/60";
+  return "text-muted-foreground";
 }
 
 export function orbitForeground() {

@@ -97,8 +97,7 @@ function TagRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85",
-        "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85"
       )}
     >
       <TagDot name={tag.name} color={tag.color} size={8} />
@@ -125,8 +124,7 @@ function CollectionRollupChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85",
-        "dark:border-white/12 dark:bg-white/[0.045] dark:text-white/80"
+        "inline-flex min-h-7 max-w-full items-center gap-1.5 surface-inset-strong px-2 text-xs text-foreground/85"
       )}
     >
       <span className="min-w-0 max-w-[13rem] truncate">{collection.name}</span>
@@ -205,7 +203,7 @@ function StrategyLines({
 
   const lineClass = cn(
     "grid gap-1 surface-inset px-3 py-2 text-xs leading-relaxed sm:grid-cols-[7rem_minmax(0,1fr)]",
-    "text-muted-foreground dark:border-white/10 dark:bg-white/[0.035] dark:text-white/60"
+    "text-muted-foreground"
   );
 
   return (
@@ -328,7 +326,7 @@ export function OrbitScanOverviewStrip({
           </div>
           <p
             className={cn(
-              "mt-1 text-sm font-medium leading-5 text-foreground/90 dark:text-white/90",
+              "mt-1 text-sm font-medium leading-5 text-foreground/90",
               !open && "truncate"
             )}
           >

@@ -128,25 +128,47 @@ export function useBookmarkDialogs(options: UseBookmarkDialogsOptions = {}) {
     [onDialogClose]
   );
 
-  return {
-    tagDialogOpen,
-    setTagDialogOpen: handleTagDialogOpenChange,
-    collectionDialogOpen,
-    setCollectionDialogOpen: handleCollectionDialogOpenChange,
-    createCollectionOpen,
-    setCreateCollectionOpen,
-    tagTargetIds: activeTagTargetIds,
-    setTagTargetIds,
-    collectionTargetIds: activeCollectionTargetIds,
-    setCollectionTargetIds,
-    tagDialogBookmarks,
-    collectionDialogBookmarks,
-    dialogTagIds,
-    dialogCollectionIds,
-    openTagDialog,
-    openCollectionDialog,
-    openTagForBookmark,
-    openCollectionForBookmark,
-    handleCreateCollectionOpen,
-  };
+  // Memoized so consumers can safely use the returned object as a hook dep
+  // (use-dashboard-page depends on it in its aggregate useMemo).
+  return useMemo(
+    () => ({
+      tagDialogOpen,
+      setTagDialogOpen: handleTagDialogOpenChange,
+      collectionDialogOpen,
+      setCollectionDialogOpen: handleCollectionDialogOpenChange,
+      createCollectionOpen,
+      setCreateCollectionOpen,
+      tagTargetIds: activeTagTargetIds,
+      setTagTargetIds,
+      collectionTargetIds: activeCollectionTargetIds,
+      setCollectionTargetIds,
+      tagDialogBookmarks,
+      collectionDialogBookmarks,
+      dialogTagIds,
+      dialogCollectionIds,
+      openTagDialog,
+      openCollectionDialog,
+      openTagForBookmark,
+      openCollectionForBookmark,
+      handleCreateCollectionOpen,
+    }),
+    [
+      tagDialogOpen,
+      handleTagDialogOpenChange,
+      collectionDialogOpen,
+      handleCollectionDialogOpenChange,
+      createCollectionOpen,
+      activeTagTargetIds,
+      activeCollectionTargetIds,
+      tagDialogBookmarks,
+      collectionDialogBookmarks,
+      dialogTagIds,
+      dialogCollectionIds,
+      openTagDialog,
+      openCollectionDialog,
+      openTagForBookmark,
+      openCollectionForBookmark,
+      handleCreateCollectionOpen,
+    ]
+  );
 }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const kickSyncWorkerMock = vi.hoisted(() => vi.fn());
 const enqueueSyncRunMock = vi.hoisted(() => vi.fn());
+const peekSyncRunGateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1", syncXFolders: false })),
@@ -13,6 +14,7 @@ vi.mock("@/lib/sync-queue", async (importOriginal) => {
     ...actual,
     enqueueSyncRun: enqueueSyncRunMock,
     kickSyncWorker: kickSyncWorkerMock,
+    peekSyncRunGate: peekSyncRunGateMock,
   };
 });
 
@@ -35,8 +37,26 @@ vi.mock("next/server", async (importOriginal) => {
 describe("/api/bookmarks/sync POST", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    peekSyncRunGateMock.mockResolvedValue(null);
     enqueueSyncRunMock.mockResolvedValue({ created: { id: "run-1" } });
     kickSyncWorkerMock.mockResolvedValue(undefined);
+  });
+
+  it("rejects with 409 before consuming a rate-limit token when a sync is active", async () => {
+    const activeRun = { id: "run-0", status: "RUNNING" };
+    peekSyncRunGateMock.mockResolvedValue({ conflict: activeRun });
+    const { checkRateLimit } = await import("@/lib/rate-limit");
+    const { POST } = await import("./route");
+
+    const response = await POST(new Request("http://localhost/api/bookmarks/sync", {
+      method: "POST",
+    }));
+    const json = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(json.currentRun).toEqual(activeRun);
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(enqueueSyncRunMock).not.toHaveBeenCalled();
   });
 
   it("accepts sync with 202 and dispatches the background worker", async () => {

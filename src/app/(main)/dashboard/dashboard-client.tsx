@@ -588,8 +588,10 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <AppPageCenter>
-          <div role="status" aria-label="Loading" className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        // Match the data-loading skeleton (default view mode is "grid") so the
+        // first paint doesn't pop from a bare spinner to skeleton rows.
+        <AppPageCenter className="items-stretch justify-start overflow-hidden">
+          <DashboardSkeleton viewMode="grid" />
         </AppPageCenter>
       }
     >

@@ -14,6 +14,7 @@ import {
 import type { CollectionWithCount } from "@/types";
 
 import { HighlightProgress } from "@/components/highlight-progress";
+import { useTypography } from "@/hooks/use-typography";
 import { highlightSurfaceActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
   onDelete,
   selected = false,
 }: UserCollectionCardProps) {
+  const t = useTypography();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
@@ -131,12 +133,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
           <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
             {itemCount.toLocaleString()}
           </p>
-          <p
-            className={cn(
-              "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
-              "text-muted-foreground/70"
-            )}
-          >
+          <p className={cn("mt-1", t.label, "font-semibold")}>
             saved
           </p>
         </div>
@@ -174,6 +171,7 @@ export const XFolderCard = React.memo(function XFolderCard({
   onCopy,
   selected = false,
 }: XFolderCardProps) {
+  const t = useTypography();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
@@ -235,12 +233,7 @@ export const XFolderCard = React.memo(function XFolderCard({
           <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
             {itemCount.toLocaleString()}
           </p>
-          <p
-            className={cn(
-              "mt-1 text-2xs font-semibold uppercase tracking-[0.08em]",
-              "text-muted-foreground/70"
-            )}
-          >
+          <p className={cn("mt-1", t.label, "font-semibold")}>
             synced
           </p>
         </div>

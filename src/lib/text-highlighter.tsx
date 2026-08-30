@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 const MENTION_OR_URL_RE = /((?:@|#)\w+|https?:\/\/\S+)/g;
 const HIGHLIGHT_CLASS_NAME =
-  "rounded-[0.25rem] bg-primary/15 px-0.5 text-foreground ring-1 ring-primary/10";
+  "rounded-sm bg-primary/15 px-0.5 text-foreground ring-1 ring-primary/10";
 
 function hasRichTextToken(text: string) {
   return text.includes("@") || text.includes("#") || text.includes("http");

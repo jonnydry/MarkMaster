@@ -26,11 +26,15 @@ constants in `src/lib/typography.ts`. Only three tracking values exist:
 `tracking-[0.08em]` (micro labels), `tracking-wider` (section labels),
 `tracking-[0.14em]` (chrome labels — sidebar, map strips). Micro text sizes:
 `text-2xs` (10px) and `text-xs` — nothing smaller.
+Sanctioned exception: the sidebar "MarkMaster" wordmark uses `tracking-[-0.02em]`
+as deliberate brand tightening — do not copy that value anywhere else.
 
 ## Focus
 One recipe: `focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45`
 (destructive controls may use the `ring-destructive/*` variants). Never `ring-primary`,
-never `ring-[3px]`/`ring-3`.
+never `ring-[3px]`/`ring-3`. `ring-primary` is banned for focus indication only —
+decorative selection states (e.g. selected cards/swatches) may use it; that is the
+sanctioned exception.
 
 ## Shape
 Square aesthetic — no pills:

@@ -31,7 +31,6 @@ import {
 } from "@/lib/orbit-grok-parse";
 import {
   getOrbitXaiRuntimeStatus,
-  DEFAULT_XAI_MODEL,
   ORBIT_SCAN_PLAN_JSON_SCHEMA,
   ORBIT_XAI_PROMPT_CACHE_KEY,
   ORBIT_XAI_REASONING_EFFORT,

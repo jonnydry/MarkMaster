@@ -50,24 +50,24 @@ const eslintConfig = defineConfig([
             "Off-contract radius — components use rounded-sm (micro-elements rounded-[2px]; circles rounded-full).",
         },
         {
-          selector: "Literal[value=/\brounded-(lg|md)\b/]",
+          selector: "Literal[value=/\\brounded-(lg|md)\\b/]",
           message:
             "Off-contract radius — components use rounded-sm (micro-elements rounded-[2px]; circles rounded-full).",
         },
         {
-          selector: "TemplateElement[value.raw=/\brounded-(lg|md)\b/]",
+          selector: "TemplateElement[value.raw=/\\brounded-(lg|md)\\b/]",
           message:
             "Off-contract radius — components use rounded-sm (micro-elements rounded-[2px]; circles rounded-full).",
         },
         {
           selector:
-            "Literal[value=/\bbg-surface-[^\\s\"']+.*\bdark:(?:[^\\s\"']*:)*(?:bg-|border-white)/]",
+            "Literal[value=/\\bbg-surface-[^\\s\"']+.*\\bdark:(?:[^\\s\"']*:)*(?:bg-|border-white)/]",
           message:
             "Dark-modified surface hand-roll — rely on surface-* utilities and theme tokens instead of dark:bg-white/... overrides.",
         },
         {
           selector:
-            "TemplateElement[value.raw=/\bbg-surface-[^\\s\"'`]+.*\bdark:(?:[^\\s\"'`]*:)*(?:bg-|border-white)/]",
+            "TemplateElement[value.raw=/\\bbg-surface-[^\\s\"'`]+.*\\bdark:(?:[^\\s\"'`]*:)*(?:bg-|border-white)/]",
           message:
             "Dark-modified surface hand-roll — rely on surface-* utilities and theme tokens instead of dark:bg-white/... overrides.",
         },

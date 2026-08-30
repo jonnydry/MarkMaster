@@ -86,21 +86,15 @@ export function OrbitMapRail({
   copyingCollectionId,
   variant = "rail",
   className}: OrbitMapRailProps) {
-  const fallbackNodeById = useMemo(
-    () => (nodeByIdProp ? null : new Map(data.nodes.map((node) => [node.id, node]))),
+  const nodeById = useMemo(
+    () => nodeByIdProp ?? new Map(data.nodes.map((node) => [node.id, node])),
     [data.nodes, nodeByIdProp]
   );
-  const nodeById = nodeByIdProp ?? fallbackNodeById ?? new Map();
   const activeNode = selection ? nodeById.get(selection.id) ?? null : null;
-  const fallbackConnectionIndex = useMemo(
-    () =>
-      connectionIndexProp
-        ? null
-        : buildOrbitMapConnectionIndex(data.edges),
+  const connectedNodeIdsById = useMemo(
+    () => connectionIndexProp ?? buildOrbitMapConnectionIndex(data.edges),
     [connectionIndexProp, data.edges]
   );
-  const connectedNodeIdsById =
-    connectionIndexProp ?? fallbackConnectionIndex ?? new Map();
   const connected = useMemo(() => {
     if (!activeNode) return [];
     return getConnectedOrbitMapNodes(

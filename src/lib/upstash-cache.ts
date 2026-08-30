@@ -1,14 +1,5 @@
-import { Redis } from "@upstash/redis";
 import { logError } from "@/lib/logger";
-
-let _redis: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (!_redis && process.env.UPSTASH_REDIS_REST_URL) {
-    _redis = Redis.fromEnv();
-  }
-  return _redis;
-}
+import { getRedis } from "@/lib/redis";
 
 export async function getUserCacheVersion(userId: string): Promise<number> {
   const redis = getRedis();
@@ -23,38 +14,21 @@ export async function getUserCacheVersion(userId: string): Promise<number> {
   }
 }
 
-/** Per-user debounce map: collapses rapid-fire invalidations into one bump. */
-const invalidationTimers = new Map<string, NodeJS.Timeout>();
-const INVALIDATION_DEBOUNCE_MS = 2_000;
-
 /**
  * Bumps the user's cache generation so prior graph/analytics entries are ignored.
- * Debounced: a burst of invalidations within INVALIDATION_DEBOUNCE_MS coalesces
- * into a single Redis write per user, eliminating cache-stampede churn.
+ *
+ * Awaits the Redis write before returning: on serverless the instance can be
+ * frozen as soon as the response is sent, so a deferred (setTimeout) bump may
+ * never fire — and the client refetches immediately after a mutation response,
+ * so the bump must land before we respond anyway. A single INCR per mutation
+ * is cheap; read-side stampedes are already handled by inFlightCompute.
  */
-export function invalidateUserResponseCache(userId: string): void {
-  const existing = invalidationTimers.get(userId);
-  if (existing) clearTimeout(existing);
-
-  const timer = setTimeout(() => {
-    invalidationTimers.delete(userId);
-    void flushInvalidateUserResponseCache(userId);
-  }, INVALIDATION_DEBOUNCE_MS);
-
-  invalidationTimers.set(userId, timer);
-}
-
-/** Immediate bump — use when downstream clients refetch right away (e.g. sync finish). */
-export async function invalidateUserResponseCacheImmediate(
-  userId: string
-): Promise<void> {
-  const existing = invalidationTimers.get(userId);
-  if (existing) {
-    clearTimeout(existing);
-    invalidationTimers.delete(userId);
-  }
+export async function invalidateUserResponseCache(userId: string): Promise<void> {
   await flushInvalidateUserResponseCache(userId);
 }
+
+/** Alias kept for call sites that want to be explicit about immediacy. */
+export const invalidateUserResponseCacheImmediate = invalidateUserResponseCache;
 
 async function flushInvalidateUserResponseCache(userId: string): Promise<void> {
   const redis = getRedis();
@@ -66,7 +40,16 @@ async function flushInvalidateUserResponseCache(userId: string): Promise<void> {
   }
 }
 
-/** Read-through JSON cache with fail-open behavior when Redis is unavailable. */
+/**
+ * Read-through JSON cache with fail-open behavior when Redis is unavailable.
+ *
+ * Serialization is left entirely to the Upstash client: its default
+ * serializer JSON.stringifies non-string values on SET and its default
+ * automaticDeserialization JSON.parses on GET. Do NOT re-add a manual
+ * JSON.stringify/JSON.parse layer here — the client's GET already returns a
+ * parsed object, so a manual JSON.parse(object) throws, gets swallowed by
+ * the fail-open handler, and silently turns every read into a cache miss.
+ */
 export async function getCachedJson<T>(
   key: string,
   ttlSeconds: number,
@@ -75,23 +58,23 @@ export async function getCachedJson<T>(
   const redis = getRedis();
   if (redis) {
     try {
-      const cached = await redis.get<string>(key);
-      if (cached) {
-        return JSON.parse(cached) as T;
+      const cached = await redis.get<T>(key);
+      if (cached !== null && cached !== undefined) {
+        return cached;
       }
-  } catch (error) {
-    logError("Cache", `read failed for ${key}`, error);
-  }
+    } catch (error) {
+      logError("Cache", `read failed for ${key}`, error);
+    }
   }
 
   const value = await inFlightCompute(key, compute);
 
   if (redis) {
     try {
-      await redis.set(key, JSON.stringify(value), { ex: ttlSeconds });
-  } catch (error) {
-    logError("Cache", `write failed for ${key}`, error);
-  }
+      await redis.set(key, value, { ex: ttlSeconds });
+    } catch (error) {
+      logError("Cache", `write failed for ${key}`, error);
+    }
   }
 
   return value;

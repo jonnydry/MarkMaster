@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Providers } from "@/components/providers";
 import { ThemeInitScript } from "@/components/theme-init-script";
+import { ConfirmDialogHost } from "@/components/ui/confirm-dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { defaultFontVariables } from "@/lib/app-fonts";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default async function RootLayout({
         <Providers>
           {children}
           <Toaster />
+          <ConfirmDialogHost />
         </Providers>
       </body>
     </html>

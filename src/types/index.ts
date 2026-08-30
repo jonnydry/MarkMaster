@@ -86,6 +86,8 @@ export interface CollectionWithCount {
   type: CollectionType;
   isPublic: boolean;
   shareSlug: string | null;
+  /** ISO timestamp the share link expires at; null means it never expires. */
+  shareExpiresAt: string | null;
   externalSource: string | null;
   externalSourceId: string | null;
   createdAt: string;

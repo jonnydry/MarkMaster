@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback, useSyncExternalStore } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTheme, useColorTheme } from '@/components/providers';
 import { resolveOrbitMapCanvasTheme } from '@/lib/orbit-map-theme-colors';
 import { getOrbitMapLivingEnabled } from '@/lib/orbit-map-living';
@@ -414,7 +414,12 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       });
     }, [theme, colorTheme, useFallback, workerGeneration]);
 
-    const graphKey = graph ? buildOrbitMapStructureKey(graph) : "";
+    // Hashing every node + edge is O(graph size); memoize so it only reruns
+    // when the graph payload identity changes, not on every host render.
+    const graphKey = useMemo(
+      () => (graph ? buildOrbitMapStructureKey(graph) : ""),
+      [graph]
+    );
 
     useEffect(() => {
       if (!props.hideLooseFilter || requestedFilter !== "loose") return;
@@ -494,12 +499,22 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [useFallback, workerGeneration]);
 
-    // Forward resize to worker
+    // Forward resize to worker. Each RESIZE triggers a full style pass in the
+    // worker, so drag-resize bursts are coalesced: only the latest size is
+    // kept and posted on a trailing animation frame (same pattern as the
+    // pointer-move/wheel coalescing below).
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas || useFallback || !workerRef.current) return;
 
-      const postResize = (width: number, height: number) => {
+      let pendingResize: { width: number; height: number } | null = null;
+      let resizeFrame: number | null = null;
+
+      const flushResize = () => {
+        resizeFrame = null;
+        if (!pendingResize) return;
+        const { width, height } = pendingResize;
+        pendingResize = null;
         setViewportSize({ width, height });
         workerRef.current?.postMessage({
           type: WorkerMessageType.RESIZE,
@@ -508,6 +523,13 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           height,
           dpr: getSafeDpr(window.devicePixelRatio),
         });
+      };
+
+      const postResize = (width: number, height: number) => {
+        pendingResize = { width, height };
+        if (resizeFrame === null) {
+          resizeFrame = window.requestAnimationFrame(flushResize);
+        }
       };
 
       const observer = new ResizeObserver((entries) => {
@@ -523,6 +545,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       });
 
       return () => {
+        if (resizeFrame !== null) {
+          window.cancelAnimationFrame(resizeFrame);
+        }
         observer.disconnect();
         unsubscribeDpr();
       };

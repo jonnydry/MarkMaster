@@ -34,9 +34,13 @@ MarkMaster is a **bookmark manager built for people who save a lot on X** and ne
 - Export to JSON or CSV with metadata
 
 ### 🗂️ Organization
-- **Collections** with drag ordering and public `/share/[slug]` pages
+- **Collections** with drag ordering and public `/share/[slug]` pages — share links can optionally expire (7/30/90 days), managed from the collection page
 - **X folder sync** — import premium bookmark folders into managed collections
 - Incremental sync with encrypted token storage and local archive
+
+> **Archive semantics:** sync only adds — removing a bookmark on X never
+> deletes it (or its tags, notes, and highlights) from MarkMaster. Your
+> library is a permanent archive layered on top of X, not a mirror of it.
 
 ### 🤖 Orbit & Grok (optional)
 - Batch Grok scans with adaptive sizing (quick / balanced / deep)
@@ -124,6 +128,11 @@ npm run env:check
 | `CRON_SECRET` | **Yes in production** | Authorizes Vercel Cron queue draining (and can authorize worker route as fallback) |
 | `OWNER_USER_ID` | **Yes in production** | Prisma User.id allowed to access debug tools; endpoints fail closed if unset in production |
 | `CSP_MODE` | No | Production defaults to `enforce`; set `report-only` only for a temporary diagnostics/rollback window |
+| `APP_URL` / `NEXT_PUBLIC_APP_URL` | No | Override the origin used in share links (defaults to `NEXTAUTH_URL`) |
+| `TRUSTED_PROXY_HOPS` | Self-hosted | Trusted reverse-proxy hop count for client-IP resolution (`src/lib/client-ip.ts`); Vercel needs no configuration |
+| `XAI_API_BASE_URL` / `XAI_ORBIT_MODEL` | No | Override the xAI endpoint or Grok model for Orbit scans |
+| `ORBIT_SCAN_ENRICHMENT` | No | Toggle the Orbit scan enrichment phase |
+| `SKIP_DB_MIGRATION_CHECK` | No (dev) | Skip the migration-status check `npm run dev` performs |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 
@@ -159,11 +168,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+**Local development data.** There is no seed script: all bookmark data comes
+from syncing your real X bookmarks, which requires the configured X OAuth app
+(step 4). After signing in, run a sync from the sidebar to populate your
+library — a fresh clone renders empty until then.
+
 **Production build** (migrations + build):
 
 ```bash
 npm run deploy:build
 ```
+
+> **Warning — production only.** `deploy:build` runs `prisma migrate deploy`
+> against whatever `DIRECT_URL` points at before building. Never use it as a
+> preview/CI build command with production env vars: every preview would
+> migrate the production database, and a migration can apply even if the
+> subsequent build fails (schema ahead of code). Previews and CI should run
+> plain `npm run build`; apply migrations as a separate release step.
 
 ---
 

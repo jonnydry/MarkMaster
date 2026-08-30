@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
 import { getClientIp } from "@/lib/client-ip";
 import { debugAccessDeniedResponse } from "@/lib/debug-access";
+import { logError, logWarn } from "@/lib/logger";
 import { readJsonBody } from "@/lib/request-body";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -20,8 +21,6 @@ interface CspReport {
   "status-code"?: number;
 }
 
-// In-memory store for recent CSP violations (useful for the debug page)
-const MAX_RECENT_VIOLATIONS = 50;
 const MAX_CSP_REPORT_BODY_BYTES = 16 * 1024;
 const cspReportSchema = z.object({
   "blocked-uri": z.string().trim().max(2048).optional(),
@@ -36,16 +35,14 @@ const cspReportSchema = z.object({
   "script-sample": z.string().trim().max(240).optional(),
   "status-code": z.number().int().min(0).max(999).optional(),
 });
-const recentCspViolations: Array<{
-  timestamp: string;
-  report: CspReport;
-}> = [];
 
 /**
  * CSP Violation Reporting Endpoint
  *
- * - POST: Receives reports from the browser (public, as browsers send these unauthenticated).
- * - GET:  Returns recent violations for the internal debug UI.
+ * - POST: Receives reports from the browser (public, as browsers send these
+ *         unauthenticated) and logs them with the "csp-violation" prefix.
+ *         Serverless instances share no memory, so logs are the store.
+ * - GET:  Points the internal debug UI at the logs.
  *         Requires authentication. In production this fails closed unless
  *         OWNER_USER_ID is set and matches the caller (see debug-access.ts).
  */
@@ -81,37 +78,24 @@ export async function POST(req: NextRequest) {
 
     const report = parsed.data as CspReport;
 
-    // Store for the debug UI
-    recentCspViolations.unshift({
-      timestamp: new Date().toISOString(),
-      report,
-    });
-
-    // Keep only the most recent violations
-    if (recentCspViolations.length > MAX_RECENT_VIOLATIONS) {
-      recentCspViolations.length = MAX_RECENT_VIOLATIONS;
-    }
-
-    // Human-readable logging
     const directive = report["effective-directive"] || report["violated-directive"] || "unknown";
     const blocked = report["blocked-uri"] || "unknown";
     const source = report["source-file"]
       ? `${report["source-file"]}:${report["line-number"] || "?"}:${report["column-number"] || "?"}`
       : "inline or eval";
 
-    console.warn("\n[CSP Violation]");
-    console.warn(`  Directive      : ${directive}`);
-    console.warn(`  Blocked URI    : ${blocked}`);
-    console.warn(`  Source         : ${source}`);
-    console.warn(`  Disposition    : ${report["disposition"] || "enforce"}`);
-    if (report["script-sample"]) {
-      console.warn(`  Script Sample  : ${report["script-sample"].substring(0, 120)}`);
-    }
-    console.warn("");
+    logWarn("csp-violation", `${directive} blocked ${blocked}`, {
+      directive,
+      blockedUri: blocked,
+      source,
+      disposition: report["disposition"] || "enforce",
+      documentUri: report["document-uri"],
+      scriptSample: report["script-sample"]?.substring(0, 120),
+    });
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("[CSP Report] Failed to parse report:", error);
+    logError("csp-violation", "Failed to parse report", error);
     return NextResponse.json({ error: "Invalid report" }, { status: 400 });
   }
 }
@@ -126,10 +110,8 @@ export async function GET() {
   const denied = debugAccessDeniedResponse(user);
   if (denied) return denied;
 
-  // Return recent CSP violations for the debug page (authenticated users only)
   return NextResponse.json({
-    violations: recentCspViolations,
-    count: recentCspViolations.length,
+    note: 'CSP violations are written to server logs with the "[csp-violation]" prefix; per-instance memory cannot aggregate them on serverless.',
   });
 }
 

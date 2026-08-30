@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useId } from "react";
-import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  appOverlayDialogLightboxClassName,
+  appOverlayLightboxMediaClassName,
+} from "@/lib/app-layout";
 import { cn } from "@/lib/utils";
 
 export interface ImageLightboxProps {
@@ -11,46 +20,40 @@ export interface ImageLightboxProps {
   onClose: () => void;
 }
 
+/**
+ * Full-resolution media viewer built on the shared base-ui Dialog so focus
+ * trap/restore, Escape, and click-outside dismissal come from the primitive.
+ * The near-black backdrop over media is a sanctioned literal-alpha exception.
+ */
 export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
-  const labelId = useId();
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={labelId}
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute top-4 right-4 flex size-9 items-center justify-center rounded-sm border border-white/20 bg-black/50 text-white hover:bg-white/10 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
-        aria-label="Close full resolution image"
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-black/90 dark:bg-black/90 supports-backdrop-filter:backdrop-blur-none"
+        className={appOverlayDialogLightboxClassName}
       >
-        <X className="size-5" />
-      </button>
-      <img
-        id={labelId}
-        src={src}
-        alt={alt}
-        className={cn(
-          "block h-auto w-auto max-w-full object-contain",
-          "max-h-[min(92dvh,calc(100dvh-4rem))]"
-        )}
-        onClick={(e) => e.stopPropagation()}
-      />
-    </div>,
-    document.body
+        <DialogTitle className="sr-only">{alt}</DialogTitle>
+        <DialogClose
+          aria-label="Close full resolution image"
+          className="fixed top-4 right-4 flex size-9 items-center justify-center rounded-sm border border-white/20 bg-black/50 text-white hover:bg-white/10 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+        >
+          <X className="size-5" />
+        </DialogClose>
+        <img
+          src={src}
+          alt={alt}
+          className={cn(
+            "block h-auto w-auto object-contain",
+            appOverlayLightboxMediaClassName
+          )}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { FetchJsonError, sendJson, type JsonValue } from "@/lib/fetch-json";
@@ -295,6 +295,12 @@ export function useOrbitScan(): OrbitScanHandle {
     [decisionsByBookmarkId]
   );
 
+  // Refuse overlapping scans synchronously (double-click, digest + manual
+  // trigger racing) and tag each request so a superseded response can never
+  // overwrite newer state.
+  const scanInFlightRef = useRef(false);
+  const scanRequestIdRef = useRef(0);
+
   const scanNow = useCallback(
     async (bookmarkIds: string[], batch?: OrbitScanBatchMetadata) => {
       const unique = Array.from(new Set(bookmarkIds));
@@ -308,6 +314,10 @@ export function useOrbitScan(): OrbitScanHandle {
         });
         return null;
       }
+
+      if (scanInFlightRef.current) return null;
+      scanInFlightRef.current = true;
+      const requestId = ++scanRequestIdRef.current;
 
       setScanning(true);
       setError(null);
@@ -331,6 +341,7 @@ export function useOrbitScan(): OrbitScanHandle {
               : {}),
           },
         });
+        if (requestId !== scanRequestIdRef.current) return null;
         setPlan(result);
         setScannedBookmarks(result.scannedBookmarks ?? []);
         setDismissed(new Set());
@@ -349,7 +360,9 @@ export function useOrbitScan(): OrbitScanHandle {
           err,
           "Could not scan Orbit with Grok"
         );
-        setError(failure);
+        if (requestId === scanRequestIdRef.current) {
+          setError(failure);
+        }
         trackFlywheelEvent("orbit.scan.failed", {
           durationMs: Date.now() - startedAt,
           requestedCount: unique.length,
@@ -359,7 +372,10 @@ export function useOrbitScan(): OrbitScanHandle {
         });
         throw err;
       } finally {
-        setScanning(false);
+        if (requestId === scanRequestIdRef.current) {
+          scanInFlightRef.current = false;
+          setScanning(false);
+        }
       }
     },
     []

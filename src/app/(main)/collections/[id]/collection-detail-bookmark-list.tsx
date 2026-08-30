@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type RefObject } from "react";
+import { useCallback, useMemo, type RefObject } from "react";
 import { ChevronDown, ChevronUp, FolderOpen, Layers } from "lucide-react";
 
 import { BookmarkList } from "@/app/(main)/dashboard/bookmark-list";
@@ -63,6 +63,15 @@ export function CollectionDetailBookmarkList({
     () => sortedItems.map((item) => item.bookmark),
     [sortedItems]
   );
+  // Stable identity so memoized BookmarkCards don't re-render on every parent
+  // render; adapts BookmarkList's `string | string[]` delete signature.
+  const handleRemoveIds = useCallback(
+    (bookmarkIds: string | string[]) => {
+      const id = Array.isArray(bookmarkIds) ? bookmarkIds[0] : bookmarkIds;
+      if (id) onRemoveItem(id);
+    },
+    [onRemoveItem]
+  );
   const showReorderControls = canReorder && !isSyncedFromX && viewMode === "feed";
 
   if (sortedItems.length === 0) {
@@ -114,7 +123,7 @@ export function CollectionDetailBookmarkList({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
+                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
                 disabled={reordering || (page === 1 && index === 0)}
                 onClick={() => onMoveItem(index, -1)}
                 aria-label="Move bookmark up"
@@ -125,7 +134,7 @@ export function CollectionDetailBookmarkList({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="h-6 w-6 border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground sm:h-7 sm:w-7"
+                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
                 disabled={
                   reordering ||
                   (page === totalPages && index === sortedItems.length - 1)
@@ -144,7 +153,7 @@ export function CollectionDetailBookmarkList({
                 selected={activeBookmarkId === item.bookmark.id}
                 onSelect={onSelectBookmark}
                 onOpenExpanded={onOpenExpanded}
-                onDelete={() => onRemoveItem(item.bookmark.id)}
+                onDelete={onRemoveItem}
                 deleteLabel="Remove from collection"
               />
             </div>
@@ -171,7 +180,7 @@ export function CollectionDetailBookmarkList({
       onAddToCollection={() => {}}
       onAddNote={() => {}}
       onOpenExpanded={onOpenExpanded}
-      onDelete={isSyncedFromX ? undefined : (id) => onRemoveItem(id as string)}
+      onDelete={isSyncedFromX ? undefined : handleRemoveIds}
       deleteLabel={isSyncedFromX ? undefined : "Remove from collection"}
       disableVirtualization
     />

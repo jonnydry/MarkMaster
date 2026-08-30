@@ -11,6 +11,7 @@ import {
 } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
+import { appFeedMediaCapClassName } from "@/lib/app-layout";
 import { BOOKMARK_FEED_MAX_WIDTH_PX } from "@/lib/bookmark-feed-layout";
 import {
   type BookmarkMediaJson,
@@ -57,7 +58,7 @@ const LAYOUT: Record<
     shellClass: "mt-3 overflow-hidden rounded-sm border border-hairline-soft bg-transparent",
     gridClass: (n) => (n === 1 ? "" : "grid grid-cols-2 gap-0.5"),
     imageSizes: `(max-width: 768px) 100vw, ${BOOKMARK_FEED_MAX_WIDTH_PX}px`,
-    singleTileClass: "max-h-[70vh] object-contain",
+    singleTileClass: cn(appFeedMediaCapClassName, "object-contain"),
     multiTileClass: "aspect-square",
     compactTileClass: "",
   },

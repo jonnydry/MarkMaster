@@ -129,6 +129,8 @@ describe("OrbitMapCanvasHost DPR resize bridge", () => {
           contentRect: { width: 320, height: 180 } as DOMRectReadOnly,
         } as ResizeObserverEntry,
       ], ResizeObserverMock.instances[0] as unknown as ResizeObserver);
+      // RESIZE is coalesced onto a trailing animation frame.
+      vi.runOnlyPendingTimers();
     });
 
     expect(worker.postMessage).toHaveBeenCalledWith(
@@ -158,6 +160,8 @@ describe("OrbitMapCanvasHost DPR resize bridge", () => {
 
     await act(async () => {
       window.dispatchEvent(new Event("resize"));
+      // RESIZE is coalesced onto a trailing animation frame.
+      vi.runOnlyPendingTimers();
     });
 
     expect(worker.postMessage).toHaveBeenCalledWith(

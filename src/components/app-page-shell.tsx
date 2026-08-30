@@ -61,17 +61,23 @@ export function AppPageShell({
           {mainTop}
           <div
             ref={scrollRef}
+            id="app-main-content"
             className={cn(appPageScrollClassName, scrollClassName)}
           >
             {children}
           </div>
         </>
       ) : (
-        <div className={cn(mainColumnClassName, mainClassName)} {...mainProps}>
+        <div
+          className={cn(mainColumnClassName, mainClassName)}
+          {...mainProps}
+          id={layout === "column" ? "app-main-content" : undefined}
+        >
           {mainTop}
           {layout === "scroll" ? (
             <div
               ref={scrollRef}
+              id="app-main-content"
               className={cn(appPageScrollClassName, scrollClassName)}
             >
               {children}

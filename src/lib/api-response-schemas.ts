@@ -43,8 +43,9 @@ export const bookmarkWithRelationsSchema = v.looseObject({
 
 export const bookmarkListResponseSchema = v.looseObject({
   bookmarks: v.array(bookmarkWithRelationsSchema),
-  total: v.number(),
-  totalPages: v.number(),
+  // Absent on cursor (keyset) pages — the client carries page-1 totals forward.
+  total: v.optional(v.number()),
+  totalPages: v.optional(v.number()),
   nextCursor: v.optional(v.string()),
   page: v.optional(v.number()),
   personalBoostAuthors: v.optional(v.array(v.string())),
@@ -71,6 +72,7 @@ export const collectionWithCountSchema = v.object({
   type: collectionTypeSchema,
   isPublic: v.boolean(),
   shareSlug: v.nullable(v.string()),
+  shareExpiresAt: v.nullable(v.string()),
   externalSource: v.nullable(v.string()),
   externalSourceId: v.nullable(v.string()),
   createdAt: v.string(),
@@ -219,6 +221,7 @@ export const collectionDetailSchema = v.object({
   type: v.string(),
   isPublic: v.boolean(),
   shareSlug: v.nullable(v.string()),
+  shareExpiresAt: v.nullable(v.string()),
   externalSource: v.nullable(v.string()),
   externalSourceId: v.nullable(v.string()),
   items: v.array(
@@ -241,6 +244,7 @@ export const shareContentSchema = v.object({
   xIntentUrl: v.string(),
   collectionName: v.string(),
   itemCount: v.number(),
+  shareExpiresAt: v.nullable(v.string()),
 }) as unknown as v.GenericSchema<unknown, ShareContent>;
 
 export const bookmarkFocusResponseSchema = v.object({

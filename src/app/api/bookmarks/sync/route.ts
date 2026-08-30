@@ -7,6 +7,7 @@ import {
   ACTIVE_SYNC_STATUSES,
   enqueueSyncRun,
   kickSyncWorker,
+  peekSyncRunGate,
   STALE_SYNC_WINDOW_MS,
   syncRunSelect,
   type SyncRunSnapshot,
@@ -127,6 +128,19 @@ export async function POST(req: Request) {
     if (parsed.data.includeFolders !== undefined) {
       includeFolders = parsed.data.includeFolders;
     }
+  }
+
+  // Cheap read-only gate first: a 409/429 rejection should not consume the
+  // user's sync rate-limit token. enqueueSyncRun re-checks under a lock.
+  const gate = await peekSyncRunGate(user.id);
+  if (gate) {
+    if ("conflict" in gate) {
+      return NextResponse.json(
+        { error: "A sync is already running.", currentRun: gate.conflict },
+        { status: 409 }
+      );
+    }
+    return syncCooldownResponse(gate.cooldown.retryUntil, gate.cooldown.latestRun);
   }
 
   const [rateLimitResult, globalResult] = await Promise.all([

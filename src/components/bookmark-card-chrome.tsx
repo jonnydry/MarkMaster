@@ -99,7 +99,7 @@ export function BookmarkTagChip({
       }}
       title={title ?? name}
       className={cn(
-        "inline-flex h-5 max-w-full items-center gap-1 px-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        "relative inline-flex h-5 max-w-full items-center gap-1 px-1.5 text-2xs font-medium text-muted-foreground transition-colors after:absolute after:-inset-x-1 after:-inset-y-3 hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         density === "strong" ? "surface-inset-strong" : "surface-inset",
         uppercase ? "uppercase tracking-[0.08em]" : "normal-case",
         className

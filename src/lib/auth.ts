@@ -1,8 +1,6 @@
 import NextAuth from "next-auth";
 import Twitter from "next-auth/providers/twitter";
 import { logError } from "@/lib/logger";
-import { prisma } from "./prisma";
-import { decrypt } from "./encryption";
 import {
   authJwtCallback,
   authSessionCallback,
@@ -178,24 +176,6 @@ export async function getDbUser(): Promise<DbUser | null> {
     return session?.dbUser ?? null;
   } catch (e) {
     logError("auth", "getDbUser failed", e);
-    return null;
-  }
-}
-
-export async function getUserTokens(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
-  });
-  if (!user) return null;
-  try {
-    return {
-      accessToken: decrypt(user.accessToken),
-      refreshToken: decrypt(user.refreshToken),
-      tokenExpiresAt: user.tokenExpiresAt,
-    };
-  } catch (e) {
-    logError("auth", "getUserTokens decrypt failed", e);
     return null;
   }
 }

@@ -80,7 +80,7 @@ export function HighlightCard({
 
   const feedbackControls =
     feedback === "good" ? (
-      <span className="text-emerald-400/90">
+      <span className="text-success">
         You marked Great
         <button
           type="button"
@@ -95,7 +95,7 @@ export function HighlightCard({
         </button>
       </span>
     ) : feedback === "not_relevant" ? (
-      <span className="text-amber-400/90">
+      <span className="text-amber-600 dark:text-amber-300">
         Not relevant to you
         <button
           type="button"
@@ -119,7 +119,7 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Boosted for future Highlights & Digests");
           }}
-          className="text-emerald-300 hover:text-emerald-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+          className="text-success hover:text-success/80 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Good
         </button>
@@ -132,7 +132,7 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Deprioritized in future Highlights");
           }}
-          className="text-amber-300 hover:text-amber-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+          className="text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Not relevant
         </button>
@@ -177,7 +177,7 @@ export function HighlightCard({
             <span
               className={cn(
                 "rounded-sm px-1.5 py-px",
-                "border border-amber-400/20 bg-amber-400/10 text-2xs uppercase tracking-wider text-amber-200"
+                "border border-amber-400/20 bg-amber-400/10 text-2xs uppercase tracking-wider text-amber-700 dark:text-amber-200"
               )}
               title={
                 itemLabel.includes("Resurfaced")
@@ -189,7 +189,7 @@ export function HighlightCard({
             </span>
           ) : null}
         </div>
-        <span className={cn(t.data, "text-2xs font-bold text-muted-foreground/55")}>
+        <span className={cn(t.data, "text-2xs font-bold text-muted-foreground")}>
           #{index + 1}
         </span>
       </div>
@@ -207,8 +207,8 @@ export function HighlightCard({
       <div
         className={cn(
           isCarouselLayout
-            ? "mt-1.5 line-clamp-1 text-2xs text-muted-foreground/65"
-            : "mt-1 text-2xs text-muted-foreground/70",
+            ? "mt-1.5 line-clamp-1 text-2xs text-muted-foreground"
+            : "mt-1 text-2xs text-muted-foreground",
           t.monoNative && t.label,
           "normal-case"
         )}
@@ -258,7 +258,7 @@ export function HighlightCard({
         </div>
         <span
           className={cn(
-            "shrink-0 text-2xs text-muted-foreground/75",
+            "shrink-0 text-2xs text-muted-foreground",
             isCarouselLayout
               ? "normal-case tracking-normal"
               : "uppercase tracking-[0.08em]",
@@ -272,7 +272,7 @@ export function HighlightCard({
       {isCarouselLayout ? (
         <div
           className={cn(
-            "mt-2 flex items-center justify-between gap-3 text-2xs uppercase tracking-[0.08em] text-muted-foreground/70",
+            "mt-2 flex items-center justify-between gap-3 text-2xs uppercase tracking-[0.08em] text-muted-foreground",
             t.monoNative && t.label
           )}
           onClick={(e) => e.stopPropagation()}
@@ -285,7 +285,7 @@ export function HighlightCard({
           {reviewButton ? <div className="mt-1">{reviewButton}</div> : null}
           <div
             className={cn(
-              "mt-1.5 flex items-center gap-2 text-2xs uppercase tracking-[0.08em] text-muted-foreground/70",
+              "mt-1.5 flex items-center gap-2 text-2xs uppercase tracking-[0.08em] text-muted-foreground",
               t.monoNative && t.label
             )}
             onClick={(e) => e.stopPropagation()}

@@ -17,6 +17,7 @@ import {
   useSurfaceKeyboardShortcuts,
   type KeyboardShortcutGroup,
 } from "@/hooks/use-keyboard-shortcuts";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import {
   buildCollectionsSummary,
@@ -25,9 +26,13 @@ import {
   splitCollections,
   type CollectionFilter,
 } from "@/lib/collections-presentation";
-import { sendJson } from "@/lib/fetch-json";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
+import { MAX_BOOKMARK_TARGETS } from "@/lib/validations";
+import type { CollectionWithCount } from "@/types";
+
+const UNDO_TOAST_DURATION_MS = 10_000;
 
 export const COLLECTION_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
@@ -181,13 +186,90 @@ export function useCollectionsPage() {
     [queryClient]
   );
 
+  const restoreDeletedCollection = useCallback(
+    async (snapshot: CollectionWithCount, bookmarkIds: string[]) => {
+      try {
+        const restored = await sendJson<{ id: string }>("/api/collections", {
+          method: "POST",
+          body: {
+            name: snapshot.name,
+            description: snapshot.description ?? "",
+            isPublic: snapshot.isPublic,
+          },
+        });
+        for (let i = 0; i < bookmarkIds.length; i += MAX_BOOKMARK_TARGETS) {
+          await sendJson(`/api/collections/${restored.id}/items`, {
+            method: "POST",
+            body: { bookmarkIds: bookmarkIds.slice(i, i + MAX_BOOKMARK_TARGETS) },
+          });
+        }
+        await invalidateCollectionsQuery(queryClient);
+        toast.success(`Restored "${snapshot.name}"`);
+      } catch (restoreError) {
+        toast.error(
+          restoreError instanceof Error
+            ? restoreError.message
+            : "Could not restore collection"
+        );
+      }
+    },
+    [queryClient]
+  );
+
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm("Delete this collection? This cannot be undone.")) return;
+      const confirmed = await confirmDialog({
+        title: "Delete this collection?",
+        description: "Bookmarks inside it stay in your library.",
+        confirmLabel: "Delete collection",
+        destructive: true,
+      });
+      if (!confirmed) return;
+
+      // The API hard-deletes the collection and its item rows, so capture the
+      // metadata and full item list up front to power the undo toast.
+      const snapshot = collections.find((collection) => collection.id === id);
+      let undoState: {
+        snapshot: CollectionWithCount;
+        bookmarkIds: string[];
+      } | null = null;
+      if (snapshot) {
+        try {
+          const bookmarkIds: string[] = [];
+          let page = 1;
+          let totalPages = 1;
+          do {
+            const detail = await fetchJson<{
+              items: { bookmark: { id: string } }[];
+              totalPages: number;
+            }>(`/api/collections/${id}?page=${page}&limit=100`);
+            bookmarkIds.push(...detail.items.map((item) => item.bookmark.id));
+            totalPages = detail.totalPages;
+            page += 1;
+          } while (page <= totalPages);
+          undoState = { snapshot, bookmarkIds };
+        } catch {
+          // Snapshot fetch failed — still delete, just without offering undo.
+        }
+      }
+
       try {
         await sendJson(`/api/collections/${id}`, { method: "DELETE" });
         await invalidateCollectionsQuery(queryClient);
-        toast.success("Collection deleted");
+        if (undoState) {
+          const { snapshot: deleted, bookmarkIds } = undoState;
+          toast.success("Collection deleted", {
+            duration: UNDO_TOAST_DURATION_MS,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void restoreDeletedCollection(deleted, bookmarkIds);
+              },
+            },
+          });
+        } else {
+          toast.success("Collection deleted");
+        }
       } catch (deleteError) {
         toast.error(
           deleteError instanceof Error
@@ -196,7 +278,7 @@ export function useCollectionsPage() {
         );
       }
     },
-    [queryClient]
+    [collections, queryClient, restoreDeletedCollection]
   );
 
   const clearCollectionFilters = useCallback(() => {

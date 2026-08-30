@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { cache, type ReactElement } from "react";
 import { Prisma } from "@prisma/client";
@@ -10,6 +11,11 @@ import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { buttonVariantClassName } from "@/lib/button-variants";
 import { prisma } from "@/lib/prisma";
+import {
+  PUBLIC_SHARE_REVALIDATE_SECONDS,
+  publicShareCacheTag,
+} from "@/lib/public-share-cache";
+import { isShareLinkExpired } from "@/lib/share-content";
 import { AppPublicPage } from "@/components/app-page-shell";
 import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
@@ -47,63 +53,118 @@ const publicBookmarkSelect = {
   },
 } satisfies Prisma.BookmarkSelect;
 
-const getPublicCollectionShell = cache(async (slug: string) => {
-  return prisma.collection.findFirst({
-    where: {
-      shareSlug: slug,
-      isPublic: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      user: {
-        select: {
-          username: true,
-          displayName: true,
-          profileImageUrl: true,
+// unstable_cache gives cross-request data caching (tagged per slug, expired
+// on publish/unpublish and collection edits); the React cache() wrapper on the
+// shell dedupes the generateMetadata + page calls within a single request.
+const getPublicCollectionShell = cache(async (slug: string) =>
+  unstable_cache(
+    async () =>
+      prisma.collection.findFirst({
+        where: {
+          shareSlug: slug,
+          isPublic: true,
         },
-      },
-      _count: {
-        select: { items: true },
-      },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          shareExpiresAt: true,
+          user: {
+            select: {
+              username: true,
+              displayName: true,
+              profileImageUrl: true,
+            },
+          },
+          _count: {
+            select: { items: true },
+          },
+        },
+      }),
+    ["public-share-shell", slug],
+    {
+      tags: [publicShareCacheTag(slug)],
+      revalidate: PUBLIC_SHARE_REVALIDATE_SECONDS,
+    }
+  )()
+);
+
+// Expiry is checked at request time against the cached value (never inside
+// the cached function), so an expired link 404s immediately instead of
+// serving until the stale cache window closes.
+const getActivePublicCollectionShell = async (slug: string) => {
+  const collection = await getPublicCollectionShell(slug);
+  if (!collection || isShareLinkExpired(collection.shareExpiresAt)) return null;
+  return collection;
+};
+
+const getPublicCollectionStats = async (slug: string, collectionId: string) =>
+  unstable_cache(
+    async () => {
+      const [authorRows, tagRows] = await Promise.all([
+        prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+          SELECT COUNT(DISTINCT b."authorUsername")::bigint AS count
+          FROM "CollectionItem" ci
+          INNER JOIN "Bookmark" b ON b."id" = ci."bookmarkId"
+          WHERE ci."collectionId" = ${collectionId}
+        `),
+        prisma.$queryRaw<
+          { id: string; name: string; color: string; count: bigint }[]
+        >(Prisma.sql`
+          SELECT t."id", t."name", t."color", COUNT(*)::bigint AS count
+          FROM "CollectionItem" ci
+          INNER JOIN "BookmarkTag" bt ON bt."bookmarkId" = ci."bookmarkId"
+          INNER JOIN "Tag" t ON t."id" = bt."tagId"
+          WHERE ci."collectionId" = ${collectionId}
+          GROUP BY t."id", t."name", t."color"
+          ORDER BY count DESC, t."name" ASC
+          LIMIT 6
+        `),
+      ]);
+
+      return {
+        authorCount: Number(authorRows[0]?.count ?? 0),
+        topTags: tagRows.map((tag) => ({
+          ...tag,
+          count: Number(tag.count),
+        })),
+      };
     },
-  });
-});
+    ["public-share-stats", collectionId],
+    {
+      tags: [publicShareCacheTag(slug)],
+      revalidate: PUBLIC_SHARE_REVALIDATE_SECONDS,
+    }
+  )();
 
-const getPublicCollectionStats = cache(async (collectionId: string) => {
-  const [authorRows, tagRows] = await Promise.all([
-    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
-      SELECT COUNT(DISTINCT b."authorUsername")::bigint AS count
-      FROM "CollectionItem" ci
-      INNER JOIN "Bookmark" b ON b."id" = ci."bookmarkId"
-      WHERE ci."collectionId" = ${collectionId}
-    `),
-    prisma.$queryRaw<
-      { id: string; name: string; color: string; count: bigint }[]
-    >(Prisma.sql`
-      SELECT t."id", t."name", t."color", COUNT(*)::bigint AS count
-      FROM "CollectionItem" ci
-      INNER JOIN "BookmarkTag" bt ON bt."bookmarkId" = ci."bookmarkId"
-      INNER JOIN "Tag" t ON t."id" = bt."tagId"
-      WHERE ci."collectionId" = ${collectionId}
-      GROUP BY t."id", t."name", t."color"
-      ORDER BY count DESC, t."name" ASC
-      LIMIT 6
-    `),
-  ]);
-
-  return {
-    authorCount: Number(authorRows[0]?.count ?? 0),
-    topTags: tagRows.map((tag) => ({
-      ...tag,
-      count: Number(tag.count),
-    })),
-  };
-});
+const getPublicCollectionItems = async (
+  slug: string,
+  collectionId: string,
+  page: number
+) =>
+  unstable_cache(
+    async () =>
+      prisma.collectionItem.findMany({
+        where: { collectionId },
+        select: {
+          id: true,
+          bookmark: {
+            select: publicBookmarkSelect,
+          },
+        },
+        orderBy: { sortOrder: "asc" },
+        skip: (page - 1) * PUBLIC_SHARE_PAGE_SIZE,
+        take: PUBLIC_SHARE_PAGE_SIZE,
+      }),
+    ["public-share-items", collectionId, String(page)],
+    {
+      tags: [publicShareCacheTag(slug)],
+      revalidate: PUBLIC_SHARE_REVALIDATE_SECONDS,
+    }
+  )();
 
 async function getPublicCollectionPage(slug: string, requestedPage: number) {
-  const collection = await getPublicCollectionShell(slug);
+  const collection = await getActivePublicCollectionShell(slug);
   if (!collection) return null;
 
   const totalItems = collection._count.items;
@@ -111,19 +172,8 @@ async function getPublicCollectionPage(slug: string, requestedPage: number) {
   const page = Math.min(requestedPage, totalPages);
 
   const [stats, items] = await Promise.all([
-    getPublicCollectionStats(collection.id),
-    prisma.collectionItem.findMany({
-      where: { collectionId: collection.id },
-      select: {
-        id: true,
-        bookmark: {
-          select: publicBookmarkSelect,
-        },
-      },
-      orderBy: { sortOrder: "asc" },
-      skip: (page - 1) * PUBLIC_SHARE_PAGE_SIZE,
-      take: PUBLIC_SHARE_PAGE_SIZE,
-    }),
+    getPublicCollectionStats(slug, collection.id),
+    getPublicCollectionItems(slug, collection.id, page),
   ]);
 
   return {
@@ -146,7 +196,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const collection = await getPublicCollectionShell(slug);
+  const collection = await getActivePublicCollectionShell(slug);
 
   if (!collection) {
     return {

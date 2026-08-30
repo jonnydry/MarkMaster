@@ -40,12 +40,7 @@ export function OrbitScanFailureNotice({
       )}
     >
       <div className="flex min-w-0 gap-3">
-        <div
-          className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm border",
-            "border-hairline-soft bg-surface-2/70 dark:border-white/12 dark:bg-black/15"
-          )}
-        >
+        <div className="surface-inset-strong mt-0.5 flex size-8 shrink-0 items-center justify-center">
           <Icon className={cn("size-4", presentation.iconClassName)} />
         </div>
         <div className="min-w-0">
@@ -59,11 +54,11 @@ export function OrbitScanFailureNotice({
             >
               {presentation.label}
             </span>
-            <p className="text-sm font-semibold text-foreground dark:text-white">
+            <p className="text-sm font-semibold text-foreground">
               {error.title}
             </p>
           </div>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground dark:text-white/80">
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {error.message}
           </p>
           <p className={cn("mt-1 text-xs leading-5", orbitMetaMuted())}>
@@ -77,7 +72,7 @@ export function OrbitScanFailureNotice({
           type="button"
           size="sm"
           variant="outline"
-          className="h-9 rounded-sm border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft dark:border-white/20 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+          className="surface-inset-strong h-9 text-foreground hover:bg-accent-soft"
           disabled={scanning || retryTargetCount === 0}
           onClick={onRetry}
         >
@@ -94,7 +89,7 @@ export function OrbitScanFailureNotice({
             href={error.recoveryHref}
             className={cn(
               buttonVariants({ size: "sm", variant: "outline" }),
-              "h-9 rounded-sm border-hairline-soft bg-surface-2/70 text-foreground hover:bg-accent-soft dark:border-white/25 dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/[0.12]"
+              "surface-inset-strong h-9 text-foreground hover:bg-accent-soft"
             )}
           >
             <Settings2 className="size-3.5" />

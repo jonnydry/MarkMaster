@@ -26,9 +26,23 @@ export function invalidateTagsQuery(queryClient: QueryClient) {
   ]);
 }
 
-/** Tag sidebar + orbit graph after bookmark tag attach/detach (list rows are optimistic). */
+/**
+ * Tag sidebar + orbit graph + collection-detail rows after bookmark tag
+ * attach/detach (list rows are optimistic).
+ */
 export function invalidateBookmarkTagSideEffects(queryClient: QueryClient) {
-  return invalidateTagsQuery(queryClient);
+  return Promise.all([
+    invalidateTagsQuery(queryClient),
+    queryClient.invalidateQueries({ queryKey: ["collection"] }),
+  ]);
+}
+
+/** Collection-detail rows + analytics notedCount after note create/delete (list rows are optimistic). */
+export function invalidateBookmarkNoteSideEffects(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["collection"] }),
+    queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+  ]);
 }
 
 export function invalidateCollectionsQuery(queryClient: QueryClient) {

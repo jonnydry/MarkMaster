@@ -3,12 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const TEST_KEY =
   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-const prismaMock = vi.hoisted(() => ({
-  user: {
+const prismaMock = vi.hoisted(() => {
+  const user = {
     findUnique: vi.fn(),
     update: vi.fn(),
-  },
-}));
+  };
+  return {
+    user,
+    // Interactive transaction: run the callback against a tx that shares the
+    // user mock and accepts the advisory-lock $executeRaw call.
+    $transaction: vi.fn(
+      async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ user, $executeRaw: vi.fn(async () => 0) })
+    ),
+  };
+});
 
 const fetchMock = vi.hoisted(() => vi.fn());
 
@@ -127,6 +136,65 @@ describe("getFreshXAccessToken", () => {
       data: { refreshToken: string };
     };
     expect(decrypt(updateArgs.data.refreshToken)).toBe("stable-refresh-token");
+  });
+
+  it("collapses concurrent refreshes into a single token exchange", async () => {
+    const { encrypt } = await import("./encryption");
+    const expired = {
+      accessToken: encrypt("expired-access-token"),
+      tokenExpiresAt: new Date(Date.now() - 1_000),
+    };
+    prismaMock.user.findUnique.mockResolvedValue({
+      ...expired,
+      refreshToken: encrypt("refresh-token"),
+    });
+
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "fresh-access-token",
+          refresh_token: "fresh-refresh-token",
+          expires_in: 7200,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    prismaMock.user.update.mockResolvedValue({});
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    const [a, b] = await Promise.all([
+      getFreshXAccessToken("user-1"),
+      getFreshXAccessToken("user-1"),
+    ]);
+
+    expect(a).toBe("fresh-access-token");
+    expect(b).toBe("fresh-access-token");
+    // Both callers share one in-flight refresh: one exchange, one DB write.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(prismaMock.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the exchange when another holder refreshed while waiting for the lock", async () => {
+    const { encrypt } = await import("./encryption");
+    prismaMock.user.findUnique
+      // Initial read: token looks expired.
+      .mockResolvedValueOnce({
+        accessToken: encrypt("expired-access-token"),
+        tokenExpiresAt: new Date(Date.now() - 1_000),
+      })
+      // Re-read under the advisory lock: a concurrent holder already refreshed.
+      .mockResolvedValueOnce({
+        accessToken: encrypt("already-refreshed-token"),
+        refreshToken: encrypt("rotated-refresh-token"),
+        tokenExpiresAt: new Date(Date.now() + 2 * 60 * 60_000),
+      });
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    const token = await getFreshXAccessToken("user-1");
+
+    expect(token).toBe("already-refreshed-token");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
   it("throws when the refresh endpoint returns an error", async () => {

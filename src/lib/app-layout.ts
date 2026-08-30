@@ -77,6 +77,26 @@ export const appOverlayDialogGridReviewClassName = cn(
   "lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[minmax(0,1fr)]"
 );
 
+/** Scrollable standard dialog content — height capped via the overlay inset. */
+export const appOverlayDialogScrollClassName =
+  "max-h-[min(80dvh,calc(100dvh-var(--app-overlay-inset-wide)*2))] overflow-y-auto";
+
+/** Image lightbox popup — transparent shell sized to its media. */
+export const appOverlayDialogLightboxClassName = cn(
+  "app-overlay-dialog-lightbox flex w-auto items-center justify-center",
+  "max-w-none border-none bg-transparent p-0 sm:max-w-none"
+);
+
+/** Media inside the image lightbox — capped by viewport via the overlay inset. */
+export const appOverlayLightboxMediaClassName = cn(
+  "max-h-[min(92dvh,calc(100dvh-var(--app-overlay-inset-wide)*2))]",
+  "max-w-[calc(100vw-var(--app-overlay-inset-wide)*2)]"
+);
+
+/** Cap for tall single media tiles in feed cards. */
+export const appFeedMediaCapClassName =
+  "max-h-[min(70dvh,calc(100dvh-var(--app-overlay-inset-wide)*2))]";
+
 /** Floating panel over the Orbit map canvas (mobile rail). */
 export const appOverlayPanelClassName = "app-overlay-panel";
 

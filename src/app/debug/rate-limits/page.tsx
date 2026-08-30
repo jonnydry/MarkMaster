@@ -24,23 +24,8 @@ interface RateLimitResponse {
   limits: RateLimitInfo[];
 }
 
-interface CspViolation {
-  timestamp: string;
-  report: {
-    "blocked-uri"?: string;
-    "effective-directive"?: string;
-    "violated-directive"?: string;
-    "source-file"?: string;
-    "line-number"?: number;
-    "column-number"?: number;
-    "disposition"?: string;
-    "script-sample"?: string;
-  };
-}
-
 interface CspReportResponse {
-  violations: CspViolation[];
-  count: number;
+  note: string;
 }
 
 export default function RateLimitsDebugPage() {
@@ -207,54 +192,16 @@ export default function RateLimitsDebugPage() {
         <div className="mb-4 flex items-center gap-2">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
-            Recent CSP Violations
+            CSP Violations
           </h2>
-          {cspData && (
-            <span className="text-xs rounded bg-yellow-100 px-2 py-0.5 text-yellow-800">
-              {cspData.count} recent
-            </span>
-          )}
         </div>
 
-        {cspData && cspData.violations.length > 0 ? (
-          <div className="space-y-3">
-            {cspData.violations.slice(0, 20).map((violation, index) => {
-              const r = violation.report;
-              return (
-                <Card key={index} className="border-yellow-200 bg-yellow-50/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      {r["effective-directive"] || r["violated-directive"] || "Unknown Directive"}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {new Date(violation.timestamp).toLocaleString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-1 text-sm">
-                    <div><strong>Blocked URI:</strong> {r["blocked-uri"] || "—"}</div>
-                    <div><strong>Source:</strong> {r["source-file"] ? `${r["source-file"]}:${r["line-number"]}:${r["column-number"]}` : "inline/eval"}</div>
-                    {r["script-sample"] && (
-                      <div className="truncate text-xs text-muted-foreground">
-                        Sample: <code>{r["script-sample"]}</code>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-            {cspData.violations.length > 20 && (
-              <p className="text-center text-xs text-muted-foreground">
-                Showing latest 20 of {cspData.count} violations.
-              </p>
-            )}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="py-6 text-center text-muted-foreground">
-              No CSP violations reported yet. This is good!
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="py-6 text-center text-muted-foreground">
+            {cspData?.note ??
+              'CSP violations are written to server logs with the "[csp-violation]" prefix.'}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="text-center text-xs text-muted-foreground">

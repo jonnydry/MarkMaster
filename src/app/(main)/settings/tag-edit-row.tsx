@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PRESET_COLORS } from "@/lib/constants";
+import { PRESET_COLORS, getColorName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { TagWithCount } from "@/types";
 
@@ -19,7 +19,7 @@ const ColorSwatch = React.memo(function ColorSwatch({
   return (
     <button
       type="button"
-      aria-label={`Select color ${color}`}
+      aria-label={`Select color ${getColorName(color)}`}
       aria-pressed={selected}
       className={cn(
         "size-6 rounded-full border transition-transform motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",

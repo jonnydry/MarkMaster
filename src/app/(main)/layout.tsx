@@ -15,6 +15,12 @@ export default async function MainLayout({
   if (!session.dbUser) redirect("/login?error=SessionUnavailable");
   return (
     <div className={cn(appFixedViewportClassName, "flex flex-col")}>
+      <a
+        href="#app-main-content"
+        className="sr-only rounded-sm focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:border focus:border-hairline-strong focus:bg-popover focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-popover-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+      >
+        Skip to content
+      </a>
       <QueryProvider>
         <AuthSessionProvider session={session}>
           <AuthenticatedShell>{children}</AuthenticatedShell>

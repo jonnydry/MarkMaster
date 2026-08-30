@@ -6,6 +6,23 @@ import type { SortField, SortDirection, MediaFilter } from "@/types";
 const PAGE_LIMIT = "20";
 const DEBOUNCE_MS = 300;
 
+/**
+ * Mirrors the server's `tokenizeBookmarkSearch` minimum term length (see
+ * `src/lib/bookmark-search.ts`, not imported here to keep Prisma out of the
+ * client bundle). Searches with no usable term are dropped server-side, so
+ * don't bother sending them.
+ */
+const MIN_SEARCH_TERM_LENGTH = 2;
+
+function hasSearchableTerm(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .some(
+      (term) => term.replace(/^[@#]+/, "").trim().length >= MIN_SEARCH_TERM_LENGTH
+    );
+}
+
 type BookmarkFilterInitialState = {
   selectedTags?: string[];
   authorFilter?: string;
@@ -51,7 +68,9 @@ export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
   const setSearch = useCallback((v: string) => {
     setSearchImmediate(v);
     clearTimeout(debounceRef.current);
-    if (v === "") {
+    if (!hasSearchableTerm(v)) {
+      // Covers "" and searches the server would drop entirely (all terms
+      // below the minimum length) — skip the pointless refetch.
       setDebouncedSearch("");
     } else {
       debounceRef.current = setTimeout(() => {
@@ -111,6 +130,9 @@ export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
       tagFilter: selectedTags.join(","),
       ...(dateFrom && { dateFrom }),
       ...(dateTo && { dateTo }),
+      ...((dateFrom || dateTo) && {
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      }),
       ...(collectionId && { collectionId }),
       ...(bookmarkId && { bookmarkId }),
     });
@@ -239,7 +261,7 @@ export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
       clearFilters,
       resetPage,
       queryString,
-      isSearchPending: search !== debouncedSearch,
+      isSearchPending: hasSearchableTerm(search) && search !== debouncedSearch,
     }),
     [
       search,

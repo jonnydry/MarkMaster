@@ -13,6 +13,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { TypographyFontLoader } from "@/components/typography-font-loader";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { toast } from "@/lib/toast";
 import {
   type ColorThemeId,
   resolveColorTheme,
@@ -280,6 +282,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 }
 
+const OFFLINE_TOAST_ID = "markmaster-offline";
+
+/**
+ * Persistent (dismissable) toast while the browser is offline, cleared on
+ * reconnect. Renders nothing itself.
+ */
+function OfflineIndicator() {
+  const online = useOnlineStatus();
+
+  useEffect(() => {
+    if (online) {
+      toast.dismiss(OFFLINE_TOAST_ID);
+      return;
+    }
+    toast.warning("You're offline", {
+      id: OFFLINE_TOAST_ID,
+      description: "Syncing and saving will fail until the connection returns.",
+      duration: Infinity,
+      closeButton: true,
+    });
+  }, [online]);
+
+  return null;
+}
+
 /** React Query — scoped to authenticated (main) routes only. */
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -292,7 +319,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <OfflineIndicator />
+      {children}
+    </QueryClientProvider>
   );
 }
 

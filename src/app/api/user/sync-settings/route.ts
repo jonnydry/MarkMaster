@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/request-body";
 
 const syncSettingsBodySchema = z.object({
   syncXFolders: z.boolean(),
@@ -14,14 +15,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const body = await readJsonBody(req);
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: body.status });
   }
 
-  const parsed = syncSettingsBodySchema.safeParse(body);
+  const parsed = syncSettingsBodySchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "syncXFolders must be a boolean" },

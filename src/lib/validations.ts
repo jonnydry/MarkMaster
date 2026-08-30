@@ -47,6 +47,28 @@ const dateOnlySchema = z
   .trim()
   .refine(isValidDateOnly, "Date must use YYYY-MM-DD format");
 
+const TIME_ZONE_PATTERN = /^[A-Za-z_][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,2}$/;
+
+function isSupportedTimeZone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** IANA zone name (e.g. "America/New_York"); safe to pass as a SQL bind parameter. */
+export const timeZoneSchema = z
+  .string()
+  .trim()
+  .max(64, "Time zone is too long")
+  .regex(TIME_ZONE_PATTERN, "Invalid time zone")
+  .refine(isSupportedTimeZone, "Unknown time zone");
+
+/** Joins a YYYY-MM-DD filter value with its IANA zone: "2026-08-30@America/New_York". */
+export const DATE_FILTER_TIME_ZONE_SEPARATOR = "@";
+
 const tagFilterSchema = z
   .string()
   .trim()
@@ -134,6 +156,13 @@ export const patchCollectionSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   isPublic: z.boolean().optional(),
+  /**
+   * Share-link lifetime in days; null means the link never expires. The
+   * server computes the absolute expiry from now — clients never send dates.
+   */
+  shareExpiryDays: z
+    .union([z.literal(7), z.literal(30), z.literal(90), z.null()])
+    .optional(),
 });
 
 export const addCollectionItemSchema = bookmarkTargetSchema;
@@ -190,6 +219,7 @@ export const bookmarksQuerySchema = z
     tagFilter: tagFilterSchema,
     dateFrom: dateOnlySchema.optional(),
     dateTo: dateOnlySchema.optional(),
+    timeZone: timeZoneSchema.optional(),
     bookmarkId: idSchema.optional(),
     collectionId: idSchema.optional(),
     unaffiliated: booleanQueryFlagSchema,
@@ -250,6 +280,19 @@ export const bookmarksQuerySchema = z
         });
       }
     }
+  })
+  // Fold the zone into the date values so the bookmarks route can pass them
+  // through opaquely; getDateStart/getNextDateStart decode the pair and build
+  // day boundaries in the user's zone.
+  .transform((value) => {
+    if (!value.timeZone || (!value.dateFrom && !value.dateTo)) return value;
+    const withZone = (date: string | undefined) =>
+      date ? `${date}${DATE_FILTER_TIME_ZONE_SEPARATOR}${value.timeZone}` : date;
+    return {
+      ...value,
+      dateFrom: withZone(value.dateFrom),
+      dateTo: withZone(value.dateTo),
+    };
   });
 
 export const exportQuerySchema = z.object({

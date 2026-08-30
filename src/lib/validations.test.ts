@@ -58,4 +58,34 @@ describe("validation schemas", () => {
       }).success
     ).toBe(false);
   });
+
+  it("folds a valid timeZone into date filter values", () => {
+    const parsed = bookmarksQuerySchema.parse({
+      dateFrom: "2026-05-01",
+      dateTo: "2026-05-02",
+      timeZone: "America/New_York",
+    });
+
+    expect(parsed.dateFrom).toBe("2026-05-01@America/New_York");
+    expect(parsed.dateTo).toBe("2026-05-02@America/New_York");
+
+    const withoutZone = bookmarksQuerySchema.parse({ dateFrom: "2026-05-01" });
+    expect(withoutZone.dateFrom).toBe("2026-05-01");
+  });
+
+  it("rejects malformed or unknown time zones", () => {
+    expect(
+      bookmarksQuerySchema.safeParse({
+        dateFrom: "2026-05-01",
+        timeZone: "America/New_York'; DROP TABLE --",
+      }).success
+    ).toBe(false);
+
+    expect(
+      bookmarksQuerySchema.safeParse({
+        dateFrom: "2026-05-01",
+        timeZone: "Not/AZone",
+      }).success
+    ).toBe(false);
+  });
 });

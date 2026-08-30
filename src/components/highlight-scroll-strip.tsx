@@ -97,7 +97,7 @@ export function HighlightScrollStrip({
                 tabIndex={-1}
                 onClick={() => scrollToIndex(i)}
                 className={cn(
-                  "h-1.5 rounded-full transition-[width,background-color] duration-150",
+                  "h-1.5 rounded-[2px] transition-[width,background-color] duration-150",
                   i === activeIndex
                     ? "w-4 bg-primary/80"
                     : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50"

@@ -8,7 +8,7 @@ import type { BookmarkWithRelations } from "@/types";
 
 export type PerformanceHighlightsResponse = {
   bookmarks: BookmarkWithRelations[];
-  total: number;
+  total?: number;
   totalPages?: number;
   /** Populated when personalBoost=1: top authors (and tags) from user's organized bookmarks for richer personalization boost (Phase 2 item 7) */
   personalBoostAuthors?: string[];

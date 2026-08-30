@@ -11,6 +11,10 @@ vi.mock("@/lib/upstash-cache", () => ({
   invalidateUserResponseCache: vi.fn(async () => {}),
 }));
 
+vi.mock("@/lib/public-share-cache", () => ({
+  expirePublicShareCache: vi.fn(),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     collection: {
@@ -199,6 +203,117 @@ describe("/api/collections/[id]", () => {
       data: { name: "Renamed" },
     });
     expect(invalidateUserResponseCache).toHaveBeenCalledWith("user-1");
+  });
+
+  it("stamps a future expiry when setting shareExpiryDays on a public collection", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { PATCH } = await import("./route");
+
+    vi.mocked(prisma.collection.findUnique).mockResolvedValue({
+      shareSlug: "slug-1",
+      type: "user_collection",
+      isPublic: true,
+    } as never);
+    vi.mocked(prisma.collection.update).mockResolvedValue({
+      id: "collection-1",
+      shareSlug: "slug-1",
+    } as never);
+
+    const before = Date.now();
+    const response = await PATCH(
+      new NextRequest("http://localhost/api/collections/collection-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareExpiryDays: 7 }),
+      }),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+    const after = Date.now();
+
+    expect(response.status).toBe(200);
+    const updateArgs = vi.mocked(prisma.collection.update).mock.calls[0][0];
+    const shareExpiresAt = (updateArgs.data as { shareExpiresAt: Date }).shareExpiresAt;
+    expect(shareExpiresAt).toBeInstanceOf(Date);
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    expect(shareExpiresAt.getTime()).toBeGreaterThanOrEqual(before + sevenDaysMs);
+    expect(shareExpiresAt.getTime()).toBeLessThanOrEqual(after + sevenDaysMs);
+  });
+
+  it("clears the expiry when shareExpiryDays is null", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { PATCH } = await import("./route");
+
+    vi.mocked(prisma.collection.findUnique).mockResolvedValue({
+      shareSlug: "slug-1",
+      type: "user_collection",
+      isPublic: true,
+    } as never);
+    vi.mocked(prisma.collection.update).mockResolvedValue({
+      id: "collection-1",
+      shareSlug: "slug-1",
+    } as never);
+
+    const response = await PATCH(
+      new NextRequest("http://localhost/api/collections/collection-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareExpiryDays: null }),
+      }),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.collection.update).toHaveBeenCalledWith({
+      where: { id: "collection-1", userId: "user-1" },
+      data: { shareExpiresAt: null },
+    });
+  });
+
+  it("clears the expiry when unpublishing", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { PATCH } = await import("./route");
+
+    vi.mocked(prisma.collection.findUnique).mockResolvedValue({
+      shareSlug: "slug-1",
+      type: "user_collection",
+      isPublic: true,
+    } as never);
+    vi.mocked(prisma.collection.update).mockResolvedValue({
+      id: "collection-1",
+      shareSlug: null,
+    } as never);
+
+    const response = await PATCH(
+      new NextRequest("http://localhost/api/collections/collection-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: false }),
+      }),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.collection.update).toHaveBeenCalledWith({
+      where: { id: "collection-1", userId: "user-1" },
+      data: { isPublic: false, shareSlug: null, shareExpiresAt: null },
+    });
+  });
+
+  it("rejects unsupported shareExpiryDays values", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { PATCH } = await import("./route");
+
+    const response = await PATCH(
+      new NextRequest("http://localhost/api/collections/collection-1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareExpiryDays: 14 }),
+      }),
+      { params: Promise.resolve({ id: "collection-1" }) }
+    );
+
+    expect(response.status).toBe(400);
+    expect(prisma.collection.update).not.toHaveBeenCalled();
   });
 
   it("blocks renaming X-synced folder collections", async () => {

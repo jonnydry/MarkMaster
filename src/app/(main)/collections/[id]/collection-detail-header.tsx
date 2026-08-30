@@ -7,13 +7,72 @@ import {
   Layers,
   Lock,
   Share2,
+  Timer,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { highlightActiveClass } from "@/lib/highlight-chrome";
+import { isShareLinkExpired } from "@/lib/share-content";
 import { cn } from "@/lib/utils";
 import type { CollectionDetail } from "@/hooks/use-collection-detail-page";
+
+export type ShareExpiryDays = 7 | 30 | 90 | null;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function shareExpiryStatusLabel(shareExpiresAt: string | null): string {
+  if (!shareExpiresAt) return "Never expires";
+  if (isShareLinkExpired(shareExpiresAt)) return "Link expired";
+  const remainingDays = Math.ceil(
+    (new Date(shareExpiresAt).getTime() - Date.now()) / DAY_MS
+  );
+  return remainingDays === 1 ? "Expires in 1 day" : `Expires in ${remainingDays} days`;
+}
+
+function ShareExpirySelect({
+  shareExpiresAt,
+  onShareExpiryChange,
+}: {
+  shareExpiresAt: string | null;
+  onShareExpiryChange: (days: ShareExpiryDays) => void;
+}) {
+  return (
+    <Select
+      value={shareExpiresAt ? null : "never"}
+      onValueChange={(value: string | null) => {
+        if (!value) return;
+        onShareExpiryChange(
+          value === "never" ? null : (Number(value) as ShareExpiryDays)
+        );
+      }}
+    >
+      <SelectTrigger
+        size="lg"
+        aria-label="Share link expiry"
+        className={cn(
+          "gap-1.5 border-hairline-soft bg-transparent px-3 text-sm",
+          isShareLinkExpired(shareExpiresAt) && "text-destructive"
+        )}
+      >
+        <Timer className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        {shareExpiryStatusLabel(shareExpiresAt)}
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="never">Never</SelectItem>
+        <SelectItem value="7">7 days</SelectItem>
+        <SelectItem value="30">30 days</SelectItem>
+        <SelectItem value="90">90 days</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
 
 type CollectionDetailHeaderActionsProps = {
   collection: CollectionDetail;
@@ -22,6 +81,7 @@ type CollectionDetailHeaderActionsProps = {
   isUserCollection: boolean;
   onCopyAsCollection: () => void;
   onTogglePublic: () => void;
+  onShareExpiryChange: (days: ShareExpiryDays) => void;
   onCopyShareLink: () => void;
   onShareOnX: () => void;
 };
@@ -33,6 +93,7 @@ export function CollectionDetailHeaderActions({
   isUserCollection,
   onCopyAsCollection,
   onTogglePublic,
+  onShareExpiryChange,
   onCopyShareLink,
   onShareOnX,
 }: CollectionDetailHeaderActionsProps) {
@@ -79,6 +140,10 @@ export function CollectionDetailHeaderActions({
           </Button>
           {collection.isPublic && collection.shareSlug && (
             <>
+              <ShareExpirySelect
+                shareExpiresAt={collection.shareExpiresAt}
+                onShareExpiryChange={onShareExpiryChange}
+              />
               <Button
                 variant="outline"
                 size="lg"
@@ -189,9 +254,10 @@ export function CollectionDetailBackButton({ onBack }: { onBack: () => void }) {
   return (
     <Button
       variant="outline"
-      size="icon"
-      className="size-10 shrink-0 border-hairline-soft bg-transparent"
+      size="icon-xl"
+      className="shrink-0 border-hairline-soft bg-transparent"
       onClick={onBack}
+      aria-label="Back to collections"
     >
       <ArrowLeft className="size-4" />
     </Button>

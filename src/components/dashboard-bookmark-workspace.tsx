@@ -8,6 +8,7 @@ import {
   BookmarkCardSelectionToggle,
   BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
+import { useTypography } from "@/hooks/use-typography";
 import { formatPostDate } from "@/lib/format-metrics";
 import { getMediaImageUrl } from "@/lib/bookmark-media";
 import { cn } from "@/lib/utils";
@@ -196,16 +197,18 @@ export function DashboardBookmarkWorkspace({
   onSelectionChange,
   onTagClick,
 }: DashboardBookmarkWorkspaceProps) {
+  const t = useTypography();
+
   return (
     <section aria-label="Bookmark workspace" className="min-w-0 px-3 pb-3 pt-3">
       <div className="sticky top-[var(--header-height)] z-20 grid grid-cols-1 surface-inset-strong px-3 py-2 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem]">
-        <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span className={cn(t.label, "font-semibold")}>
           Item
         </span>
-        <span className="hidden text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground min-[860px]:block">
+        <span className={cn("hidden min-[860px]:block", t.label, "font-semibold")}>
           Author
         </span>
-        <span className="hidden text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground min-[860px]:block">
+        <span className={cn("hidden min-[860px]:block", t.label, "font-semibold")}>
           Date
         </span>
       </div>

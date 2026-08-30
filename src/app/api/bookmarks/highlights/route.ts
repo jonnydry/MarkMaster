@@ -6,12 +6,15 @@ import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
 
+const MAX_EXCLUDE_IDS = 100;
+
 const highlightsQuerySchema = z.object({
   raw: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   personalBoost: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   limit: z.coerce.number().int().min(1).max(24).default(4),
   excludeIds: z
     .string()
+    .max(4096, "excludeIds is too long")
     .optional()
     .transform((value) =>
       value
@@ -20,7 +23,22 @@ const highlightsQuerySchema = z.object({
             .map((id) => id.trim())
             .filter(Boolean)
         : []
-    ),
+    )
+    .superRefine((ids, ctx) => {
+      if (ids.length > MAX_EXCLUDE_IDS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `At most ${MAX_EXCLUDE_IDS} bookmarks can be excluded at once`,
+        });
+      }
+
+      if (ids.some((id) => id.length > 128)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "excludeIds contains an ID that is too long",
+        });
+      }
+    }),
 });
 
 const performanceScoreSql = Prisma.sql`(

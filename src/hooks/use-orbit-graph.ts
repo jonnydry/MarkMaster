@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
   keepPreviousData,
   useQuery,
-  useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
 
@@ -12,8 +10,17 @@ import { readOrbitGraphPayload } from "@/lib/orbit-graph-payload";
 import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
 import type { OrbitGraphPayload, OrbitGraphScope } from "@/types";
 
-export function orbitGraphQueryKey(scope: OrbitGraphScope = "library") {
-  return [...ORBIT_GRAPH_QUERY_KEY, scope] as const;
+/**
+ * The cached payload varies by BOTH scope and expanded anchors, so both must
+ * be part of the query key. Keying by scope alone let a 304 revalidation
+ * restore a payload from a different expand state (e.g. the collapsed graph
+ * served while the UI believed it loaded an expanded one).
+ */
+export function orbitGraphQueryKey(
+  scope: OrbitGraphScope = "library",
+  expandedAnchors: string[] = []
+) {
+  return [...ORBIT_GRAPH_QUERY_KEY, scope, expandedAnchors.join(",")] as const;
 }
 
 const orbitGraphEtags = new Map<string, string>();
@@ -29,43 +36,21 @@ export function useOrbitGraphQuery(
   scope: OrbitGraphScope = "library",
   expandedAnchors: string[] = []
 ) {
-  const queryClient = useQueryClient();
-  const anchorsRef = useRef(expandedAnchors);
-  const expandKey = expandedAnchors.join(",");
-  const previousRef = useRef({ scope, expandKey });
-
-  const query = useQuery<OrbitGraphPayload>({
-    queryKey: orbitGraphQueryKey(scope),
+  return useQuery<OrbitGraphPayload>({
+    queryKey: orbitGraphQueryKey(scope, expandedAnchors),
     queryFn: ({ client, queryKey }) =>
-      fetchOrbitGraph(scope, anchorsRef.current, {
+      fetchOrbitGraph(scope, expandedAnchors, {
         previous: client.getQueryData<OrbitGraphPayload>(queryKey),
-        requestKey: orbitGraphRequestKey(scope, anchorsRef.current),
+        requestKey: orbitGraphRequestKey(scope, expandedAnchors),
       }),
+    // Expand/collapse changes the key; keep showing the previous graph while
+    // the new state loads instead of flashing empty.
     placeholderData: keepPreviousData,
     staleTime: 30_000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
   });
-
-  useEffect(() => {
-    anchorsRef.current = expandedAnchors;
-    const scopeChanged = previousRef.current.scope !== scope;
-    const expandChanged = previousRef.current.expandKey !== expandKey;
-    previousRef.current = { scope, expandKey };
-    if (scopeChanged || !expandChanged) return;
-
-    void queryClient.fetchQuery({
-      queryKey: orbitGraphQueryKey(scope),
-      queryFn: ({ client, queryKey }) =>
-        fetchOrbitGraph(scope, anchorsRef.current, {
-          previous: client.getQueryData<OrbitGraphPayload>(queryKey),
-          requestKey: orbitGraphRequestKey(scope, anchorsRef.current),
-        }),
-    });
-  }, [expandKey, expandedAnchors, queryClient, scope]);
-
-  return query;
 }
 
 async function fetchOrbitGraph(
@@ -81,7 +66,11 @@ async function fetchOrbitGraph(
     : "";
   const requestKey =
     options?.requestKey ?? orbitGraphRequestKey(scope, expandedAnchors);
-  const ifNoneMatch = orbitGraphEtags.get(requestKey);
+  // Only revalidate with an ETag when we still hold the payload it describes;
+  // otherwise a 304 would leave us with nothing to render.
+  const ifNoneMatch = options?.previous
+    ? orbitGraphEtags.get(requestKey)
+    : undefined;
   const res = await fetch(
     `/api/orbit/graph?scope=${scope}${expandParam}`,
     {
@@ -96,6 +85,9 @@ async function fetchOrbitGraph(
 
   if (res.status === 304) {
     if (options?.previous) return options.previous;
+    // Defensive: shouldn't happen since we only send If-None-Match alongside
+    // a cached payload, but never leave a stale ETag that would 304 forever.
+    orbitGraphEtags.delete(requestKey);
     throw new Error("Orbit graph not modified but no cached payload is available");
   }
 

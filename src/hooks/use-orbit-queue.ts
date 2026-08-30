@@ -11,6 +11,7 @@ import {
 } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
+import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
 import { useOrbitLibraryBootstrap } from "@/hooks/use-orbit-library-bootstrap";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { fetchJson } from "@/lib/fetch-json";
@@ -99,9 +100,10 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
   });
 
   const bookmarks = orbitData?.bookmarks ?? EMPTY_BOOKMARKS;
-  const total = orbitData?.total ?? 0;
+  const carriedTotals = useCarriedListTotals(orbitData);
+  const total = carriedTotals.total;
   const totalPages =
-    orbitView === "all" ? Math.max(orbitData?.totalPages ?? 1, 1) : 1;
+    orbitView === "all" ? Math.max(carriedTotals.totalPages, 1) : 1;
   const bookmarkById = useMemo(() => buildBookmarkByIdMap(bookmarks), [bookmarks]);
 
   const queueIsLoading = isLoading && !orbitData;

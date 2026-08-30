@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
 import { readJsonBody } from "@/lib/request-body";
 import { collectionDetailQuerySchema, patchCollectionSchema } from "@/lib/validations";
+import { expirePublicShareCache } from "@/lib/public-share-cache";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import {
@@ -62,6 +63,7 @@ export async function GET(
       type: true,
       isPublic: true,
       shareSlug: true,
+      shareExpiresAt: true,
       externalSource: true,
       externalSourceId: true,
       createdAt: true,
@@ -165,7 +167,7 @@ export async function PATCH(
 
   const existingCollection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
-    select: { shareSlug: true, type: true },
+    select: { shareSlug: true, type: true, isPublic: true },
   });
 
   if (!existingCollection) {
@@ -190,11 +192,25 @@ export async function PATCH(
     updateData.isPublic = parsed.data.isPublic;
     if (parsed.data.isPublic) {
       if (!existingCollection.shareSlug) {
-        updateData.shareSlug = nanoid(10);
+        updateData.shareSlug = nanoid(16);
       }
     } else {
       updateData.shareSlug = null;
     }
+  }
+
+  // Expiry only exists for public links. Unpublishing always clears it so a
+  // later republish starts fresh; setting a duration recomputes from now.
+  const willBePublic = parsed.data.isPublic ?? existingCollection.isPublic;
+  if (!willBePublic) {
+    if (parsed.data.isPublic === false || parsed.data.shareExpiryDays !== undefined) {
+      updateData.shareExpiresAt = null;
+    }
+  } else if (parsed.data.shareExpiryDays !== undefined) {
+    updateData.shareExpiresAt =
+      parsed.data.shareExpiryDays === null
+        ? null
+        : new Date(Date.now() + parsed.data.shareExpiryDays * 24 * 60 * 60 * 1000);
   }
 
   const collection = await prisma.collection.update({
@@ -203,6 +219,11 @@ export async function PATCH(
   });
 
   await invalidateUserResponseCache(user.id);
+
+  // Expire the public share cache for both the previous slug (unpublish must
+  // revoke immediately) and the current one (rename/description edits).
+  expirePublicShareCache(existingCollection.shareSlug);
+  expirePublicShareCache(collection.shareSlug);
 
   return NextResponse.json(collection);
 }
@@ -224,7 +245,7 @@ export async function DELETE(
 
   const collection = await prisma.collection.findUnique({
     where: { id, userId: user.id },
-    select: { type: true },
+    select: { type: true, shareSlug: true },
   });
 
   if (!collection) {
@@ -243,6 +264,7 @@ export async function DELETE(
   });
 
   await invalidateUserResponseCache(user.id);
+  expirePublicShareCache(collection.shareSlug);
 
   return NextResponse.json({ success: true });
 }

@@ -53,6 +53,38 @@ function getProxyLimiters() {
 
 // getUserIdFromRequest is imported from the Edge-safe @/lib/auth-edge module (correct JWE decryption, no Node.js dependencies)
 
+// === CSRF origin verification ===
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function isTrustedOrigin(originHeader: string, request: NextRequest): boolean {
+  let origin: URL;
+  try {
+    origin = new URL(originHeader);
+  } catch {
+    // Includes the literal "null" Origin sent from sandboxed/opaque contexts.
+    return false;
+  }
+
+  if (origin.origin === request.nextUrl.origin) return true;
+  if (origin.host === request.headers.get("host")) return true;
+
+  for (const configured of [
+    process.env.APP_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXTAUTH_URL,
+  ]) {
+    const trimmed = configured?.trim();
+    if (!trimmed) continue;
+    try {
+      if (new URL(trimmed).origin === origin.origin) return true;
+    } catch {
+      // Ignore malformed configured URLs.
+    }
+  }
+
+  return false;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api");
@@ -62,7 +94,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Health checks bypass all rate limiting: uptime monitors poll frequently
+  // and must see real service state even when Redis is down or unconfigured.
+  if (pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
   const isAuthRoute = pathname.startsWith("/api/auth");
+
+  // SameSite=Lax cookies are the primary CSRF defense; this backstop rejects
+  // mutating API requests whose Origin header disagrees with our own origin.
+  // Absence of the header must pass (server-to-server calls like the sync
+  // worker dispatch set none). NextAuth routes run their own CSRF protection.
+  if (isApiRoute && !isAuthRoute && MUTATING_METHODS.has(request.method)) {
+    const originHeader = request.headers.get("origin");
+    if (originHeader && !isTrustedOrigin(originHeader, request)) {
+      return NextResponse.json(
+        { error: "Forbidden", message: "Cross-origin request rejected." },
+        { status: 403 }
+      );
+    }
+  }
+
   const skipsPerUserLimit =
     isPublicShareRoute ||
     isAuthRoute ||

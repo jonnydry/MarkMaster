@@ -8,6 +8,7 @@ import { RefreshCw } from "lucide-react";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { toast } from "@/lib/toast";
 import { sendJson, FetchJsonError } from "@/lib/fetch-json";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { findTerminalRunForId, isExpectedFinishedRun } from "@/lib/sync-client-completion";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
@@ -43,6 +44,7 @@ export function SyncButton({
   const { data: syncStatus, refetch: refetchSyncStatus, isError: syncStatusError } =
     useSyncStatus();
 
+  const online = useOnlineStatus();
   const currentRun = syncStatus?.currentRun;
   const latestRun = syncStatus?.recentRuns[0] ?? null;
   const isRateLimited = rateLimitedUntil !== null;
@@ -261,9 +263,15 @@ export function SyncButton({
           onClick={needsReconnect ? handleReconnect : handleSync}
           aria-label={needsReconnect ? "Reconnect X" : buttonLabel}
           aria-busy={isAnySyncRunning}
-          title={needsReconnect ? "Reconnect X — session expired" : syncTitle}
+          title={
+            !online
+              ? "Offline — syncing is unavailable until the connection returns"
+              : needsReconnect
+                ? "Reconnect X — session expired"
+                : syncTitle
+          }
           variant="highlight"
-          disabled={isRateLimited && !needsReconnect}
+          disabled={!online || (isRateLimited && !needsReconnect)}
           className="highlight-search-shell relative h-10 w-10 overflow-hidden p-0 disabled:opacity-70"
         >
           {needsReconnect ? (
@@ -320,7 +328,12 @@ export function SyncButton({
         onClick={handleSync}
         aria-busy={isAnySyncRunning}
         variant="highlight"
-        disabled={isRateLimited}
+        title={
+          !online
+            ? "Offline — syncing is unavailable until the connection returns"
+            : undefined
+        }
+        disabled={!online || isRateLimited}
         className="highlight-search-shell relative h-9 w-full gap-2 overflow-hidden text-sm disabled:opacity-70"
       >
         <RefreshCw

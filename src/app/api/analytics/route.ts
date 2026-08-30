@@ -3,6 +3,7 @@ import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildMediaBreakdown } from "@/lib/analytics";
 import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
+import { timeZoneSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import type { AnalyticsData } from "@/types";
 
@@ -39,8 +40,20 @@ export async function GET(req: NextRequest) {
       ? (rangeParam as "30d" | "90d" | "12m" | "all")
       : "90d";
   const fwTimeFilter = getFlywheelCreatedAtFilter(range);
+
+  const timeZoneParam = req.nextUrl.searchParams.get("timeZone");
+  const parsedTimeZone =
+    timeZoneParam === null ? null : timeZoneSchema.safeParse(timeZoneParam);
+  if (parsedTimeZone && !parsedTimeZone.success) {
+    return NextResponse.json(
+      { error: "Invalid timeZone parameter" },
+      { status: 400 }
+    );
+  }
+  const timeZone = parsedTimeZone?.data ?? "UTC";
+
   const cacheVersion = await getUserCacheVersion(user.id);
-  const cacheKey = `cache:analytics:${user.id}:v${cacheVersion}:${range}`;
+  const cacheKey = `cache:analytics:${user.id}:v${cacheVersion}:${range}:${timeZone}`;
 
   const analyticsPayload = await getCachedJson<AnalyticsData>(cacheKey, 120, async () => {
   const [
@@ -74,15 +87,17 @@ export async function GET(req: NextRequest) {
       ORDER BY count DESC
       LIMIT 10
     `,
+    // "bookmarkedAt" is a naive UTC timestamp: convert to timestamptz first,
+    // then bucket in the caller's zone. timeZone is a validated bind parameter.
     prisma.$queryRaw<{ month: string; count: bigint }[]>`
-      SELECT to_char("bookmarkedAt", 'YYYY-MM') as month, COUNT(*)::bigint as count
+      SELECT to_char("bookmarkedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}, 'YYYY-MM') as month, COUNT(*)::bigint as count
       FROM "Bookmark"
       WHERE "userId" = ${user.id}
       GROUP BY month
       ORDER BY month ASC
     `,
     prisma.$queryRaw<{ day: string; count: bigint }[]>`
-      SELECT to_char("bookmarkedAt", 'YYYY-MM-DD') as day, COUNT(*)::bigint as count
+      SELECT to_char("bookmarkedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${timeZone}, 'YYYY-MM-DD') as day, COUNT(*)::bigint as count
       FROM "Bookmark"
       WHERE "userId" = ${user.id}
         AND "bookmarkedAt" >= NOW() - INTERVAL '180 days'

@@ -43,6 +43,49 @@ export function getPerformanceScoreSql() {
   )`;
 }
 
+/**
+ * Same score expression as {@link getPerformanceScoreSql}, rebuilt from the
+ * raw counts a performance cursor carries. Both sides of the keyset
+ * comparison are then computed by Postgres with the identical expression, so
+ * the tie between the boundary row and itself matches exactly — comparing a
+ * JS `Math.log` float against Postgres `LN` can be off by an ULP, which made
+ * the tie branch unreachable and occasionally skipped/duplicated a row.
+ */
+function getPerformanceScoreFromCountsSql(counts: PerformanceCursorCounts) {
+  const [likes, retweets, replies, quotes, bookmarks] = counts;
+  return Prisma.sql`(
+    1.0 * LN(1 + ${likes}::int) +
+    2.0 * LN(1 + ${retweets}::int) +
+    3.5 * LN(1 + ${replies}::int) +
+    2.0 * LN(1 + ${quotes}::int) +
+    6.0 * LN(1 + ${bookmarks}::int)
+  )`;
+}
+
+/** `[likes, retweets, replies, quotes, bookmarks]` — the score's raw inputs. */
+type PerformanceCursorCounts = [number, number, number, number, number];
+
+/**
+ * Performance cursors store `sortValue` as `"likes,retweets,replies,quotes,bookmarks"`.
+ * Returns null for anything else — including legacy v1 cursors that carried a
+ * JS-computed float, which callers keep handling as a plain numeric boundary.
+ */
+export function parsePerformanceCursorCounts(
+  sortValue: string | number
+): PerformanceCursorCounts | null {
+  if (typeof sortValue !== "string") return null;
+
+  const parts = sortValue.split(",");
+  if (parts.length !== 5) return null;
+
+  const counts = parts.map((part) => Number(part));
+  if (!counts.every((count) => Number.isInteger(count) && count >= 0)) {
+    return null;
+  }
+
+  return counts as PerformanceCursorCounts;
+}
+
 function metricCount(
   publicMetrics: PrismaTypes.JsonValue | null,
   key: string
@@ -73,18 +116,15 @@ export function getBookmarkSortValue(
     case "replies":
       return metricCount(bookmark.publicMetrics, "reply_count");
     case "performance": {
-      const likes = metricCount(bookmark.publicMetrics, "like_count");
-      const retweets = metricCount(bookmark.publicMetrics, "retweet_count");
-      const replies = metricCount(bookmark.publicMetrics, "reply_count");
-      const quotes = metricCount(bookmark.publicMetrics, "quote_count");
-      const bookmarks = metricCount(bookmark.publicMetrics, "bookmark_count");
-      return (
-        1.0 * Math.log(1 + likes) +
-        2.0 * Math.log(1 + retweets) +
-        3.5 * Math.log(1 + replies) +
-        2.0 * Math.log(1 + quotes) +
-        6.0 * Math.log(1 + bookmarks)
-      );
+      // Carry the raw metric inputs instead of a JS-computed float; SQL
+      // rebuilds the score from them (see getPerformanceScoreFromCountsSql).
+      return [
+        metricCount(bookmark.publicMetrics, "like_count"),
+        metricCount(bookmark.publicMetrics, "retweet_count"),
+        metricCount(bookmark.publicMetrics, "reply_count"),
+        metricCount(bookmark.publicMetrics, "quote_count"),
+        metricCount(bookmark.publicMetrics, "bookmark_count"),
+      ].join(",");
     }
     default: {
       const _exhaustive: never = sortField;
@@ -134,6 +174,23 @@ export function decodeBookmarkListCursor(raw: string): BookmarkListCursor | null
     ) {
       return null;
     }
+    if (
+      (parsed.sortField === "likes" ||
+        parsed.sortField === "retweets" ||
+        parsed.sortField === "replies") &&
+      typeof parsed.sortValue !== "number"
+    ) {
+      return null;
+    }
+    if (
+      parsed.sortField === "performance" &&
+      typeof parsed.sortValue === "string" &&
+      parsePerformanceCursorCounts(parsed.sortValue) === null
+    ) {
+      // Numbers are still accepted here: legacy v1 performance cursors
+      // carried a JS-computed float and keep working (see buildBookmarkKeysetSql).
+      return null;
+    }
 
     return {
       sortField: parsed.sortField,
@@ -154,94 +211,65 @@ export function cursorMatchesRequest(
   return cursor.sortField === sortField && cursor.sortDirection === sortDirection;
 }
 
-function compareOperator(direction: "asc" | "desc", step: "primary" | "tie") {
-  if (direction === "desc") {
-    return step === "primary" ? "<" : "<";
-  }
-  return step === "primary" ? ">" : ">";
-}
-
+/**
+ * Keyset predicates use Postgres row-value comparison —
+ * `(expr, "id") < (value, cursorId)` — rather than the equivalent
+ * `expr < value OR (expr = value AND ...)` form: the row-value form can be
+ * driven as a single range scan and evaluates the sort expression once per
+ * row instead of twice.
+ */
 export function buildBookmarkKeysetSql(
   cursor: BookmarkListCursor
 ): Prisma.Sql {
-  const primaryOp = compareOperator(cursor.sortDirection, "primary");
-  const tieOp = compareOperator(cursor.sortDirection, "tie");
+  const op = Prisma.raw(cursor.sortDirection === "desc" ? "<" : ">");
 
   switch (cursor.sortField) {
     case "bookmarkedAt": {
       const sortValue = new Date(String(cursor.sortValue));
       return Prisma.sql`
-        (
-          b."bookmarkedAt" ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (b."bookmarkedAt" = ${sortValue} AND b."id" ${Prisma.raw(tieOp)} ${cursor.id})
-        )
+        (b."bookmarkedAt", b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "tweetCreatedAt": {
       const sortValue = new Date(String(cursor.sortValue));
       return Prisma.sql`
-        (
-          b."tweetCreatedAt" ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (b."tweetCreatedAt" = ${sortValue} AND b."id" ${Prisma.raw(tieOp)} ${cursor.id})
-        )
+        (b."tweetCreatedAt", b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "authorUsername": {
       const sortValue = String(cursor.sortValue);
       return Prisma.sql`
-        (
-          b."authorUsername" ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (b."authorUsername" = ${sortValue} AND b."id" ${Prisma.raw(tieOp)} ${cursor.id})
-        )
+        (b."authorUsername", b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "likes": {
       const sortValue = Number(cursor.sortValue);
       return Prisma.sql`
-        (
-          COALESCE((b."publicMetrics"->>'like_count')::int, 0) ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (
-            COALESCE((b."publicMetrics"->>'like_count')::int, 0) = ${sortValue}
-            AND b."id" ${Prisma.raw(tieOp)} ${cursor.id}
-          )
-        )
+        (COALESCE((b."publicMetrics"->>'like_count')::int, 0), b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "retweets": {
       const sortValue = Number(cursor.sortValue);
       return Prisma.sql`
-        (
-          COALESCE((b."publicMetrics"->>'retweet_count')::int, 0) ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (
-            COALESCE((b."publicMetrics"->>'retweet_count')::int, 0) = ${sortValue}
-            AND b."id" ${Prisma.raw(tieOp)} ${cursor.id}
-          )
-        )
+        (COALESCE((b."publicMetrics"->>'retweet_count')::int, 0), b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "replies": {
       const sortValue = Number(cursor.sortValue);
       return Prisma.sql`
-        (
-          COALESCE((b."publicMetrics"->>'reply_count')::int, 0) ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (
-            COALESCE((b."publicMetrics"->>'reply_count')::int, 0) = ${sortValue}
-            AND b."id" ${Prisma.raw(tieOp)} ${cursor.id}
-          )
-        )
+        (COALESCE((b."publicMetrics"->>'reply_count')::int, 0), b."id") ${op} (${sortValue}, ${cursor.id})
       `;
     }
     case "performance": {
-      const sortValue = Number(cursor.sortValue);
-      const scoreSql = getPerformanceScoreSql();
+      const counts = parsePerformanceCursorCounts(cursor.sortValue);
+      // Legacy v1 cursors carried a JS-computed float; compare against it
+      // directly (old semantics — ties may not match exactly) so in-flight
+      // cursors keep paginating instead of erroring.
+      const boundarySql = counts
+        ? getPerformanceScoreFromCountsSql(counts)
+        : Prisma.sql`${Number(cursor.sortValue)}`;
       return Prisma.sql`
-        (
-          ${scoreSql} ${Prisma.raw(primaryOp)} ${sortValue}
-          OR (
-            ${scoreSql} = ${sortValue}
-            AND b."id" ${Prisma.raw(tieOp)} ${cursor.id}
-          )
-        )
+        (${getPerformanceScoreSql()}, b."id") ${op} (${boundarySql}, ${cursor.id})
       `;
     }
     default: {

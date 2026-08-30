@@ -12,8 +12,10 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Copy, ExternalLink, Check } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { generateClipboardThread } from "@/lib/share-content";
+import { formatPostDate } from "@/lib/format-metrics";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
+import { appOverlayDialogScrollClassName } from "@/lib/app-layout";
 import { useTypography } from "@/hooks/use-typography";
 import type { ShareContent } from "@/lib/share-content";
 
@@ -49,7 +51,7 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+      <DialogContent className={cn("sm:max-w-lg", appOverlayDialogScrollClassName)}>
         <DialogHeader>
           <DialogTitle>Share &quot;{shareContent.collectionName}&quot;</DialogTitle>
           <DialogDescription>
@@ -69,6 +71,9 @@ export function ShareDialog({
                 variant="outline"
                 size="icon"
                 className="shrink-0"
+                aria-label={
+                  copiedField === "link" ? "Link copied" : "Copy public link"
+                }
                 onClick={() =>
                   copyToClipboard(shareContent.shareUrl, "link")
                 }
@@ -80,6 +85,11 @@ export function ShareDialog({
                 )}
               </Button>
             </div>
+            {shareContent.shareExpiresAt && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Link expires {formatPostDate(shareContent.shareExpiresAt)}
+              </p>
+            )}
           </div>
 
           {/* Summary tweet */}

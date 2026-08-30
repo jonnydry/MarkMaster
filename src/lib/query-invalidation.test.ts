@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   invalidateBookmarkDeletionSideEffects,
+  invalidateBookmarkNoteSideEffects,
   invalidateBookmarkTagSideEffects,
   invalidateCollectionMetadataQueries,
   invalidateOrbitApplyQueries,
@@ -20,7 +21,22 @@ describe("query invalidation helpers", () => {
 
     const keys = invalidateSpy.mock.calls.map(([args]) => args.queryKey);
     expect(keys).toContainEqual(["tags"]);
+    expect(keys).toContainEqual(["collection"]);
     expect(keys).toContainEqual(ORBIT_GRAPH_QUERY_KEY);
+    expect(keys.some((key) => key?.[0] === "bookmarks")).toBe(false);
+  });
+
+  it("invalidates note side effects for collection rows and analytics only", async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue();
+
+    await invalidateBookmarkNoteSideEffects(queryClient);
+
+    const keys = invalidateSpy.mock.calls.map(([args]) => args.queryKey);
+    expect(keys).toContainEqual(["collection"]);
+    expect(keys).toContainEqual(["analytics"]);
     expect(keys.some((key) => key?.[0] === "bookmarks")).toBe(false);
   });
 

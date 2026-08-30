@@ -25,7 +25,12 @@ function redact(input: string): string {
 }
 
 function formatError(error: unknown): string {
-  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  if (error instanceof Error) {
+    // The stack starts with "Name: message" and is the one thing needed to
+    // debug production issues. redact() flattens control chars, so the stack
+    // lands on a single injection-safe line.
+    return error.stack ?? `${error.name}: ${error.message}`;
+  }
   return String(error);
 }
 

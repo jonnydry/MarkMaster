@@ -138,13 +138,22 @@ function buildTweetQueryParams(ids?: string[]) {
   return params;
 }
 
+const RATE_LIMIT_RESET_FALLBACK_MS = 15 * 60 * 1000;
+
 function readRateLimit(response: Response): RateLimitInfo {
+  // A missing/garbled reset header must not produce an epoch-0 resetAt (the
+  // UI would render a meaningless "resets at"); assume a conservative window.
+  const resetSeconds = Number.parseInt(
+    response.headers.get("x-rate-limit-reset") ?? "",
+    10
+  );
   return {
     remaining: parseInt(response.headers.get("x-rate-limit-remaining") || "0"),
     limit: parseInt(response.headers.get("x-rate-limit-limit") || "180"),
-    resetAt: new Date(
-      parseInt(response.headers.get("x-rate-limit-reset") || "0") * 1000
-    ),
+    resetAt:
+      Number.isFinite(resetSeconds) && resetSeconds > 0
+        ? new Date(resetSeconds * 1000)
+        : new Date(Date.now() + RATE_LIMIT_RESET_FALLBACK_MS),
   };
 }
 
@@ -242,17 +251,68 @@ function parseBookmarkPayload(
   );
 }
 
-async function refreshAccessToken(
-  userId: string
-): Promise<string> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { refreshToken: true },
+/**
+ * In-process single-flight: concurrent callers within one invocation (e.g. a
+ * sync pagination loop racing an Orbit scan) share the same refresh promise.
+ */
+const inflightTokenRefreshes = new Map<string, Promise<string>>();
+
+/**
+ * X rotates refresh tokens on every use, so refreshes must be serialized per
+ * user: two concurrent exchanges with the same stored refresh token either
+ * fail with invalid_grant or race their DB writes — and the losing write can
+ * overwrite the freshly rotated refresh token with a stale one, permanently
+ * breaking the connection until the user re-authenticates.
+ */
+async function refreshAccessToken(userId: string): Promise<string> {
+  const existing = inflightTokenRefreshes.get(userId);
+  if (existing) return existing;
+
+  const promise = refreshAccessTokenSerialized(userId).finally(() => {
+    inflightTokenRefreshes.delete(userId);
   });
-  if (!user) throw new Error("User not found");
+  inflightTokenRefreshes.set(userId, promise);
+  return promise;
+}
 
-  const refreshToken = decrypt(user.refreshToken);
+async function refreshAccessTokenSerialized(userId: string): Promise<string> {
+  return prisma.$transaction(
+    async (tx) => {
+      // Serialize across instances/invocations. Released on commit/rollback.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`token:${userId}`}))`;
 
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
+      });
+      if (!user) throw new Error("User not found");
+
+      // Another holder refreshed while we waited for the lock — reuse its token.
+      if (
+        user.tokenExpiresAt &&
+        user.tokenExpiresAt.getTime() >= Date.now() + 60_000
+      ) {
+        return decrypt(user.accessToken);
+      }
+
+      const accessToken = await exchangeRefreshToken(
+        tx,
+        userId,
+        decrypt(user.refreshToken)
+      );
+      return accessToken;
+    },
+    // The token-endpoint fetch runs while holding the lock; give the
+    // interactive transaction enough budget for the 30s fetch timeout.
+    { timeout: 45_000, maxWait: 10_000 }
+  );
+}
+
+async function exchangeRefreshToken(
+  tx: Pick<typeof prisma, "user">,
+  userId: string,
+  refreshToken: string
+): Promise<string> {
   const clientId = process.env.AUTH_TWITTER_ID;
   const clientSecret = process.env.AUTH_TWITTER_SECRET;
   if (!clientId) {
@@ -303,7 +363,7 @@ async function refreshAccessToken(
       ? data.refresh_token
       : refreshToken;
 
-  await prisma.user.update({
+  await tx.user.update({
     where: { id: userId },
     data: {
       accessToken: encrypt(data.access_token),
@@ -384,6 +444,12 @@ export async function fetchBookmarks(
   };
 }
 
+// Hard caps on X pagination loops: a malformed or repeating next_token from
+// the API must not spin until maxDuration kills the function (burning the
+// user's rate-limit budget along the way).
+const MAX_FOLDER_LIST_PAGES = 10; // 100 folders/page → 1,000 folders
+const MAX_FOLDER_TWEET_PAGES = 50;
+
 export async function fetchBookmarkFolders(
   userId: string,
   xUserId: string
@@ -391,6 +457,7 @@ export async function fetchBookmarkFolders(
   const token = await getFreshXAccessToken(userId);
   const folders: BookmarkFolder[] = [];
   let paginationToken: string | undefined;
+  let pagesFetched = 0;
   let lastRateLimit: RateLimitInfo = {
     remaining: 0,
     limit: 180,
@@ -425,7 +492,13 @@ export async function fetchBookmarkFolders(
 
     const json = (await response.json()) as XApiResponse<BookmarkFolder[]>;
     folders.push(...(json.data || []));
-    paginationToken = json.meta?.next_token;
+    pagesFetched += 1;
+    const nextToken = json.meta?.next_token;
+    // Stop on a repeated token (API echoing the same cursor) or the page cap.
+    paginationToken =
+      nextToken === paginationToken || pagesFetched >= MAX_FOLDER_LIST_PAGES
+        ? undefined
+        : nextToken;
   } while (paginationToken);
 
   return { folders, rateLimit: lastRateLimit };
@@ -443,6 +516,7 @@ async function fetchBookmarkFolderTweetIds(
   const tweetIds: string[] = [];
   const seenIds = new Set<string>();
   let paginationToken: string | undefined;
+  let pagesFetched = 0;
   let lastRateLimit: RateLimitInfo = {
     remaining: 0,
     limit: 180,
@@ -481,7 +555,12 @@ async function fetchBookmarkFolderTweetIds(
         tweetIds.push(row.id);
       }
     }
-    paginationToken = json.meta?.next_token;
+    pagesFetched += 1;
+    const nextToken = json.meta?.next_token;
+    paginationToken =
+      nextToken === paginationToken || pagesFetched >= MAX_FOLDER_TWEET_PAGES
+        ? undefined
+        : nextToken;
   } while (paginationToken);
 
   return { tweetIds, rateLimit: lastRateLimit };

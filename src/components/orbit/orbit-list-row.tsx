@@ -118,7 +118,7 @@ export const OrbitListRow = memo(function OrbitListRow({
         orbitHoverRowClass(),
         !selectionMode &&
           selected &&
-          ("border-primary/20 bg-primary/10 dark:border-primary/10 dark:bg-[#0F0F0F]"),
+          ("border-primary/20 bg-primary/10 dark:border-primary/10 dark:bg-surface-1"),
         selectionMode && bulkSelected && "bg-primary/5",
         queueStatus === "dismissed" && "opacity-50",
         queueStatus === "applied" && "opacity-70"

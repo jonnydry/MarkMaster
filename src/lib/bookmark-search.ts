@@ -2,13 +2,20 @@ import { Prisma } from "@prisma/client";
 
 const MAX_SEARCH_TERMS = 8;
 
+/**
+ * Terms shorter than this are dropped: the pg_trgm indexes cannot serve 1-2
+ * character patterns, so they would degrade into worst-case sequential scans.
+ * If every term is dropped the request is treated as "no search".
+ */
+export const MIN_SEARCH_TERM_LENGTH = 2;
+
 export function tokenizeBookmarkSearch(input: string): string[] {
   const seen = new Set<string>();
   const terms: string[] = [];
 
   for (const rawTerm of input.trim().split(/\s+/)) {
     const term = rawTerm.replace(/^[@#]+/, "").trim();
-    if (!term) continue;
+    if (term.length < MIN_SEARCH_TERM_LENGTH) continue;
 
     const key = term.toLowerCase();
     if (seen.has(key)) continue;

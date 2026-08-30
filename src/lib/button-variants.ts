@@ -34,11 +34,15 @@ export const buttonVariants = cva(
         xs: "h-6 gap-1 rounded-sm px-2 text-xs in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-sm px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
+        // Icon variants keep their visual size but extend the hit area to
+        // ~44px with an absolute after: inset (same recipe as Checkbox/Switch).
+        icon: "relative size-8 after:absolute after:-inset-1.5",
         "icon-xs":
-          "size-6 rounded-sm in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-7 rounded-sm in-data-[slot=button-group]:rounded-sm",
+          "relative size-6 rounded-sm after:absolute after:-inset-2.5 in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm":
+          "relative size-7 rounded-sm after:absolute after:-inset-2 in-data-[slot=button-group]:rounded-sm",
         "icon-lg": "size-9",
+        "icon-xl": "relative size-10 after:absolute after:-inset-0.5",
       },
     },
     defaultVariants: {

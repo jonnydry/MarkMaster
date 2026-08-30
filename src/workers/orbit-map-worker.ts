@@ -356,8 +356,21 @@ function isEdgeRevealActive() {
   return edgeRevealStartedAt !== null;
 }
 
+/**
+ * Palette objects are cached per theme: getPalette() is called from hot paths
+ * (drawLinks, updateLabels run per frame) and allocating a fresh palette on
+ * every call churns the GC for no reason. Invalidated whenever the theme
+ * inputs change (INIT / SET_THEME).
+ */
+let cachedPalette: ReturnType<typeof getOrbitMapPalette> | null = null;
+
+function invalidatePaletteCache() {
+  cachedPalette = null;
+}
+
 function getPalette() {
-  return getOrbitMapPalette(colorMode, accentHex, backgroundHex);
+  cachedPalette ??= getOrbitMapPalette(colorMode, accentHex, backgroundHex);
+  return cachedPalette;
 }
 
 /**
@@ -759,6 +772,7 @@ function handleInit(msg: InitMessage) {
   accentHex = msg.accentHex;
   backgroundHex = msg.backgroundHex;
   colorThemeId = msg.colorTheme;
+  invalidatePaletteCache();
   living.setEnabled(Boolean(msg.livingMap));
   const palette = getPalette();
 
@@ -861,6 +875,7 @@ function handleSetTheme(msg: SetThemeMessage) {
   accentHex = msg.accentHex;
   backgroundHex = msg.backgroundHex;
   colorThemeId = msg.colorTheme;
+  invalidatePaletteCache();
   applyColorMode();
 }
 

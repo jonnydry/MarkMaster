@@ -14,7 +14,7 @@ import { resolveBookmarkNavigationId } from "@/lib/grid-bookmark-navigation";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { bookmarkLabel } from "@/lib/collections-presentation";
 import { getAboveFoldMediaBookmarkIds } from "@/lib/bookmark-feed-layout";
-import { fetchJson, sendJson } from "@/lib/fetch-json";
+import { fetchJson, FetchJsonError, sendJson } from "@/lib/fetch-json";
 import {
   collectionDetailSchema,
   shareContentSchema,
@@ -59,6 +59,8 @@ export type CollectionDetail = {
   type: string;
   isPublic: boolean;
   shareSlug: string | null;
+  /** ISO timestamp the share link expires at; null means it never expires. */
+  shareExpiresAt: string | null;
   externalSource: string | null;
   externalSourceId: string | null;
   items: CollectionItemRow[];
@@ -138,12 +140,14 @@ export function useCollectionDetailPage(
           collectionDetailSchema
         )) as unknown as CollectionDetail;
       } catch (fetchError) {
-        if (fetchError instanceof Error && fetchError.message.includes("404")) {
+        if (fetchError instanceof FetchJsonError && fetchError.status === 404) {
           throw new Error("NOT_FOUND");
         }
         throw new Error("LOAD_FAILED");
       }
     },
+    retry: (failureCount, queryError) =>
+      queryError.message !== "NOT_FOUND" && failureCount < 3,
     placeholderData: keepPreviousData,
   });
 
@@ -237,6 +241,31 @@ export function useCollectionDetailPage(
       );
     }
   }, [collection, collectionId, queryClient]);
+
+  const handleShareExpiryChange = useCallback(
+    async (days: 7 | 30 | 90 | null) => {
+      if (!collection) return;
+      try {
+        await sendJson(`/api/collections/${collectionId}`, {
+          method: "PATCH",
+          body: { shareExpiryDays: days },
+        });
+        await invalidateCollectionMetadataQueries(queryClient, collectionId);
+        toast.success(
+          days === null
+            ? "Share link never expires"
+            : `Share link expires in ${days} days`
+        );
+      } catch (expiryError) {
+        toast.error(
+          expiryError instanceof Error
+            ? expiryError.message
+            : "Could not update link expiry"
+        );
+      }
+    },
+    [collection, collectionId, queryClient]
+  );
 
   const handleCopyShareLink = useCallback(async () => {
     if (!collection?.shareSlug) return;
@@ -489,6 +518,7 @@ export function useCollectionDetailPage(
     startEditingName,
     handleCopyAsCollection,
     handleTogglePublic,
+    handleShareExpiryChange,
     handleCopyShareLink,
     handleRemoveItem,
     handleShareOnX,

@@ -151,7 +151,7 @@ function VirtualizedBookmarkRows({
                 onAddToCollection={onAddToCollection}
                 onAddNote={onAddNote}
                 onOpenExpanded={onOpenExpanded}
-                onDelete={onDelete ? (id) => onDelete(id) : undefined}
+                onDelete={onDelete}
                 deleteLabel={deleteLabel}
                 className={getStaggerClass(index, "animate-fade-in")}
                 isPerformanceHighlight={performanceHighlightId === bookmark.id}
@@ -217,7 +217,7 @@ function StaticBookmarkRows({
           onAddToCollection={onAddToCollection}
           onAddNote={onAddNote}
           onOpenExpanded={onOpenExpanded}
-          onDelete={onDelete ? (id) => onDelete(id) : undefined}
+          onDelete={onDelete}
           deleteLabel={deleteLabel}
           className={getStaggerClass(index, "animate-fade-in")}
           isPerformanceHighlight={performanceHighlightId === bookmark.id}

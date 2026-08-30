@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 
 import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
+import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
 import { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
@@ -18,6 +19,7 @@ import {
 } from "@/hooks/use-library-data";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useSyncStatus } from "@/hooks/use-sync-status";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchJson } from "@/lib/fetch-json";
 import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
@@ -34,8 +36,9 @@ import type {
 
 export type BookmarkResponse = {
   bookmarks: BookmarkWithRelations[];
-  total: number;
-  totalPages: number;
+  /** Absent on cursor (keyset) pages; carry the page-1 value forward. */
+  total?: number;
+  totalPages?: number;
   nextCursor?: string;
   page?: number;
   personalBoostAuthors?: string[];
@@ -140,8 +143,7 @@ export function useDashboardPage() {
   const feedReady = !isLoading && !isError;
 
   const bookmarks: BookmarkWithRelations[] = bookmarkData?.bookmarks ?? EMPTY_BOOKMARKS;
-  const total: number = bookmarkData?.total || 0;
-  const totalPages: number = bookmarkData?.totalPages || 1;
+  const { total, totalPages } = useCarriedListTotals(bookmarkData);
 
   const prefetchBookmarkPage = useCallback(
     (targetPage: number) => {
@@ -314,9 +316,14 @@ export function useDashboardPage() {
 
   const handleBulkHide = useCallback(async () => {
     if (visibleSelectedBookmarkIds.length === 0) return;
-    const confirmed = window.confirm(
-      `Hide ${visibleSelectedBookmarkIds.length} bookmark${visibleSelectedBookmarkIds.length === 1 ? "" : "s"} from MarkMaster?`
-    );
+    const count = visibleSelectedBookmarkIds.length;
+    const confirmed = await confirmDialog({
+      title: `Hide ${count} bookmark${count === 1 ? "" : "s"}?`,
+      description:
+        "Hidden bookmarks disappear from MarkMaster but stay bookmarked on X.",
+      confirmLabel: count === 1 ? "Hide bookmark" : `Hide ${count} bookmarks`,
+      destructive: true,
+    });
     if (!confirmed) return;
 
     await actions.handleDeleteBookmark(visibleSelectedBookmarkIds);

@@ -97,6 +97,9 @@ export function useScrollspy(
       scrollRoot.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
+    // Depend on the joined id list (not the array identity) so callers passing
+    // a fresh array literal each render don't tear down and re-attach the
+    // scroll listeners; `opts` is likewise tracked by its primitive fields.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids.join(","), opts?.topOffsetPx, opts?.scrollMarginPx]);
 

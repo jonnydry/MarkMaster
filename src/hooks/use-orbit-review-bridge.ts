@@ -23,6 +23,32 @@ import type {
 
 type OrbitScanApi = ReturnType<typeof useOrbitScan>;
 
+const DECISION_EVENT_RETRY_DELAYS_MS = [2_000, 8_000];
+
+/**
+ * Best-effort learning signal: retry each failed batch in the background with
+ * backoff (3 attempts total), then drop it. The batch is retried serially in
+ * its own chain, so the same events are never in flight twice; the server
+ * inserts blindly, and this keeps the duplicate window to "response lost after
+ * commit" only.
+ */
+async function postDecisionEventsWithRetry(events: OrbitDecisionEventPayload[]) {
+  const body = JSON.parse(JSON.stringify({ events })) as JsonValue;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await sendJson("/api/orbit/decision-events", { method: "POST", body });
+      return;
+    } catch (err) {
+      const delayMs = DECISION_EVENT_RETRY_DELAYS_MS[attempt];
+      if (delayMs === undefined) {
+        console.warn("[orbit] decision event write failed after retries:", err);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 type UseOrbitReviewBridgeOptions = {
   scan: OrbitScanApi;
   setActiveBookmarkId: (id: string | null) => void;
@@ -112,16 +138,7 @@ export function useOrbitReviewBridge(options: UseOrbitReviewBridgeOptions) {
             ...decisionCounts,
           });
 
-          try {
-            await sendJson("/api/orbit/decision-events", {
-              method: "POST",
-              body: JSON.parse(
-                JSON.stringify({ events: opts.decisionEvents })
-              ) as JsonValue,
-            });
-          } catch (err) {
-            console.warn("[orbit] decision event write failed:", err);
-          }
+          void postDecisionEventsWithRetry(opts.decisionEvents);
         }
 
         for (const bookmarkId of opts.keptBookmarkIds) {

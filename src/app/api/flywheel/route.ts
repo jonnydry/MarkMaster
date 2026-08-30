@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
+import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 const MAX_FLYWHEEL_BODY_BYTES = 8 * 1024;
@@ -52,6 +53,13 @@ export async function POST(request: Request) {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Exempt from the proxy's api:write debit (lightweight route), so this
+  // dedicated bucket is the only per-user cap on FlywheelEvent inserts.
+  const rateLimitResult = await checkRateLimit("flywheel", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   try {

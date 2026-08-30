@@ -27,6 +27,16 @@ describe("tokenizeBookmarkSearch", () => {
       tokenizeBookmarkSearch("one two three four five six seven eight nine ten")
     ).toEqual(["one", "two", "three", "four", "five", "six", "seven", "eight"]);
   });
+
+  it("drops terms shorter than the trigram-friendly minimum", () => {
+    expect(tokenizeBookmarkSearch("a neural x")).toEqual(["neural"]);
+    expect(tokenizeBookmarkSearch("ab")).toEqual(["ab"]);
+  });
+
+  it("returns no terms when every term is too short (treated as no search)", () => {
+    expect(tokenizeBookmarkSearch("a")).toEqual([]);
+    expect(tokenizeBookmarkSearch("a b @c #d")).toEqual([]);
+  });
 });
 
 describe("bookmarkSearchLikePattern", () => {

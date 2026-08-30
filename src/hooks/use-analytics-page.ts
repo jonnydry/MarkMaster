@@ -53,6 +53,10 @@ export const ANALYTICS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   },
 ];
 
+function getClientTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
 export function useAnalyticsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,6 +68,7 @@ export function useAnalyticsPage() {
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [range, setRange] = useState<TimeRange>("90d");
   const activeTab = parseAnalyticsTab(searchParams.get("tab"));
+  const timeZone = useMemo(() => getClientTimeZone(), []);
 
   const {
     data: analytics,
@@ -73,9 +78,13 @@ export function useAnalyticsPage() {
     refetch,
     isFetching,
   } = useQuery<AnalyticsData>({
-    queryKey: ["analytics", range],
+    queryKey: ["analytics", range, timeZone],
     queryFn: () =>
-      fetchJson(`/api/analytics?range=${range}`, undefined, analyticsDataSchema),
+      fetchJson(
+        `/api/analytics?range=${range}&timeZone=${encodeURIComponent(timeZone)}`,
+        undefined,
+        analyticsDataSchema
+      ),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,

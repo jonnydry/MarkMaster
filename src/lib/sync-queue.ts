@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import type { Prisma } from "@prisma/client";
 
+import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { executeSyncRun } from "@/lib/sync-run-executor";
 import { getSyncRetryUntil } from "@/lib/sync-throttle";
@@ -76,6 +77,43 @@ export async function markStaleActiveSyncRuns(
       errorMessage: "Sync did not finish.",
     },
   });
+}
+
+/**
+ * Read-only conflict/cooldown check used before consuming a rate-limit token.
+ * enqueueSyncRun re-checks atomically under the advisory lock, so this only
+ * exists to avoid burning the caller's sync quota on requests that would be
+ * rejected with 409/429 anyway.
+ */
+export async function peekSyncRunGate(
+  userId: string
+): Promise<Exclude<EnqueueSyncResult, { created: { id: string } }> | null> {
+  const active = await prisma.syncRun.findFirst({
+    where: {
+      userId,
+      status: { in: [...ACTIVE_SYNC_STATUSES] },
+      // Stale runs get FAILED by enqueueSyncRun; don't treat them as conflicts.
+      startedAt: { gte: new Date(Date.now() - STALE_SYNC_WINDOW_MS) },
+    },
+    select: syncRunSelect,
+  });
+  if (active) {
+    return { conflict: active };
+  }
+
+  const latestRun = await prisma.syncRun.findFirst({
+    where: { userId, status: { in: ["COMPLETED", "RATE_LIMITED"] } },
+    orderBy: { startedAt: "desc" },
+    select: syncRunSelect,
+  });
+  if (latestRun) {
+    const retryUntil = getSyncRetryUntil(latestRun);
+    if (retryUntil) {
+      return { cooldown: { retryUntil, latestRun } };
+    }
+  }
+
+  return null;
 }
 
 export async function enqueueSyncRun(
@@ -164,9 +202,20 @@ export async function processSyncRun(runId: string) {
       return null;
     }
 
-    return tx.syncRun.update({
+    // updateMany instead of update: a concurrent claim (or deletion) between
+    // the read above and this write should yield "not processed", not a
+    // P2025 exception bubbling up as a 500.
+    const claimedCount = await tx.syncRun.updateMany({
       where: { id: runId, status: "PENDING" },
       data: { status: "RUNNING" },
+    });
+
+    if (claimedCount.count === 0) {
+      return null;
+    }
+
+    return tx.syncRun.findUnique({
+      where: { id: runId },
       select: {
         id: true,
         userId: true,
@@ -220,6 +269,27 @@ function getSyncWorkerBaseUrl() {
   return "http://localhost:3000";
 }
 
+const SYNC_WORKER_DISPATCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Mark a run FAILED only if it is still PENDING — if the worker already
+ * claimed it (RUNNING), the dispatch actually succeeded and this is a no-op.
+ */
+async function failUndispatchedRun(runId: string) {
+  try {
+    await prisma.syncRun.updateMany({
+      where: { id: runId, status: "PENDING" },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        errorMessage: "Could not start the sync worker. Please try again.",
+      },
+    });
+  } catch (error) {
+    logError("SyncQueue", `Failed to mark undispatched run ${runId}`, error);
+  }
+}
+
 /** Dispatch a separate worker invocation (own maxDuration budget). */
 export async function kickSyncWorker(runId: string) {
   const secret = process.env.SYNC_WORKER_SECRET?.trim();
@@ -241,15 +311,27 @@ export async function kickSyncWorker(runId: string) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ runId }),
+      // The worker responds only after processing the run; we just need to
+      // know the invocation started. Cap the wait so `after()` isn't pinned
+      // for the entire sync.
+      signal: AbortSignal.timeout(SYNC_WORKER_DISPATCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      console.error(
-        `[sync-queue] worker dispatch failed (${response.status}) for run ${runId}`
+      logError(
+        "SyncQueue",
+        `Worker dispatch failed (${response.status}) for run ${runId}`
       );
+      await failUndispatchedRun(runId);
     }
   } catch (error) {
-    console.error(`[sync-queue] worker dispatch error for run ${runId}:`, error);
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      // The worker is (very likely) processing; it just hasn't responded
+      // within the dispatch window. Leave the run alone.
+      return;
+    }
+    logError("SyncQueue", `Worker dispatch error for run ${runId}`, error);
+    await failUndispatchedRun(runId);
   }
 }
 

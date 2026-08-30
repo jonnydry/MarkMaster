@@ -47,6 +47,12 @@ Use clear, descriptive commit messages:
 - Prefer explicit return types on exported functions
 - Use `const` / `let` appropriately; avoid `var`
 
+### Validation Schemas
+
+- **zod** is used for server-side request validation (`src/lib/validations.ts`).
+- **valibot** is used for client-side response validation (`src/lib/api-response-schemas.ts`).
+- This split is deliberate — valibot's smaller footprint keeps the client bundle lean, while zod stays server-only. Don't import zod in client code or move schemas between the two files without keeping this boundary.
+
 ### React / Next.js
 
 - App Router conventions — read `AGENTS.md` for project-specific rules

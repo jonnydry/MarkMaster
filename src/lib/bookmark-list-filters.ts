@@ -9,15 +9,67 @@ import {
   buildBookmarkAuthorFilterSql,
   buildBookmarkSearchTermSql,
 } from "@/lib/bookmark-search";
+import { DATE_FILTER_TIME_ZONE_SEPARATOR } from "@/lib/validations";
 
+function splitDateFilterValue(value: string): { date: string; timeZone?: string } {
+  const separatorIndex = value.indexOf(DATE_FILTER_TIME_ZONE_SEPARATOR);
+  if (separatorIndex === -1) return { date: value };
+  return {
+    date: value.slice(0, separatorIndex),
+    timeZone: value.slice(separatorIndex + 1),
+  };
+}
+
+function getTimeZoneOffsetMs(instant: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  // Some runtimes render midnight as "24" with hour12: false.
+  const wallClockAsUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second")
+  );
+  return wallClockAsUtc - instant.getTime();
+}
+
+/** UTC instant of local midnight for a YYYY-MM-DD date in an IANA zone. */
+function getZonedDayStart(date: string, timeZone: string) {
+  const utcMidnight = new Date(`${date}T00:00:00.000Z`);
+  // Second pass converges when the zone offset differs between UTC midnight
+  // and the actual local midnight (DST boundaries).
+  const guess = new Date(
+    utcMidnight.getTime() - getTimeZoneOffsetMs(utcMidnight, timeZone)
+  );
+  return new Date(utcMidnight.getTime() - getTimeZoneOffsetMs(guess, timeZone));
+}
+
+/** Accepts "YYYY-MM-DD" (UTC) or "YYYY-MM-DD@Zone" (day start in that zone). */
 export function getDateStart(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
+  const { date, timeZone } = splitDateFilterValue(value);
+  return timeZone
+    ? getZonedDayStart(date, timeZone)
+    : new Date(`${date}T00:00:00.000Z`);
 }
 
 export function getNextDateStart(value: string) {
-  const next = getDateStart(value);
+  const { date, timeZone } = splitDateFilterValue(value);
+  const next = new Date(`${date}T00:00:00.000Z`);
   next.setUTCDate(next.getUTCDate() + 1);
-  return next;
+  if (!timeZone) return next;
+  return getZonedDayStart(next.toISOString().slice(0, 10), timeZone);
 }
 
 export function buildMediaFilterCondition(

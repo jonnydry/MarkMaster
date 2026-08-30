@@ -36,13 +36,13 @@ export function ErrorState({
       : layout === "inline"
         ? "font-medium"
         : "text-lg font-semibold",
-    isStage && "text-lg font-medium text-white",
+    isStage && "text-lg font-medium text-foreground",
     !isStage && layout !== "inline" && layout !== "panel" && "heading-font text-foreground"
   );
 
   const descriptionClass = cn(
-    layout === "panel" ? "mt-1 text-xs text-muted-foreground" : "mt-1.5 max-w-xs text-sm leading-6",
-    isStage ? "text-sm text-white/65" : "text-muted-foreground"
+    layout === "panel" ? "mt-1 text-xs" : "mt-1.5 max-w-xs text-sm leading-6",
+    "text-muted-foreground"
   );
 
   return (

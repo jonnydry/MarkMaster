@@ -22,6 +22,10 @@ model User {
   lastSyncAt      DateTime?
   /** When true, bookmark sync also mirrors X bookmark folders into collections. */
   syncXFolders    Boolean   @default(false)
+  /** Last time the X bookmark-folders list API was actually called (drives the folder metadata TTL). */
+  xFoldersFetchedAt DateTime?
+  /** Bump to invalidate all of this user's JWT sessions (checked in the jwt callback). */
+  sessionVersion  Int       @default(1)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -76,6 +80,7 @@ model Bookmark {
   @@unique([userId, tweetId])
   @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
   @@index([userId, tweetCreatedAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, authorUsername, id])
 }
 
 model Tag {
@@ -109,6 +114,8 @@ model Collection {
   type             CollectionType @default(user_collection)
   isPublic         Boolean        @default(false)
   shareSlug        String?        @unique
+  /// When set, the public share link stops resolving at this instant; null means the link never expires.
+  shareExpiresAt   DateTime?
   externalSource   String?
   externalSourceId String?
   createdAt        DateTime       @default(now())

@@ -8,6 +8,7 @@ import {
   invalidateBookmarkCollectionSideEffects,
   invalidateBookmarkDeletionSideEffects,
   invalidateBookmarkListQueries,
+  invalidateBookmarkNoteSideEffects,
   invalidateBookmarkTagSideEffects,
   invalidateLibraryQueries,
 } from "@/lib/query-invalidation";
@@ -216,6 +217,9 @@ export function useBookmarkActions() {
       });
       toast.error(err instanceof Error ? err.message : "Could not save note");
     },
+    onSettled: () => {
+      void invalidateBookmarkNoteSideEffects(queryClient);
+    },
   });
 
   const deleteNoteMutation = useMutation({
@@ -252,6 +256,9 @@ export function useBookmarkActions() {
         queryClient.setQueryData(key, data);
       });
       toast.error(err instanceof Error ? err.message : "Could not delete note");
+    },
+    onSettled: () => {
+      void invalidateBookmarkNoteSideEffects(queryClient);
     },
   });
 
@@ -347,14 +354,25 @@ export function useBookmarkActions() {
       isAddingToCollection: addToCollectionMutation.isPending,
       isDeletingBookmark: deleteBookmarkMutation.isPending,
     }),
+    // Depend on the stable pieces (mutateAsync identity, isPending flags)
+    // rather than the mutation result objects: TanStack's useMutation returns
+    // a fresh object every render, which made this memo — and everything
+    // downstream that depends on `actions` — recompute unconditionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       refreshAll,
-      addTagMutation,
-      removeTagMutation,
-      addNoteMutation,
-      deleteNoteMutation,
-      addToCollectionMutation,
-      deleteBookmarkMutation,
+      addTagMutation.mutateAsync,
+      addTagMutation.isPending,
+      removeTagMutation.mutateAsync,
+      removeTagMutation.isPending,
+      addNoteMutation.mutateAsync,
+      addNoteMutation.isPending,
+      deleteNoteMutation.mutateAsync,
+      deleteNoteMutation.isPending,
+      addToCollectionMutation.mutateAsync,
+      addToCollectionMutation.isPending,
+      deleteBookmarkMutation.mutateAsync,
+      deleteBookmarkMutation.isPending,
     ]
   );
 }

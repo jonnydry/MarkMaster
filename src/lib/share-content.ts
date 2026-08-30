@@ -9,9 +9,23 @@ export interface ShareContent {
   xIntentUrl: string;
   collectionName: string;
   itemCount: number;
+  /** ISO timestamp the share link expires at; null means it never expires. */
+  shareExpiresAt: string | null;
 }
 
 import { getBookmarkTweetUrl } from "./bookmark-url";
+
+/**
+ * True once a share link's expiry has passed — an expired link behaves as if
+ * the collection were unpublished. Accepts strings because values read back
+ * from unstable_cache have their Dates JSON-serialized to ISO strings.
+ */
+export function isShareLinkExpired(
+  shareExpiresAt: Date | string | null | undefined
+): boolean {
+  if (!shareExpiresAt) return false;
+  return new Date(shareExpiresAt).getTime() <= Date.now();
+}
 
 const X_TWEET_MAX_LENGTH = 280;
 
@@ -54,7 +68,8 @@ export function generateShareContent(
   collectionDescription: string | null,
   bookmarks: BookmarkForShare[],
   shareSlug: string,
-  origin: string
+  origin: string,
+  shareExpiresAt: Date | null = null
 ): ShareContent {
   const shareUrl = `${origin}/share/${shareSlug}`;
   const total = bookmarks.length;
@@ -114,6 +129,7 @@ export function generateShareContent(
     xIntentUrl,
     collectionName,
     itemCount: total,
+    shareExpiresAt: shareExpiresAt ? shareExpiresAt.toISOString() : null,
   };
 }
 

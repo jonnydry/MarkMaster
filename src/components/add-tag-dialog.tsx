@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2 } from "lucide-react";
-import { PRESET_COLORS } from "@/lib/constants";
+import { PRESET_COLORS, getColorName } from "@/lib/constants";
 import { highlightActiveClass, highlightIdleClass, highlightInteractiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { getBalancedTagColor } from "@/lib/tag-colors";
@@ -207,7 +207,7 @@ export function AddTagDialog({
                   <button
                     key={c}
                     type="button"
-                    aria-label={`Select color ${c}`}
+                    aria-label={`Select color ${getColorName(c)}`}
                     aria-pressed={color === c}
                     className={cn(
                       "h-6 w-6 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getHighlightFeedback } from "@/lib/highlight-feedback";
@@ -503,7 +503,28 @@ export function useOrbitReviewSession({
     setActiveDraftId,
   ]);
 
-  const handleApplyAll = useCallback(async () => {
+  // Synchronous single-flight guard: keyboard shortcuts ("a"/"x") can repeat
+  // while an apply is awaiting the network, which would double-apply the same
+  // draft. The ref refuses re-entry immediately; the state drives UI disabling.
+  const applyInFlightRef = useRef(false);
+  const [isApplying, setIsApplying] = useState(false);
+
+  const runExclusiveApply = useCallback(
+    async (apply: () => Promise<void>) => {
+      if (applyInFlightRef.current) return;
+      applyInFlightRef.current = true;
+      setIsApplying(true);
+      try {
+        await apply();
+      } finally {
+        applyInFlightRef.current = false;
+        setIsApplying(false);
+      }
+    },
+    []
+  );
+
+  const applyAll = useCallback(async () => {
     if (
       !reviewedPlan ||
       (reviewedPlan.suggestions.length === 0 && keptBookmarkIds.length === 0)
@@ -538,7 +559,12 @@ export function useOrbitReviewSession({
     reviewedPlan,
   ]);
 
-  const handleApplyCurrent = useCallback(async () => {
+  const handleApplyAll = useCallback(
+    () => runExclusiveApply(applyAll),
+    [applyAll, runExclusiveApply]
+  );
+
+  const applyCurrent = useCallback(async () => {
     if (!activeDraft || !sourcePlan) return;
 
     const singlePlan = buildReviewedOrbitPlan({
@@ -577,7 +603,12 @@ export function useOrbitReviewSession({
     sourcePlan,
   ]);
 
-  const handleKeepCurrent = useCallback(async () => {
+  const handleApplyCurrent = useCallback(
+    () => runExclusiveApply(applyCurrent),
+    [applyCurrent, runExclusiveApply]
+  );
+
+  const keepCurrent = useCallback(async () => {
     if (!activeDraft || !sourcePlan) return;
     const keptDraft = {
       ...activeDraft,
@@ -628,6 +659,11 @@ export function useOrbitReviewSession({
     sourcePlan,
     updateDraft,
   ]);
+
+  const handleKeepCurrent = useCallback(
+    () => runExclusiveApply(keepCurrent),
+    [keepCurrent, runExclusiveApply]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -720,6 +756,7 @@ export function useOrbitReviewSession({
     handleApplyCurrent,
     handleKeepCurrent,
     handleApplyAll,
+    isApplying,
     pendingApplyCount,
     canApplyAll: Boolean(
       reviewedPlan &&

@@ -70,7 +70,7 @@ function MapMetric({
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+      <p className="text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </p>
       <p className="text-sm font-semibold tabular-nums text-foreground/85">
@@ -86,7 +86,7 @@ function MapMetricDivider() {
 
 function CompactMetric({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-2xs text-muted-foreground/80">
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-2xs text-muted-foreground">
       <span className="font-medium uppercase tracking-[0.14em]">{label}</span>
       <span className="font-semibold tabular-nums text-foreground/85">
         {value.toLocaleString()}
