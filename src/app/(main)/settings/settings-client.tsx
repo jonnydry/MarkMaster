@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { AppPageShell } from "@/components/app-page-shell";
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { sendJson } from "@/lib/fetch-json";
+import { toast } from "@/lib/toast";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -140,6 +143,27 @@ export default function SettingsPage() {
       updateSession: () => updateSession({ refresh: "lastSyncAt" }),
     });
   }, [queryClient, updateSession]);
+
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
+  const handleRevokeSessions = useCallback(async () => {
+    const confirmed = await confirmDialog({
+      title: "Sign out everywhere?",
+      description:
+        "Sessions on all devices are invalidated within a few minutes. You'll be signed out here immediately.",
+      confirmLabel: "Sign out everywhere",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    setIsRevokingSessions(true);
+    try {
+      await sendJson("/api/user/revoke-sessions", { method: "POST" });
+      await signOut({ callbackUrl: "/" });
+    } catch {
+      toast.error("Could not revoke sessions. Please try again.");
+      setIsRevokingSessions(false);
+    }
+  }, []);
 
   const scrollToSettingsSection = useCallback((sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({
@@ -387,7 +411,6 @@ export default function SettingsPage() {
                     <SettingsRow
                       label="Sign out"
                       description="Clears this browser session. Your synced data stays until you revoke access on X."
-                      divider={false}
                     >
                       <Button
                         variant="destructive"
@@ -397,6 +420,22 @@ export default function SettingsPage() {
                       >
                         <LogOut className="size-4" />
                         Sign out
+                      </Button>
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Sign out everywhere"
+                      description="Invalidates sessions on all devices within a few minutes. Use this if a device was lost or a session may be compromised."
+                      divider={false}
+                    >
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="gap-2"
+                        disabled={isRevokingSessions}
+                        onClick={handleRevokeSessions}
+                      >
+                        <ShieldCheck className="size-4" />
+                        {isRevokingSessions ? "Signing out…" : "Sign out everywhere"}
                       </Button>
                     </SettingsRow>
                   </SettingsSection>

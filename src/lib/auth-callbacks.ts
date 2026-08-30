@@ -20,7 +20,20 @@ export interface SessionWithUser extends Session {
   dbUser?: DbUser;
 }
 
-type JwtWithDbUser = JWT & { dbUser?: JwtDbUser };
+type JwtWithDbUser = JWT & {
+  dbUser?: JwtDbUser;
+  /** User.sessionVersion at last validation; a DB mismatch revokes the session. */
+  sessionVersion?: number;
+  /** Epoch ms of the last sessionVersion check against the database. */
+  sessionValidatedAt?: number;
+};
+
+/**
+ * How long a JWT may go without re-checking User.sessionVersion. The token is
+ * the source of truth between checks (no DB hit in the happy path), so this
+ * is the maximum time a revoked session stays usable.
+ */
+export const SESSION_REVALIDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 export async function authSignInCallback({
   account,
@@ -108,6 +121,55 @@ export async function authSignInCallback({
   return true;
 }
 
+/**
+ * Compare the token's sessionVersion against the database at most once per
+ * SESSION_REVALIDATE_INTERVAL_MS. Returns false when the session has been
+ * revoked (version bumped or user deleted). Database errors fail open —
+ * a DB blip must not log everyone out — and leave sessionValidatedAt
+ * untouched so the next request retries.
+ */
+async function revalidateSessionVersion(
+  token: JwtWithDbUser
+): Promise<boolean> {
+  const userId = token.dbUser?.id;
+  // Legacy tokens minted before dbUser embedding carry only xId; they are at
+  // most maxAge old and get replaced at next sign-in. Skip rather than guess.
+  if (!userId) return true;
+
+  const validatedAt = token.sessionValidatedAt;
+  if (
+    typeof validatedAt === "number" &&
+    typeof token.sessionVersion === "number" &&
+    Date.now() - validatedAt < SESSION_REVALIDATE_INTERVAL_MS
+  ) {
+    return true;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { sessionVersion: true },
+    });
+
+    if (!user) return false;
+
+    // Tokens minted before sessionVersion existed adopt the current version.
+    if (
+      typeof token.sessionVersion === "number" &&
+      user.sessionVersion !== token.sessionVersion
+    ) {
+      return false;
+    }
+
+    token.sessionVersion = user.sessionVersion;
+    token.sessionValidatedAt = Date.now();
+    return true;
+  } catch (e) {
+    console.error("[auth] sessionVersion revalidation failed:", e);
+    return true;
+  }
+}
+
 export async function authJwtCallback({
   token,
   account,
@@ -119,7 +181,7 @@ export async function authJwtCallback({
   account?: Account | null;
   profile?: Profile;
   trigger?: "signIn" | "signUp" | "update";
-}): Promise<JWT> {
+}): Promise<JWT | null> {
   const tokenWithDbUser = token as JwtWithDbUser;
 
   if (account) {
@@ -136,11 +198,15 @@ export async function authJwtCallback({
           profileImageUrl: true,
           lastSyncAt: true,
           syncXFolders: true,
+          sessionVersion: true,
         },
       });
 
       if (user) {
-        tokenWithDbUser.dbUser = user;
+        const { sessionVersion, ...dbUser } = user;
+        tokenWithDbUser.dbUser = dbUser;
+        tokenWithDbUser.sessionVersion = sessionVersion;
+        tokenWithDbUser.sessionValidatedAt = Date.now();
       }
     } catch (e) {
       console.error("[auth] jwt initial load failed:", e);
@@ -150,6 +216,9 @@ export async function authJwtCallback({
     const twitterProfile = profile as Record<string, unknown> | undefined;
     const data = twitterProfile?.data as Record<string, string> | undefined;
     tokenWithDbUser.username = data?.username ?? (profile?.name || "");
+  } else {
+    const stillValid = await revalidateSessionVersion(tokenWithDbUser);
+    if (!stillValid) return null;
   }
 
   if (trigger === "update" && tokenWithDbUser.dbUser) {

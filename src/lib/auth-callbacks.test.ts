@@ -113,7 +113,7 @@ describe("authJwtCallback", () => {
     vi.clearAllMocks();
   });
 
-  it("embeds dbUser on initial sign-in", async () => {
+  it("embeds dbUser and stamps sessionVersion on initial sign-in", async () => {
     const { authJwtCallback } = await import("./auth-callbacks");
     const dbUser = {
       id: "user-1",
@@ -125,7 +125,7 @@ describe("authJwtCallback", () => {
       syncXFolders: false,
     };
 
-    prismaMock.user.findUnique.mockResolvedValue(dbUser);
+    prismaMock.user.findUnique.mockResolvedValue({ ...dbUser, sessionVersion: 3 });
 
     const token = await authJwtCallback({
       token: {},
@@ -133,9 +133,12 @@ describe("authJwtCallback", () => {
       profile: { data: { username: "alice" }, name: "Alice" } as Profile,
     });
 
-    expect(token.dbUser).toEqual(dbUser);
-    expect(token.xId).toBe("x-1");
-    expect(token.username).toBe("alice");
+    expect(token).not.toBeNull();
+    expect(token?.dbUser).toEqual(dbUser);
+    expect(token?.sessionVersion).toBe(3);
+    expect(token?.sessionValidatedAt).toEqual(expect.any(Number));
+    expect(token?.xId).toBe("x-1");
+    expect(token?.username).toBe("alice");
   });
 
   it("refreshes lastSyncAt when trigger is update", async () => {
@@ -162,12 +165,130 @@ describe("authJwtCallback", () => {
       trigger: "update",
     });
 
-    expect(token.dbUser?.lastSyncAt).toEqual(syncedAt);
-    expect(token.dbUser?.syncXFolders).toBe(true);
+    expect(token?.dbUser?.lastSyncAt).toEqual(syncedAt);
+    expect(token?.dbUser?.syncXFolders).toBe(true);
     expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-1" },
       select: { lastSyncAt: true, syncXFolders: true },
     });
+  });
+});
+
+describe("authJwtCallback sessionVersion revalidation", () => {
+  const dbUser = {
+    id: "user-1",
+    xId: "x-1",
+    username: "alice",
+    displayName: "Alice",
+    profileImageUrl: null,
+    lastSyncAt: null,
+    syncXFolders: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("skips the database when the token was validated recently", async () => {
+    const { authJwtCallback } = await import("./auth-callbacks");
+
+    const token = await authJwtCallback({
+      token: {
+        dbUser,
+        sessionVersion: 1,
+        sessionValidatedAt: Date.now() - 1000,
+      },
+    });
+
+    expect(token).not.toBeNull();
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the stored sessionVersion no longer matches", async () => {
+    const { authJwtCallback, SESSION_REVALIDATE_INTERVAL_MS } = await import(
+      "./auth-callbacks"
+    );
+
+    prismaMock.user.findUnique.mockResolvedValue({ sessionVersion: 2 });
+
+    const token = await authJwtCallback({
+      token: {
+        dbUser,
+        sessionVersion: 1,
+        sessionValidatedAt: Date.now() - SESSION_REVALIDATE_INTERVAL_MS - 1,
+      },
+    });
+
+    expect(token).toBeNull();
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      select: { sessionVersion: true },
+    });
+  });
+
+  it("returns null when the user row is gone", async () => {
+    const { authJwtCallback } = await import("./auth-callbacks");
+
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    const token = await authJwtCallback({
+      token: { dbUser, sessionVersion: 1 },
+    });
+
+    expect(token).toBeNull();
+  });
+
+  it("re-stamps the token when the version still matches", async () => {
+    const { authJwtCallback, SESSION_REVALIDATE_INTERVAL_MS } = await import(
+      "./auth-callbacks"
+    );
+
+    prismaMock.user.findUnique.mockResolvedValue({ sessionVersion: 1 });
+    const staleValidatedAt = Date.now() - SESSION_REVALIDATE_INTERVAL_MS - 1;
+
+    const token = await authJwtCallback({
+      token: {
+        dbUser,
+        sessionVersion: 1,
+        sessionValidatedAt: staleValidatedAt,
+      },
+    });
+
+    expect(token).not.toBeNull();
+    expect(token?.sessionValidatedAt).toBeGreaterThan(staleValidatedAt);
+  });
+
+  it("adopts the current version for tokens minted before sessionVersion existed", async () => {
+    const { authJwtCallback } = await import("./auth-callbacks");
+
+    prismaMock.user.findUnique.mockResolvedValue({ sessionVersion: 4 });
+
+    const token = await authJwtCallback({ token: { dbUser } });
+
+    expect(token).not.toBeNull();
+    expect(token?.sessionVersion).toBe(4);
+  });
+
+  it("fails open on database errors without stamping validation time", async () => {
+    const { authJwtCallback } = await import("./auth-callbacks");
+
+    prismaMock.user.findUnique.mockRejectedValue(new Error("db down"));
+
+    const token = await authJwtCallback({
+      token: { dbUser, sessionVersion: 1 },
+    });
+
+    expect(token).not.toBeNull();
+    expect(token?.sessionValidatedAt).toBeUndefined();
+  });
+
+  it("leaves legacy tokens without dbUser untouched", async () => {
+    const { authJwtCallback } = await import("./auth-callbacks");
+
+    const token = await authJwtCallback({ token: { xId: "x-legacy" } });
+
+    expect(token).not.toBeNull();
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
   });
 });
 
