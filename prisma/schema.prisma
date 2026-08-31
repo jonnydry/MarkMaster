@@ -81,6 +81,9 @@ model Bookmark {
   @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
   @@index([userId, tweetCreatedAt(sort: Desc), id(sort: Desc)])
   @@index([userId, authorUsername, id])
+  @@index([tweetText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_tweetText_trgm_idx")
+  @@index([authorUsername(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_authorUsername_trgm_idx")
+  @@index([authorDisplayName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_authorDisplayName_trgm_idx")
 }
 
 model Tag {
@@ -155,6 +158,7 @@ model Note {
 
   @@unique([bookmarkId, userId])
   @@index([userId])
+  @@index([content(ops: raw("gin_trgm_ops"))], type: Gin, map: "Note_content_trgm_idx")
 }
 
 model HiddenBookmark {
