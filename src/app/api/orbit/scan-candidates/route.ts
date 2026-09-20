@@ -7,6 +7,7 @@ import {
   buildBookmarkSearchTermSql,
   tokenizeBookmarkSearch,
 } from "@/lib/bookmark-search";
+import { bookmarkListSelect } from "@/lib/bookmark-list-query";
 import { ORBIT_SCAN_CANDIDATE_POOL_SIZE } from "@/lib/orbit-config";
 import { prisma } from "@/lib/prisma";
 import {
@@ -27,13 +28,19 @@ const scanCandidatesQuerySchema = z.object({
   sortDirection: z.enum(["asc", "desc"]).default("desc"),
 });
 
-const scanCandidateInclude = {
-  tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
-  notes: { select: { id: true, content: true } },
-  collectionItems: {
-    select: { collection: { select: { id: true, name: true } } },
-  },
-} as const;
+/**
+ * Compact candidate rows (Speed-H3): the old `include` shipped every scalar
+ * column — quotedTweet, xMetadata, publicMetrics, media — turning 160 rows
+ * into a multi-MB payload. The client batch planner and queue/review cards
+ * only consume the slim list fields (tweetText, urls, media alt text, notes,
+ * tags, collections); the scan route re-reads full rows server-side, so the
+ * big JSON blobs are returned as explicit nulls to keep the response shape.
+ */
+const scanCandidateSelect = bookmarkListSelect;
+
+function toScanCandidateRow<T extends object>(bookmark: T) {
+  return { ...bookmark, quotedTweet: null, xMetadata: null };
+}
 
 function buildScanCandidateBaseSql(userId: string, searchTerms: string[]) {
   const conditions: Prisma.Sql[] = [
@@ -96,13 +103,13 @@ export async function GET(req: NextRequest) {
         ? []
         : await prisma.bookmark.findMany({
             where: { id: { in: pageIds } },
-            include: scanCandidateInclude,
+            select: scanCandidateSelect,
           });
 
     const order = new Map(pageIds.map((id, index) => [id, index]));
     bookmarks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 
-    return NextResponse.json({ bookmarks });
+    return NextResponse.json({ bookmarks: bookmarks.map(toScanCandidateRow) });
   }
 
   const relationFilters: Prisma.BookmarkWhereInput[] = [
@@ -121,11 +128,11 @@ export async function GET(req: NextRequest) {
 
   const bookmarks = await prisma.bookmark.findMany({
     where,
-    include: scanCandidateInclude,
+    select: scanCandidateSelect,
     orderBy: { bookmarkedAt: sortDirection },
     skip: (page - 1) * pageSize,
     take: limit,
   });
 
-  return NextResponse.json({ bookmarks });
+  return NextResponse.json({ bookmarks: bookmarks.map(toScanCandidateRow) });
 }

@@ -41,12 +41,20 @@ describe("/api/orbit/scan-candidates", () => {
     const sql = pageQuery?.strings?.join(" ") ?? "";
 
     expect(response.status).toBe(200);
-    expect(body.bookmarks).toEqual([{ id: "bookmark-1" }]);
+    // The route trims the payload (Speed-H3): heavyweight JSON blobs come
+    // back as explicit nulls so the client type contract is unchanged.
+    expect(body.bookmarks).toEqual([
+      { id: "bookmark-1", quotedTweet: null, xMetadata: null },
+    ]);
     expect(sql).toContain('"tweetText" ILIKE');
     expect(sql).toContain("user_collection");
     expect(prisma.bookmark.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: { in: ["bookmark-1"] } },
+        select: expect.not.objectContaining({
+          quotedTweet: true,
+          xMetadata: true,
+        }),
       })
     );
   });
@@ -85,5 +93,40 @@ describe("/api/orbit/scan-candidates", () => {
         take: 50,
       })
     );
+  });
+
+  it("selects compact rows without quotedTweet/xMetadata blobs", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+      { id: "bookmark-1", tweetText: "hello", urls: [] },
+    ]);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/scan-candidates")
+    );
+    const body = await response.json();
+
+    const findManyArgs = vi.mocked(prisma.bookmark.findMany).mock.calls[0]?.[0];
+    expect(findManyArgs).not.toHaveProperty("include");
+    expect(findManyArgs?.select).toMatchObject({
+      id: true,
+      tweetText: true,
+      urls: true,
+      media: true,
+      publicMetrics: true,
+      tags: expect.anything(),
+      notes: expect.anything(),
+      collectionItems: expect.anything(),
+    });
+    expect(findManyArgs?.select).not.toHaveProperty("quotedTweet");
+    expect(findManyArgs?.select).not.toHaveProperty("xMetadata");
+
+    expect(body.bookmarks[0]).toMatchObject({
+      id: "bookmark-1",
+      quotedTweet: null,
+      xMetadata: null,
+    });
   });
 });

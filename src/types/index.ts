@@ -53,6 +53,7 @@ export interface BookmarkWithRelations {
     description?: string;
     images?: Array<{ url: string; width: number; height: number }>;
   }> | null;
+  /** Null from compact endpoints (scan-candidates) — only detail routes hydrate it. */
   quotedTweet: {
     id: string;
     text: string;
@@ -62,6 +63,7 @@ export interface BookmarkWithRelations {
       profile_image_url?: string;
     } | null;
   } | null;
+  /** Null from compact endpoints (scan-candidates) — only detail routes hydrate it. */
   xMetadata: {
     schemaVersion?: number;
     tweet?: Record<string, unknown>;
