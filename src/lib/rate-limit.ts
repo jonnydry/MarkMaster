@@ -119,7 +119,8 @@ function getRatelimiters(): Record<RateLimitAction, Ratelimit> | null {
           new Ratelimit({
             redis,
             limiter: Ratelimit.slidingWindow(policy.requests, policy.window),
-            analytics: true,
+            // No Upstash analytics: each check stays a single Redis roundtrip (Speed-H2).
+            analytics: false,
             prefix: prefixForAction(action),
           }),
         ]
@@ -142,7 +143,8 @@ function getGlobalSyncLimiter() {
     _globalSyncLimiter = new Ratelimit({
       redis: getRedis()!,
       limiter: Ratelimit.slidingWindow(GLOBAL_SYNC_LIMIT.requests, GLOBAL_SYNC_LIMIT.window),
-      analytics: true,
+      // No Upstash analytics: each check stays a single Redis roundtrip (Speed-H2).
+      analytics: false,
       prefix: "ratelimit:global-sync",
     });
   }
@@ -154,7 +156,8 @@ function getGlobalOrbitLimiter() {
     _globalOrbitLimiter = new Ratelimit({
       redis: getRedis()!,
       limiter: Ratelimit.slidingWindow(GLOBAL_ORBIT_LIMIT.requests, GLOBAL_ORBIT_LIMIT.window),
-      analytics: true,
+      // No Upstash analytics: each check stays a single Redis roundtrip (Speed-H2).
+      analytics: false,
       prefix: "ratelimit:global-orbit",
     });
   }

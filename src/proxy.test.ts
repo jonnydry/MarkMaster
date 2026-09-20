@@ -191,6 +191,20 @@ describe("auth limiter", () => {
     expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
 
+  it("prefers the auth 429 when the auth and global budgets both deny", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-30T00:00:00Z"));
+    proxyLimitMock.mockResolvedValue({ success: false, reset: Date.now() + 10_000 });
+    const proxy = await importProxy();
+
+    const response = await proxy(makeRequest("/api/auth/callback/twitter"));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      message: "Too many sign-in attempts.",
+    });
+  });
+
   it("fails open when the auth limiter throws", async () => {
     proxyLimitMock.mockImplementation(async (prefix: string) => {
       if (prefix === "ratelimit:auth") throw new Error("redis down");
@@ -231,7 +245,65 @@ describe("global limiter", () => {
 
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("5");
-    expect(getUserIdFromRequestMock).not.toHaveBeenCalled();
+    // The per-user check runs concurrently with the global check, so the JWT
+    // decode fires even on a global denial — the denial still wins.
+    expect(getUserIdFromRequestMock).toHaveBeenCalled();
+  });
+
+  it("prefers the global 429 when global and per-user checks both deny", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-30T00:00:00Z"));
+    proxyLimitMock.mockImplementation(async (prefix: string) =>
+      prefix === "ratelimit:global"
+        ? { success: false, reset: Date.now() + 5_000 }
+        : allowResult
+    );
+    getUserIdFromRequestMock.mockResolvedValue("user-1");
+    checkRateLimitMock.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: Date.now() + 60_000,
+      retryAfter: 60,
+    });
+    createRateLimitResponseMock.mockReturnValue(
+      NextResponse.json({ error: "per-user" }, { status: 429 })
+    );
+    const proxy = await importProxy();
+
+    const response = await proxy(makeRequest("/api/bookmarks"));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      message: "The system is under high load. Please try again later.",
+    });
+  });
+
+  it("runs the global and per-user checks concurrently", async () => {
+    // The global check only resolves after the per-user check has started —
+    // a serial chain would deadlock here and time out.
+    getUserIdFromRequestMock.mockResolvedValue("user-1");
+    let releaseGlobal: (() => void) | undefined;
+    const globalGate = new Promise<void>((resolve) => {
+      releaseGlobal = resolve;
+    });
+    proxyLimitMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "ratelimit:global") {
+        await globalGate;
+      }
+      return allowResult;
+    });
+    checkRateLimitMock.mockImplementation(async () => {
+      releaseGlobal?.();
+      return allowResult;
+    });
+    const proxy = await importProxy();
+
+    const response = await proxy(makeRequest("/api/bookmarks"));
+
+    expectPassthrough(response);
+    expect(proxyLimitMock).toHaveBeenCalledWith("ratelimit:global", expect.any(String));
+    expect(checkRateLimitMock).toHaveBeenCalledWith("api:read", "user-1");
   });
 
   it("fails open and continues to per-user limiting when the global limiter throws", async () => {

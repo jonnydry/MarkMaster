@@ -33,13 +33,15 @@ function getProxyLimiters() {
     globalLimiter = new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(500, "1 m"), // 500 req/min across all IPs
-      analytics: true,
+      // No Upstash analytics: each check stays a single Redis roundtrip (Speed-H2).
+      analytics: false,
       prefix: "ratelimit:global",
     });
     authLimiter = new Ratelimit({
       redis,
       limiter: Ratelimit.slidingWindow(60, "5 m"),
-      analytics: true,
+      // No Upstash analytics: each check stays a single Redis roundtrip (Speed-H2).
+      analytics: false,
       prefix: "ratelimit:auth",
     });
   } catch (err) {
@@ -138,15 +140,21 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  // === Global Safety Limit ===
+  // === Rate limiting ===
   // Resolve the client IP without trusting client-spoofable x-forwarded-for hops.
   // Tune TRUSTED_PROXY_HOPS to your deployment's proxy chain (see lib/client-ip.ts).
   const ip = getClientIp(request.headers);
   const limiters = getProxyLimiters();
 
+  // Each check resolves to a denial response or null. They run concurrently
+  // (Speed-H2): the old serial chain cost 2-3 Upstash roundtrips per request.
+  // Denial precedence is unchanged — auth before global, global before
+  // per-user — and every check fails open on Redis errors.
+
   // OAuth endpoints stay reachable when the main API is intentionally failing
   // closed, but receive their own conservative IP budget when Redis is present.
-  if (isAuthRoute && limiters.authLimiter) {
+  const checkAuthIpLimit = async (): Promise<NextResponse | null> => {
+    if (!isAuthRoute || !limiters.authLimiter) return null;
     try {
       const authResult = await limiters.authLimiter.limit(ip);
       if (!authResult.success) {
@@ -165,13 +173,13 @@ export async function proxy(request: NextRequest) {
     } catch (error) {
       logError("Proxy", "Auth rate limit check failed (failing open)", error);
     }
-  }
+    return null;
+  };
 
-  // Safely check global rate limit. If Redis is down or misconfigured, fail open.
-  if (limiters.globalLimiter) {
+  const checkGlobalIpLimit = async (): Promise<NextResponse | null> => {
+    if (!limiters.globalLimiter) return null;
     try {
       const globalResult = await limiters.globalLimiter.limit(ip);
-
       if (!globalResult.success) {
         return NextResponse.json(
           {
@@ -181,7 +189,9 @@ export async function proxy(request: NextRequest) {
           {
             status: 429,
             headers: {
-              "Retry-After": String(Math.ceil((globalResult.reset - Date.now()) / 1000)),
+              "Retry-After": String(
+                Math.ceil((globalResult.reset - Date.now()) / 1000)
+              ),
             },
           }
         );
@@ -190,40 +200,50 @@ export async function proxy(request: NextRequest) {
       logError("Proxy", "Global rate limit check failed (failing open)", error);
       // Fail open to avoid taking down the entire application
     }
-  }
+    return null;
+  };
 
-  if (skipsPerUserLimit) {
-    return NextResponse.next();
-  }
-
-  // === Per-user rate limiting ===
   // api:read / api:write are enforced here for all authenticated API routes.
   // Route handlers use checkRateLimit only for specialized buckets (sync, orbit, csp-report).
-  const userId = await getUserIdFromRequest(request);
+  const checkPerUserLimit = async (): Promise<NextResponse | null> => {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) return null;
 
-  if (!userId) {
-    return NextResponse.next();
-  }
+    const method = request.method;
+    if (isLightweightApiRequest(pathname, method)) return null;
 
-  const method = request.method;
+    const action =
+      method === "GET" || method === "HEAD" ? "api:read" : "api:write";
 
-  if (isLightweightApiRequest(pathname, method)) {
-    return NextResponse.next();
-  }
-
-  const action = method === "GET" || method === "HEAD" ? "api:read" : "api:write";
-
-  // Wrap per-user rate limiting in try/catch as an extra safety net
-  try {
-    const rateLimitResult = await checkRateLimit(action, userId);
-
-    if (!rateLimitResult.success) {
-      return createRateLimitResponse(rateLimitResult);
+    // Wrap per-user rate limiting in try/catch as an extra safety net
+    try {
+      const rateLimitResult = await checkRateLimit(action, userId);
+      if (!rateLimitResult.success) {
+        return createRateLimitResponse(rateLimitResult);
+      }
+    } catch (error) {
+      logError("Proxy", "Per-user rate limit check failed (failing open)", error);
+      // Fail open — do not block legitimate users when rate limiting is broken
     }
-  } catch (error) {
-    logError("Proxy", "Per-user rate limit check failed (failing open)", error);
-    // Fail open — do not block legitimate users when rate limiting is broken
+    return null;
+  };
+
+  if (skipsPerUserLimit) {
+    const [authDenied, globalDenied] = await Promise.all([
+      checkAuthIpLimit(),
+      checkGlobalIpLimit(),
+    ]);
+    if (authDenied) return authDenied;
+    if (globalDenied) return globalDenied;
+    return NextResponse.next();
   }
+
+  const [globalDenied, perUserDenied] = await Promise.all([
+    checkGlobalIpLimit(),
+    checkPerUserLimit(),
+  ]);
+  if (globalDenied) return globalDenied;
+  if (perUserDenied) return perUserDenied;
 
   return NextResponse.next();
 }
