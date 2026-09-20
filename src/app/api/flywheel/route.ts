@@ -5,7 +5,6 @@ import { flywheelEventSchema } from "@/lib/flywheel-event-schema";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
-import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 const MAX_FLYWHEEL_BODY_BYTES = 8 * 1024;
 
@@ -57,7 +56,12 @@ export async function POST(request: Request) {
       },
     });
 
-    await invalidateUserResponseCache(user.id);
+    // Deliberately no response-cache invalidation (Speed-H1): flywheel events
+    // are telemetry only read by /api/orbit/scan-quality, which queries
+    // Prisma directly and never goes through the versioned response cache.
+    // Bumping the per-user cache version here nuked the analytics/graph/scan
+    // caches on every ingested event — including the scan cache the
+    // just-completed scan had filled.
 
     return NextResponse.json({ ok: true });
   } catch (err) {
