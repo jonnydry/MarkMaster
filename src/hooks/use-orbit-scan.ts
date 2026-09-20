@@ -82,6 +82,16 @@ export interface OrbitScanHandle extends OrbitScanState {
   getDecision: (bookmarkId: string) => OrbitBookmarkDecision | null;
   hasSuggestion: (bookmarkId: string) => boolean;
   clearPlan: () => void;
+  /**
+   * Restore a previously persisted scan plan + review progress (UX-H1).
+   * No flywheel event fires — the scan already reported completion when it
+   * originally ran. No-op while a scan is in flight; callers should only
+   * restore when no plan exists.
+   */
+  restoreScanSnapshot: (
+    payload: OrbitScanResponsePayload,
+    dismissedBookmarkIds: Iterable<string>
+  ) => void;
 }
 
 export type OrbitScanApi = OrbitScanHandle;
@@ -682,6 +692,20 @@ export function useOrbitScan(): OrbitScanHandle {
     setError(null);
   }, []);
 
+  const restoreScanSnapshot = useCallback(
+    (
+      payload: OrbitScanResponsePayload,
+      dismissedBookmarkIds: Iterable<string>
+    ) => {
+      if (scanInFlightRef.current) return;
+      setPlan(payload);
+      setScannedBookmarks(payload.scannedBookmarks ?? []);
+      setDismissed(new Set(dismissedBookmarkIds));
+      setError(null);
+    },
+    []
+  );
+
   return {
     plan,
     scannedBookmarks,
@@ -701,5 +725,6 @@ export function useOrbitScan(): OrbitScanHandle {
     getDecision,
     hasSuggestion,
     clearPlan,
+    restoreScanSnapshot,
   };
 }

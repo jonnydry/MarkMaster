@@ -14,6 +14,11 @@ import {
   deriveOrbitScanBatchState,
   mergeReviewBookmarks,
 } from "@/lib/orbit-scan-batch-state";
+import {
+  clearOrbitScanSnapshot,
+  loadOrbitScanSnapshot,
+  saveOrbitScanSnapshot,
+} from "@/lib/orbit-scan-snapshot";
 import { useOrbitFlywheelScan } from "@/hooks/use-orbit-flywheel-scan";
 import { useOrbitReviewBridge } from "@/hooks/use-orbit-review-bridge";
 import { useOrbitScanRunners } from "@/hooks/use-orbit-scan-runners";
@@ -40,6 +45,8 @@ import type {
 type UseOrbitScanSessionOptions = {
   router: ReturnType<typeof import("next/navigation").useRouter>;
   searchParams: ReturnType<typeof import("next/navigation").useSearchParams>;
+  /** Current user id — scopes the persisted scan snapshot (UX-H1). */
+  userId: string | null;
   orbitView: OrbitView;
   page: number;
   pageSize: number;
@@ -62,6 +69,7 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
   const {
     router,
     searchParams,
+    userId,
     orbitView,
     page,
     pageSize,
@@ -88,6 +96,43 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
   );
   const [scanBatchMode, setScanBatchMode] =
     useState<OrbitScanBatchMode>("auto");
+
+  // UX-H1 interim persistence: rehydrate a scan plan saved by this browser
+  // tab so navigating away from Orbit no longer discards a paid scan. Runs
+  // once per mount, only after the user id is known, and never clobbers a
+  // plan from a scan that raced ahead of rehydration.
+  const scanSnapshotRestoreAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (scanSnapshotRestoreAttemptedRef.current) return;
+    if (!userId) return;
+    scanSnapshotRestoreAttemptedRef.current = true;
+    if (scan.plan || scan.scanning) return;
+    const snapshot = loadOrbitScanSnapshot(userId);
+    if (!snapshot) return;
+    scan.restoreScanSnapshot(snapshot.payload, snapshot.dismissedBookmarkIds);
+    // One-shot rehydration from sessionStorage: lazy useState init cannot be
+    // used because the user id resolves asynchronously from the session, and
+    // this runs at most once per mount — no cascading-render risk.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAppliedBookmarkIds(new Set(snapshot.appliedBookmarkIds));
+  }, [userId, scan]);
+
+  // Mirror the active plan + review progress into sessionStorage; clearing
+  // the plan (apply-all, dismissal, completion) removes the snapshot. Waits
+  // for the restore attempt so a fresh mount cannot wipe a stored snapshot.
+  useEffect(() => {
+    if (!userId || !scanSnapshotRestoreAttemptedRef.current) return;
+    if (scan.plan) {
+      saveOrbitScanSnapshot({
+        userId,
+        payload: scan.plan,
+        dismissedBookmarkIds: scan.dismissedBookmarkIds,
+        appliedBookmarkIds,
+      });
+    } else {
+      clearOrbitScanSnapshot(userId);
+    }
+  }, [userId, scan.plan, scan.dismissedBookmarkIds, appliedBookmarkIds]);
 
   const review = useOrbitReviewBridge({
     scan,

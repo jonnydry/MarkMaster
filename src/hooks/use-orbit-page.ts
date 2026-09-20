@@ -26,6 +26,7 @@ export function useOrbitPage() {
   const session = useOrbitScanSession({
     router: queue.router,
     searchParams: queue.searchParams,
+    userId: queue.dbUser?.id ?? null,
     orbitView: queue.orbitView,
     page: queue.page,
     pageSize: queue.pageSize,
