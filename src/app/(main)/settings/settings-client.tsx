@@ -333,7 +333,7 @@ export default function SettingsPage() {
                     id="orbit-grok"
                     icon={BrainCircuit}
                     title="Orbit Grok"
-                    description="Server-side xAI configuration for scan and review."
+                    description="Grok proposes names; Jev assigns existing vocabulary. Sweep reviews 72 at once. Classify library drains the untagged queue in the background (safe reuse only)."
                     badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
                   >
                     <OrbitGrokStatusPanel

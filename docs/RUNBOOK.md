@@ -64,7 +64,8 @@ manually-failed run cannot be resurrected by a still-running invocation.
 - **Everything returns 503 "Rate limiting is not configured"** — production
   fails closed when `UPSTASH_REDIS_REST_URL`/`_TOKEN` are missing. Set them
   and redeploy. Auth, share pages, `/api/health`, `/api/orbit/status`, and
-  the internal sync routes stay reachable during this state.
+  the internal sync and Orbit library-classify worker routes stay reachable
+  during this state.
 - **Upstash outage** — runtime Redis errors deliberately **fail open** (users
   keep working, throttling is silently off). Evidence: `[Proxy] … rate limit
   check failed (failing open)` log lines. No action usually needed; watch for

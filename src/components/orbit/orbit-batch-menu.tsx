@@ -33,7 +33,11 @@ const BATCH_OPTIONS: Array<{
   {
     mode: "deep",
     label: `Deep`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · largest pass`},
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · richest Grok pass`},
+  {
+    mode: "sweep",
+    label: `Sweep`,
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.sweep.size} bookmarks · Jev assigns existing names`},
 ];
 
 export interface OrbitBatchMenuProps {
@@ -41,6 +45,8 @@ export interface OrbitBatchMenuProps {
   resolvedBatchProfile: OrbitScanBatchProfileId;
   deepUnlocked: boolean;
   deepLockedReason: string;
+  sweepUnlocked: boolean;
+  sweepLockedReason: string;
   disabled?: boolean;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
 }
@@ -55,6 +61,8 @@ export function OrbitBatchMenu({
   resolvedBatchProfile,
   deepUnlocked,
   deepLockedReason,
+  sweepUnlocked,
+  sweepLockedReason,
   disabled = false,
   onBatchModeChange,
 }: OrbitBatchMenuProps) {
@@ -90,11 +98,15 @@ export function OrbitBatchMenu({
             orbitMetaMuted()
           )}
         >
-          Grok batch size
+          Scan batch size
         </div>
         {BATCH_OPTIONS.map((option) => {
           const active = batchMode === option.mode;
-          const locked = option.mode === "deep" && !deepUnlocked;
+          const locked =
+            (option.mode === "deep" && !deepUnlocked) ||
+            (option.mode === "sweep" && !sweepUnlocked);
+          const lockedReason =
+            option.mode === "sweep" ? sweepLockedReason : deepLockedReason;
           return (
             <button
               key={option.mode}
@@ -102,7 +114,7 @@ export function OrbitBatchMenu({
               disabled={locked}
               aria-pressed={active}
               onClick={() => onBatchModeChange(option.mode)}
-              title={locked ? deepLockedReason : option.detail}
+              title={locked ? lockedReason : option.detail}
               className={cn(
                 "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors",
                 active
@@ -128,7 +140,7 @@ export function OrbitBatchMenu({
                     orbitMetaMuted()
                   )}
                 >
-                  {locked ? deepLockedReason : option.detail}
+                  {locked ? lockedReason : option.detail}
                 </span>
               </span>
             </button>

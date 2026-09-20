@@ -23,6 +23,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import {
   orbitScanCandidatesResponseSchema,
   orbitScanQualityPayloadSchema,
+  orbitXaiStatusPayloadSchema,
 } from "@/lib/api-response-schemas";
 import type { OrbitScanCandidatesResponse } from "@/lib/orbit-page-types";
 import { buildOrbitScanCandidatesQueryString } from "@/lib/orbit-queue-params";
@@ -125,6 +126,14 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     staleTime: 60_000,
   });
 
+  const { data: orbitStatus } = useQuery({
+    queryKey: ["orbit", "xai-status", null],
+    queryFn: () =>
+      fetchJson("/api/orbit/status", undefined, orbitXaiStatusPayloadSchema),
+    staleTime: 30_000,
+  });
+  const hybridScanAvailable = Boolean(orbitStatus?.typesafe.apiKeyConfigured);
+
   const scanCandidateBookmarks = scanCandidatesData
     ? scanCandidatesData.bookmarks
     : bookmarks;
@@ -152,11 +161,13 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
         hasSearchQuery,
         scanning: scan.scanning,
         hasPlan: Boolean(scan.plan),
+        hybridScanAvailable,
       }),
     [
       scanCandidateBookmarks,
       bookmarkById,
       scanQuality,
+      hybridScanAvailable,
       scanBatchMode,
       selectionMode,
       selectedBookmarkIds,
@@ -180,6 +191,8 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     selectedScanTargetIds,
     deepUnlocked,
     deepLockedReason,
+    sweepUnlocked,
+    sweepLockedReason,
     hasSelectionOverflow,
     scanHelperText,
     scanButtonLabel,
@@ -313,6 +326,8 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     scanBatchLimit,
     deepUnlocked,
     deepLockedReason,
+    sweepUnlocked,
+    sweepLockedReason,
     canApplyStrongMatches,
     canRescanCurrentSelection,
     staleScanPlan,

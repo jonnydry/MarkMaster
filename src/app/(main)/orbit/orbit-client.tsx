@@ -134,6 +134,8 @@ export default function OrbitPage() {
     scanBatchLimit,
     deepUnlocked,
     deepLockedReason,
+    sweepUnlocked,
+    sweepLockedReason,
     canApplyStrongMatches,
     canRescanCurrentSelection,
     staleScanPlan,
@@ -278,6 +280,8 @@ export default function OrbitPage() {
               resolvedBatchProfile={scanBatchProfile}
               deepUnlocked={deepUnlocked}
               deepLockedReason={deepLockedReason}
+              sweepUnlocked={sweepUnlocked}
+              sweepLockedReason={sweepLockedReason}
               mapHref={orbitMapHref}
               onBatchModeChange={setScanBatchMode}
               onScan={handleScan}

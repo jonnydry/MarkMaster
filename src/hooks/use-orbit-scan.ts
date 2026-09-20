@@ -11,7 +11,7 @@ import {
   isSafeAutoApplySuggestion,
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import { ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import { invalidateOrbitApplyQueries } from "@/lib/query-invalidation";
 import type {
   BookmarkWithRelations,
@@ -132,6 +132,11 @@ function classifyOrbitScanFailure(code: OrbitScanFailureCode): {
         kind: "auth",
         title: "xAI credentials need attention",
       };
+    case "typesafe_auth":
+      return {
+        kind: "auth",
+        title: "TypeSafe credentials need attention",
+      };
     case "xai_model":
       return {
         kind: "model",
@@ -154,6 +159,11 @@ function classifyOrbitScanFailure(code: OrbitScanFailureCode): {
         kind: "provider",
         title: "Grok scan could not finish",
       };
+    case "typesafe_unavailable":
+      return {
+        kind: "provider",
+        title: "Jev could not finish the Orbit assignment",
+      };
     case "unknown":
     default:
       return {
@@ -166,7 +176,9 @@ function classifyOrbitScanFailure(code: OrbitScanFailureCode): {
 function buildOrbitScanRecovery(code: OrbitScanFailureCode):
   | { recoveryHref: string; recoveryLabel: string }
   | undefined {
-  if (code !== "xai_auth" && code !== "xai_model") return undefined;
+  if (code !== "xai_auth" && code !== "xai_model" && code !== "typesafe_auth") {
+    return undefined;
+  }
 
   return {
     recoveryHref: `/settings?orbitIssue=${encodeURIComponent(code)}#orbit-grok`,
@@ -227,10 +239,15 @@ export function buildOrbitScanCompletedFlywheelPayload(args: {
     modelAbstains,
     sourceUnknowns: args.result.batch.selectedSourceUnknownCount,
     safeAutoApplyCount: suggestions.filter(isSafeAutoApplySuggestion).length,
+    // Flat primitives only: the flywheel ingest schema allows one level of
+    // nesting, so enrichment counters are flattened into this group.
     signalQuality: {
       richCount: args.result.batch.signalQuality?.richCount ?? 0,
       sparseCount: args.result.batch.signalQuality?.sparseCount ?? 0,
-      enrichment: args.result.batch.enrichment ?? null,
+      enrichmentAttempted: args.result.batch.enrichment?.attempted ?? null,
+      enrichmentRefreshed: args.result.batch.enrichment?.refreshed ?? null,
+      enrichmentSkipped: args.result.batch.enrichment?.skipped ?? null,
+      enrichmentFailed: args.result.batch.enrichment?.failed ?? null,
     },
     suggestionOutcomes: {
       reusedExistingTags,
@@ -239,6 +256,16 @@ export function buildOrbitScanCompletedFlywheelPayload(args: {
       newCollections,
       abstained: modelAbstains,
     },
+    ...(args.result.batch.hybrid
+      ? {
+          hybrid: {
+            firstPassLeftovers: args.result.batch.hybrid.firstPassLeftovers,
+            refinedLeftovers: args.result.batch.hybrid.refinedLeftovers,
+            recoveredOnRefine: args.result.batch.hybrid.recoveredOnRefine,
+            escalatedToGrok: args.result.batch.hybrid.escalatedToGrok,
+          },
+        }
+      : {}),
   };
 }
 
@@ -305,12 +332,12 @@ export function useOrbitScan(): OrbitScanHandle {
     async (bookmarkIds: string[], batch?: OrbitScanBatchMetadata) => {
       const unique = Array.from(new Set(bookmarkIds));
       if (unique.length === 0) return null;
-      if (unique.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
+      if (unique.length > ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN) {
         setError({
           kind: "request",
           code: "scan_request",
           title: "Orbit scan request needs a refresh",
-          message: `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
+          message: `Scan up to ${ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
         });
         return null;
       }

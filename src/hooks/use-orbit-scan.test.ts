@@ -18,6 +18,13 @@ describe("buildOrbitScanFailure", () => {
       recoveryHref: "/settings?orbitIssue=xai_auth#orbit-grok",
     },
     {
+      code: "typesafe_auth",
+      kind: "auth",
+      title: "TypeSafe credentials need attention",
+      message: "TypeSafe rejected the request. Confirm TYPESAFE_API_KEY.",
+      recoveryHref: "/settings?orbitIssue=typesafe_auth#orbit-grok",
+    },
+    {
       code: "xai_model",
       kind: "model",
       title: "Configured Grok model is unavailable",
@@ -76,6 +83,12 @@ describe("buildOrbitScanCompletedFlywheelPayload", () => {
           selectionReason: "test",
           signalQuality: { richCount: 1, sparseCount: 1 },
           enrichment: { attempted: 1, refreshed: 1, skipped: 1 },
+          hybrid: {
+            firstPassLeftovers: 1,
+            refinedLeftovers: 1,
+            recoveredOnRefine: 0,
+            escalatedToGrok: 1,
+          },
         },
         plan: {
           overview: {
@@ -141,7 +154,10 @@ describe("buildOrbitScanCompletedFlywheelPayload", () => {
       signalQuality: {
         richCount: 1,
         sparseCount: 1,
-        enrichment: { attempted: 1, refreshed: 1, skipped: 1 },
+        enrichmentAttempted: 1,
+        enrichmentRefreshed: 1,
+        enrichmentSkipped: 1,
+        enrichmentFailed: null,
       },
       suggestionOutcomes: {
         reusedExistingTags: 1,
@@ -149,6 +165,12 @@ describe("buildOrbitScanCompletedFlywheelPayload", () => {
         reusedExistingCollections: 1,
         newCollections: 0,
         abstained: 1,
+      },
+      hybrid: {
+        firstPassLeftovers: 1,
+        refinedLeftovers: 1,
+        recoveredOnRefine: 0,
+        escalatedToGrok: 1,
       },
     });
   });

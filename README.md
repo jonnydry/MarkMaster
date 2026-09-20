@@ -122,7 +122,9 @@ npm run env:check
 | `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
 | `AUTH_TRUST_HOST` | Self-hosted production | Set `true` only behind a trusted reverse proxy that replaces forwarded Host headers; Vercel is detected automatically |
 | `ENCRYPTION_KEY` | Yes | 64-char hex for token encryption (`openssl rand -hex 32`) |
-| `XAI_API_KEY` | No | Enables Grok Orbit scans |
+| `XAI_API_KEY` | No | Enables Grok Orbit scans (vocab proposal + leftover escalation) |
+| `TYPESAFE_API_KEY` | No | Enables Jev assignment, Sweep batches (72), and one-shot library classify |
+| `TYPESAFE_DEFAULT_MODEL` | No | Override the TypeSafe model (default `jev-latest`) |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | **Yes in production** | Distributed rate limiting; proxy returns 503 if absent in production |
 | `SYNC_WORKER_SECRET` | **Yes in production** | Authorizes sync-worker dispatch and `/api/internal/sync/worker` |
 | `CRON_SECRET` | **Yes in production** | Authorizes Vercel Cron queue draining (and can authorize worker route as fallback) |

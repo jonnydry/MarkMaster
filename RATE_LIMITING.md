@@ -8,6 +8,7 @@ MarkMaster uses **per-user rate limiting** backed by Upstash Redis to protect ex
 |-----------------|--------------------|-------------|-------|
 | **Sync**        | 1 request          | 30 minutes  | Most expensive operation |
 | **Orbit Scan**  | 10 requests        | 1 day       | More generous than sync |
+| **Orbit Library** | 24 requests      | 1 day       | One Classify click starts a background drain of the untagged queue |
 | **Orbit Graph** | 120 requests       | 1 hour      | Orbit map graph reads (GET `/api/orbit/graph`) |
 | **API Reads**   | 100 requests       | 5 minutes   | General data fetching (bookmarks, analytics, export, etc.) |
 | **API Writes**  | 30 requests        | 5 minutes   | Creating/updating tags, collections, notes, etc. |
@@ -19,6 +20,7 @@ These limits are **per user**.
 **Special expensive operations** (with dedicated tight limits):
 - `POST /api/bookmarks/sync` → `"sync"` + global sync cap
 - `POST /api/orbit/scan` → `"orbit"` + global orbit cap
+- `POST /api/orbit/library-classify` → `"orbit:library"`
 - `GET /api/orbit/graph` → `"orbit:graph"` (120 req/hour)
 
 **General API**:

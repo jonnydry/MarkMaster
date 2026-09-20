@@ -84,6 +84,8 @@ export interface OrbitCommandBarProps {
   resolvedBatchProfile: OrbitScanBatchProfileId;
   deepUnlocked: boolean;
   deepLockedReason: string;
+  sweepUnlocked: boolean;
+  sweepLockedReason: string;
   mapHref: string;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
   onScan: () => void;
@@ -126,6 +128,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       resolvedBatchProfile,
       deepUnlocked,
       deepLockedReason,
+      sweepUnlocked,
+      sweepLockedReason,
       mapHref,
       onBatchModeChange,
       onScan,
@@ -243,6 +247,8 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               resolvedBatchProfile={resolvedBatchProfile}
               deepUnlocked={deepUnlocked}
               deepLockedReason={deepLockedReason}
+              sweepUnlocked={sweepUnlocked}
+              sweepLockedReason={sweepLockedReason}
               disabled={scanBusy}
               onBatchModeChange={onBatchModeChange}
             />

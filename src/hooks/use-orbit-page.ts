@@ -163,6 +163,8 @@ export function useOrbitPage() {
       scanBatchLimit: session.scanBatchLimit,
       deepUnlocked: session.deepUnlocked,
       deepLockedReason: session.deepLockedReason,
+      sweepUnlocked: session.sweepUnlocked,
+      sweepLockedReason: session.sweepLockedReason,
       canApplyStrongMatches: session.canApplyStrongMatches,
       canRescanCurrentSelection: session.canRescanCurrentSelection,
       staleScanPlan: session.staleScanPlan,

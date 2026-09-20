@@ -95,4 +95,34 @@ describe("OrbitScanOverviewStrip", () => {
       screen.queryByRole("button", { name: "Apply strong matches" })
     ).not.toBeInTheDocument();
   });
+
+  it("shows hybrid leftover recovery counts on an Orbit pass", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrbitScanOverviewStrip
+        payload={{
+          ...payload,
+          model: "jev-latest+grok-4.6",
+          batch: {
+            ...payload.batch,
+            hybrid: {
+              firstPassLeftovers: 8,
+              refinedLeftovers: 3,
+              recoveredOnRefine: 5,
+              escalatedToGrok: 3,
+            },
+          },
+        }}
+        suggestionCount={2}
+        scanning={false}
+        applyingBatch={false}
+        canApplyStrongMatches
+        onReview={vi.fn()}
+        onApplyStrongMatches={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Orbit pass/i }));
+    expect(screen.getByText(/Jev leftovers 8 · recovered 5 · Grok 3/)).toBeInTheDocument();
+  });
 });

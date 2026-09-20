@@ -307,7 +307,7 @@ export function OrbitScanOverviewStrip({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <GrokMark className="size-4 text-primary" title="Grok" />
             <span className={cn(orbitLabelClass(), "text-primary/75")}>
-              Grok pass
+              {payload.batch.hybrid ? "Orbit pass" : "Grok pass"}
             </span>
             <span
               className={cn(
@@ -396,6 +396,13 @@ export function OrbitScanOverviewStrip({
           </div>
 
           <div className="space-y-4 px-3 pb-3 pt-3 sm:px-4">
+            {payload.batch.hybrid ? (
+              <p className={cn("text-xs", orbitMetaMuted())}>
+                Jev leftovers {payload.batch.hybrid.firstPassLeftovers} · recovered{" "}
+                {payload.batch.hybrid.recoveredOnRefine} · Grok{" "}
+                {payload.batch.hybrid.escalatedToGrok}
+              </p>
+            ) : null}
             <StrategyLines
               taggingStrategy={overview.taggingStrategy}
               collectionStrategy={overview.collectionStrategy}

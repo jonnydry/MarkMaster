@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { trackFlywheelEvent } from "@/lib/flywheel";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import { ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import type { OrbitReviewSession } from "@/lib/orbit-client-constants";
 import type { OrbitScanRequest } from "@/lib/orbit-page-types";
 import type { OrbitScanPlan } from "@/types";
@@ -66,7 +66,7 @@ export function useOrbitFlywheelScan(options: UseOrbitFlywheelScanOptions) {
     const ids = digestIdsFromUrl
       .split(",")
       .filter(Boolean)
-      .slice(0, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN);
+      .slice(0, ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN);
     if (ids.length === 0) return;
 
     lastHandledDigestKeyRef.current = digestIdsFromUrl;

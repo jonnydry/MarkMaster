@@ -1,17 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatRow } from "@/components/ui/stat-row";
-import { fetchJson } from "@/lib/fetch-json";
-import { orbitXaiStatusPayloadSchema } from "@/lib/api-response-schemas";
+import { fetchJson, sendJson } from "@/lib/fetch-json";
+import {
+  orbitLibraryClassifyQueueSchema,
+  orbitLibraryClassifyResultSchema,
+  orbitXaiStatusPayloadSchema,
+} from "@/lib/api-response-schemas";
+import { invalidateOrbitApplyQueries } from "@/lib/query-invalidation";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 export function parseOrbitIssue(value: string | null): OrbitScanFailureCode | null {
-  return value === "xai_auth" || value === "xai_model" ? value : null;
+  return value === "xai_auth" || value === "xai_model" || value === "typesafe_auth"
+    ? value
+    : null;
 }
 
 export function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
@@ -47,7 +56,7 @@ export function OrbitGrokStatusPanel({
   if (loading) {
     return (
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-10 rounded-sm skeleton-shimmer" />
         ))}
       </dl>
@@ -133,9 +142,30 @@ export function OrbitGrokStatusPanel({
           size="sm"
           headingFont={false}
           tabularNums={false}
+          className={cn(
+            !status.typesafe.apiKeyConfigured && "text-amber-800 dark:text-amber-100"
+          )}
+          valueClassName="break-words text-foreground"
+          label="TypeSafe key"
+          value={status.typesafe.apiKeyConfigured ? "Configured" : "Missing"}
+        />
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
           valueClassName="break-words text-foreground"
           label="Endpoint"
           value={`${status.baseUrl}${status.baseUrlSource === "environment" ? " · env" : ""}`}
+        />
+        <StatRow
+          size="sm"
+          headingFont={false}
+          tabularNums={false}
+          valueClassName="break-words text-foreground"
+          label="Jev model"
+          value={`${status.typesafe.model}${
+            status.typesafe.modelSource === "environment" ? " · env" : ""
+          }`}
         />
       </dl>
 
@@ -143,6 +173,7 @@ export function OrbitGrokStatusPanel({
         <Button size="sm" variant="outline" onClick={onRetry}>
           Refresh
         </Button>
+        <OrbitLibraryClassifyButton enabled={status.typesafe.apiKeyConfigured} />
         <Link
           href="/orbit"
           className="inline-flex h-8 items-center rounded-sm border border-transparent px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
@@ -151,5 +182,69 @@ export function OrbitGrokStatusPanel({
         </Link>
       </div>
     </div>
+  );
+}
+
+function OrbitLibraryClassifyButton({ enabled }: { enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const queueQuery = useQuery({
+    queryKey: ["orbit", "library-classify-queue"],
+    queryFn: () =>
+      fetchJson(
+        "/api/orbit/library-classify",
+        undefined,
+        orbitLibraryClassifyQueueSchema
+      ),
+    enabled,
+    staleTime: 30_000,
+  });
+  const untaggedCount = queueQuery.data?.untaggedCount;
+  const label =
+    typeof untaggedCount === "number"
+      ? `Classify ${untaggedCount.toLocaleString()} untagged`
+      : "Classify library";
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={!enabled || busy || untaggedCount === 0}
+      title={
+        enabled
+          ? "Drains the untagged queue in the background. Auto-applies only high-confidence reuse; leftovers stay in Orbit."
+          : "Set TYPESAFE_API_KEY to classify the library"
+      }
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const result = await sendJson("/api/orbit/library-classify", {
+            method: "POST",
+            body: {},
+            schema: orbitLibraryClassifyResultSchema,
+          });
+          await invalidateOrbitApplyQueries(queryClient);
+          await queryClient.invalidateQueries({
+            queryKey: ["orbit", "library-classify-queue"],
+          });
+          const summary = `Applied ${result.applied} · skipped ${result.skippedReview} · ${result.remaining} left`;
+          toast.success(
+            result.continued
+              ? `Library classify is draining in the background · ${summary}`
+              : `Library classify finished · ${summary}`
+          );
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Library classify could not start."
+          );
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Classifying…" : label}
+    </Button>
   );
 }
