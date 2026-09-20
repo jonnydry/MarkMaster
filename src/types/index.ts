@@ -195,6 +195,8 @@ export type OrbitScanFailureCode =
   | "xai_rate_limited"
   | "xai_unavailable"
   | "xai_response"
+  | "typesafe_auth"
+  | "typesafe_unavailable"
   | "unknown";
 
 export interface OrbitScanErrorPayload {
@@ -208,7 +210,8 @@ export type OrbitXaiStatusState = "ready" | "misconfigured";
 export type OrbitXaiStatusIssueCode =
   | "missing_api_key"
   | "xai_auth"
-  | "xai_model";
+  | "xai_model"
+  | "typesafe_auth";
 
 export interface OrbitXaiStatusIssue {
   code: OrbitXaiStatusIssueCode;
@@ -227,6 +230,11 @@ export interface OrbitXaiStatusPayload {
   privacy: {
     storeDisabled: boolean;
     zeroDataRetention: boolean | null;
+  };
+  typesafe: {
+    apiKeyConfigured: boolean;
+    model: string;
+    modelSource: "default" | "environment";
   };
   issues: OrbitXaiStatusIssue[];
 }
@@ -274,7 +282,7 @@ export interface OrbitScanOverview {
   collectionStrategy: string;
 }
 
-export type OrbitScanBatchProfileId = "quick" | "balanced" | "deep";
+export type OrbitScanBatchProfileId = "quick" | "balanced" | "deep" | "sweep";
 export type OrbitScanBatchMode = "auto" | OrbitScanBatchProfileId;
 
 export interface OrbitScanBatchMetadata {
@@ -300,6 +308,14 @@ export interface OrbitScanBatchMetadata {
     richCount: number;
     sparseCount: number;
   };
+  hybrid?: OrbitHybridScanMetrics;
+}
+
+export interface OrbitHybridScanMetrics {
+  firstPassLeftovers: number;
+  refinedLeftovers: number;
+  recoveredOnRefine: number;
+  escalatedToGrok: number;
 }
 
 export interface OrbitScanPlan {
@@ -367,6 +383,11 @@ export interface OrbitScanQualityPayload {
     rich: { scans: number; usefulSuggestionRate: number };
     sparse: { scans: number; usefulSuggestionRate: number };
   };
+  hybrid?: {
+    leftoverRate: number;
+    refineRecoveryRate: number;
+    grokEscalateRate: number;
+  };
   deep: {
     unlocked: boolean;
     reason: string;
@@ -402,6 +423,21 @@ export interface OrbitApplyResult {
   reusedCollections: number;
   collectionAssignments: number;
   skippedNewCollectionSingletons: number;
+}
+
+export interface OrbitLibraryClassifyResult {
+  processed: number;
+  applied: number;
+  skippedReview: number;
+  remaining: number;
+  continued: boolean;
+  queueCount?: number;
+  pagesLeft?: number;
+  cursor?: {
+    bookmarkedAt: string;
+    id: string;
+  };
+  appliedResult?: OrbitApplyResult | null;
 }
 
 export type OrbitGraphCollectionVariant = "user_collection" | "x_folder";

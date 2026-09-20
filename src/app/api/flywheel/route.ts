@@ -1,46 +1,13 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
+import { flywheelEventSchema } from "@/lib/flywheel-event-schema";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 
 const MAX_FLYWHEEL_BODY_BYTES = 8 * 1024;
-const flywheelPayloadValueSchema = z.union([
-  z.string().trim().max(240),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-]);
-const flywheelEventSchema = z.object({
-  eventType: z.enum([
-    "cta.review_in_orbit",
-    "cta.digest_review_together",
-    "feedback.good",
-    "feedback.not_relevant",
-    "mode.quick",
-    "mode.deep",
-    "digest.session_start",
-    "quick.keep",
-    "orbit.scan.completed",
-    "orbit.scan.failed",
-    "orbit.review.applied",
-  ]),
-  payload: z
-    .record(z.string().trim().min(1).max(40), flywheelPayloadValueSchema)
-    .superRefine((value, ctx) => {
-      if (Object.keys(value).length > 24) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Payload has too many fields",
-        });
-      }
-    })
-    .nullable()
-    .optional(),
-});
 
 /**
  * Phase 3 Item 12 Slice 1: Minimal ingest for flywheel events.

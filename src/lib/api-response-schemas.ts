@@ -205,14 +205,37 @@ export const orbitXaiStatusPayloadSchema = v.object({
     storeDisabled: v.boolean(),
     zeroDataRetention: v.nullable(v.boolean()),
   }),
+  typesafe: v.object({
+    apiKeyConfigured: v.boolean(),
+    model: v.string(),
+    modelSource: v.picklist(["default", "environment"]),
+  }),
   issues: v.array(
     v.object({
-      code: v.picklist(["missing_api_key", "xai_auth", "xai_model"]),
+      code: v.picklist([
+        "missing_api_key",
+        "xai_auth",
+        "xai_model",
+        "typesafe_auth",
+      ]),
       title: v.string(),
       message: v.string(),
     })
   ),
 }) as unknown as v.GenericSchema<unknown, OrbitXaiStatusPayload>;
+
+export const orbitLibraryClassifyResultSchema = v.object({
+  processed: v.number(),
+  applied: v.number(),
+  skippedReview: v.number(),
+  remaining: v.number(),
+  continued: v.boolean(),
+  queueCount: v.optional(v.number()),
+});
+
+export const orbitLibraryClassifyQueueSchema = v.object({
+  untaggedCount: v.number(),
+});
 
 export const collectionDetailSchema = v.object({
   id: v.string(),

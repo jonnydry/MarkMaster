@@ -41,6 +41,16 @@ if (ok) {
     );
   }
 
+  if (process.env.TYPESAFE_API_KEY?.trim()) {
+    console.log(
+      "Optional: TYPESAFE_API_KEY is set — Jev can assign Orbit labels."
+    );
+  } else {
+    console.log(
+      "Optional: TYPESAFE_API_KEY is unset — Orbit assignment stays Grok-only until you add it (see README)."
+    );
+  }
+
   // Rate limiting (Phase 0 remediation)
   if (process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
     console.log("Production: UPSTASH_REDIS_REST_* vars detected — using distributed rate limiting.");

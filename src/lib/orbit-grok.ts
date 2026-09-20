@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-  ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
   ORBIT_SCAN_BATCH_PROFILES,
+  getOrbitScanMaxBookmarks,
 } from "@/lib/orbit-config";
+import { runHybridOrbitScan } from "@/lib/orbit-hybrid-scan";
+import { isTypeSafeConfigured } from "@/lib/typesafe";
 import type { OrbitLearningHint, OrbitNeighborHint } from "@/lib/orbit-signal-extraction";
 import {
   GENERIC_COLLECTION_NAMES,
@@ -38,6 +40,7 @@ import {
   type OrbitAuthorPriorHint,
   type OrbitBookmarkForScan,
   type OrbitCollectionContext,
+  type OrbitHybridLeftoverNote,
   type OrbitScanPlan,
   type OrbitTagContext,
 } from "@/lib/orbit-grok-schemas";
@@ -125,9 +128,10 @@ function buildScanCacheKey(args: {
     .join(",");
   const mode = args.batch?.mode ?? "balanced";
   const profile = args.batch?.profile ?? "balanced";
+  const engine = isTypeSafeConfigured() ? "hybrid" : "grok";
   return getUserCacheVersion(args.userId).then(
     (version) =>
-      `cache:orbit:scan:${args.userId}:v${version}:${sortedIds}:${mode}:${profile}`
+      `cache:orbit:scan:${args.userId}:v${version}:${engine}:${sortedIds}:${mode}:${profile}`
   );
 }
 
@@ -154,6 +158,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batch?: OrbitScanBatchMetadata;
+  hybridLeftoverNotes?: OrbitHybridLeftoverNote[];
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitGrokError(
@@ -163,26 +168,70 @@ export async function scanOrbitBookmarksWithXai(args: {
     );
   }
 
-  if (args.bookmarks.length > ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN) {
+  const apiKey = process.env.XAI_API_KEY?.trim();
+  const hybrid = isTypeSafeConfigured();
+  const scanLimit = getOrbitScanMaxBookmarks(hybrid);
+  if (args.bookmarks.length > scanLimit) {
     throw new OrbitGrokError(
-      `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time.`,
+      `Scan up to ${scanLimit} bookmarks at a time.`,
       400,
       "scan_request"
     );
   }
-
-  const apiKey = process.env.XAI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!hybrid && !apiKey) {
     throw new OrbitGrokError(
-      "Set XAI_API_KEY before scanning Orbit with Grok.",
+      "Set TYPESAFE_API_KEY or XAI_API_KEY before scanning Orbit.",
       503,
       "xai_auth"
     );
   }
 
   const cacheKey = await buildScanCacheKey(args);
+  if (hybrid) {
+    return getCachedJson(cacheKey, SCAN_CACHE_TTL_SECONDS, () =>
+      runHybridOrbitScan({
+        bookmarks: args.bookmarks,
+        existingTags: args.existingTags,
+        existingCollections: args.existingCollections,
+        authorPriorHints: args.authorPriorHints,
+        learningHints: args.learningHints,
+        neighborHints: args.neighborHints,
+        batch: args.batch,
+        xaiApiKey: apiKey ?? null,
+        escalateLeftovers: apiKey
+          ? async (bookmarks, notes) => {
+              const escalated = await fetchOrbitScanFromXai(
+                { ...args, bookmarks, hybridLeftoverNotes: notes },
+                apiKey
+              );
+              return {
+                overview: escalated.plan.overview,
+                suggestions: escalated.plan.suggestions.map((suggestion) => ({
+                  bookmarkId: suggestion.bookmarkId,
+                  confidence: suggestion.confidence,
+                  reasoning: suggestion.reasoning,
+                  tags: suggestion.tags.map((tag) => ({
+                    name: tag.name,
+                    color: tag.color,
+                    reason: tag.reason,
+                  })),
+                  collection: suggestion.collection
+                    ? {
+                        name: suggestion.collection.name,
+                        description: suggestion.collection.description,
+                        reason: suggestion.collection.reason,
+                      }
+                    : null,
+                })),
+              };
+            }
+          : undefined,
+      })
+    );
+  }
+
   return getCachedJson(cacheKey, SCAN_CACHE_TTL_SECONDS, () =>
-    fetchOrbitScanFromXai(args, apiKey)
+    fetchOrbitScanFromXai(args, apiKey!)
   );
 }
 

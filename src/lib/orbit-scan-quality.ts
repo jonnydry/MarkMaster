@@ -229,6 +229,32 @@ export function evaluateOrbitScanQuality(args: {
         }
       : undefined;
 
+  const hybridTotals = args.scanEvents.reduce(
+    (totals, event) => {
+      if (event.eventType !== "orbit.scan.completed" || !isRecord(event.payload)) {
+        return totals;
+      }
+      const hybrid = isRecord(event.payload.hybrid) ? event.payload.hybrid : null;
+      if (!hybrid) return totals;
+      return {
+        leftovers: totals.leftovers + numberFromPayload(hybrid, "firstPassLeftovers"),
+        recovered: totals.recovered + numberFromPayload(hybrid, "recoveredOnRefine"),
+        escalated: totals.escalated + numberFromPayload(hybrid, "escalatedToGrok"),
+        requested:
+          totals.requested + numberFromPayload(event.payload, "requestedCount"),
+      };
+    },
+    { leftovers: 0, recovered: 0, escalated: 0, requested: 0 }
+  );
+  const hybrid =
+    hybridTotals.requested > 0
+      ? {
+          leftoverRate: rate(hybridTotals.leftovers, hybridTotals.requested),
+          refineRecoveryRate: rate(hybridTotals.recovered, hybridTotals.leftovers),
+          grokEscalateRate: rate(hybridTotals.escalated, hybridTotals.requested),
+        }
+      : undefined;
+
   return {
     recommendedProfile,
     profileReason,
@@ -242,6 +268,7 @@ export function evaluateOrbitScanQuality(args: {
     reviewedSuggestionCount,
     reviewUsefulRate,
     ...(qualityBySignalTier ? { qualityBySignalTier } : {}),
+    ...(hybrid ? { hybrid } : {}),
     deep: {
       unlocked: deepUnlocked,
       reason: deepReason,

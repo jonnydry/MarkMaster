@@ -1112,6 +1112,43 @@ describe("Orbit static instructions", () => {
       "Return exactly one suggestion for each id in bookmarkIds (1 bookmark)."
     );
   });
+
+  it("tells leftover Grok scans to keep Jev reuse names", () => {
+    const payload = buildOrbitPromptPayload({
+      bookmarks: [
+        {
+          id: "b1",
+          tweetId: "t1",
+          authorUsername: "ada",
+          authorDisplayName: "Ada",
+          authorVerified: true,
+          tweetText: "A leftover compiler note.",
+          tweetCreatedAt: new Date("2026-05-01T12:00:00.000Z"),
+          bookmarkedAt: new Date("2026-05-02T12:00:00.000Z"),
+          publicMetrics: null,
+          media: null,
+          urls: null,
+          quotedTweet: null,
+          notes: [],
+        },
+      ],
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+      existingCollections: [],
+      hybridLeftoverNotes: [
+        {
+          bookmarkId: "b1",
+          matchedTags: ["AI"],
+          matchedCollection: null,
+          reason: "Needs a more specific name.",
+        },
+      ],
+    });
+
+    expect(buildOrbitUserPrompt(payload)).toContain(
+      "Keep those exact names, fill only the topical gap"
+    );
+    expect(payload.hybridLeftoverNotes?.[0]?.matchedTags).toEqual(["AI"]);
+  });
 });
 
 describe("buildOrbitScanSummary", () => {

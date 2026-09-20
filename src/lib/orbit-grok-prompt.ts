@@ -8,6 +8,7 @@ import type {
   OrbitAuthorPriorHint,
   OrbitBookmarkForScan,
   OrbitCollectionContext,
+  OrbitHybridLeftoverNote,
   OrbitTagContext,
 } from "@/lib/orbit-grok-schemas";
 import {
@@ -34,6 +35,7 @@ export function buildOrbitPromptPayload(args: {
   authorPriorHints?: OrbitAuthorPriorHint[];
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
+  hybridLeftoverNotes?: OrbitHybridLeftoverNote[];
 }) {
   const palette = getTagColorSpectrum(ORBIT_PROMPT_PALETTE_SIZE);
 
@@ -96,6 +98,9 @@ export function buildOrbitPromptPayload(args: {
   return {
     bookmarkIds: bookmarkPayloads.map((bookmark) => bookmark.id),
     palette,
+    ...(args.hybridLeftoverNotes?.length
+      ? { hybridLeftoverNotes: args.hybridLeftoverNotes }
+      : {}),
 
     existingTags: finalTags.map((tag) => ({
       name: tag.name,
@@ -298,6 +303,8 @@ function renderInstructionList(items: readonly string[]) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
+/** Full-plan prompt for Grok-only scans and leftover escalation.
+ * New-name increments use `proposeOrbitVocabWithXai` instead. */
 export function buildOrbitSystemPrompt() {
   const instructions = ORBIT_STATIC_INSTRUCTIONS;
 
@@ -343,8 +350,15 @@ export function buildOrbitUserPrompt(
   payload: ReturnType<typeof buildOrbitPromptPayload>
 ) {
   const count = payload.bookmarkIds.length;
+  const leftoverLine =
+    "hybridLeftoverNotes" in payload && payload.hybridLeftoverNotes?.length
+      ? "Jev already assigned some existing labels. Keep those exact names, fill only the topical gap, and do not invent a second name for a topic Jev already matched."
+      : null;
   return [
     `Sort this Orbit batch. Return exactly one suggestion for each id in bookmarkIds (${count} bookmark${count === 1 ? "" : "s"}).`,
+    leftoverLine,
     JSON.stringify(payload),
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

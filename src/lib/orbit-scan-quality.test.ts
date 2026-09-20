@@ -110,6 +110,31 @@ describe("evaluateOrbitScanQuality", () => {
     );
   });
 
+  it("aggregates hybrid leftover and recovery rates from completed scans", () => {
+    const quality = evaluateOrbitScanQuality({
+      scanEvents: [
+        completed({
+          requestedCount: 20,
+          durationMs: 20_000,
+          usefulSuggestions: 14,
+          modelAbstains: 4,
+          hybrid: {
+            firstPassLeftovers: 10,
+            refinedLeftovers: 4,
+            recoveredOnRefine: 6,
+            escalatedToGrok: 4,
+          },
+        }),
+      ],
+    });
+
+    expect(quality.hybrid).toEqual({
+      leftoverRate: 0.5,
+      refineRecoveryRate: 0.6,
+      grokEscalateRate: 0.2,
+    });
+  });
+
   it("classifies mixed batches exclusively by dominant signal tier", () => {
     const quality = evaluateOrbitScanQuality({
       scanEvents: [

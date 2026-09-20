@@ -115,6 +115,7 @@ describe("checkRateLimit with Upstash configured", () => {
     const expectedPrefixes: Record<string, string> = {
       sync: "ratelimit:sync",
       orbit: "ratelimit:orbit",
+      "orbit:library": "ratelimit:orbit-library",
       "orbit:graph": "ratelimit:orbit-graph",
       media: "ratelimit:media",
       "api:read": "ratelimit:api-read",

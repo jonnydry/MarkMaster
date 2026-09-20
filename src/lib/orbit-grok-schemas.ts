@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import {
+  ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN,
+  ORBIT_SCAN_CANDIDATE_POOL_SIZE,
+} from "@/lib/orbit-config";
+import {
+  getTypeSafeModel,
+  getTypeSafeModelSource,
+  isTypeSafeConfigured,
+} from "@/lib/typesafe";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
@@ -59,6 +67,14 @@ export function getOrbitXaiRuntimeStatus(args?: {
     });
   }
 
+  if (args?.lastFailureCode === "typesafe_auth") {
+    issues.push({
+      code: "typesafe_auth",
+      title: "TypeSafe rejected the last Orbit request",
+      message: "Confirm TYPESAFE_API_KEY is valid and has access to Jev.",
+    });
+  }
+
   return {
     state: issues.length > 0 ? "misconfigured" : "ready",
     checkedAt: new Date().toISOString(),
@@ -70,6 +86,11 @@ export function getOrbitXaiRuntimeStatus(args?: {
     privacy: {
       storeDisabled: true,
       zeroDataRetention: null,
+    },
+    typesafe: {
+      apiKeyConfigured: isTypeSafeConfigured(),
+      model: getTypeSafeModel(),
+      modelSource: getTypeSafeModelSource(),
     },
     issues,
   };
@@ -105,6 +126,13 @@ export interface OrbitCollectionContext {
   name: string;
   description: string | null;
   bookmarkCount?: number;
+}
+
+export interface OrbitHybridLeftoverNote {
+  bookmarkId: string;
+  matchedTags: string[];
+  matchedCollection: string | null;
+  reason: string;
 }
 
 export interface OrbitAuthorPriorHint {
@@ -183,26 +211,26 @@ export const orbitScanPlanSchema = z.object({
   suggestions: z
     .array(orbitBookmarkSuggestionSchema)
     .max(
-      ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
-      `Apply up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} Orbit suggestions at a time`
+      ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN,
+      `Apply up to ${ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN} Orbit suggestions at a time`
     ),
 });
 
-const orbitScanBatchProfileSchema = z.enum(["quick", "balanced", "deep"]);
+const orbitScanBatchProfileSchema = z.enum(["quick", "balanced", "deep", "sweep"]);
 
 export const orbitScanBatchMetadataSchema = z.object({
-  mode: z.enum(["auto", "quick", "balanced", "deep"]),
+  mode: z.enum(["auto", "quick", "balanced", "deep", "sweep"]),
   profile: orbitScanBatchProfileSchema,
-  requestedCount: z.number().int().min(1).max(ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
-  candidatePoolCount: z.number().int().min(1).max(100),
+  requestedCount: z.number().int().min(1).max(ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN),
+  candidatePoolCount: z.number().int().min(1).max(ORBIT_SCAN_CANDIDATE_POOL_SIZE),
   sharedSignalCount: z.number().min(0),
-  sourceUnknownCount: z.number().int().min(0).max(100),
+  sourceUnknownCount: z.number().int().min(0).max(ORBIT_SCAN_CANDIDATE_POOL_SIZE),
   sourceUnknownRate: z.number().min(0).max(1),
   selectedSourceUnknownCount: z
     .number()
     .int()
     .min(0)
-    .max(ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN),
+    .max(ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN),
   selectedSourceUnknownRate: z.number().min(0).max(1),
   usefulSignalCount: z.number().int().min(0),
   selectionReason: z.string().trim().min(1).max(240),
@@ -223,6 +251,14 @@ export const orbitScanBatchMetadataSchema = z.object({
       sparseCount: z.number().int().min(0),
     })
     .optional(),
+  hybrid: z
+    .object({
+      firstPassLeftovers: z.number().int().min(0),
+      refinedLeftovers: z.number().int().min(0),
+      recoveredOnRefine: z.number().int().min(0),
+      escalatedToGrok: z.number().int().min(0),
+    })
+    .optional(),
 });
 
 export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
@@ -232,8 +268,8 @@ export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
       .array(z.string().trim().min(1, "Bookmark ID is required"))
       .min(1, "Select at least one bookmark to scan")
       .max(
-        ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
-        `Scan up to ${ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`
+        ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN,
+        `Scan up to ${ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`
       ),
     batch: orbitScanBatchMetadataSchema.optional(),
   }),

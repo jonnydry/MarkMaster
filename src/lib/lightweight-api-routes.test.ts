@@ -11,6 +11,12 @@ describe("isLightweightApiRequest", () => {
   it("allows flywheel beacons", () => {
     expect(isLightweightApiRequest("/api/flywheel", "POST")).toBe(true);
     expect(isLightweightApiRequest("/api/flywheel", "GET")).toBe(false);
+    expect(isLightweightApiRequest("/api/orbit/library-classify", "POST")).toBe(
+      true
+    );
+    expect(isLightweightApiRequest("/api/orbit/library-classify", "GET")).toBe(
+      true
+    );
   });
 
   it("allows collection mutations to skip proxy api:write (handler applies it)", () => {

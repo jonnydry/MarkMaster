@@ -532,7 +532,7 @@ describe("/api/orbit/scan", () => {
         method: "POST",
         body: JSON.stringify({
           mode: "scan",
-          bookmarkIds: Array.from({ length: 37 }, (_, index) => `bookmark-${index}`),
+          bookmarkIds: Array.from({ length: 73 }, (_, index) => `bookmark-${index}`),
         }),
       })
     );

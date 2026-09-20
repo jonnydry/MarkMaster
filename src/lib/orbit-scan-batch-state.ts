@@ -29,6 +29,7 @@ export function mergeReviewBookmarks(
 }
 
 export type OrbitScanBatchStateInput = {
+  hybridScanAvailable?: boolean;
   scanCandidateBookmarks: BookmarkWithRelations[];
   bookmarkById: Map<string, BookmarkWithRelations>;
   scanQuality: OrbitScanQualityPayload | undefined;
@@ -56,6 +57,8 @@ export type OrbitScanBatchState = {
   selectedScanTargetIds: string[];
   deepUnlocked: boolean;
   deepLockedReason: string;
+  sweepUnlocked: boolean;
+  sweepLockedReason: string;
   hasSelectionOverflow: boolean;
   scanHelperText: string;
   scanButtonLabel: string;
@@ -76,12 +79,13 @@ export function deriveOrbitScanBatchState(
     hasSearchQuery,
     scanning,
     hasPlan,
+    hybridScanAvailable = false,
   } = input;
 
   const candidatePoolPlan = planOrbitScanBatch(
     scanCandidateBookmarks,
     Math.min(
-      ORBIT_SCAN_BATCH_PROFILES.deep.size,
+      ORBIT_SCAN_BATCH_PROFILES.sweep.size,
       Math.max(1, scanCandidateBookmarks.length)
     )
   );
@@ -97,9 +101,17 @@ export function deriveOrbitScanBatchState(
   const deepLockedReason = deepLockedBySourceQuality
     ? "Current candidates have too much missing source context for Deep."
     : (scanQuality?.deep.reason ?? "Needs scan history before Deep unlocks.");
+  const sweepUnlocked = hybridScanAvailable;
+  const sweepLockedReason = hybridScanAvailable
+    ? "Sweep uses Jev to review 72 bookmarks in one pass."
+    : "Set TYPESAFE_API_KEY to unlock Sweep batches.";
 
   const resolvedScanBatchMode: OrbitScanBatchMode =
-    scanBatchMode === "deep" && !deepUnlocked ? "auto" : scanBatchMode;
+    scanBatchMode === "deep" && !deepUnlocked
+      ? "auto"
+      : scanBatchMode === "sweep" && !sweepUnlocked
+        ? "auto"
+        : scanBatchMode;
 
   const scanBatchProfile: OrbitScanBatchProfileId =
     resolvedScanBatchMode === "auto"
@@ -146,8 +158,8 @@ export function deriveOrbitScanBatchState(
     ? "Loading the current Orbit queue."
     : scanningSelection
       ? hasSelectionOverflow
-        ? `Grok will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
-        : `Grok will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
+        ? `Orbit will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
+        : `Orbit will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
       : queueBatchCount > 0
         ? `${scanProfileLabel} scan selected ${queueBatchCount} ${queueOrderLabel} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"} from ${defaultScanPlan.candidateCount.toLocaleString()} candidates. Review each suggestion before applying.`
         : hasSearchQuery
@@ -188,6 +200,8 @@ export function deriveOrbitScanBatchState(
     selectedScanTargetIds,
     deepUnlocked,
     deepLockedReason,
+    sweepUnlocked,
+    sweepLockedReason,
     hasSelectionOverflow,
     scanHelperText,
     scanButtonLabel,

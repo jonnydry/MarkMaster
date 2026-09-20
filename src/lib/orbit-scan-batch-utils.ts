@@ -30,7 +30,8 @@ export function buildOrbitScanContextKey(args: {
 export function profileForCount(count: number): OrbitScanBatchProfileId {
   if (count <= ORBIT_SCAN_BATCH_PROFILES.quick.size) return "quick";
   if (count <= ORBIT_SCAN_BATCH_PROFILES.balanced.size) return "balanced";
-  return "deep";
+  if (count <= ORBIT_SCAN_BATCH_PROFILES.deep.size) return "deep";
+  return "sweep";
 }
 
 export function buildFallbackBatchMetadata(args: {
@@ -79,5 +80,6 @@ export function chooseAutoProfile(args: {
 }): OrbitScanBatchProfileId {
   if (!args.quality || args.quality.successfulScanCount < 3) return "quick";
   if (args.sourceUnknownRate > 0.35) return "quick";
+  if (args.quality.recommendedProfile === "sweep") return "deep";
   return args.quality.recommendedProfile;
 }

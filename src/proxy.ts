@@ -120,7 +120,8 @@ export async function proxy(request: NextRequest) {
     isPublicShareRoute ||
     isAuthRoute ||
     pathname.startsWith("/api/orbit/status") ||
-    pathname.startsWith("/api/internal/sync");
+    pathname.startsWith("/api/internal/sync") ||
+    pathname.startsWith("/api/internal/orbit");
 
   if (
     process.env.NODE_ENV === "production" &&

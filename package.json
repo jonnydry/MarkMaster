@@ -32,13 +32,15 @@
     "db:check": "node scripts/check-db-migrations.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "env:check": "node scripts/check-env.mjs"
+    "env:check": "node scripts/check-env.mjs",
+    "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@prisma/client": "^6.19.3",
     "@tanstack/react-query": "^5.96.2",
     "@tanstack/react-virtual": "^3.14.2",
+    "@typesafe-ai/sdk": "^0.6.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",

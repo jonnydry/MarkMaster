@@ -82,4 +82,51 @@ describe("deriveOrbitScanBatchState", () => {
     expect(state.scanTargetIds).toEqual(["one"]);
     expect(state.scanButtonLabel).toBe("Auto-categorize selection");
   });
+
+  it("falls back from Sweep when TypeSafe is not configured", () => {
+    const state = deriveOrbitScanBatchState({
+      scanCandidateBookmarks: [bookmark("one")],
+      bookmarkById: new Map([["one", bookmark("one")]]),
+      scanQuality: undefined,
+      scanBatchMode: "sweep",
+      selectionMode: false,
+      selectedBookmarkIds: new Set(),
+      queueSortDirection: "desc",
+      queueIsLoading: false,
+      hasSearchQuery: false,
+      scanning: false,
+      hasPlan: false,
+      hybridScanAvailable: false,
+    });
+
+    expect(state.sweepUnlocked).toBe(false);
+    expect(state.resolvedScanBatchMode).toBe("auto");
+  });
+
+  it("unlocks a 72-bookmark Sweep when hybrid scan is available", () => {
+    const bookmarks = Array.from({ length: 80 }, (_, index) =>
+      bookmark(String(index))
+    );
+    const bookmarkById = new Map(bookmarks.map((entry) => [entry.id, entry]));
+
+    const state = deriveOrbitScanBatchState({
+      scanCandidateBookmarks: bookmarks,
+      bookmarkById,
+      scanQuality: undefined,
+      scanBatchMode: "sweep",
+      selectionMode: false,
+      selectedBookmarkIds: new Set(),
+      queueSortDirection: "desc",
+      queueIsLoading: false,
+      hasSearchQuery: false,
+      scanning: false,
+      hasPlan: false,
+      hybridScanAvailable: true,
+    });
+
+    expect(state.sweepUnlocked).toBe(true);
+    expect(state.resolvedScanBatchMode).toBe("sweep");
+    expect(state.scanBatchLimit).toBe(72);
+    expect(state.scanTargetIds).toHaveLength(72);
+  });
 });

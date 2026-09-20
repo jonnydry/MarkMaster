@@ -146,6 +146,7 @@ describe("production without Upstash configured", () => {
     "/api/auth/signin",
     "/api/orbit/status",
     "/api/internal/sync",
+    "/api/internal/orbit",
     "/api/health",
     "/share/abc123",
   ])("keeps exempt route %s reachable", async (path) => {

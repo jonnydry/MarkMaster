@@ -12,7 +12,11 @@ import { ORBIT_SCAN_ENRICHMENT } from "@/lib/orbit-config";
 import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { enrichBookmarksForScan } from "@/lib/orbit-scan-enrichment";
 import { getOrbitNeighborHintsForScan } from "@/lib/orbit-scan-neighbors";
-import { mapOrbitScannedBookmarksForClient } from "@/lib/orbit-scan-bookmarks";
+import {
+  mapOrbitScannedBookmarksForClient,
+  orbitScanBookmarkInclude,
+  withOrbitFolderHints,
+} from "@/lib/orbit-scan-bookmarks";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { computeOrbitScanSignalQuality } from "@/lib/orbit-scan-signal-quality";
@@ -20,25 +24,10 @@ import type { OrbitScanErrorPayload } from "@/types";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 /**
- * Deep scans drive an xAI call allowed up to 180 s (see orbit-grok.ts); give
- * the route enough platform budget so the call isn't killed mid-flight.
+ * Hybrid scans are usually Jev-bound; leftover Grok escalation can still
+ * take up to 180 s (see orbit-grok.ts). Keep enough platform budget.
  */
 export const maxDuration = 240;
-
-const orbitScanBookmarkInclude = {
-  notes: { select: { id: true, content: true } },
-  collectionItems: {
-    select: {
-      collection: {
-        select: {
-          id: true,
-          name: true,
-          type: true,
-        },
-      },
-    },
-  },
-} as const;
 
 export async function POST(req: NextRequest) {
   const user = await getDbUser();
@@ -126,16 +115,7 @@ export async function POST(req: NextRequest) {
           (bookmarkOrder.get(b.id) ?? Number.POSITIVE_INFINITY)
       );
 
-      let bookmarksWithFolderHints = bookmarks.map(
-        ({ collectionItems, ...bookmark }) => ({
-          ...bookmark,
-          xFolderHints: collectionItems.flatMap(({ collection }) =>
-            collection.type === "x_folder"
-              ? [{ id: collection.id, name: collection.name }]
-              : []
-          ),
-        })
-      );
+      let bookmarksWithFolderHints = bookmarks.map(withOrbitFolderHints);
 
       let enrichmentMetadata:
         | {

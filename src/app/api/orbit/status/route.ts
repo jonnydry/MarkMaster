@@ -7,7 +7,9 @@ import type { OrbitScanFailureCode } from "@/types";
 function parseRecoverableOrbitFailure(
   value: string | null
 ): OrbitScanFailureCode | null {
-  return value === "xai_auth" || value === "xai_model" ? value : null;
+  return value === "xai_auth" || value === "xai_model" || value === "typesafe_auth"
+    ? value
+    : null;
 }
 
 export async function GET(req: NextRequest) {

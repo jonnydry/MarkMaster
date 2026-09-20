@@ -1,5 +1,38 @@
 import type { BookmarkWithRelations } from "@/types";
 
+export const orbitScanBookmarkInclude = {
+  notes: { select: { id: true, content: true } },
+  collectionItems: {
+    select: {
+      collection: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+    },
+  },
+} as const;
+
+export function withOrbitFolderHints<
+  T extends {
+    collectionItems: Array<{
+      collection: { id: string; name: string; type?: string };
+    }>;
+  },
+>(bookmark: T) {
+  const { collectionItems, ...rest } = bookmark;
+  return {
+    ...rest,
+    xFolderHints: collectionItems.flatMap(({ collection }) =>
+      collection.type === "x_folder"
+        ? [{ id: collection.id, name: collection.name }]
+        : []
+    ),
+  };
+}
+
 type OrbitScanBookmarkRow = {
   id: string;
   tweetId: string;

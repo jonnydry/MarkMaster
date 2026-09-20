@@ -14,6 +14,7 @@ import { getRedis } from "@/lib/redis";
 export type RateLimitAction =
   | "sync"
   | "orbit"
+  | "orbit:library"
   | "orbit:graph"
   | "media"
   | "api:read"
@@ -28,6 +29,7 @@ export type RateLimitAction =
 export const DEBUG_RATE_LIMIT_ACTIONS = [
   "sync",
   "orbit",
+  "orbit:library",
   "orbit:graph",
   "media",
   "api:read",
@@ -57,6 +59,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 10,
     window: "1 d",
     description: "Orbit scans - more generous than syncs",
+  },
+  "orbit:library": {
+    requests: 24,
+    window: "1 d",
+    description: "Orbit library classify kicks - Jev backlog pages",
   },
   "orbit:graph": {
     requests: 120,
