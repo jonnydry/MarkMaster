@@ -40,7 +40,7 @@ export const ORBIT_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
     title: "Orbit Actions",
     shortcuts: [
-      { id: "scan", keys: ["Shift+G"], label: "Run Orbit scan" },
+      { id: "scan", keys: ["Shift+G"], label: "Scan queue" },
       { id: "review", keys: ["V"], label: "Open Review pass" },
       { id: "tag", keys: ["T"], label: "Add tag to selected item" },
       { id: "collection", keys: ["C"], label: "Add selected item to collection" },

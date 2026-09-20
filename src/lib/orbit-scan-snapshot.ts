@@ -3,14 +3,13 @@ import * as v from "valibot";
 import type { OrbitScanResponsePayload } from "@/types";
 
 /**
- * Interim persistence for the active Orbit scan plan (UX-H1).
+ * Persistence for the active Orbit scan plan (UX-H1).
  *
- * A paid Grok/Jev scan used to live only in React state, so any navigation
- * silently discarded it. Until a real pending-suggestions table exists, the
- * trimmed plan (suggestions + batch metadata, never full bookmark bodies) and
- * review progress are mirrored into sessionStorage keyed per user, and
- * rehydrated when the Orbit page mounts. Bookmark bodies are recovered from
- * the queue / scan-candidates queries the page already fetches.
+ * The trimmed plan (suggestions + batch metadata, never full bookmark bodies)
+ * and review progress live in sessionStorage as the per-tab cache and in
+ * `OrbitScanSnapshot` as the durable copy. Orbit rehydrates from the cache
+ * first, then the server when the cache is empty. Bookmark bodies are recovered
+ * from the queue / scan-candidates queries the page already fetches.
  */
 export const ORBIT_SCAN_SNAPSHOT_VERSION = 1;
 
@@ -83,6 +82,7 @@ const snapshotSchema = v.object({
   payload: scanPayloadSchema,
   dismissedBookmarkIds: v.array(v.string()),
   appliedBookmarkIds: v.array(v.string()),
+  scanContextKey: v.optional(v.string()),
 });
 
 export interface OrbitScanSnapshot {
@@ -92,6 +92,7 @@ export interface OrbitScanSnapshot {
   payload: OrbitScanResponsePayload;
   dismissedBookmarkIds: string[];
   appliedBookmarkIds: string[];
+  scanContextKey?: string;
 }
 
 export function orbitScanSnapshotStorageKey(userId: string): string {
@@ -103,7 +104,66 @@ export interface BuildOrbitScanSnapshotArgs {
   payload: OrbitScanResponsePayload;
   dismissedBookmarkIds: Iterable<string>;
   appliedBookmarkIds: Iterable<string>;
+  scanContextKey?: string | null;
   now?: Date;
+}
+
+export type ParseOrbitScanSnapshotInputResult =
+  | { ok: true; snapshot: OrbitScanSnapshot }
+  | { ok: false; reason: "invalid" | "too_large" };
+
+export const orbitScanSnapshotGetResponseSchema = v.object({
+  snapshot: v.nullable(snapshotSchema),
+});
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/**
+ * Validate a PUT body (or any untrusted object) into a sized, schema-checked
+ * snapshot owned by `userId`. Oversized plans are refused rather than stored.
+ */
+export function parseOrbitScanSnapshotInput(
+  data: unknown,
+  userId: string,
+  now?: Date
+): ParseOrbitScanSnapshotInputResult {
+  if (!data || typeof data !== "object") {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const record = data as Record<string, unknown>;
+  if (!record.payload || typeof record.payload !== "object") {
+    return { ok: false, reason: "invalid" };
+  }
+  if (
+    record.dismissedBookmarkIds !== undefined &&
+    !isStringArray(record.dismissedBookmarkIds)
+  ) {
+    return { ok: false, reason: "invalid" };
+  }
+  if (
+    record.appliedBookmarkIds !== undefined &&
+    !isStringArray(record.appliedBookmarkIds)
+  ) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const raw = buildOrbitScanSnapshotRaw({
+    userId,
+    payload: record.payload as OrbitScanResponsePayload,
+    dismissedBookmarkIds: record.dismissedBookmarkIds ?? [],
+    appliedBookmarkIds: record.appliedBookmarkIds ?? [],
+    scanContextKey:
+      typeof record.scanContextKey === "string" ? record.scanContextKey : null,
+    now,
+  });
+  if (!raw) return { ok: false, reason: "too_large" };
+
+  const snapshot = parseOrbitScanSnapshotRaw(raw, userId);
+  if (!snapshot) return { ok: false, reason: "invalid" };
+  return { ok: true, snapshot };
 }
 
 /**
@@ -123,6 +183,7 @@ export function buildOrbitScanSnapshotRaw(
     payload: trimmedPayload,
     dismissedBookmarkIds: Array.from(args.dismissedBookmarkIds),
     appliedBookmarkIds: Array.from(args.appliedBookmarkIds),
+    ...(args.scanContextKey ? { scanContextKey: args.scanContextKey } : {}),
   };
 
   const raw = JSON.stringify(snapshot);

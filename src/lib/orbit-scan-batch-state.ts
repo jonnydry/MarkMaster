@@ -183,8 +183,8 @@ export function deriveOrbitScanBatchState(
             ? "Categorizing selection…"
             : "Categorizing queue…"
           : scanningSelection
-            ? "Auto-categorize selection"
-            : "Auto-categorize queue";
+            ? "Scan selection"
+            : "Scan queue";
 
   return {
     resolvedScanBatchMode,

@@ -16,6 +16,7 @@ export type RateLimitAction =
   | "orbit"
   | "orbit:library"
   | "orbit:graph"
+  | "orbit:snapshot"
   | "media"
   | "api:read"
   | "api:write"
@@ -31,6 +32,7 @@ export const DEBUG_RATE_LIMIT_ACTIONS = [
   "orbit",
   "orbit:library",
   "orbit:graph",
+  "orbit:snapshot",
   "media",
   "api:read",
   "api:write",
@@ -69,6 +71,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 120,
     window: "1 h",
     description: "Orbit map graph reads - expensive graph generation",
+  },
+  "orbit:snapshot": {
+    requests: 120,
+    window: "5 m",
+    description: "Orbit scan snapshot persist - cheap upsert of the active plan",
   },
   media: {
     requests: 600,

@@ -84,7 +84,7 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     shortcuts: [
       { id: "connection", keys: ["1"], label: "Connection" },
       { id: "sync", keys: ["2"], label: "Sync" },
-      { id: "orbit-grok", keys: ["3"], label: "Orbit Grok" },
+      { id: "orbit-grok", keys: ["3"], label: "Orbit scanning" },
       { id: "appearance", keys: ["4"], label: "Appearance" },
       { id: "export", keys: ["5"], label: "Export" },
       { id: "tags", keys: ["6"], label: "Tags" },
@@ -295,7 +295,7 @@ export default function SettingsPage() {
                       </li>
                       <li className="flex items-start gap-2">
                         <BrainCircuit className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                        Orbit only calls Grok when you scan, then waits for approval.
+                        Scan matches your existing tags first. Grok only fills gaps you approve.
                       </li>
                     </ul>
                   </SettingsSection>
@@ -333,8 +333,8 @@ export default function SettingsPage() {
                   <SettingsSection
                     id="orbit-grok"
                     icon={BrainCircuit}
-                    title="Orbit Grok"
-                    description="Scans reuse your existing tags first and only invent new names when needed. Sweep reviews 72 at once. Classify library drains the untagged queue in the background (safe matches only)."
+                    title="Orbit scanning"
+                    description="Scan queue matches your existing tags first and only invents names when needed. Sweep reviews 72 at once. Classify library drains untagged bookmarks in the background (safe matches only)."
                     badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
                   >
                     <OrbitGrokStatusPanel

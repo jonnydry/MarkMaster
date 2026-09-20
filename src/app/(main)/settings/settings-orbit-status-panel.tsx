@@ -234,7 +234,7 @@ function OrbitLibraryClassifyButton({ enabled }: { enabled: boolean }) {
         body: {},
         schema: orbitLibraryClassifyResultSchema,
       });
-      await invalidateOrbitApplyQueries(queryClient);
+      await invalidateOrbitApplyQueries(queryClient, { includeGraph: true });
       await queryClient.invalidateQueries({
         queryKey: ["orbit", "library-classify-queue"],
       });

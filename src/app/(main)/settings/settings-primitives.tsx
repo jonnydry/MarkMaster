@@ -16,7 +16,7 @@ import type { OrbitXaiStatusPayload } from "@/types";
 export const SETTINGS_SECTIONS = [
   { id: "connection", label: "Connection" },
   { id: "sync", label: "Sync" },
-  { id: "orbit-grok", label: "Orbit Grok" },
+  { id: "orbit-grok", label: "Orbit scanning" },
   { id: "appearance", label: "Appearance" },
   { id: "export", label: "Export" },
   { id: "tags", label: "Tags" },

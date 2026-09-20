@@ -76,6 +76,7 @@ export interface OrbitCommandBarProps {
 
   // Action / scan
   scanButtonLabel: string;
+  scanHelperText: string;
   queueIsLoading: boolean;
   scanning: boolean;
   scanTargetCount: number;
@@ -120,6 +121,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       triagedCount,
       passTotal,
       scanButtonLabel,
+      scanHelperText,
       queueIsLoading,
       scanning,
       scanTargetCount,
@@ -335,6 +337,10 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           {showTriageProgress ? (
             <span className={cn(orbitDataClass(), "normal-case")}>
               {triagedCount} / {passTotal} triaged
+            </span>
+          ) : scanHelperText ? (
+            <span className={cn(orbitDataClass(), "normal-case")}>
+              {scanHelperText}
             </span>
           ) : null}
           {isUpdating ? (

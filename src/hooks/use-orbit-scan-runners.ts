@@ -101,6 +101,10 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
     setLastScanRequest(null);
   }, []);
 
+  const restoreScanContext = useCallback((key: string | null) => {
+    setScanContextAtLastRun(key);
+  }, []);
+
   const runOrbitScan = useCallback(
     async (request: OrbitScanRequest) => {
       if (request.targetIds.length === 0) return null;
@@ -109,8 +113,8 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
 
       toast.info(
         request.scanningSelection
-          ? "Orbit is categorizing your selection — this should be quicker."
-          : "Orbit is categorizing your queue — large batches can take a minute."
+          ? "Scanning your selection — this should be quicker."
+          : "Scanning your queue — large batches can take a minute."
       );
       try {
         const result = await scan.scanNow(request.targetIds, request.batch);
@@ -118,7 +122,7 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
           setScanContextAtLastRun(request.contextKey);
           const scopeLabel = request.scanningSelection ? "selected" : "Orbit";
           toast.success(
-            `Orbit categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
+            `Scanned ${result.plan.suggestions.length} ${scopeLabel} bookmark${
               result.plan.suggestions.length === 1 ? "" : "s"
             }`
           );
@@ -218,6 +222,7 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
       canRescanCurrentSelection,
       buildScanRequest,
       runOrbitScan,
+      restoreScanContext,
       clearScanRunState,
       handleScan,
       handleRetryScan,
@@ -231,6 +236,7 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
       canRescanCurrentSelection,
       buildScanRequest,
       runOrbitScan,
+      restoreScanContext,
       clearScanRunState,
       handleScan,
       handleRetryScan,

@@ -8,6 +8,7 @@ import {
   invalidateCollectionMetadataQueries,
   invalidateOrbitApplyQueries,
   ORBIT_GRAPH_QUERY_KEY,
+  ORBIT_SCAN_CANDIDATES_QUERY_KEY,
 } from "./query-invalidation";
 
 describe("query invalidation helpers", () => {
@@ -68,7 +69,8 @@ describe("query invalidation helpers", () => {
     expect(keys).toContainEqual(["tags"]);
     expect(keys).toContainEqual(["collections"]);
     expect(keys).toContainEqual(["library-stats"]);
-    expect(keys).toContainEqual(ORBIT_GRAPH_QUERY_KEY);
+    expect(keys).toContainEqual(ORBIT_SCAN_CANDIDATES_QUERY_KEY);
+    expect(keys).not.toContainEqual(ORBIT_GRAPH_QUERY_KEY);
     expect(keys.some((key) => key?.[0] === "analytics")).toBe(false);
     expect(keys.some((key) => key?.[0] === "performance-highlights")).toBe(false);
     expect(
@@ -89,6 +91,19 @@ describe("query invalidation helpers", () => {
     expect(
       invalidateSpy.mock.calls.every(([args]) => args.refetchType === "none")
     ).toBe(true);
+  });
+
+  it("can include the orbit graph after a library-wide apply", async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue();
+
+    await invalidateOrbitApplyQueries(queryClient, { includeGraph: true });
+
+    const keys = invalidateSpy.mock.calls.map(([args]) => args.queryKey);
+    expect(keys).toContainEqual(ORBIT_GRAPH_QUERY_KEY);
+    expect(keys).toContainEqual(ORBIT_SCAN_CANDIDATES_QUERY_KEY);
   });
 
   it("invalidates collection metadata without library stats or orbit graph", async () => {

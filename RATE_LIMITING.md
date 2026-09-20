@@ -13,6 +13,7 @@ MarkMaster uses **per-user rate limiting** backed by Upstash Redis to protect ex
 | **API Reads**     | 100 requests  | 5 minutes  | General data fetching (bookmarks, analytics, export, etc.) |
 | **API Writes**    | 30 requests   | 5 minutes  | Creating/updating tags, collections, notes, etc. |
 | **Flywheel**      | 120 requests  | 5 minutes  | Instrumentation ingest; exempt from the proxy `api:write` debit |
+| **Orbit Snapshot**| 120 requests  | 5 minutes  | Durable scan-plan upsert; exempt from the proxy `api:write` debit |
 | **Media**         | 600 requests  | 5 minutes  | Authenticated media proxy range requests |
 | **CSP report**    | 200 requests  | 5 minutes  | Public ingestion, keyed by IP |
 
@@ -27,6 +28,7 @@ These limits are **per user**, except CSP reports (IP-keyed).
 - `GET /api/orbit/library-classify` → `"api:read"` (count query; skipped by the proxy so it is not double-charged)
 - `GET /api/orbit/graph` → `"orbit:graph"`
 - `POST /api/flywheel` → `"flywheel"`
+- `GET/PUT/DELETE /api/orbit/scan-snapshot` → `"orbit:snapshot"`
 - `GET /api/media` → `"media"`
 - `GET /api/export` → `"api:read"` (handler-owned, skipped by the proxy)
 
@@ -106,4 +108,4 @@ Possible enhancements for when the app is public or has more users:
 
 ---
 
-**Last updated**: September 2026 (collection handler `api:write`, flywheel bucket, library-classify GET)
+**Last updated**: September 2026 (orbit scan snapshot persist)

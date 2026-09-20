@@ -17,6 +17,14 @@ describe("isLightweightApiRequest", () => {
     expect(isLightweightApiRequest("/api/orbit/library-classify", "GET")).toBe(
       true
     );
+    expect(isLightweightApiRequest("/api/orbit/scan-snapshot", "GET")).toBe(true);
+    expect(isLightweightApiRequest("/api/orbit/scan-snapshot", "PUT")).toBe(true);
+    expect(isLightweightApiRequest("/api/orbit/scan-snapshot", "DELETE")).toBe(
+      true
+    );
+    expect(isLightweightApiRequest("/api/orbit/scan-snapshot", "POST")).toBe(
+      false
+    );
   });
 
   it("allows collection mutations to skip proxy api:write (handler applies it)", () => {

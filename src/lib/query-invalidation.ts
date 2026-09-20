@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 export const ORBIT_GRAPH_QUERY_KEY = ["orbit", "graph"] as const;
+export const ORBIT_SCAN_CANDIDATES_QUERY_KEY = ["orbit", "scan-candidates"] as const;
 
 type InvalidateOptions = {
   /** Refetch only queries mounted on screen (default). Use "all" after full sync. "none" marks stale without refetch. */
@@ -82,15 +83,22 @@ export function invalidateBookmarkDeletionSideEffects(queryClient: QueryClient) 
 /** Orbit scan apply: tags/collections on bookmarks change; skip analytics/highlights. */
 export function invalidateOrbitApplyQueries(
   queryClient: QueryClient,
-  options?: InvalidateOptions
+  options?: InvalidateOptions & { includeGraph?: boolean }
 ) {
   const refetchType = options?.refetchType ?? "active";
+  const includeGraph = options?.includeGraph ?? false;
   return Promise.all([
     invalidateBookmarkListQueries(queryClient, { refetchType }),
     queryClient.invalidateQueries({ queryKey: ["tags"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["collections"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["library-stats"], refetchType }),
-    invalidateOrbitGraphQuery(queryClient, { refetchType }),
+    queryClient.invalidateQueries({
+      queryKey: ORBIT_SCAN_CANDIDATES_QUERY_KEY,
+      refetchType,
+    }),
+    ...(includeGraph
+      ? [invalidateOrbitGraphQuery(queryClient, { refetchType })]
+      : []),
   ]);
 }
 

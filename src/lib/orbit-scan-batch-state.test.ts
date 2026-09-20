@@ -80,7 +80,7 @@ describe("deriveOrbitScanBatchState", () => {
 
     expect(state.scanningSelection).toBe(true);
     expect(state.scanTargetIds).toEqual(["one"]);
-    expect(state.scanButtonLabel).toBe("Auto-categorize selection");
+    expect(state.scanButtonLabel).toBe("Scan selection");
   });
 
   it("falls back from Sweep when TypeSafe is not configured", () => {

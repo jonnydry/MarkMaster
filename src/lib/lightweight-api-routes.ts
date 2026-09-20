@@ -24,6 +24,16 @@ export function isLightweightApiRequest(pathname: string, method: string): boole
     return method === "GET" || method === "HEAD" || method === "POST";
   }
 
+  if (pathname === "/api/orbit/scan-snapshot") {
+    // Handler applies the orbit:snapshot bucket for GET/PUT/DELETE.
+    return (
+      method === "GET" ||
+      method === "HEAD" ||
+      method === "PUT" ||
+      method === "DELETE"
+    );
+  }
+
   // These handlers apply their own purpose-built limits. Media needs a larger
   // range-request budget; export deliberately has a tighter read limit.
   if (pathname === "/api/media" || pathname === "/api/export") {

@@ -123,6 +123,7 @@ export default function OrbitPage() {
     reviewSession,
     feedbackById,
     scanButtonLabel,
+    scanHelperText,
     triagedCount,
     passTotal,
     activeScanPlanSuggestionCount,
@@ -336,6 +337,7 @@ export default function OrbitPage() {
               triagedCount={triagedCount}
               passTotal={passTotal}
               scanButtonLabel={scanButtonLabel}
+              scanHelperText={scanHelperText}
               queueIsLoading={queueIsLoading}
               scanning={scan.scanning}
               scanTargetCount={scanTargetIds.length}
@@ -470,7 +472,7 @@ export default function OrbitPage() {
                       ) : (
                         <OrbitLogoMark className="size-3.5" />
                       )}
-                      Auto-categorize selection
+                      Scan selection
                     </Button>
                     <Button
                       size="sm"

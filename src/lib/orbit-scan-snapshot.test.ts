@@ -8,6 +8,7 @@ import {
   clearOrbitScanSnapshot,
   loadOrbitScanSnapshot,
   orbitScanSnapshotStorageKey,
+  parseOrbitScanSnapshotInput,
   parseOrbitScanSnapshotRaw,
   saveOrbitScanSnapshot,
 } from "@/lib/orbit-scan-snapshot";
@@ -99,6 +100,7 @@ describe("buildOrbitScanSnapshotRaw / parseOrbitScanSnapshotRaw", () => {
       payload: scanPayload(),
       dismissedBookmarkIds: new Set(["b2"]),
       appliedBookmarkIds: ["b1"],
+      scanContextKey: "ctx-recent-1",
     });
     expect(raw).not.toBeNull();
 
@@ -110,6 +112,7 @@ describe("buildOrbitScanSnapshotRaw / parseOrbitScanSnapshotRaw", () => {
     expect(snapshot!.payload.plan.suggestions[0].tags[0].name).toBe("testing");
     expect(snapshot!.dismissedBookmarkIds).toEqual(["b2"]);
     expect(snapshot!.appliedBookmarkIds).toEqual(["b1"]);
+    expect(snapshot!.scanContextKey).toBe("ctx-recent-1");
   });
 
   it("strips full bookmark rows from the persisted payload", () => {
@@ -239,5 +242,56 @@ describe("sessionStorage round-trip", () => {
 
     expect(loadOrbitScanSnapshot("user-2")).toBeNull();
     expect(loadOrbitScanSnapshot(USER_ID)).not.toBeNull();
+  });
+});
+
+describe("parseOrbitScanSnapshotInput", () => {
+  it("accepts a PUT body and stamps the authenticated user", () => {
+    const result = parseOrbitScanSnapshotInput(
+      {
+        payload: scanPayload(),
+        dismissedBookmarkIds: ["b2"],
+        appliedBookmarkIds: ["b1"],
+      },
+      USER_ID,
+      new Date("2026-09-20T00:00:00.000Z")
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.userId).toBe(USER_ID);
+    expect(result.snapshot.dismissedBookmarkIds).toEqual(["b2"]);
+    expect(result.snapshot.appliedBookmarkIds).toEqual(["b1"]);
+    expect(result.snapshot.savedAt).toBe("2026-09-20T00:00:00.000Z");
+  });
+
+  it("rejects missing payloads and non-string id lists", () => {
+    expect(parseOrbitScanSnapshotInput({}, USER_ID).ok).toBe(false);
+    expect(
+      parseOrbitScanSnapshotInput(
+        { payload: scanPayload(), dismissedBookmarkIds: [1] },
+        USER_ID
+      )
+    ).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("refuses oversized plans", () => {
+    const result = parseOrbitScanSnapshotInput(
+      {
+        payload: scanPayload({
+          plan: {
+            overview: {
+              summary: "x".repeat(ORBIT_SCAN_SNAPSHOT_MAX_CHARS + 1),
+              taggingStrategy: "",
+              collectionStrategy: "",
+            },
+            suggestions: [],
+          },
+        }),
+      },
+      USER_ID
+    );
+
+    expect(result).toEqual({ ok: false, reason: "too_large" });
   });
 });
