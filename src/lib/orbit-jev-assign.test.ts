@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  assignOrbitBookmarksWithJev,
   buildJevAssignmentFromAnswers,
   jevAssignmentsToRawPlan,
   mapJevScoreToConfidence,
@@ -8,7 +9,20 @@ import {
   shortlistOrbitTagsForJev,
 } from "@/lib/orbit-jev-assign";
 import { buildBookmarkPayload } from "@/lib/orbit-grok-normalize";
+import { OrbitGrokError } from "@/lib/orbit-grok-schemas";
 import type { OrbitBookmarkForScan } from "@/lib/orbit-grok-schemas";
+
+const systemOneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/typesafe", () => ({
+  getTypeSafeClient: () => ({ systemOne: systemOneMock }),
+  getTypeSafeModel: () => "jev-latest",
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logWarn: vi.fn(),
+  logError: vi.fn(),
+}));
 
 function bookmark(overrides?: Partial<OrbitBookmarkForScan>): OrbitBookmarkForScan {
   return {
@@ -253,6 +267,95 @@ describe("buildJevAssignmentFromAnswers", () => {
     expect(assignment.needsNewLabel).toBe(true);
     expect(assignment.abstain).toBe(true);
     expect(assignment.confidence).toBe("low");
+  });
+});
+
+describe("assignOrbitBookmarksWithJev failure isolation", () => {
+  const successAnswers = {
+    answers: {
+      tag_0: { noul: 0.9 },
+      needs_new_label: { noul: 0.1 },
+      match_quality: { score: 2 },
+      collection: { choice: "none", confidence: 0.2 },
+    },
+  };
+
+  const batchArgs = {
+    existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 3 }],
+    existingCollections: [],
+    pool: {
+      tags: [{ name: "AI", existing: true }],
+      collections: [],
+    },
+    retryBaseDelayMs: 1,
+  };
+
+  beforeEach(() => {
+    systemOneMock.mockReset();
+  });
+
+  it("keeps completed assignments when one item fails with a non-rate-limit error", async () => {
+    systemOneMock.mockImplementation(async ({ state }: { state: { bookmark: { id: string } } }) => {
+      if (state.bookmark.id === "bm-fail") {
+        throw new Error("provider exploded");
+      }
+      return successAnswers;
+    });
+
+    const assignments = await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-ok" }), bookmark({ id: "bm-fail" })],
+    });
+
+    expect(assignments).toHaveLength(2);
+    const ok = assignments.find((entry) => entry.bookmarkId === "bm-ok");
+    const failed = assignments.find((entry) => entry.bookmarkId === "bm-fail");
+    expect(ok?.abstain).toBe(false);
+    expect(ok?.tags.map((tag) => tag.name)).toEqual(["AI"]);
+    expect(failed?.abstain).toBe(true);
+    expect(failed?.tags).toEqual([]);
+    // A non-rate-limit failure never retries.
+    expect(
+      systemOneMock.mock.calls.filter(
+        ([call]) => call.state.bookmark.id === "bm-fail"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("retries rate-limited items with backoff and recovers", async () => {
+    let failuresLeft = 1;
+    systemOneMock.mockImplementation(async () => {
+      if (failuresLeft > 0) {
+        failuresLeft -= 1;
+        throw new OrbitGrokError("slow down", 429, "typesafe_unavailable");
+      }
+      return successAnswers;
+    });
+
+    const assignments = await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-1" })],
+    });
+
+    expect(systemOneMock).toHaveBeenCalledTimes(2);
+    expect(assignments[0]?.abstain).toBe(false);
+    expect(assignments[0]?.tags.map((tag) => tag.name)).toEqual(["AI"]);
+  });
+
+  it("abstains after exhausting rate-limit retries", async () => {
+    systemOneMock.mockRejectedValue(
+      new OrbitGrokError("slow down", 429, "typesafe_unavailable")
+    );
+
+    const assignments = await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-1" })],
+    });
+
+    // Initial attempt + 2 retries.
+    expect(systemOneMock).toHaveBeenCalledTimes(3);
+    expect(assignments[0]?.abstain).toBe(true);
+    expect(assignments[0]?.bookmarkId).toBe("bm-1");
   });
 });
 

@@ -39,6 +39,7 @@ import type {
   OrbitTagContext,
 } from "@/lib/orbit-grok-schemas";
 import type { OrbitLearningHint, OrbitNeighborHint } from "@/lib/orbit-signal-extraction";
+import { logWarn } from "@/lib/logger";
 import { getTypeSafeClient, getTypeSafeModel } from "@/lib/typesafe";
 import type { OrbitScanConfidence } from "@/types";
 
@@ -600,6 +601,36 @@ export async function assignOneOrbitBookmarkWithJev(args: {
   });
 }
 
+/** Retries per item when TypeSafe reports a rate limit (jittered backoff). */
+const JEV_ASSIGN_RATE_LIMIT_RETRIES = 2;
+const JEV_ASSIGN_RETRY_BASE_DELAY_MS = 300;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitedAssignError(error: unknown): boolean {
+  return error instanceof OrbitGrokError && error.status === 429;
+}
+
+/**
+ * A per-item failure becomes an abstain/leftover so the hybrid refine and
+ * Grok-escalation paths pick the bookmark up instead of the whole batch
+ * rejecting and discarding every completed assignment (Speed-M2).
+ */
+function abstainAssignmentForFailure(bookmarkId: string): OrbitJevAssignment {
+  return {
+    bookmarkId,
+    confidence: "low",
+    reasoning:
+      "This bookmark could not be checked on this pass — it stays in Orbit.",
+    tags: [],
+    collection: null,
+    needsNewLabel: false,
+    abstain: true,
+  };
+}
+
 export async function assignOrbitBookmarksWithJev(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
@@ -609,6 +640,8 @@ export async function assignOrbitBookmarksWithJev(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batchVocabulary?: OrbitBatchVocabulary;
+  /** Test hook — base backoff for rate-limit retries. */
+  retryBaseDelayMs?: number;
 }): Promise<OrbitJevAssignment[]> {
   const authorHintByUsername = new Map(
     (args.authorPriorHints ?? []).map((hint) => [
@@ -622,24 +655,44 @@ export async function assignOrbitBookmarksWithJev(args: {
   const neighborById = new Map(
     (args.neighborHints ?? []).map((entry) => [entry.bookmarkId, entry.hint])
   );
+  const retryBaseDelayMs =
+    args.retryBaseDelayMs ?? JEV_ASSIGN_RETRY_BASE_DELAY_MS;
 
-  return mapInPool(
-    args.bookmarks,
-    ORBIT_JEV_ASSIGN_CONCURRENCY,
-    (bookmark) =>
-      assignOneOrbitBookmarkWithJev({
-        bookmark,
-        existingTags: args.existingTags,
-        existingCollections: args.existingCollections,
-        pool: args.pool,
-        authorPriorHint: authorHintByUsername.get(
-          normalizeKey(bookmark.authorUsername)
-        ),
-        learningHint: learningById.get(bookmark.id),
-        neighborHint: neighborById.get(bookmark.id),
-        batchVocabulary: args.batchVocabulary,
-      })
-  );
+  return mapInPool(args.bookmarks, ORBIT_JEV_ASSIGN_CONCURRENCY, async (bookmark) => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await assignOneOrbitBookmarkWithJev({
+          bookmark,
+          existingTags: args.existingTags,
+          existingCollections: args.existingCollections,
+          pool: args.pool,
+          authorPriorHint: authorHintByUsername.get(
+            normalizeKey(bookmark.authorUsername)
+          ),
+          learningHint: learningById.get(bookmark.id),
+          neighborHint: neighborById.get(bookmark.id),
+          batchVocabulary: args.batchVocabulary,
+        });
+      } catch (error) {
+        const rateLimited = isRateLimitedAssignError(error);
+        if (rateLimited && attempt < JEV_ASSIGN_RATE_LIMIT_RETRIES) {
+          const backoff = retryBaseDelayMs * 2 ** attempt;
+          await sleep(backoff + Math.random() * backoff);
+          continue;
+        }
+        logWarn(
+          "OrbitJevAssign",
+          rateLimited
+            ? `Bookmark ${bookmark.id} still rate limited after ${
+                attempt + 1
+              } attempts; abstaining.`
+            : `Assignment failed for bookmark ${bookmark.id}; abstaining.`,
+          error
+        );
+        return abstainAssignmentForFailure(bookmark.id);
+      }
+    }
+  });
 }
 
 export function jevAssignmentsToRawPlan(

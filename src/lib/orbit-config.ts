@@ -71,8 +71,28 @@ export const ORBIT_JEV_NEEDS_NEW_LABEL_THRESHOLD = 0.7;
 /** Accept a collection Choice other than none at or above this confidence. */
 export const ORBIT_JEV_COLLECTION_CONFIDENCE_THRESHOLD = 0.6;
 
-/** Parallel Jev requests during a scan. */
-export const ORBIT_JEV_ASSIGN_CONCURRENCY = 8;
+function parseBoundedIntEnv(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+/**
+ * Parallel Jev requests during a scan (override with ORBIT_JEV_ASSIGN_CONCURRENCY).
+ * Default 12 is safe because per-item failures abstain into leftovers instead
+ * of rejecting the whole batch (see assignOrbitBookmarksWithJev).
+ */
+export const ORBIT_JEV_ASSIGN_CONCURRENCY = parseBoundedIntEnv(
+  process.env.ORBIT_JEV_ASSIGN_CONCURRENCY,
+  12,
+  1,
+  32
+);
 
 /** Untagged bookmarks processed per library-classify worker page. */
 export const ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE = 48;
