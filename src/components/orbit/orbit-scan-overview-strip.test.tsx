@@ -123,6 +123,43 @@ describe("OrbitScanOverviewStrip", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /Orbit pass/i }));
-    expect(screen.getByText(/Jev leftovers 8 · recovered 5 · Grok 3/)).toBeInTheDocument();
+    const outcomeLine = screen.getByText(
+      /Couldn't match: 8 · Fixed on retry: 5 · Sent to Grok for new names: 3/
+    );
+    expect(outcomeLine).toBeInTheDocument();
+    // Raw engine metrics stay available for power users via the tooltip.
+    expect(outcomeLine).toHaveAttribute(
+      "title",
+      expect.stringContaining("Jev leftovers 8")
+    );
+  });
+
+  it("hides the hybrid breakdown when every bookmark matched first pass", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrbitScanOverviewStrip
+        payload={{
+          ...payload,
+          batch: {
+            ...payload.batch,
+            hybrid: {
+              firstPassLeftovers: 0,
+              refinedLeftovers: 0,
+              recoveredOnRefine: 0,
+              escalatedToGrok: 0,
+            },
+          },
+        }}
+        suggestionCount={2}
+        scanning={false}
+        applyingBatch={false}
+        canApplyStrongMatches
+        onReview={vi.fn()}
+        onApplyStrongMatches={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Orbit pass/i }));
+    expect(screen.queryByText(/Couldn't match/)).not.toBeInTheDocument();
   });
 });

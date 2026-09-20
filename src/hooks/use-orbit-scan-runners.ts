@@ -109,8 +109,8 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
 
       toast.info(
         request.scanningSelection
-          ? "Grok is categorizing your selection — this should be quicker."
-          : "Grok is categorizing your queue — large batches can take a minute."
+          ? "Orbit is categorizing your selection — this should be quicker."
+          : "Orbit is categorizing your queue — large batches can take a minute."
       );
       try {
         const result = await scan.scanNow(request.targetIds, request.batch);
@@ -118,7 +118,7 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
           setScanContextAtLastRun(request.contextKey);
           const scopeLabel = request.scanningSelection ? "selected" : "Orbit";
           toast.success(
-            `Grok categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
+            `Orbit categorized ${result.plan.suggestions.length} ${scopeLabel} bookmark${
               result.plan.suggestions.length === 1 ? "" : "s"
             }`
           );

@@ -277,6 +277,24 @@ export function OrbitScanOverviewStrip({
 
   const { summary, tagRollups, collectionRollups, plan } = payload;
   const { overview } = plan;
+
+  // Outcome language for the hybrid breakdown (Consistency-H1 / UX-H3):
+  // hidden when nothing was left over; raw engine metrics stay in the
+  // tooltip for power users.
+  const hybrid = payload.batch.hybrid;
+  const hasHybridActivity = Boolean(
+    hybrid &&
+      (hybrid.firstPassLeftovers > 0 ||
+        hybrid.recoveredOnRefine > 0 ||
+        hybrid.escalatedToGrok > 0)
+  );
+  const hybridOutcomeLine =
+    hybrid && hasHybridActivity
+      ? `Couldn't match: ${hybrid.firstPassLeftovers} · Fixed on retry: ${hybrid.recoveredOnRefine} · Sent to Grok for new names: ${hybrid.escalatedToGrok}`
+      : null;
+  const hybridEngineDetail = hybrid
+    ? `Jev leftovers ${hybrid.firstPassLeftovers} · recovered ${hybrid.recoveredOnRefine} · Grok escalations ${hybrid.escalatedToGrok}`
+    : null;
   const reviewLabel =
     suggestionCount === 1
       ? "Review 1 suggestion"
@@ -330,7 +348,9 @@ export function OrbitScanOverviewStrip({
               !open && "truncate"
             )}
           >
-            {open ? overview.summary : `Grok plan · ${modelLine}`}
+            {open
+              ? overview.summary
+              : `${payload.batch.hybrid ? "Orbit plan" : "Grok plan"} · ${modelLine}`}
           </p>
         </div>
       </button>
@@ -396,11 +416,12 @@ export function OrbitScanOverviewStrip({
           </div>
 
           <div className="space-y-4 px-3 pb-3 pt-3 sm:px-4">
-            {payload.batch.hybrid ? (
-              <p className={cn("text-xs", orbitMetaMuted())}>
-                Jev leftovers {payload.batch.hybrid.firstPassLeftovers} · recovered{" "}
-                {payload.batch.hybrid.recoveredOnRefine} · Grok{" "}
-                {payload.batch.hybrid.escalatedToGrok}
+            {hybridOutcomeLine ? (
+              <p
+                className={cn("text-xs", orbitMetaMuted())}
+                title={hybridEngineDetail ?? undefined}
+              >
+                {hybridOutcomeLine}
               </p>
             ) : null}
             <StrategyLines

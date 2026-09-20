@@ -122,7 +122,7 @@ export function OrbitReviewGrokProposal({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
-        {declined ? "Grok proposed (not applying)" : "Grok proposed"}
+        {declined ? "Orbit proposed (not applying)" : "Orbit proposed"}
       </div>
       <div className="flex flex-wrap gap-1.5">
         {original.tags.map((tag) => (

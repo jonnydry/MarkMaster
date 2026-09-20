@@ -37,7 +37,7 @@ const BATCH_OPTIONS: Array<{
   {
     mode: "sweep",
     label: `Sweep`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.sweep.size} bookmarks · Jev assigns existing names`},
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.sweep.size} bookmarks · reuses existing tags only — never invents new ones`},
 ];
 
 export interface OrbitBatchMenuProps {

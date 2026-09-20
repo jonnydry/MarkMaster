@@ -103,7 +103,7 @@ export function deriveOrbitScanBatchState(
     : (scanQuality?.deep.reason ?? "Needs scan history before Deep unlocks.");
   const sweepUnlocked = hybridScanAvailable;
   const sweepLockedReason = hybridScanAvailable
-    ? "Sweep uses Jev to review 72 bookmarks in one pass."
+    ? "Sweep reviews 72 bookmarks in one pass, reusing existing tags only."
     : "Set TYPESAFE_API_KEY to unlock Sweep batches.";
 
   const resolvedScanBatchMode: OrbitScanBatchMode =

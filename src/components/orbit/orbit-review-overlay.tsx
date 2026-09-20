@@ -546,7 +546,7 @@ export function OrbitReviewOverlay({
           <div className="px-6 py-10 text-center text-sm text-muted-foreground">
             {plan
               ? "No suggestions are waiting for review."
-              : "Grok is preparing suggestions for this review."}
+              : "Orbit is preparing suggestions for this review."}
           </div>
         )}
       </DialogContent>

@@ -179,7 +179,7 @@ export function useOrbitReviewBridge(options: UseOrbitReviewBridgeOptions) {
       const wasDismissed = scan.dismissedBookmarkIds.has(bookmarkId);
       scan.toggleDismiss(bookmarkId);
       if (wasDismissed) {
-        toast.success("Grok suggestion restored for this bookmark.");
+        toast.success("Orbit suggestion restored for this bookmark.");
         return true;
       }
       toast.message("Kept in Orbit for this pass.");

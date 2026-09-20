@@ -393,20 +393,20 @@ export function buildJevAssignmentFromAnswers(args: {
     reason:
       tag.reason ??
       (tag.existing
-        ? `Jev matched existing tag (${noul.toFixed(2)})`
-        : `Jev accepted proposed tag (${noul.toFixed(2)})`),
+        ? `Matched your existing tag (score ${noul.toFixed(2)})`
+        : `Accepted proposed tag (score ${noul.toFixed(2)})`),
   }));
 
   return {
     bookmarkId: args.bookmarkId,
     confidence,
     reasoning: needsNewLabel
-      ? "Candidate labels miss the topic; review or invent a name."
+      ? "None of your existing tags fit this bookmark — it needs a new name."
       : abstain
-        ? "No candidate label cleared the apply threshold."
-        : `Assigned from the closed label pool (${tagReasons.length} tag${
+        ? "No existing tag matched confidently enough to apply."
+        : `Matched ${tagReasons.length} existing tag${
             tagReasons.length === 1 ? "" : "s"
-          }).`,
+          } from your library.`,
     tags: tagReasons.slice(0, 3),
     collection: pickedCollection
       ? {
@@ -416,7 +416,7 @@ export function buildJevAssignmentFromAnswers(args: {
             `Suggested home for ${pickedCollection.name}.`,
           reason:
             pickedCollection.reason ??
-            "Jev selected this collection from the closed pool.",
+            "Chosen from your existing collections.",
         }
       : null,
     needsNewLabel,
@@ -648,13 +648,22 @@ export function jevAssignmentsToRawPlan(
   const assigned = assignments.filter(
     (assignment) => assignment.tags.length > 0 || assignment.collection
   ).length;
+  const total = assignments.length;
+  // Outcome language — engine names and scoring jargon stay out of user copy
+  // (Consistency-H1); the overview strip shows the model id for power users.
+  const summary =
+    assigned === total && total > 0
+      ? `Matched all ${total} bookmark${
+          total === 1 ? "" : "s"
+        } to your existing tags and collections.`
+      : `Matched ${assigned} of ${total} bookmarks to your existing tags and collections.`;
   return {
     overview: {
-      summary: `Jev assigned ${assigned} of ${assignments.length} bookmarks against the closed label pool.`,
+      summary,
       taggingStrategy:
-        "Independent Noul scores per shortlisted tag; Grok only proposed new names.",
+        "Reused tags from your library — only confident matches were applied.",
       collectionStrategy:
-        "One Choice per bookmark from the closed collection pool, including none.",
+        "Each bookmark went to at most one existing collection, or none when nothing fit.",
     },
     suggestions: assignments.map((assignment) => ({
       bookmarkId: assignment.bookmarkId,
