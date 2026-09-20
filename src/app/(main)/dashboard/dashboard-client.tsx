@@ -223,7 +223,7 @@ function DashboardContent() {
             compactable={viewMode !== "grid"}
             bodyClassName="px-0 py-0"
           >
-                <h1 className="sr-only">Dashboard</h1>
+                <h1 className="sr-only">Bookmarks</h1>
                 <DashboardToolbar
                   mobileSidebar={
                     <MobileSidebar
@@ -518,7 +518,7 @@ function DashboardContent() {
           open
           onOpenChange={setKeyboardShortcutsOpen}
           groups={DASHBOARD_SHORTCUT_GROUPS}
-          description="Dashboard navigation and quick actions."
+          description="Bookmark navigation and quick actions."
         />
       ) : null}
 

@@ -311,13 +311,13 @@ export default function OrbitMapPage() {
           ) : null}
 
           {graph && !selection ? (
-            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-sm px-3 py-2 text-2xs font-medium text-foreground/70 sm:flex">
-              <MousePointer2 className="size-3.5 text-primary" aria-hidden="true" />
-              <span>Select a node to inspect</span>
+            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 overflow-hidden rounded-sm px-3 py-2 text-2xs font-medium text-foreground/70 sm:flex">
+              <MousePointer2 className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="whitespace-nowrap">Click to inspect</span>
               <span className="text-foreground/30" aria-hidden="true">·</span>
-              <span>Scroll to zoom</span>
-              <span className="text-foreground/30" aria-hidden="true">·</span>
-              <span>Drag to pan</span>
+              <span className="whitespace-nowrap">Scroll to zoom</span>
+              <span className="hidden text-foreground/30 md:inline" aria-hidden="true">·</span>
+              <span className="hidden whitespace-nowrap md:inline">Drag to pan</span>
             </div>
           ) : null}
 

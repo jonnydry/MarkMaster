@@ -99,7 +99,7 @@ interface OrbitReviewGrokProposalProps {
   className?: string;
 }
 
-/** Read-only preview of Grok's proposed tags and collection. */
+/** Read-only preview of the scan's proposed tags and collection. */
 export function OrbitReviewGrokProposal({
   original,
   decision,
@@ -112,7 +112,7 @@ export function OrbitReviewGrokProposal({
   if (!hasTags && !hasCollection) {
     return (
       <p className={cn("text-xs text-muted-foreground/80", className)}>
-        Grok suggests keeping this bookmark in Orbit unchanged.
+        Orbit suggests keeping this bookmark in Orbit unchanged.
       </p>
     );
   }

@@ -3,12 +3,19 @@ import type { QueryClient } from "@tanstack/react-query";
 export const ORBIT_GRAPH_QUERY_KEY = ["orbit", "graph"] as const;
 
 type InvalidateOptions = {
-  /** Refetch only queries mounted on screen (default). Use "all" after full sync. */
-  refetchType?: "active" | "all";
+  /** Refetch only queries mounted on screen (default). Use "all" after full sync. "none" marks stale without refetch. */
+  refetchType?: "active" | "all" | "none";
 };
 
-export function invalidateOrbitGraphQuery(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: ORBIT_GRAPH_QUERY_KEY });
+export function invalidateOrbitGraphQuery(
+  queryClient: QueryClient,
+  options?: InvalidateOptions
+) {
+  const refetchType = options?.refetchType ?? "active";
+  return queryClient.invalidateQueries({
+    queryKey: ORBIT_GRAPH_QUERY_KEY,
+    refetchType,
+  });
 }
 
 export function invalidateBookmarkListQueries(
@@ -83,7 +90,7 @@ export function invalidateOrbitApplyQueries(
     queryClient.invalidateQueries({ queryKey: ["tags"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["collections"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["library-stats"], refetchType }),
-    invalidateOrbitGraphQuery(queryClient),
+    invalidateOrbitGraphQuery(queryClient, { refetchType }),
   ]);
 }
 

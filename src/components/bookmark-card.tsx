@@ -85,7 +85,7 @@ function BookmarkRank({
       >
         {rank}
       </span>
-      <span className="mt-1 h-1.5 w-1.5 rounded-[2px] border border-hairline-soft bg-surface-2" />
+      <span className="mt-1 h-1.5 w-1.5 rounded-[2px] bg-surface-2" />
     </div>
   );
 }

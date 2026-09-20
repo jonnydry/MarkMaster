@@ -244,7 +244,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                   "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
                   "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
                 )}
-                title={`Grok suggests: ${
+                title={`Orbit suggests: ${
                   suggestion.kind === "collection" ? "add to" : "tag as"
                 } ${suggestion.label} · ${suggestion.confidence} confidence`}
               >

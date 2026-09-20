@@ -21,7 +21,11 @@ export function OrbitMapStatsStrip({
           "pointer-events-none absolute bottom-4 left-4 z-20 hidden max-w-[calc(100%-6rem)] items-center gap-3 px-3 py-2 lg:flex"
         )}
       >
-        <MapMetric label="Loose" value={stats.looseBookmarks} />
+        <MapMetric
+          label="Loose"
+          value={stats.looseBookmarks}
+          title="In Orbit — not on a tag or collection"
+        />
         <MapMetricDivider />
         <MapMetric label="Tags" value={stats.tagCount} />
         <MapMetricDivider />
@@ -64,12 +68,14 @@ export function OrbitMapStatsStrip({
 function MapMetric({
   label,
   value,
+  title,
 }: {
   label: string;
   value: number;
+  title?: string;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" title={title}>
       <p className="text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </p>

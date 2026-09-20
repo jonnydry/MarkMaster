@@ -139,7 +139,7 @@ describe("applyOrbitScanPlan", () => {
     await expect(
       applyOrbitScanPlan({ userId: "u1", plan, createCollections: true })
     ).rejects.toMatchObject({
-      name: "OrbitGrokError",
+      name: "OrbitScanError",
       status: 404,
     } satisfies Partial<OrbitGrokError>);
   });

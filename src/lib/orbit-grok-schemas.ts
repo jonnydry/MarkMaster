@@ -16,7 +16,7 @@ export const ORBIT_XAI_PROMPT_CACHE_KEY = "markmaster-orbit-scan";
 export const ORBIT_XAI_REASONING_EFFORT = "low";
 
 
-export class OrbitGrokError extends Error {
+export class OrbitScanError extends Error {
   status: number;
   code: OrbitScanFailureCode;
   retryAfterSeconds?: number;
@@ -28,12 +28,16 @@ export class OrbitGrokError extends Error {
     opts?: { retryAfterSeconds?: number }
   ) {
     super(message);
-    this.name = "OrbitGrokError";
+    this.name = "OrbitScanError";
     this.status = status;
     this.code = code;
     this.retryAfterSeconds = opts?.retryAfterSeconds;
   }
 }
+
+/** @deprecated Use OrbitScanError — this class now covers Grok and Jev failures. */
+export const OrbitGrokError = OrbitScanError;
+export type OrbitGrokError = OrbitScanError;
 
 export function getOrbitXaiRuntimeStatus(args?: {
   lastFailureCode?: OrbitScanFailureCode | null;

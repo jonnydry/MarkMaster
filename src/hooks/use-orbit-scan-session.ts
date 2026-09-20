@@ -345,9 +345,13 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
   }, [clearConsumedReviewUrlParams]);
 
   const handleClearScanPlan = useCallback(() => {
+    const hadApplies = appliedBookmarkIds.size > 0;
     scan.clearPlan();
     clearScanRunState();
-  }, [clearScanRunState, scan]);
+    if (hadApplies) {
+      void scan.refreshAppliedQueries();
+    }
+  }, [appliedBookmarkIds.size, clearScanRunState, scan]);
 
   return {
     scan,

@@ -20,7 +20,6 @@ import {
   BookmarkOverlayAuthorHeader,
   BookmarkOverlayPostColumn,
 } from "@/components/bookmark-overlay/bookmark-overlay-primitives";
-import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import {
   OrbitReviewCollectionField,
@@ -116,7 +115,7 @@ export function OrbitReviewOverlay({
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <DialogDescription className="sr-only">
-          Review Grok suggestions with full bookmark context.
+          Review Orbit suggestions with full bookmark context.
         </DialogDescription>
 
         {completion ? (
@@ -310,11 +309,11 @@ export function OrbitReviewOverlay({
                   </div>
                 </div>
 
-                {/* Grok suggestion */}
+                {/* Orbit suggestion */}
                 <div className="rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
                   <div className={cn("flex items-center gap-2", t.label, "font-semibold text-primary/80")}>
-                    <GrokMark className="size-3.5" />
-                    Grok suggestion
+                    <OrbitLogoMark className="size-3.5" />
+                    Orbit suggestion
                   </div>
                   {activeOriginal?.reasoning ? (
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -408,7 +407,7 @@ export function OrbitReviewOverlay({
                       disabled={applying}
                     >
                       <Sparkles className="size-3.5" />
-                      Use Grok suggestion
+                      Use Orbit suggestion
                     </Button>
                     {activeHasChanges ? (
                       <Button

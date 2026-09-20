@@ -12,6 +12,7 @@ import {
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useOrbitLibraryBootstrap } from "@/hooks/use-orbit-library-bootstrap";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { fetchJson } from "@/lib/fetch-json";
@@ -62,6 +63,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     useState<OrbitSortDirection>(orbitUrlState.sortDirection);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
+  const querySearch = useDebouncedValue(deferredSearch, 280);
   const [page, setPage] = useState(orbitUrlState.page);
   const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
 
@@ -77,10 +79,10 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
         page,
         pageSize,
         sortDirection: queueSortDirection,
-        search: deferredSearch,
+        search: querySearch,
         pageCursors,
       }),
-    [deferredSearch, orbitView, page, pageCursors, pageSize, queueSortDirection]
+    [orbitView, page, pageCursors, pageSize, querySearch, queueSortDirection]
   );
 
   const {
@@ -108,7 +110,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
 
   const queueIsLoading = isLoading && !orbitData;
   const hasSearchQuery = search.trim().length > 0;
-  const isSearchPending = search.trim() !== deferredSearch;
+  const isSearchPending = search.trim() !== querySearch;
   const allQueueCountLabel = total.toLocaleString();
 
   useEffect(() => {
@@ -199,7 +201,7 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     queueSortDirection,
     search,
     page,
-    deferredSearch,
+    deferredSearch: querySearch,
     pageSize,
     queryString,
     bookmarks,

@@ -75,13 +75,14 @@ export interface OrbitScanHandle extends OrbitScanState {
     minConfidence: OrbitScanConfidence;
     safeExistingOnly?: boolean;
   }) => Promise<OrbitApplyResult | null>;
-  /** Skip this bookmark for the current Grok pass (idempotent). */
+  /** Skip this bookmark for the current scan pass (idempotent). */
   dismiss: (bookmarkId: string) => void;
-  /** Skip or restore Grok suggestion for the current pass. */
+  /** Skip or restore an Orbit suggestion for the current pass. */
   toggleDismiss: (bookmarkId: string) => void;
   getDecision: (bookmarkId: string) => OrbitBookmarkDecision | null;
   hasSuggestion: (bookmarkId: string) => boolean;
   clearPlan: () => void;
+  refreshAppliedQueries: () => Promise<unknown>;
   /**
    * Restore a previously persisted scan plan + review progress (UX-H1).
    * No flywheel event fires — the scan already reported completion when it
@@ -395,7 +396,7 @@ export function useOrbitScan(): OrbitScanHandle {
       } catch (err) {
         const failure = buildOrbitScanFailure(
           err,
-          "Could not scan Orbit with Grok"
+          "Could not scan Orbit"
         );
         if (requestId === scanRequestIdRef.current) {
           setError(failure);
@@ -444,7 +445,14 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateOrbitApplyQueries(queryClient);
+        const remaining = plan.plan.suggestions.filter(
+          (suggestion) =>
+            suggestion.bookmarkId !== bookmarkId &&
+            !dismissed.has(suggestion.bookmarkId)
+        );
+        await invalidateOrbitApplyQueries(queryClient, {
+          refetchType: remaining.length === 0 ? "active" : "none",
+        });
 
         setDismissed((current) => {
           const next = new Set(current);
@@ -460,7 +468,7 @@ export function useOrbitScan(): OrbitScanHandle {
         setApplyingBookmarkId(null);
       }
     },
-    [plan, queryClient]
+    [dismissed, plan, queryClient]
   );
 
   const applyEntirePlan = useCallback(
@@ -553,7 +561,10 @@ export function useOrbitScan(): OrbitScanHandle {
           }
         );
 
-        await invalidateOrbitApplyQueries(queryClient);
+        await invalidateOrbitApplyQueries(queryClient, {
+          refetchType:
+            pool.length === filtered.length ? "active" : "none",
+        });
 
         setDismissed((current) => {
           const next = new Set(current);
@@ -692,6 +703,10 @@ export function useOrbitScan(): OrbitScanHandle {
     setError(null);
   }, []);
 
+  const refreshAppliedQueries = useCallback(() => {
+    return invalidateOrbitApplyQueries(queryClient);
+  }, [queryClient]);
+
   const restoreScanSnapshot = useCallback(
     (
       payload: OrbitScanResponsePayload,
@@ -725,6 +740,7 @@ export function useOrbitScan(): OrbitScanHandle {
     getDecision,
     hasSuggestion,
     clearPlan,
+    refreshAppliedQueries,
     restoreScanSnapshot,
   };
 }

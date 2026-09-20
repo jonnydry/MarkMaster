@@ -73,7 +73,7 @@ export function OrbitModeSwitch({
             )}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />
-            <span className={cn(compact ? "sr-only" : "hidden sm:inline")}>
+            <span className={cn(compact && "sr-only")}>
               {label}
             </span>
           </Link>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  OrbitGrokError,
+  OrbitScanError,
   applyOrbitScanPlan,
   orbitScanRequestSchema,
   scanOrbitBookmarksWithXai,
@@ -17,6 +17,7 @@ import {
   orbitScanBookmarkInclude,
   withOrbitFolderHints,
 } from "@/lib/orbit-scan-bookmarks";
+import { logError } from "@/lib/logger";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { computeOrbitScanSignalQuality } from "@/lib/orbit-scan-signal-quality";
@@ -202,7 +203,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ applied });
   } catch (error) {
-    if (error instanceof OrbitGrokError) {
+    if (error instanceof OrbitScanError) {
       const payload: OrbitScanErrorPayload = {
         error: error.message,
         code: error.code,
@@ -214,7 +215,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(payload, { status: error.status });
     }
 
-    console.error("[orbit] scan failed unexpectedly:", error);
+    logError("orbit", "scan failed unexpectedly", error);
 
     return NextResponse.json(
       {

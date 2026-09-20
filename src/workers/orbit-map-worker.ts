@@ -257,6 +257,8 @@ let camera = { x: 0, y: 0, zoom: 1 };
 let cameraAnimationToken = 0;
 /** Scope the camera was last auto-fitted for (preserved across refetches). */
 let lastFittedScope: string | null = null;
+/** True after the user pans, zooms, or flies to a cluster — skip resize refit. */
+let cameraUserAdjusted = false;
 
 // Simple map from node id to its Pixi Graphics object
 const nodeGraphicsMap = new Map<string, Graphics>();
@@ -547,6 +549,7 @@ const interactions = createOrbitMapInteractions<MapNode>({
   getCamera: () => camera,
   panBy: (dx, dy) => {
     cancelCameraAnimation();
+    cameraUserAdjusted = true;
     camera.x += dx;
     camera.y += dy;
     constrainCamera();
@@ -833,8 +836,15 @@ function handleResize(msg: ResizeMessage) {
   }
   app.renderer.resize(msg.width, msg.height);
   layoutVignette(msg.width, msg.height);
-  constrainCamera();
+  // Overview stays framed when the canvas shrinks (e.g. 390px). Once the
+  // user has panned or zoomed, only constrain so their view isn't yanked.
+  if (currentGraph && nodeData.length > 0 && !cameraUserAdjusted) {
+    autoFitCamera(msg.width, msg.height);
+  } else {
+    constrainCamera();
+  }
   updateNodeStyles();
+  postCameraChanged();
 }
 
 function handleSetVisibility(msg: SetVisibilityMessage) {
@@ -1192,6 +1202,7 @@ function handleDestroy() {
   highlightedNodeIds = null;
   currentSelection = null;
   lastFittedScope = null;
+  cameraUserAdjusted = false;
   hasPlayedEntrance = false;
   entranceStartedAt = null;
   camera = { x: 0, y: 0, zoom: 1 };
@@ -2799,6 +2810,7 @@ function frameSelection(selection: OrbitMapSelection) {
   if (!app) return;
   const target = nodeById.get(selection.id);
   if (!target) return;
+  cameraUserAdjusted = true;
 
   const width = app.renderer.width;
   const height = app.renderer.height;
@@ -2852,6 +2864,7 @@ function frameSelection(selection: OrbitMapSelection) {
 function handleCameraMessage(msg: CameraControlMessage) {
   if (!app) return;
   cancelCameraAnimation();
+  cameraUserAdjusted = true;
 
   switch (msg.type) {
     case WorkerMessageType.PAN: {
@@ -2900,6 +2913,7 @@ function handleCameraMessage(msg: CameraControlMessage) {
 function handleWheel(msg: WheelMessage) {
   if (!app) return;
   cancelCameraAnimation();
+  cameraUserAdjusted = true;
 
   const normalizedDelta = Math.max(
     -WHEEL_DELTA_CAP,
@@ -2928,6 +2942,7 @@ function handleResetView() {
   const bounds = getGraphBounds();
   if (!bounds) return;
 
+  cameraUserAdjusted = false;
   const fit = getOrbitMapFrameCameraState(bounds, getCameraConfig());
   animateCameraTo(constrainCameraState(fit), 380);
 }
@@ -2972,6 +2987,7 @@ function handleDoubleClick(msg: DoubleClickMessage) {
   // Empty space: animated zoom-in toward the cursor.
   const newZoom = clampZoom(camera.zoom * 1.7);
   if (newZoom === camera.zoom) return;
+  cameraUserAdjusted = true;
   const target = constrainCameraState({
     x: msg.x - worldX * newZoom,
     y: msg.y - worldY * newZoom,
@@ -3120,6 +3136,7 @@ function constrainCameraState(nextCamera: typeof camera): typeof camera {
 }
 
 function autoFitCamera(width: number, height: number) {
+  cameraUserAdjusted = false;
   if (!currentGraph || nodeData.length === 0) {
     camera = { x: 0, y: 0, zoom: 1 };
     return;

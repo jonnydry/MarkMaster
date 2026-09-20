@@ -603,7 +603,7 @@ function DashboardLink({ href}: { href: string;  }) {
       )}
     >
       <LayoutGrid className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">Dashboard</span>
+      <span className="min-w-0 truncate">Bookmarks</span>
     </Link>
   );
 }

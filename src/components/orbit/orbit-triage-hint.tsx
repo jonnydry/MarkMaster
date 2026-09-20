@@ -44,7 +44,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
     >
       <Sparkles className="size-3.5 shrink-0 text-primary/70" aria-hidden />
       <p className="min-w-0 flex-1">
-        <span className={strong}>Scan</span> with Grok, then{" "}
+        <span className={strong}>Scan</span>, then{" "}
         <span className={strong}>Accept</span> ·{" "}
         <span className={strong}>Skip</span> ·{" "}
         <span className={strong}>Edit</span> each row inline — or open the{" "}

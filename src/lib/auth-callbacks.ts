@@ -1,6 +1,7 @@
 import type { Account, Profile, Session, User } from "next-auth";
 import type { AdapterUser } from "next-auth/adapters";
 import type { JWT } from "next-auth/jwt";
+import { logError } from "./logger";
 import { prisma } from "./prisma";
 import { encrypt } from "./encryption";
 
@@ -46,7 +47,7 @@ export async function authSignInCallback({
   if (!account || !profile) return false;
 
   if (!account.access_token) {
-    console.error("[auth] Missing access_token from provider");
+    logError("auth", "Missing access_token from provider");
     return false;
   }
 
@@ -78,7 +79,7 @@ export async function authSignInCallback({
       : existingUser?.refreshToken;
 
     if (!refreshToken) {
-      console.error("[auth] Missing refresh_token for new sign-in");
+      logError("auth", "Missing refresh_token for new sign-in");
       return false;
     }
 
@@ -114,7 +115,7 @@ export async function authSignInCallback({
       });
     }
   } catch (e) {
-    console.error("[auth] signIn prisma upsert failed:", e);
+    logError("auth", "signIn prisma upsert failed", e);
     return false;
   }
 
@@ -165,7 +166,7 @@ async function revalidateSessionVersion(
     token.sessionValidatedAt = Date.now();
     return true;
   } catch (e) {
-    console.error("[auth] sessionVersion revalidation failed:", e);
+    logError("auth", "sessionVersion revalidation failed", e);
     return true;
   }
 }
@@ -209,7 +210,7 @@ export async function authJwtCallback({
         tokenWithDbUser.sessionValidatedAt = Date.now();
       }
     } catch (e) {
-      console.error("[auth] jwt initial load failed:", e);
+      logError("auth", "jwt initial load failed", e);
     }
 
     tokenWithDbUser.xId = xId;
@@ -236,8 +237,9 @@ export async function authJwtCallback({
         };
       }
     } catch (e) {
-      console.error(
-        "[auth] jwt update trigger failed to refresh lastSyncAt:",
+      logError(
+        "auth",
+        "jwt update trigger failed to refresh lastSyncAt",
         e,
       );
     }
@@ -280,7 +282,7 @@ export async function authSessionCallback({
         sessionWithUser.dbUser = user;
       }
     } catch (e) {
-      console.error("[auth] session fallback prisma lookup failed:", e);
+      logError("auth", "session fallback prisma lookup failed", e);
     }
   }
 

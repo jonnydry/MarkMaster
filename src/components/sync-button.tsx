@@ -20,6 +20,8 @@ interface SyncButtonProps {
   /** Shown in the status line after the sync message, e.g. " · 99 bookmarks". */
   bookmarkCount?: number;
   detail?: "compact" | "full";
+  /** Where the folder-scan toggle lives relative to this button. */
+  folderScanHint?: "above" | "settings";
   layout?: "panel" | "icon";
   onSyncStateChange?: (syncing: boolean) => void;
 }
@@ -29,6 +31,7 @@ export function SyncButton({
   onSyncComplete,
   bookmarkCount,
   detail = "compact",
+  folderScanHint = "settings",
   layout = "panel",
   onSyncStateChange,
 }: SyncButtonProps) {
@@ -394,8 +397,9 @@ export function SyncButton({
         <div className="mt-1 grid gap-1.5 border-t border-hairline-soft pt-2 text-xs leading-snug text-muted-foreground">
           <p>Fetches newest X bookmarks and updates existing saves.</p>
           <p>
-            Enable X folder scanning in Settings to mirror bookmark folders into
-            synced collections.
+            {folderScanHint === "above"
+              ? "Turn on Scan X bookmark folders above to mirror bookmark folders into synced collections."
+              : "Enable X folder scanning in Settings to mirror bookmark folders into synced collections."}
           </p>
           <p>Pauses safely on rate limits and resumes on the next sync.</p>
         </div>

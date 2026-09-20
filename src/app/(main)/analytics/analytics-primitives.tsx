@@ -144,8 +144,9 @@ export function AnalyticsHero({
 }) {
   const untaggedPct = 100 - triagedPct;
   const allTriaged = untaggedCount === 0;
+  const noRecentBookmarks = last30d === 0;
   const trend =
-    !velocityDelta
+    noRecentBookmarks || !velocityDelta
       ? "flat"
       : velocityDelta.pct == null
         ? "up"
@@ -162,8 +163,9 @@ export function AnalyticsHero({
       : trend === "down"
         ? "text-destructive"
         : "text-muted-foreground";
-  const deltaLabel =
-    !velocityDelta
+  const deltaLabel = noRecentBookmarks
+    ? "No new bookmarks in the last 30 days"
+    : !velocityDelta
       ? "—"
       : velocityDelta.pct == null
         ? "first 30 days"
@@ -185,7 +187,13 @@ export function AnalyticsHero({
           <StatRow
             label="In Orbit"
             value={orbitQueueCount.toLocaleString()}
-            hint={allTriaged ? "All tagged" : `${untaggedCount.toLocaleString()} untagged`}
+            hint={
+              allTriaged
+                ? "Queue is clear"
+                : untaggedCount === orbitQueueCount
+                  ? "Need a tag or collection"
+                  : `${untaggedCount.toLocaleString()} have no tags`
+            }
           />
           <StatRow
             label="Last 30 days"
@@ -237,7 +245,7 @@ export function AnalyticsHero({
           {rawHighlightsCount > 0 ? (
             <>
               <span className="text-muted-foreground/50"> · </span>
-              {rawHighlightsCount.toLocaleString()} ready for Discovery
+              {rawHighlightsCount.toLocaleString()} in Discovery
             </>
           ) : null}
           {oldestLabel && !allTriaged ? (

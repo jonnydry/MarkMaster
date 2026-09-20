@@ -45,7 +45,7 @@ describe("buildOrbitScanFailure", () => {
         code: payload.code,
         retryAfterSeconds: payload.retryAfterSeconds,
       }),
-      "Could not scan Orbit with Grok"
+      "Could not scan Orbit"
     );
 
     expect(failure).toMatchObject({

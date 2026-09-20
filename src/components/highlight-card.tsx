@@ -239,7 +239,7 @@ export function HighlightCard({
           ) : (
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-hairline-soft bg-surface-2 text-2xs font-bold text-muted-foreground",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-2xs font-bold text-muted-foreground",
                 t.monoNative && t.data
               )}
             >

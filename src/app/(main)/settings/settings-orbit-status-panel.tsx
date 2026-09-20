@@ -127,7 +127,7 @@ export function OrbitGrokStatusPanel({
           headingFont={false}
           tabularNums={false}
           valueClassName="break-words text-foreground"
-          label="Model"
+          label="Grok model"
           value={`${status.model}${status.modelSource === "environment" ? " · env" : ""}`}
         />
         <StatRow
@@ -222,7 +222,7 @@ function OrbitLibraryClassifyButton({ enabled }: { enabled: boolean }) {
   const untaggedCount = queueQuery.data?.untaggedCount;
   const label =
     typeof untaggedCount === "number"
-      ? `Classify ${untaggedCount.toLocaleString()} untagged`
+      ? `Classify ${untaggedCount.toLocaleString()} in Orbit`
       : "Classify library";
 
   const startClassify = async () => {
@@ -279,13 +279,13 @@ function OrbitLibraryClassifyButton({ enabled }: { enabled: boolean }) {
       {busy || lastRun ? (
         <p className="w-full text-xs text-muted-foreground">
           {busy
-            ? "Classifying your untagged bookmarks — safe matches are applied as they land."
+            ? "Classifying bookmarks in Orbit — safe matches are applied as they land."
             : lastRun
               ? `${
                   lastRun.continued
                     ? "Still draining in the background"
                     : "Last run finished"
-                } · tagged ${lastRun.applied.toLocaleString()} · left ${lastRun.skippedReview.toLocaleString()} for review · ${lastRun.remaining.toLocaleString()} untagged remaining`
+                } · tagged ${lastRun.applied.toLocaleString()} · left ${lastRun.skippedReview.toLocaleString()} for review · ${lastRun.remaining.toLocaleString()} still in Orbit`
               : null}
         </p>
       ) : null}
@@ -321,8 +321,8 @@ function OrbitLibraryClassifyConfirmDialog({
         <div className="p-4">
           <DialogHeader>
             <DialogTitle className="text-lg">
-              Classify {countLabel} untagged bookmark
-              {untaggedCount === 1 ? "" : "s"}?
+              Classify {countLabel}{" "}
+              {untaggedCount === 1 ? "bookmark" : "bookmarks"} in Orbit?
             </DialogTitle>
             <DialogDescription>
               A background pass over everything in your library that has no

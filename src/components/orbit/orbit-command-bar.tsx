@@ -8,7 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { OrbitPageIdentity } from "@/components/orbit/orbit-page-identity";
 import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
 import { Button } from "@/components/ui/button";
@@ -237,7 +237,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               {scanBusy ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <GrokMark className="size-3.5" title="Grok" />
+                <OrbitLogoMark className="size-3.5" />
               )}
               <span className="hidden sm:inline">{scanButtonLabel}</span>
               <span className="sm:hidden">Scan</span>

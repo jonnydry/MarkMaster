@@ -159,7 +159,7 @@ export function SettingsHero({
 
   return (
     <section className="flex min-w-0 items-center gap-3 border-b border-hairline-soft pb-5">
-      <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-hairline-soft bg-surface-2">
+      <div className="relative size-11 shrink-0 overflow-hidden rounded-full bg-surface-2">
         {user?.profileImageUrl ? (
           <Image
             src={user.profileImageUrl}

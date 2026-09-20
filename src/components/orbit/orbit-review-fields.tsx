@@ -137,7 +137,7 @@ export function OrbitReviewTagField({
               {label}
               <button
                 type="button"
-                className="rounded p-0.5 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
                 aria-label={`Remove ${label}`}
                 disabled={!included}
                 onClick={() =>

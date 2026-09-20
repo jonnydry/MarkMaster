@@ -98,7 +98,7 @@ export function CollectionsOverview({
                         {(
                           libraryBookmarkCount - organizedBookmarkCount
                         ).toLocaleString()}{" "}
-                        not yet shelved
+                        not in a collection
                       </>
                     ) : null}
                   </>

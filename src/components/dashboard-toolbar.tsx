@@ -249,7 +249,7 @@ export function DashboardToolbar({
 
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label="More dashboard tools"
+          aria-label="More bookmark tools"
           className={cn(
             "inline-flex items-center justify-center rounded-sm border border-hairline-strong bg-background/35 text-muted-foreground hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 sm:hidden",
             compact ? "size-8" : "size-9",

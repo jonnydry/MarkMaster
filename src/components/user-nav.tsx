@@ -33,6 +33,7 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label="Account menu"
         className={cn(
           "outline-none inline-flex items-center gap-1.5 rounded-full p-0.5 transition-colors",
           "hover:bg-secondary/80 dark:hover:bg-secondary/60",

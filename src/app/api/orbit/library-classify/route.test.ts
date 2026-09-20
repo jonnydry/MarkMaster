@@ -58,6 +58,7 @@ describe("/api/orbit/library-classify", () => {
     const { GET } = await import("./route");
     const response = await GET();
     expect(response.status).toBe(200);
+    expect(checkRateLimitMock).toHaveBeenCalledWith("api:read", "user-1");
     await expect(response.json()).resolves.toEqual({ untaggedCount: 1234 });
   });
 

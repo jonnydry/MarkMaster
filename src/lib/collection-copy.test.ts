@@ -46,6 +46,7 @@ describe("copyCollectionAsUserCollection", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["collections"] });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ORBIT_GRAPH_QUERY_KEY,
+      refetchType: "active",
     });
   });
 });

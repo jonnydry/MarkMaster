@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { ORBIT_LIBRARY_CLASSIFY_MAX_PAGES } from "@/lib/orbit-config";
 import { classifyOrbitLibraryRun } from "@/lib/orbit-library-classify";
-import { OrbitGrokError } from "@/lib/orbit-grok";
+import { OrbitScanError } from "@/lib/orbit-grok";
 import { isSyncWorkerAuthorized } from "@/lib/sync-queue";
 
 export const maxDuration = 240;
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       continued: result.continued,
     });
   } catch (error) {
-    if (error instanceof OrbitGrokError) {
+    if (error instanceof OrbitScanError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: error.status }

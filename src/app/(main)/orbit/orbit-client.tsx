@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type MouseEvent } from "react";
 import {
   Folder,
   Loader2,
@@ -17,7 +17,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { PaginationControls } from "@/components/pagination-controls";
-import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -86,6 +85,7 @@ export default function OrbitPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { queue, session, interactions, selection } = useOrbitPage();
   const scan = session.scan;
+  const getScanDecision = scan.getDecision;
   const {
     router,
     actions,
@@ -195,6 +195,70 @@ export default function OrbitPage() {
   } = interactions;
 
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleSelect = useCallback(
+    (id: string) => {
+      handleSelectionChange(id, !selectedBookmarkIds.has(id));
+    },
+    [handleSelectionChange, selectedBookmarkIds]
+  );
+
+  const handleSelectRow = useCallback(
+    (id: string) => {
+      if (menuForId) {
+        setMenuForId(null);
+        setMenuPosition(null);
+      }
+      if (getScanDecision(id)?.primary) {
+        handleOpenBookmarkReview(id);
+      } else {
+        setActiveBookmarkId(id);
+      }
+    },
+    [
+      getScanDecision,
+      handleOpenBookmarkReview,
+      menuForId,
+      setActiveBookmarkId,
+      setMenuForId,
+      setMenuPosition,
+    ]
+  );
+
+  const handleQuickAction = useCallback(
+    (id: string, action: string, event?: MouseEvent) => {
+      if (action === "accept") {
+        void handleAcceptSuggestion(id);
+      } else if (action === "edit") {
+        handleOpenBookmarkReview(id);
+      } else if (action === "keep") {
+        const wasDismissed = scan.dismissedBookmarkIds.has(id);
+        handleKeepInOrbit(id);
+        if (!wasDismissed) setActiveBookmarkId(null);
+      } else if (action === "tag") {
+        handleBookmarkAddTag(id);
+      } else if (action === "menu" && event) {
+        const rect = (
+          event.currentTarget as HTMLElement
+        ).getBoundingClientRect();
+        const raw = { x: rect.right + 8, y: rect.top };
+        setMenuForId(id);
+        setMenuPosition(clampMenuPosition(raw.x, raw.y));
+      } else {
+        setActiveBookmarkId(id);
+      }
+    },
+    [
+      handleAcceptSuggestion,
+      handleBookmarkAddTag,
+      handleKeepInOrbit,
+      handleOpenBookmarkReview,
+      scan.dismissedBookmarkIds,
+      setActiveBookmarkId,
+      setMenuForId,
+      setMenuPosition,
+    ]
+  );
 
   useEffect(() => {
     if (!menuForId) return;
@@ -337,7 +401,7 @@ export default function OrbitPage() {
                   )}
                 >
                   <p className="text-sm text-primary/95">
-                    This Grok pass was run on a different search, page, or
+                    This scan was run on a different search, page, or
                     selection. Review or dismiss it before trusting the
                     suggestions.
                   </p>
@@ -376,7 +440,7 @@ export default function OrbitPage() {
                           "text-amber-700 dark:text-amber-200/90"
                         )}
                       >
-                        Grok will process the first{" "}
+                        Orbit will process the first{" "}
                         {scanBatchLimit} selected.
                       </span>
                     ) : null}
@@ -404,7 +468,7 @@ export default function OrbitPage() {
                       {scan.scanning ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : (
-                        <GrokMark className="size-3.5" title="Grok" />
+                        <OrbitLogoMark className="size-3.5" />
                       )}
                       Auto-categorize selection
                     </Button>
@@ -544,42 +608,9 @@ export default function OrbitPage() {
                         getDecision={scan.getDecision}
                         dismissedBookmarkIds={scan.dismissedBookmarkIds}
                         appliedBookmarkIds={appliedBookmarkIds}
-                        onToggleSelect={(id) =>
-                          handleSelectionChange(id, !selectedBookmarkIds.has(id))
-                        }
-                        onSelect={(id) => {
-                          if (menuForId) {
-                            setMenuForId(null);
-                            setMenuPosition(null);
-                          }
-                          if (scan.getDecision(id)?.primary) {
-                            handleOpenBookmarkReview(id);
-                          } else {
-                            setActiveBookmarkId(id);
-                          }
-                        }}
-                        onQuickAction={(id, action, event) => {
-                          if (action === "accept") {
-                            void handleAcceptSuggestion(id);
-                          } else if (action === "edit") {
-                            handleOpenBookmarkReview(id);
-                          } else if (action === "keep") {
-                            const wasDismissed = scan.dismissedBookmarkIds.has(id);
-                            handleKeepInOrbit(id);
-                            if (!wasDismissed) setActiveBookmarkId(null);
-                          } else if (action === "tag") {
-                            handleBookmarkAddTag(id);
-                          } else if (action === "menu" && event) {
-                            const rect = (
-                              event.currentTarget as HTMLElement
-                            ).getBoundingClientRect();
-                            const raw = { x: rect.right + 8, y: rect.top };
-                            setMenuForId(id);
-                            setMenuPosition(clampMenuPosition(raw.x, raw.y));
-                          } else {
-                            setActiveBookmarkId(id);
-                          }
-                        }}
+                        onToggleSelect={handleToggleSelect}
+                        onSelect={handleSelectRow}
+                        onQuickAction={handleQuickAction}
                       />
 
                       {orbitView === "all" &&

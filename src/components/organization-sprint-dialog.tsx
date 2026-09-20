@@ -2,7 +2,6 @@
 
 import { CheckCircle2, Clock3, Eye, LockKeyhole } from "lucide-react";
 
-import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +61,7 @@ export function OrganizationSprintDialog({
             <SprintDetail
               icon={Eye}
               title="Useful context only"
-              description="Grok sees the post, author, and your existing tag and collection vocabulary."
+              description="Orbit sees the post, author, and your existing tag and collection vocabulary."
             />
             <SprintDetail
               icon={LockKeyhole}
@@ -72,7 +71,7 @@ export function OrganizationSprintDialog({
           </div>
 
           <div className="mt-4 flex items-center gap-2 surface-inset-strong px-3 py-2 text-xs text-muted-foreground">
-            <GrokMark className="size-3.5 shrink-0" title="Grok" />
+            <OrbitLogoMark className="size-3.5 shrink-0" title="Orbit" />
             <span>Suggestions may abstain when there is not a confident match.</span>
             <CheckCircle2 className="ml-auto size-3.5 shrink-0 text-success" aria-hidden="true" />
           </div>

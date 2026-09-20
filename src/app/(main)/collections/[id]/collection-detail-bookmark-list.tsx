@@ -211,16 +211,16 @@ export function CollectionDetailLoadingState() {
   return (
     <AppPageCenter>
       <div className="mx-auto w-full max-w-4xl space-y-4 px-6">
-        <div className="h-8 w-48 rounded skeleton-shimmer" />
+        <div className="h-8 w-48 rounded-sm skeleton-shimmer" />
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="surface-solid px-4 py-4">
               <div className="flex gap-3">
                 <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-24 rounded skeleton-shimmer" />
-                  <div className="h-3 w-full rounded skeleton-shimmer" />
-                  <div className="h-3 w-4/5 rounded skeleton-shimmer" />
+                  <div className="h-3 w-24 rounded-sm skeleton-shimmer" />
+                  <div className="h-3 w-full rounded-sm skeleton-shimmer" />
+                  <div className="h-3 w-4/5 rounded-sm skeleton-shimmer" />
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { buildMediaBreakdown } from "@/lib/analytics";
 import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import { timeZoneSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
+import { logWarn } from "@/lib/logger";
 import type { AnalyticsData } from "@/types";
 
 /**
@@ -217,8 +218,9 @@ export async function GET(req: NextRequest) {
       GROUP BY "eventType", source
     `;
   } catch (err) {
-    console.warn(
-      "[analytics] FlywheelEvent query failed — run prisma migrate deploy",
+    logWarn(
+      "analytics",
+      "FlywheelEvent query failed — run prisma migrate deploy",
       err
     );
   }
@@ -239,8 +241,9 @@ export async function GET(req: NextRequest) {
       GROUP BY "action", COALESCE("originalSuggestion"->>'confidence', '')
     `;
   } catch (err) {
-    console.warn(
-      "[analytics] OrbitDecisionEvent query failed — run prisma migrate deploy",
+    logWarn(
+      "analytics",
+      "OrbitDecisionEvent query failed — run prisma migrate deploy",
       err
     );
   }

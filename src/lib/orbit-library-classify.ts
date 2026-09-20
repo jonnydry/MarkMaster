@@ -8,7 +8,7 @@ import {
 import { getAuthorPriorHintsForScan } from "@/lib/orbit-author-history";
 import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
-import { applyOrbitScanPlan, OrbitGrokError } from "@/lib/orbit-grok";
+import { applyOrbitScanPlan, OrbitScanError } from "@/lib/orbit-grok";
 import { normalizeOrbitScanPlan } from "@/lib/orbit-grok-parse";
 import {
   assignOrbitBookmarksWithJev,
@@ -37,6 +37,63 @@ export type OrbitLibraryClassifyCursor = {
   bookmarkedAt: string;
   id: string;
 };
+
+type OrbitLibraryCatalog = {
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+    bookmarkCount: number;
+  }>;
+  collections: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    bookmarkCount: number;
+  }>;
+};
+
+async function loadOrbitLibraryCatalog(
+  userId: string
+): Promise<OrbitLibraryCatalog> {
+  const [tags, collections] = await Promise.all([
+    prisma.tag.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        _count: { select: { bookmarks: true } },
+      },
+      orderBy: { bookmarks: { _count: "desc" } },
+    }),
+    prisma.collection.findMany({
+      where: { userId, type: "user_collection" },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        _count: { select: { items: true } },
+      },
+      orderBy: { items: { _count: "desc" } },
+    }),
+  ]);
+
+  return {
+    tags: tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      bookmarkCount: tag._count.bookmarks,
+    })),
+    collections: collections.map((collection) => ({
+      id: collection.id,
+      name: collection.name,
+      description: collection.description,
+      bookmarkCount: collection._count.items,
+    })),
+  };
+}
 
 const untaggedOrbitWhere = (userId: string, cursor?: OrbitLibraryClassifyCursor) => ({
   userId,
@@ -179,6 +236,8 @@ export async function classifyOrbitLibraryRun(args: {
   let queueCount: number | undefined;
   let lastCursor = cursor;
   let warmPool: OrbitLabelPool | undefined;
+  let catalog: OrbitLibraryCatalog | undefined;
+  let remainingEstimate: number | undefined;
   let pagesLeft = args.pagesLeft ?? ORBIT_LIBRARY_CLASSIFY_MAX_PAGES;
   const pagesToRun = Math.min(
     ORBIT_LIBRARY_CLASSIFY_PAGES_PER_INVOCATION,
@@ -192,8 +251,12 @@ export async function classifyOrbitLibraryRun(args: {
       continueInBackground: false,
       pagesLeft: pagesLeft - 1,
       warmPool,
+      catalog,
+      remainingEstimate,
     });
     warmPool = result.warmPool ?? warmPool;
+    catalog = result.catalog ?? catalog;
+    remainingEstimate = result.remaining;
     processed += result.processed;
     applied += result.applied;
     skippedReview += result.skippedReview;
@@ -234,45 +297,37 @@ export async function classifyOrbitLibraryPage(args: {
   continueInBackground?: boolean;
   pagesLeft?: number;
   warmPool?: OrbitLabelPool;
-}): Promise<OrbitLibraryClassifyResult & { warmPool?: OrbitLabelPool }> {
+  catalog?: OrbitLibraryCatalog;
+  remainingEstimate?: number;
+}): Promise<
+  OrbitLibraryClassifyResult & {
+    warmPool?: OrbitLabelPool;
+    catalog?: OrbitLibraryCatalog;
+  }
+> {
   if (!isTypeSafeConfigured()) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "Set TYPESAFE_API_KEY before classifying the Orbit library.",
       503,
       "typesafe_auth"
     );
   }
 
-  const [bookmarks, tags, collections, remainingAfterPage] = await Promise.all([
+  const [bookmarks, catalog, remainingAfterPage] = await Promise.all([
     prisma.bookmark.findMany({
       where: untaggedOrbitWhere(args.userId, args.cursor),
       include: orbitScanBookmarkInclude,
       orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
       take: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
     }),
-    prisma.tag.findMany({
-      where: { userId: args.userId },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        _count: { select: { bookmarks: true } },
-      },
-      orderBy: { bookmarks: { _count: "desc" } },
-    }),
-    prisma.collection.findMany({
-      where: { userId: args.userId, type: "user_collection" },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        _count: { select: { items: true } },
-      },
-      orderBy: { items: { _count: "desc" } },
-    }),
-    prisma.bookmark.count({
-      where: untaggedOrbitWhere(args.userId, args.cursor),
-    }),
+    args.catalog
+      ? Promise.resolve(args.catalog)
+      : loadOrbitLibraryCatalog(args.userId),
+    args.remainingEstimate != null
+      ? Promise.resolve(args.remainingEstimate)
+      : prisma.bookmark.count({
+          where: untaggedOrbitWhere(args.userId, args.cursor),
+        }),
   ]);
 
   if (bookmarks.length === 0) {
@@ -283,22 +338,13 @@ export async function classifyOrbitLibraryPage(args: {
       remaining: 0,
       continued: false,
       queueCount: 0,
+      catalog,
     };
   }
 
   const bookmarksWithFolderHints = bookmarks.map(withOrbitFolderHints);
-  const existingTags = tags.map((tag) => ({
-    id: tag.id,
-    name: tag.name,
-    color: tag.color,
-    bookmarkCount: tag._count.bookmarks,
-  }));
-  const existingCollections = collections.map((collection) => ({
-    id: collection.id,
-    name: collection.name,
-    description: collection.description,
-    bookmarkCount: collection._count.items,
-  }));
+  const existingTags = catalog.tags;
+  const existingCollections = catalog.collections;
 
   const [authorPriorHints, learningHints, neighborHints] = await Promise.all([
     getAuthorPriorHintsForScan(
@@ -400,6 +446,7 @@ export async function classifyOrbitLibraryPage(args: {
     queueCount: remainingAfterPage,
     cursor,
     appliedResult,
+    catalog,
     warmPool: mergeOrbitLabelPool(
       args.warmPool ?? { tags: [], collections: [] },
       labelPoolFromAppliedNames({

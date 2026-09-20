@@ -36,7 +36,7 @@ import {
   ORBIT_SCAN_PLAN_JSON_SCHEMA,
   ORBIT_XAI_PROMPT_CACHE_KEY,
   ORBIT_XAI_REASONING_EFFORT,
-  OrbitGrokError,
+  OrbitScanError,
   type OrbitAuthorPriorHint,
   type OrbitBookmarkForScan,
   type OrbitCollectionContext,
@@ -52,6 +52,7 @@ import type {
 
 export {
   OrbitGrokError,
+  OrbitScanError,
   DEFAULT_XAI_MODEL,
   ORBIT_XAI_PROMPT_CACHE_KEY,
   ORBIT_XAI_REASONING_EFFORT,
@@ -161,7 +162,7 @@ export async function scanOrbitBookmarksWithXai(args: {
   hybridLeftoverNotes?: OrbitHybridLeftoverNote[];
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "Select at least one bookmark to scan.",
       400,
       "scan_request"
@@ -172,14 +173,14 @@ export async function scanOrbitBookmarksWithXai(args: {
   const hybrid = isTypeSafeConfigured();
   const scanLimit = getOrbitScanMaxBookmarks(hybrid);
   if (args.bookmarks.length > scanLimit) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       `Scan up to ${scanLimit} bookmarks at a time.`,
       400,
       "scan_request"
     );
   }
   if (!hybrid && !apiKey) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "Set TYPESAFE_API_KEY or XAI_API_KEY before scanning Orbit.",
       503,
       "xai_auth"
@@ -308,7 +309,7 @@ async function fetchOrbitScanFromXai(
       signal: AbortSignal.timeout(180_000),
     });
   } catch {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "xAI could not be reached. Try the scan again in a moment.",
       503,
       "xai_unavailable"
@@ -323,7 +324,7 @@ async function fetchOrbitScanFromXai(
     );
 
     if (response.status === 401 || response.status === 403) {
-      throw new OrbitGrokError(
+      throw new OrbitScanError(
         "xAI rejected the request. Confirm your API key and model access.",
         502,
         "xai_auth"
@@ -334,7 +335,7 @@ async function fetchOrbitScanFromXai(
       response.status === 404 ||
       (response.status === 400 && /model/i.test(message))
     ) {
-      throw new OrbitGrokError(
+      throw new OrbitScanError(
         "xAI could not find the configured Grok model.",
         502,
         "xai_model"
@@ -342,7 +343,7 @@ async function fetchOrbitScanFromXai(
     }
 
     if (response.status === 429) {
-      throw new OrbitGrokError(
+      throw new OrbitScanError(
         "xAI rate limit reached. Try the scan again in a moment.",
         429,
         "xai_rate_limited",
@@ -354,14 +355,14 @@ async function fetchOrbitScanFromXai(
       );
     }
 
-    throw new OrbitGrokError(message, 502, "xai_unavailable");
+    throw new OrbitScanError(message, 502, "xai_unavailable");
   }
 
   const payload = await response.json().catch(() => null);
   if (payload && typeof payload === "object") {
     const status = (payload as { status?: unknown }).status;
     if (status === "incomplete") {
-      throw new OrbitGrokError(
+      throw new OrbitScanError(
         "xAI stopped before finishing the Orbit scan. Try a smaller batch.",
         502,
         "xai_response"
@@ -372,7 +373,7 @@ async function fetchOrbitScanFromXai(
   const rawText = extractXaiResponsesOutputText(payload);
 
   if (!rawText) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "xAI returned an empty Orbit scan.",
       502,
       "xai_response"
@@ -383,7 +384,7 @@ async function fetchOrbitScanFromXai(
   try {
     parsedJson = JSON.parse(rawText);
   } catch {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "xAI returned invalid JSON for the Orbit scan.",
       502,
       "xai_response"
@@ -449,7 +450,7 @@ export async function applyOrbitScanPlan(args: {
   );
 
   if (bookmarkIds.length === 0) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "The scan plan does not contain any bookmarks.",
       400,
       "scan_request"
@@ -465,7 +466,7 @@ export async function applyOrbitScanPlan(args: {
   });
 
   if (bookmarks.length !== bookmarkIds.length) {
-    throw new OrbitGrokError(
+    throw new OrbitScanError(
       "One or more bookmarks in the scan plan no longer exist.",
       404,
       "bookmark_not_found"

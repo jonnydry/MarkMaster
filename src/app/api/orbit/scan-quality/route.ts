@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getDbUser } from "@/lib/auth";
+import { logWarn } from "@/lib/logger";
 import { evaluateOrbitScanQuality } from "@/lib/orbit-scan-quality";
 import { prisma } from "@/lib/prisma";
 
@@ -42,7 +43,7 @@ export async function GET() {
       }
     );
   } catch (err) {
-    console.warn("[orbit] scan quality query failed:", err);
+    logWarn("orbit", "scan quality query failed", err);
     return NextResponse.json(
       evaluateOrbitScanQuality({ scanEvents: [], reviewEvents: [] })
     );

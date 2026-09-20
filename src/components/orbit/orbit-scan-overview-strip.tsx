@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { GrokMark } from "@/components/brands/grok-mark";
+import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OrbitScanResponsePayload } from "@/types";
@@ -323,7 +324,11 @@ export function OrbitScanOverviewStrip({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <GrokMark className="size-4 text-primary" title="Grok" />
+            {payload.batch.hybrid ? (
+              <OrbitLogoMark className="size-4 text-primary" title="Orbit" />
+            ) : (
+              <GrokMark className="size-4 text-primary" title="Grok" />
+            )}
             <span className={cn(orbitLabelClass(), "text-primary/75")}>
               {payload.batch.hybrid ? "Orbit pass" : "Grok pass"}
             </span>

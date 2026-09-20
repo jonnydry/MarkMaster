@@ -71,6 +71,24 @@ describe("query invalidation helpers", () => {
     expect(keys).toContainEqual(ORBIT_GRAPH_QUERY_KEY);
     expect(keys.some((key) => key?.[0] === "analytics")).toBe(false);
     expect(keys.some((key) => key?.[0] === "performance-highlights")).toBe(false);
+    expect(
+      invalidateSpy.mock.calls.every(
+        ([args]) => args.refetchType === "active" || args.refetchType === undefined
+      )
+    ).toBe(true);
+  });
+
+  it("can mark orbit apply queries stale without refetching", async () => {
+    const queryClient = new QueryClient();
+    const invalidateSpy = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue();
+
+    await invalidateOrbitApplyQueries(queryClient, { refetchType: "none" });
+
+    expect(
+      invalidateSpy.mock.calls.every(([args]) => args.refetchType === "none")
+    ).toBe(true);
   });
 
   it("invalidates collection metadata without library stats or orbit graph", async () => {

@@ -324,6 +324,7 @@ export default function SettingsPage() {
                           lastSyncAt={lastSyncAt}
                           onSyncComplete={handleSyncComplete}
                           detail="full"
+                          folderScanHint="above"
                         />
                       </div>
                     </div>

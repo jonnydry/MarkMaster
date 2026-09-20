@@ -130,10 +130,19 @@ function shortcutMatchesEvent(shortcut: KeyboardShortcut, event: KeyboardEvent) 
     (event.key === "/" || event.code === "Slash") && event.shiftKey
       ? "?"
       : normalizeShortcutKey(event.key);
-  return shortcut.keys.some((key) => normalizeShortcutKey(key) === eventKey);
+  return shortcut.keys.some((key) => {
+    const wantsShift = /^shift\+/i.test(key);
+    const rawKey = wantsShift ? key.replace(/^shift\+/i, "") : key;
+    if (wantsShift && !event.shiftKey) return false;
+    if (!wantsShift && event.shiftKey && rawKey !== "?") return false;
+    return normalizeShortcutKey(rawKey) === eventKey;
+  });
 }
 
-export function formatShortcutKey(key: string) {
+export function formatShortcutKey(key: string): string {
+  if (/^shift\+/i.test(key)) {
+    return `⇧${formatShortcutKey(key.replace(/^shift\+/i, ""))}`;
+  }
   switch (key) {
     case "ArrowDown":
       return "↓";

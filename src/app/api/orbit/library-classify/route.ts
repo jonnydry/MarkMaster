@@ -6,7 +6,7 @@ import {
   countOrbitLibraryQueue,
   kickOrbitLibraryClassifyWorker,
 } from "@/lib/orbit-library-classify";
-import { OrbitGrokError } from "@/lib/orbit-grok";
+import { OrbitScanError } from "@/lib/orbit-grok";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import type { OrbitScanErrorPayload } from "@/types";
 
@@ -16,6 +16,11 @@ export async function GET() {
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit("api:read", user.id);
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
   }
 
   const untaggedCount = await countOrbitLibraryQueue(user.id);
@@ -58,7 +63,7 @@ export async function POST() {
       queueCount: result.queueCount,
     });
   } catch (error) {
-    if (error instanceof OrbitGrokError) {
+    if (error instanceof OrbitScanError) {
       const payload: OrbitScanErrorPayload = {
         error: error.message,
         code: error.code,

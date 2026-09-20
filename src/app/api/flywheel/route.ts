@@ -4,6 +4,7 @@ import { getDbUser } from "@/lib/auth";
 import { flywheelEventSchema } from "@/lib/flywheel-event-schema";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
+import { logWarn } from "@/lib/logger";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 const MAX_FLYWHEEL_BODY_BYTES = 8 * 1024;
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
   } catch (err) {
     // Fail open: instrumentation must never degrade the elegant experience.
     // We still accept (202) so beacons don't retry storm.
-    console.warn("[flywheel] ingest error (non-fatal)", err);
+    logWarn("flywheel", "ingest error (non-fatal)", err);
     return NextResponse.json({ ok: false }, { status: 202 });
   }
 }

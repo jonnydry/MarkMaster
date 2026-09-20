@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 
-import { GrokMark } from "@/components/brands/grok-mark";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import {
   BookmarkOverlayAuthorHeader,
@@ -163,8 +162,8 @@ export function OrbitBookmarkOverlay({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-primary/80">
-                      <GrokMark className="size-3.5" />
-                      Grok suggestion
+                      <OrbitLogoMark className="size-3.5" />
+                      Orbit suggestion
                     </div>
                     <div className="mt-2 text-sm font-semibold leading-6 text-foreground">
                       {decision?.primary
@@ -202,7 +201,7 @@ export function OrbitBookmarkOverlay({
             ) : (
               <div className="mt-5 surface-inset p-3">
                 <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  <GrokMark className="size-3.5" />
+                  <OrbitLogoMark className="size-3.5" />
                   {hasDecision ? "Orbit abstained" : "Not scanned yet"}
                 </div>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">

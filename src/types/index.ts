@@ -1,4 +1,10 @@
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
+import type {
+  OrbitScanBatchMode,
+  OrbitScanBatchProfileId,
+} from "@/lib/orbit-config";
+
+export type { OrbitScanBatchMode, OrbitScanBatchProfileId };
 
 export type SortField =
   | "bookmarkedAt"
@@ -283,9 +289,6 @@ export interface OrbitScanOverview {
   taggingStrategy: string;
   collectionStrategy: string;
 }
-
-export type OrbitScanBatchProfileId = "quick" | "balanced" | "deep" | "sweep";
-export type OrbitScanBatchMode = "auto" | OrbitScanBatchProfileId;
 
 export interface OrbitScanBatchMetadata {
   mode: OrbitScanBatchMode;

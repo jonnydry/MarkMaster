@@ -33,7 +33,7 @@ const BATCH_OPTIONS: Array<{
   {
     mode: "deep",
     label: `Deep`,
-    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · richest Grok pass`},
+    detail: `${ORBIT_SCAN_BATCH_PROFILES.deep.size} bookmarks · richest pass`},
   {
     mode: "sweep",
     label: `Sweep`,

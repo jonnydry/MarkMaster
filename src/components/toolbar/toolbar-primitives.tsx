@@ -159,7 +159,7 @@ export function ToolbarSegmentControl<T extends string>({
           disabled={option.disabled}
           onClick={() => onChange(option.value)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-sm text-xs font-semibold transition-colors disabled:opacity-50",
+            "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm text-xs font-semibold transition-colors disabled:opacity-50",
             buttonHeight,
             buttonPadding,
             value === option.value
