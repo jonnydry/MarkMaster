@@ -17,6 +17,7 @@ import {
 
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import {
   BookmarkOverlayCollectionsSection,
   BookmarkOverlayMetricsGrid,
@@ -233,7 +234,7 @@ export function DashboardBookmarkInspector({
         </div>
 
         <p className="mt-4 whitespace-pre-wrap text-[15px] leading-6 text-foreground">
-          {bookmark.tweetText}
+          {formatBookmarkDisplayText(bookmark)}
         </p>
 
         <div className="mt-4 grid grid-cols-4 gap-2" aria-label="Bookmark actions">

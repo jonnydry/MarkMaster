@@ -120,6 +120,7 @@ export const BookmarkCard = memo(function BookmarkCard({
   const isInteractive =
     selectionMode || canExpandCompact || Boolean(onSelect) || canPostAreaExpand;
   const {
+    displayText,
     highlightedText,
     highlightedAuthorName,
     highlightedUsername,
@@ -193,7 +194,7 @@ export const BookmarkCard = memo(function BookmarkCard({
           isInteractive
             ? `${
                 canExpandCompact ? "Expand bookmark from" : "Bookmark from"
-              } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+              } ${bookmark.authorDisplayName}: ${displayText.slice(0, 80)}`
             : undefined
         }
         onClick={isInteractive ? handleCardClick : undefined}
@@ -302,7 +303,7 @@ export const BookmarkCard = memo(function BookmarkCard({
                 : canPostAreaExpand
                   ? "Open expanded bookmark from"
                   : "Bookmark from"
-            } ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+            } ${bookmark.authorDisplayName}: ${displayText.slice(0, 80)}`
           : undefined
       }
       onClick={isInteractive ? handleCardClick : undefined}

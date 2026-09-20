@@ -116,6 +116,22 @@ delays revocation until the DB is reachable.
 - `npm run dev` refuses to start with unapplied migrations
   (`SKIP_DB_MIGRATION_CHECK=1` to bypass during UI-only work).
 
+## Live integration tests
+
+Default `npx vitest run` includes `*.live.test.ts` files but they stay skipped
+unless their env gate is set. Both gates cost real tokens — do not enable them
+in CI.
+
+| File | Gate | Needs |
+|---|---|---|
+| `src/lib/orbit-grok.live.test.ts` | `RUN_LIVE_XAI_TESTS=1` | `XAI_API_KEY` |
+| `src/lib/orbit-jev-eval.live.test.ts` | `RUN_LIVE_TYPESAFE_TESTS=1` | `TYPESAFE_API_KEY` |
+
+```bash
+RUN_LIVE_XAI_TESTS=1 npx vitest run src/lib/orbit-grok.live.test.ts
+RUN_LIVE_TYPESAFE_TESTS=1 npx vitest run src/lib/orbit-jev-eval.live.test.ts
+```
+
 ## Share pages serving stale/revoked content
 
 Public share pages cache their data for up to 5 minutes

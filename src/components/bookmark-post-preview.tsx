@@ -5,6 +5,7 @@ import {
   type BookmarkMediaGalleryVariant,
 } from "@/components/bookmark-media-gallery";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import type { BookmarkTweetLink } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,11 @@ export function BookmarkPostPreview({
   expandMedia = false,
 }: BookmarkPostPreviewProps) {
   const hasMedia = Boolean(media?.length);
+  const displayText = formatBookmarkDisplayText({
+    tweetText,
+    authorUsername,
+    media,
+  });
 
   const galleryVariant: BookmarkMediaGalleryVariant = expandMedia
     ? "overlay"
@@ -71,7 +77,7 @@ export function BookmarkPostPreview({
   if (variant === "compact") {
     return (
       <div className={cn("flex min-w-0 gap-3", className)}>
-        <p className={cn("min-w-0 flex-1", textClassName)}>{tweetText}</p>
+        <p className={cn("min-w-0 flex-1", textClassName)}>{displayText}</p>
         {gallery}
       </div>
     );
@@ -79,7 +85,7 @@ export function BookmarkPostPreview({
 
   return (
     <div className={className}>
-      <div className={textClassName}>{tweetText}</div>
+      <div className={textClassName}>{displayText}</div>
       {gallery}
     </div>
   );

@@ -11,6 +11,7 @@ import {
   getHighlightFeedback,
   removeDislikedHighlightId,
   removeLikedHighlightId} from "@/lib/highlight-feedback";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import { formatCompactCount } from "@/lib/format-metrics";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -201,7 +202,7 @@ export function HighlightCard({
           t.monoNative && "text-mono-data"
         )}
       >
-        {bookmark.tweetText}
+        {formatBookmarkDisplayText(bookmark)}
       </p>
 
       <div

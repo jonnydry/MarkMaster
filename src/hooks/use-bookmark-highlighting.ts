@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
+import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { createTextHighlighter } from "@/lib/text-highlighter";
 
 export function useBookmarkHighlighting(
@@ -9,6 +11,7 @@ export function useBookmarkHighlighting(
     authorDisplayName: string;
     authorUsername: string;
     notes: Array<{ content: string }>;
+    media?: BookmarkMediaJson[] | null;
   },
   searchQuery?: string
 ) {
@@ -17,9 +20,14 @@ export function useBookmarkHighlighting(
     [searchQuery]
   );
 
+  const displayText = useMemo(
+    () => formatBookmarkDisplayText(bookmark),
+    [bookmark]
+  );
+
   const highlightedText = useMemo(
-    () => highlighter.tweet(bookmark.tweetText),
-    [bookmark.tweetText, highlighter]
+    () => highlighter.tweet(displayText),
+    [displayText, highlighter]
   );
 
   const highlightedAuthorName = useMemo(
@@ -39,6 +47,7 @@ export function useBookmarkHighlighting(
   }, [firstNoteContent, highlighter]);
 
   return {
+    displayText,
     highlightedText,
     highlightedAuthorName,
     highlightedUsername,

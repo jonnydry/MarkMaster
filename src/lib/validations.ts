@@ -137,6 +137,11 @@ export const patchTagSchema = z.object({
   path: ["name"],
 });
 
+export const mergeTagSchema = z.object({
+  sourceTagId: idSchema,
+  targetTagId: idSchema,
+});
+
 export const createNoteSchema = z.object({
   bookmarkId: idSchema,
   content: z.string().min(1, "Content is required").max(10000, "Note too long"),

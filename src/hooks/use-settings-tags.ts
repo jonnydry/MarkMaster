@@ -5,6 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { sendJson } from "@/lib/fetch-json";
 import { invalidateTagsQuery } from "@/lib/query-invalidation";
+import {
+  findCaseDuplicateTagGroups,
+  pickCanonicalTag,
+} from "@/lib/tag-merge-groups";
 import { assignBalancedTagColors } from "@/lib/tag-colors";
 import { toast } from "@/lib/toast";
 import { useTagsQuery } from "@/hooks/use-library-data";
@@ -30,6 +34,11 @@ export function useSettingsTags() {
     () =>
       balancedTags.filter((tag, index) => tag.color !== tags[index]?.color),
     [balancedTags, tags]
+  );
+
+  const duplicateTagGroups = useMemo(
+    () => findCaseDuplicateTagGroups(tags),
+    [tags]
   );
 
   const filteredTags = useMemo(() => {
@@ -75,6 +84,74 @@ export function useSettingsTags() {
       );
     }
   }, [queryClient]);
+
+  const applyMerge = useCallback(
+    async (sourceTagId: string, targetTagId: string) => {
+      const source = tags.find((tag) => tag.id === sourceTagId);
+      const target = tags.find((tag) => tag.id === targetTagId);
+      await sendJson("/api/tags/merge", {
+        method: "POST",
+        body: { sourceTagId, targetTagId },
+      });
+      await Promise.all([
+        invalidateTagsQuery(queryClient),
+        queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+        queryClient.invalidateQueries({ queryKey: ["library-stats"] }),
+      ]);
+      setEditingTag(null);
+      toast.success(
+        `Merged ${source?.name ?? "tag"} into ${target?.name ?? "tag"}`
+      );
+    },
+    [queryClient, tags]
+  );
+
+  const handleMergeTags = useCallback(
+    async (sourceTagId: string, targetTagId: string) => {
+      const source = tags.find((tag) => tag.id === sourceTagId);
+      const target = tags.find((tag) => tag.id === targetTagId);
+      const confirmed = await confirmDialog({
+        title: `Merge “${source?.name ?? "tag"}” into “${target?.name ?? "tag"}”?`,
+        description:
+          "Bookmarks keep the destination tag. The source tag is removed.",
+        confirmLabel: "Merge tags",
+      });
+      if (!confirmed) return;
+      try {
+        await applyMerge(sourceTagId, targetTagId);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not merge tags"
+        );
+      }
+    },
+    [applyMerge, tags]
+  );
+
+  const handleMergeDuplicateGroup = useCallback(
+    async (group: typeof tags) => {
+      const canonical = pickCanonicalTag(group);
+      const sources = group.filter((tag) => tag.id !== canonical.id);
+      const confirmed = await confirmDialog({
+        title: `Keep “${canonical.name}” and merge the rest?`,
+        description: `${sources
+          .map((tag) => tag.name)
+          .join(", ")} will be removed. Bookmarks keep ${canonical.name}.`,
+        confirmLabel: "Merge duplicates",
+      });
+      if (!confirmed) return;
+      try {
+        for (const source of sources) {
+          await applyMerge(source.id, canonical.id);
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not merge tags"
+        );
+      }
+    },
+    [applyMerge]
+  );
 
   const handleStartEdit = useCallback((tag: { id: string; name: string; color: string }) => {
     setEditingTag(tag.id);
@@ -132,7 +209,10 @@ export function useSettingsTags() {
     balancingTagColors,
     balancedTagColorUpdates,
     filteredTags,
+    duplicateTagGroups,
     handleDeleteTag,
+    handleMergeTags,
+    handleMergeDuplicateGroup,
     handleUpdateTag,
     handleStartEdit,
     handleCancelEdit,

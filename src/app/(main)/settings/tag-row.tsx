@@ -1,22 +1,27 @@
 import React from "react";
+import { GitMerge, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TagDot } from "@/components/tag-dot";
 import { cn } from "@/lib/utils";
 import type { TagWithCount } from "@/types";
-import { TagDot } from "@/components/tag-dot";
 
 interface TagRowProps {
   tag: TagWithCount;
   index: number;
+  mergeTargets: TagWithCount[];
   onStartEdit: (tag: TagWithCount) => void;
   onDelete: (tagId: string) => void;
+  onMerge: (sourceTagId: string, targetTagId: string) => void;
 }
 
 export const TagRow = React.memo(function TagRow({
   tag,
   index,
+  mergeTargets,
   onStartEdit,
   onDelete,
+  onMerge,
 }: TagRowProps) {
   const count = tag._count?.bookmarks ?? 0;
 
@@ -40,6 +45,37 @@ export const TagRow = React.memo(function TagRow({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+        {mergeTargets.length > 0 ? (
+          <Popover>
+            <PopoverTrigger
+              aria-label={`Merge tag ${tag.name} into another tag`}
+              className="inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+            >
+              <GitMerge className="size-3.5" />
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-56 p-1"
+            >
+              <p className="px-2 py-1.5 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                Merge into
+              </p>
+              <div className="max-h-48 overflow-y-auto">
+                {mergeTargets.map((target) => (
+                  <button
+                    key={target.id}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                    onClick={() => onMerge(tag.id, target.id)}
+                  >
+                    <TagDot name={target.name} color={target.color} size={10} />
+                    <span className="min-w-0 truncate">{target.name}</span>
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : null}
         <Button
           variant="ghost"
           size="icon"

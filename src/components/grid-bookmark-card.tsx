@@ -94,6 +94,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   const likeLabel = metrics?.like_count ? `${formatCompactCount(metrics.like_count)} likes` : null;
   const isInteractive = selectionMode || Boolean(onSelect);
   const {
+    displayText,
     highlightedText,
     highlightedAuthorName,
     highlightedUsername,
@@ -138,7 +139,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
       aria-pressed={isInteractive ? selected : undefined}
       aria-label={
         isInteractive
-          ? `Bookmark from ${bookmark.authorDisplayName}: ${bookmark.tweetText.slice(0, 80)}`
+          ? `Bookmark from ${bookmark.authorDisplayName}: ${displayText.slice(0, 80)}`
           : undefined
       }
       onClick={isInteractive ? handleCardActivation : undefined}

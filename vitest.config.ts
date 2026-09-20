@@ -9,7 +9,11 @@ export default defineConfig({
     environment: "node",
     // Component tests (*.test.tsx) opt into jsdom via the
     // `// @vitest-environment jsdom` pragma at the top of the file.
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "src/**/*.live.test.ts",
+    ],
     setupFiles: ["src/test/setup.ts"],
     coverage: {
       provider: "v8",

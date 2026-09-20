@@ -1,3 +1,4 @@
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import { prisma } from "@/lib/prisma";
 import type {
   OrbitGraphEdge,
@@ -146,7 +147,12 @@ export async function buildOrbitGraphPayload(
     nodes.push({
       kind: "bookmark",
       id: bookmark.id,
-      title: truncateTitle(bookmark.tweetText),
+      title: truncateTitle(
+        formatBookmarkDisplayText({
+          tweetText: bookmark.tweetText,
+          authorUsername: bookmark.authorUsername,
+        })
+      ),
       authorUsername: bookmark.authorUsername,
       authorDisplayName: bookmark.authorDisplayName,
       affiliated,

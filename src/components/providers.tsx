@@ -205,7 +205,9 @@ function AppearanceProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    applyAppearance(appearance);
+    // Theme-init already painted the stored theme. Applying the SSR default
+    // here flashes dark → light for users who chose light mode.
+    applyAppearance(readAppearance());
   }, [appearance]);
 
   const setTheme = useCallback((next: Theme) => {

@@ -4,6 +4,7 @@ import { memo } from "react";
 import { Check, FolderInput, MoreHorizontal, Tag as TagIcon } from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
@@ -101,7 +102,7 @@ export const OrbitListRow = memo(function OrbitListRow({
     onSelect?.(bookmark.id);
   };
 
-  const excerpt = bookmark.tweetText?.trim() || "Untitled bookmark";
+  const excerpt = formatBookmarkDisplayText(bookmark);
   const checkboxLabel = `${author}: ${excerpt.slice(0, 80)}`;
   const mediaItems = bookmark.media;
   const hasMedia = Boolean(mediaItems?.length);

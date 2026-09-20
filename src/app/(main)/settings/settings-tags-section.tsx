@@ -1,7 +1,7 @@
 "use client";
 
 import { type RefObject } from "react";
-import { Loader2, Palette, Search, Tag } from "lucide-react";
+import { GitMerge, Loader2, Palette, Search, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -45,18 +45,21 @@ export function SettingsTagsSection({
   balancingTagColors,
   balancedTagColorUpdates,
   filteredTags,
+  duplicateTagGroups,
   handleDeleteTag,
   handleUpdateTag,
   handleStartEdit,
   handleCancelEdit,
   handleBalanceTagColors,
+  handleMergeTags,
+  handleMergeDuplicateGroup,
 }: SettingsTagsSectionProps) {
   return (
     <SettingsSection
       id="tags"
       icon={Tag}
       title="Tags"
-      description="Rename, recolor, or balance tags across your library."
+      description="Rename, recolor, merge, or balance tags across your library."
       action={
         tags.length > 1 ? (
           <Button
@@ -76,6 +79,34 @@ export function SettingsTagsSection({
         ) : null
       }
     >
+      {duplicateTagGroups.length > 0 ? (
+        <div className="mb-3 space-y-2">
+          {duplicateTagGroups.map((group) => (
+            <div
+              key={group.map((tag) => tag.id).join("-")}
+              className="flex flex-wrap items-center gap-2 surface-inset px-3 py-2"
+            >
+              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                {group.length === 2
+                  ? `${group[0]?.name} and ${group[1]?.name}`
+                  : group.map((tag) => tag.name).join(", ")}{" "}
+                look like the same tag.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-hairline-soft text-xs"
+                onClick={() => void handleMergeDuplicateGroup(group)}
+              >
+                <GitMerge className="size-3.5" />
+                Merge
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {tags.length > 0 ? (
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -122,8 +153,10 @@ export function SettingsTagsSection({
                 key={tag.id}
                 tag={tag}
                 index={index}
+                mergeTargets={tags.filter((candidate) => candidate.id !== tag.id)}
                 onStartEdit={handleStartEdit}
                 onDelete={handleDeleteTag}
+                onMerge={handleMergeTags}
               />
             )
           )}

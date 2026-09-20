@@ -10,6 +10,7 @@ import {
 } from "@/components/bookmark-card-chrome";
 import { useTypography } from "@/hooks/use-typography";
 import { formatPostDate } from "@/lib/format-metrics";
+import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import { getMediaImageUrl } from "@/lib/bookmark-media";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
@@ -128,7 +129,7 @@ function WorkspaceBookmarkRow({
       <button
         type="button"
         onClick={activate}
-        aria-label={`Preview bookmark from ${displayName}: ${bookmark.tweetText.slice(0, 90)}`}
+        aria-label={`Preview bookmark from ${displayName}: ${formatBookmarkDisplayText(bookmark).slice(0, 90)}`}
         aria-pressed={selectionMode ? selected : undefined}
         aria-current={!selectionMode && active ? "true" : undefined}
         className="absolute inset-0 z-0 rounded-none border border-transparent focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45"
@@ -145,7 +146,7 @@ function WorkspaceBookmarkRow({
         <WorkspaceThumbnail bookmark={bookmark} />
         <div className="min-w-0 flex-1 self-center">
           <p className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
-            {bookmark.tweetText}
+            {formatBookmarkDisplayText(bookmark)}
           </p>
           <div className="mt-2 flex min-w-0 items-center gap-1.5">
             <span className="truncate text-2xs text-muted-foreground min-[860px]:hidden">
