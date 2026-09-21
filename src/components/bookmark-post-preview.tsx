@@ -13,6 +13,7 @@ export interface BookmarkPostPreviewProps {
   tweetText: string;
   authorUsername: string;
   media?: BookmarkMediaJson[] | null;
+  urls?: unknown;
   tweetLink: BookmarkTweetLink;
   bookmarkKey: string;
   variant: "feed" | "compact" | "inline" | "overlay";
@@ -34,6 +35,7 @@ export function BookmarkPostPreview({
   tweetText,
   authorUsername,
   media,
+  urls,
   tweetLink,
   bookmarkKey,
   variant,
@@ -50,6 +52,7 @@ export function BookmarkPostPreview({
     tweetText,
     authorUsername,
     media,
+    urls,
   });
 
   const galleryVariant: BookmarkMediaGalleryVariant = expandMedia

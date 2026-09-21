@@ -50,7 +50,7 @@ export interface BookmarkWithRelations {
     impression_count?: number;
   } | null;
   media: BookmarkMediaJson[] | null;
-  /** Not returned by compact list endpoints to reduce JSON payload. */
+  /** Stored X url entities, including compact lists, so t.co-only cards can show a title. */
   urls?: Array<{
     url: string;
     expanded_url: string;

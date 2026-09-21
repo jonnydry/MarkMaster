@@ -32,9 +32,10 @@ export const ORBIT_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
     title: "Triage Active Item",
     shortcuts: [
-      { id: "accept", keys: ["A"], label: "Accept suggestion" },
-      { id: "skip", keys: ["S"], label: "Skip / keep in Orbit" },
+      { id: "accept", keys: ["A"], label: "Accept" },
+      { id: "skip", keys: ["S"], label: "Skip" },
       { id: "edit", keys: ["E"], label: "Edit in review" },
+      { id: "apply-edits", keys: ["Enter"], label: "Apply edits", disabled: true },
     ],
   },
   {

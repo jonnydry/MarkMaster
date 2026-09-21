@@ -198,7 +198,6 @@ export async function scanOrbitBookmarksWithXai(args: {
         learningHints: args.learningHints,
         neighborHints: args.neighborHints,
         batch: args.batch,
-        xaiApiKey: apiKey ?? null,
         escalateLeftovers: apiKey
           ? async (bookmarks, notes) => {
               const escalated = await fetchOrbitScanFromXai(

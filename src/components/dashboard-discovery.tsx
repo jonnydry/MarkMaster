@@ -97,7 +97,7 @@ function DiscoveryHeaderActions({
             size="sm"
             onClick={onReview}
             className={btnClass}
-            aria-label={`Start an Organization Sprint with ${ritualTotal} bookmarks`}
+            aria-label={`Review ${ritualTotal} bookmarks in Orbit`}
           >
             <RotateCcw className="h-3 w-3" />
             Organize{dense ? ` (${ritualTotal})` : ` ${ritualTotal}`}
@@ -298,7 +298,7 @@ export function DashboardDiscovery({
                 t.monoNative && t.label
               )}
             >
-              Organization Sprint
+              Review in Orbit
             </span>
           </div>
           <p className="mt-2 line-clamp-2 max-w-md text-sm font-semibold text-foreground">

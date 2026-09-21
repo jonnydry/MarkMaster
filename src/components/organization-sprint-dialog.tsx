@@ -37,7 +37,7 @@ export function OrganizationSprintDialog({
             <div className="flex items-center gap-2 text-primary">
               <OrbitLogoMark className="size-5" aria-hidden="true" />
               <span className="text-2xs font-semibold uppercase tracking-[0.08em]">
-                Organization Sprint
+                Review in Orbit
               </span>
             </div>
             <DialogTitle className="text-lg">

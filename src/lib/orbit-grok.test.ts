@@ -1145,7 +1145,7 @@ describe("Orbit static instructions", () => {
     });
 
     expect(buildOrbitUserPrompt(payload)).toContain(
-      "Keep those exact names, fill only the topical gap"
+      "Suggest tags from the post content"
     );
     expect(payload.hybridLeftoverNotes?.[0]?.matchedTags).toEqual(["AI"]);
   });

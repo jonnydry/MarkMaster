@@ -546,6 +546,7 @@ function SelectedClusterBody({
               tweetText={focusedBookmark.tweetText}
               authorUsername={focusedBookmark.authorUsername}
               media={focusedBookmark.media}
+              urls={focusedBookmark.urls}
               tweetLink={{
                 authorUsername: focusedBookmark.authorUsername,
                 tweetId: focusedBookmark.tweetId}}

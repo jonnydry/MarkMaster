@@ -10,12 +10,8 @@ import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
 import { applyOrbitScanPlan, OrbitScanError } from "@/lib/orbit-grok";
 import { normalizeOrbitScanPlan } from "@/lib/orbit-grok-parse";
-import {
-  assignOrbitBookmarksWithJev,
-  batchVocabularyFromPool,
-  jevAssignmentsToRawPlan,
-} from "@/lib/orbit-jev-assign";
-import { refineOrbitJevLeftovers } from "@/lib/orbit-hybrid-scan";
+import { batchVocabularyFromPool, jevAssignmentsToRawPlan } from "@/lib/orbit-jev-assign";
+import { assignAndRefineOrbitJev } from "@/lib/orbit-hybrid-scan";
 import {
   buildSeedOrbitLabelPool,
   labelPoolFromAppliedNames,
@@ -376,7 +372,7 @@ export async function classifyOrbitLibraryPage(args: {
     ? mergeOrbitLabelPool(seed, args.warmPool, { asProposed: false })
     : seed;
 
-  const firstPass = await assignOrbitBookmarksWithJev({
+  const { assignments } = await assignAndRefineOrbitJev({
     bookmarks: bookmarksWithFolderHints,
     existingTags,
     existingCollections,
@@ -384,19 +380,9 @@ export async function classifyOrbitLibraryPage(args: {
     authorPriorHints,
     learningHints,
     neighborHints,
-    batchVocabulary: args.warmPool
+    firstPassBatchVocabulary: args.warmPool
       ? batchVocabularyFromPool(args.warmPool)
       : undefined,
-  });
-  const { assignments } = await refineOrbitJevLeftovers({
-    bookmarks: bookmarksWithFolderHints,
-    assignments: firstPass,
-    pool,
-    existingTags,
-    existingCollections,
-    authorPriorHints,
-    learningHints,
-    neighborHints,
   });
 
   const plan = normalizeOrbitScanPlan(jevAssignmentsToRawPlan(assignments), {

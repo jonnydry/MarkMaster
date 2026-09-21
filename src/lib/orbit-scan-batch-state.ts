@@ -100,11 +100,11 @@ export function deriveOrbitScanBatchState(
     Boolean(scanQuality?.deep.unlocked) && !deepLockedBySourceQuality;
   const deepLockedReason = deepLockedBySourceQuality
     ? "Current candidates have too much missing source context for Deep."
-    : (scanQuality?.deep.reason ?? "Needs scan history before Deep unlocks.");
+    : (scanQuality?.deep.reason ?? "Finish a few successful scans before Deep unlocks.");
   const sweepUnlocked = hybridScanAvailable;
   const sweepLockedReason = hybridScanAvailable
     ? "Sweep reviews 72 bookmarks in one pass, reusing existing tags only."
-    : "Set TYPESAFE_API_KEY to unlock Sweep batches.";
+    : "Sweep needs library matching configured.";
 
   const resolvedScanBatchMode: OrbitScanBatchMode =
     scanBatchMode === "deep" && !deepUnlocked

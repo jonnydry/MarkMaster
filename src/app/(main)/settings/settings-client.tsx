@@ -100,6 +100,21 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   },
 ];
 
+function AppearanceModeIcon({
+  className,
+  "aria-hidden": ariaHidden,
+}: {
+  className?: string;
+  "aria-hidden"?: boolean | "true";
+}) {
+  return (
+    <span className="inline-flex" aria-hidden={ariaHidden}>
+      <Moon className={cn(className, "hidden dark:block")} />
+      <Sun className={cn(className, "dark:hidden")} />
+    </span>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -347,7 +362,7 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="appearance"
-                    icon={theme === "dark" ? Moon : Sun}
+                    icon={AppearanceModeIcon}
                     title="Appearance"
                   >
                     <div className="surface-inset px-4">

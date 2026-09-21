@@ -41,7 +41,7 @@ export function DiscoveryBatchBar({
       {celebration ? (
         <DiscoveryCelebration
           celebration={celebration}
-          prefix="Sprint ready —"
+          prefix="Review ready —"
           className="px-4 py-3"
         />
       ) : null}
@@ -49,7 +49,7 @@ export function DiscoveryBatchBar({
       <div className="surface-veil p-4">
         <div className="space-y-1">
           <p className="text-sm font-semibold text-foreground">
-            Organization Sprint
+            Review in Orbit
           </p>
           <p className="text-xs text-muted-foreground">
             {gemCount} curated gem{gemCount === 1 ? "" : "s"}

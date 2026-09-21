@@ -303,8 +303,7 @@ function renderInstructionList(items: readonly string[]) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-/** Full-plan prompt for Grok-only scans and leftover escalation.
- * New-name increments use `proposeOrbitVocabWithXai` instead. */
+/** Full-plan prompt for Grok-only scans and for leftovers with no existing tag. */
 export function buildOrbitSystemPrompt() {
   const instructions = ORBIT_STATIC_INSTRUCTIONS;
 
@@ -352,7 +351,7 @@ export function buildOrbitUserPrompt(
   const count = payload.bookmarkIds.length;
   const leftoverLine =
     "hybridLeftoverNotes" in payload && payload.hybridLeftoverNotes?.length
-      ? "Jev already assigned some existing labels. Keep those exact names, fill only the topical gap, and do not invent a second name for a topic Jev already matched."
+      ? "These bookmarks had no confident existing tag. Suggest tags from the post content. Reuse an existing tag only when it truly fits; otherwise propose one specific new tag. Abstain when the post has no topic."
       : null;
   return [
     `Sort this Orbit batch. Return exactly one suggestion for each id in bookmarkIds (${count} bookmark${count === 1 ? "" : "s"}).`,

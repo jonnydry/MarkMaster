@@ -395,6 +395,7 @@ export function BookmarkOverlayPostColumn({
         tweetText={bookmark.tweetText}
         authorUsername={bookmark.authorUsername}
         media={bookmark.media}
+        urls={bookmark.urls}
         tweetLink={{
           authorUsername: bookmark.authorUsername,
           tweetId: bookmark.tweetId,

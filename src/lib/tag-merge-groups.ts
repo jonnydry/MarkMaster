@@ -23,6 +23,37 @@ export function findCaseDuplicateTagGroups<T extends NamedTag>(
   return Array.from(groups.values()).filter((group) => group.length > 1);
 }
 
+function punctuationKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[.'’\-_/]+/g, "")
+    .replace(/\s+/g, "");
+}
+
+/**
+ * Tags that match once punctuation is removed, excluding groups that are
+ * already case or spacing twins. Does not use Orbit's alias table.
+ */
+export function findPunctuationDuplicateTagGroups<T extends NamedTag>(
+  tags: T[]
+): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const tag of tags) {
+    const key = punctuationKey(tag.name);
+    if (!key) continue;
+    const group = groups.get(key);
+    if (group) group.push(tag);
+    else groups.set(key, [tag]);
+  }
+
+  return Array.from(groups.values()).filter((group) => {
+    if (group.length < 2) return false;
+    const caseKeys = new Set(group.map((tag) => normalizeKey(tag.name)));
+    return caseKeys.size > 1;
+  });
+}
+
 /** Keep the busiest tag; prefer mixed case over ALL CAPS when counts tie. */
 export function pickCanonicalTag<T extends NamedTag>(tags: T[]): T {
   if (tags.length === 0) {
