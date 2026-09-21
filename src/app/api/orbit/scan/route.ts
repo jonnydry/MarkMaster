@@ -117,6 +117,13 @@ export async function POST(req: NextRequest) {
       );
 
       let bookmarksWithFolderHints = bookmarks.map(withOrbitFolderHints);
+      const authorUsernames = bookmarksWithFolderHints.map(
+        (bookmark) => bookmark.authorUsername
+      );
+      const authorPriorHintsPromise = getAuthorPriorHintsForScan(
+        user.id,
+        authorUsernames
+      );
 
       let enrichmentMetadata:
         | {
@@ -156,10 +163,7 @@ export async function POST(req: NextRequest) {
       });
 
       const [authorPriorHints, learningHints, neighborHints] = await Promise.all([
-        getAuthorPriorHintsForScan(
-          user.id,
-          bookmarksWithFolderHints.map((bookmark) => bookmark.authorUsername)
-        ),
+        authorPriorHintsPromise,
         getOrbitLearningHintsForScan({
           userId: user.id,
           bookmarks: bookmarksWithFolderHints,

@@ -13,12 +13,12 @@ import {
   jevAssignmentsToRawPlan,
   leftoverNotesFromAssignments,
   replaceOrbitJevAssignments,
+  type OrbitBatchVocabulary,
   type OrbitHybridLeftoverNote,
   type OrbitJevAssignment,
   type OrbitLabelPool,
 } from "@/lib/orbit-jev-assign";
 import { normalizeKey } from "@/lib/orbit-grok-normalize";
-import { proposeOrbitVocabWithXai } from "@/lib/orbit-grok-vocab";
 import {
   buildSeedOrbitLabelPool,
   mergeOrbitLabelPool,
@@ -31,7 +31,6 @@ import {
   normalizeOrbitScanPlan,
 } from "@/lib/orbit-grok-parse";
 import {
-  OrbitGrokError,
   getOrbitXaiRuntimeStatus,
   type OrbitAuthorPriorHint,
   type OrbitBookmarkForScan,
@@ -242,6 +241,51 @@ function defaultBatchMetadata(
   );
 }
 
+/**
+ * First Jev pass plus leftover refine. Callers own the label pool:
+ * Scan passes the seed pool only; Classify may pass a warm-merged pool and
+ * first-pass batch vocabulary. Grok escalation and safe auto-apply stay outside.
+ */
+export async function assignAndRefineOrbitJev(args: {
+  bookmarks: OrbitBookmarkForScan[];
+  existingTags: OrbitTagContext[];
+  existingCollections: OrbitCollectionContext[];
+  pool: OrbitLabelPool;
+  authorPriorHints?: OrbitAuthorPriorHint[];
+  learningHints?: OrbitLearningHint[];
+  neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
+  /** Classify warm-pool names for the first pass. Omit on Scan. */
+  firstPassBatchVocabulary?: OrbitBatchVocabulary;
+  proposeLeftoverVocab?: (
+    bookmarks: OrbitBookmarkForScan[],
+    notes: OrbitHybridLeftoverNote[]
+  ) => Promise<OrbitLabelPool>;
+}): Promise<{ assignments: OrbitJevAssignment[]; firstPassLeftovers: number }> {
+  const firstPass = await assignOrbitBookmarksWithJev({
+    bookmarks: args.bookmarks,
+    existingTags: args.existingTags,
+    existingCollections: args.existingCollections,
+    pool: args.pool,
+    authorPriorHints: args.authorPriorHints,
+    learningHints: args.learningHints,
+    neighborHints: args.neighborHints,
+    batchVocabulary: args.firstPassBatchVocabulary,
+  });
+  const firstPassLeftovers = selectOrbitJevLeftovers(firstPass).length;
+  const refined = await refineOrbitJevLeftovers({
+    bookmarks: args.bookmarks,
+    assignments: firstPass,
+    pool: args.pool,
+    existingTags: args.existingTags,
+    existingCollections: args.existingCollections,
+    authorPriorHints: args.authorPriorHints,
+    learningHints: args.learningHints,
+    neighborHints: args.neighborHints,
+    proposeLeftoverVocab: args.proposeLeftoverVocab,
+  });
+  return { assignments: refined.assignments, firstPassLeftovers };
+}
+
 export async function runHybridOrbitScan(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
@@ -250,60 +294,22 @@ export async function runHybridOrbitScan(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batch?: OrbitScanBatchMetadata;
-  xaiApiKey?: string | null;
   escalateLeftovers?: (
     bookmarks: OrbitBookmarkForScan[],
     notes: OrbitHybridLeftoverNote[]
   ) => Promise<OrbitScanPlanFromXai>;
 }): Promise<OrbitScanResponsePayload> {
   const seed = buildSeedOrbitLabelPool(args);
-  let proposed = { tags: [] as typeof seed.tags, collections: [] as typeof seed.collections };
   let grokUsed = false;
-
-  if (args.xaiApiKey) {
-    try {
-      proposed = await proposeOrbitVocabWithXai({
-        ...args,
-        apiKey: args.xaiApiKey,
-      });
-      grokUsed = true;
-    } catch (error) {
-      if (error instanceof OrbitGrokError) {
-        logWarn(
-          "OrbitHybrid",
-          "Grok vocabulary proposal failed; assigning the existing pool.",
-          error.message
-        );
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  const pool = mergeOrbitLabelPool(seed, proposed);
-  let assignments = await assignOrbitBookmarksWithJev({
-    ...args,
-    pool,
+  const { assignments, firstPassLeftovers } = await assignAndRefineOrbitJev({
+    bookmarks: args.bookmarks,
+    existingTags: args.existingTags,
+    existingCollections: args.existingCollections,
+    pool: seed,
+    authorPriorHints: args.authorPriorHints,
+    learningHints: args.learningHints,
+    neighborHints: args.neighborHints,
   });
-  const firstPassLeftovers = selectOrbitJevLeftovers(assignments).length;
-  const refined = await refineOrbitJevLeftovers({
-    ...args,
-    assignments,
-    pool,
-    proposeLeftoverVocab: args.xaiApiKey
-      ? async (bookmarks, notes) => {
-          const leftoverVocab = await proposeOrbitVocabWithXai({
-            ...args,
-            bookmarks,
-            gapHints: notes,
-            apiKey: args.xaiApiKey!,
-          });
-          grokUsed = true;
-          return leftoverVocab;
-        }
-      : undefined,
-  });
-  assignments = refined.assignments;
   let rawPlan = jevAssignmentsToRawPlan(assignments);
 
   const leftovers = selectOrbitJevLeftovers(assignments);
@@ -345,9 +351,9 @@ export async function runHybridOrbitScan(args: {
         ...rawPlan,
         overview: {
           ...rawPlan.overview,
-          summary: `${rawPlan.overview.summary} Escalated ${escalatedToGrok} leftover${
+          summary: `${rawPlan.overview.summary} Suggested tags for ${escalatedToGrok} bookmark${
             escalatedToGrok === 1 ? "" : "s"
-          } to Grok.`,
+          } with no existing match.`,
         },
       };
     }

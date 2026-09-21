@@ -322,7 +322,7 @@ export function useOrbitReviewSession({
     source === "weekly-gems" ||
     source === "organization-sprint" ||
     Boolean(digestBookmarkIds && digestBookmarkIds.length > 0);
-  const title = isDigestReview ? "Organization Sprint" : "Orbit review";
+  const title = "Orbit review";
   const progressKey = [
     reviewSessionId,
     focusBookmarkId ?? "all",
@@ -704,15 +704,15 @@ export function useOrbitReviewSession({
       ) {
         event.preventDefault();
         moveActiveDraft(-1);
-      } else if (key === "a") {
-        event.preventDefault();
-        void handleApplyCurrent();
-      } else if (key === "s" && activeDraft) {
+      } else if (key === "a" && activeDraft) {
         event.preventDefault();
         handleAcceptOrbitSuggestion(activeDraft.bookmarkId);
-      } else if (key === "x") {
+      } else if (key === "s") {
         event.preventDefault();
         void handleKeepCurrent();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        void handleApplyCurrent();
       }
     };
 

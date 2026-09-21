@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { formatDistanceToNow } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { toast } from "@/lib/toast";
 import { sendJson, FetchJsonError } from "@/lib/fetch-json";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useRelativeTime } from "@/hooks/use-relative-time";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { findTerminalRunForId, isExpectedFinishedRun } from "@/lib/sync-client-completion";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
@@ -155,7 +155,15 @@ export function SyncButton({
     return () => clearInterval(interval);
   }, [rateLimitedUntil]);
 
-  const statusCopy = getSyncStatusCopy(currentRun, latestRun, lastSyncAt);
+  const latestCompletedAt = latestRun?.completedAt || latestRun?.startedAt || null;
+  const latestRelative = useRelativeTime(latestCompletedAt);
+  const lastSyncRelative = useRelativeTime(lastSyncAt);
+  const statusCopy = getSyncStatusCopy(
+    currentRun,
+    latestRun,
+    latestRelative,
+    lastSyncRelative
+  );
 
   const handleSync = async () => {
     if (isAnySyncRunning) return;
@@ -382,8 +390,7 @@ export function SyncButton({
           {(lastSyncAt || bookmarkCount !== undefined) && (
             <span className="text-xs text-muted-foreground/60">
               {[
-                lastSyncAt &&
-                  `${formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true })}`,
+                lastSyncRelative,
                 bookmarkCount !== undefined &&
                   `${bookmarkCount.toLocaleString()} bookmarks`,
               ]
@@ -411,7 +418,8 @@ export function SyncButton({
 function getSyncStatusCopy(
   currentRun: SyncRunSummary | null | undefined,
   latestRun: SyncRunSummary | null | undefined,
-  lastSyncAt: Date | null
+  latestRelative: string | null,
+  lastSyncRelative: string | null
 ) {
   if (currentRun) {
     return {
@@ -421,10 +429,7 @@ function getSyncStatusCopy(
   }
 
   if (latestRun) {
-    const completedAt = latestRun.completedAt || latestRun.startedAt;
-    const relative = formatDistanceToNow(new Date(completedAt), {
-      addSuffix: true,
-    });
+    const relative = latestRelative ?? "";
 
     if (latestRun.status === "FAILED") {
       return {
@@ -436,7 +441,7 @@ function getSyncStatusCopy(
     if (latestRun.status === "RATE_LIMITED") {
       return {
         dotClass: "bg-destructive",
-        label: `Rate limited ${relative}${latestRun.resumeToken ? " · Sync again to continue" : ""}`,
+        label: `Rate limited${relative ? ` ${relative}` : ""}${latestRun.resumeToken ? " · Sync again to continue" : ""}`,
       };
     }
 
@@ -448,14 +453,14 @@ function getSyncStatusCopy(
 
     return {
       dotClass: latestRun.resumeToken ? "bg-note" : "bg-emerald",
-      label: `${summary} ${relative}${resumeNote}`,
+      label: `${summary}${relative ? ` ${relative}` : ""}${resumeNote}`,
     };
   }
 
-  if (lastSyncAt) {
+  if (lastSyncRelative) {
     return {
       dotClass: "bg-emerald",
-      label: formatDistanceToNow(new Date(lastSyncAt), { addSuffix: true }),
+      label: lastSyncRelative,
     };
   }
 
@@ -474,7 +479,7 @@ function isReauthRequiredError(message: string | null | undefined): boolean {
 }
 
 function formatFailedSyncLabel(relative: string, errorMessage: string | null | undefined) {
-  const base = `Last sync failed ${relative}`;
+  const base = relative ? `Last sync failed ${relative}` : "Last sync failed";
   const detail = errorMessage?.trim();
   if (!detail) return base;
   const maxLen = 72;

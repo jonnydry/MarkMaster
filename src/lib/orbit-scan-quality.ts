@@ -125,28 +125,28 @@ function deepLockReason(args: {
   reviewUsefulRate: number | null;
 }) {
   if (args.lastFiveSuccessfulCount < 5) {
-    return "Needs 5 successful scans before Deep batches unlock.";
+    return "Finish a few successful scans before Deep unlocks.";
   }
   if (args.largeSuccessfulScanCount < 3) {
-    return "Needs 3 successful scans of 20+ bookmarks before Deep unlocks.";
+    return "Finish a few larger scans before Deep unlocks.";
   }
   if (args.failureRate > 0.1) {
-    return "Recent Orbit scan failures are too high for Deep batches.";
+    return "Recent scans failed too often for Deep.";
   }
   if (args.usefulSuggestionRate < 0.7) {
-    return "Useful suggestion rate is below the Deep threshold.";
+    return "Recent suggestions were not useful enough for Deep.";
   }
   if (args.modelAbstainRate > 0.25) {
-    return "Grok is abstaining too often for Deep batches.";
+    return "Recent scans left too many bookmarks unmatched for Deep.";
   }
   if (args.medianDurationMs > 60_000) {
-    return "Recent scans are taking too long for Deep batches.";
+    return "Recent scans are taking too long for Deep.";
   }
   if (
     args.reviewedSuggestionCount >= 10 &&
     (args.reviewUsefulRate ?? 0) < 0.7
   ) {
-    return "Recent review outcomes are not strong enough for Deep batches.";
+    return "Recent review outcomes are not strong enough for Deep.";
   }
 
   return "Deep batches are available.";

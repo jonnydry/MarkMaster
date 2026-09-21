@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
 import { BadgeCheck } from "lucide-react";
+import { useRelativeTime } from "@/hooks/use-relative-time";
 import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkTagChip } from "@/components/bookmark-card-chrome";
 import { StatRow } from "@/components/ui/stat-row";
@@ -81,6 +81,7 @@ export function DashboardRail({
   dataUnavailable = false,
 }: DashboardRailProps) {
   const t = useTypography();
+  const lastSyncRelative = useRelativeTime(lastSyncAt);
 
   const libraryTotal = libraryStats?.libraryBookmarkCount ?? total;
   const organized = libraryStats?.organizedBookmarkCount;
@@ -147,11 +148,7 @@ export function DashboardRail({
             headingFont={false}
             tabularNums={false}
             label="Last sync"
-            value={
-              lastSyncAt
-                ? formatDistanceToNow(lastSyncAt, { addSuffix: true })
-                : "Never"
-            }
+            value={lastSyncAt ? (lastSyncRelative ?? "—") : "Never"}
           />
         </dl>
         )}

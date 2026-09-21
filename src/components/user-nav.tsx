@@ -26,7 +26,7 @@ interface UserNavProps {
 }
 
 export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { toggleTheme } = useTheme();
   const { typographyPreset, setTypographyPreset } = useFontMode();
   const { colorTheme, setColorTheme } = useColorTheme();
 
@@ -71,12 +71,10 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
           View X Profile
         </DropdownMenuItem>
         <DropdownMenuItem onClick={toggleTheme}>
-          {theme === "dark" ? (
-            <Sun />
-          ) : (
-            <Moon />
-          )}
-          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          <Sun className="hidden dark:block" />
+          <Moon className="dark:hidden" />
+          <span className="hidden dark:inline">Light Mode</span>
+          <span className="dark:hidden">Dark Mode</span>
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>

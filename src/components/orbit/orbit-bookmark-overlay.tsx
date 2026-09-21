@@ -208,7 +208,7 @@ export function OrbitBookmarkOverlay({
                   {hasDecision
                     ? decision?.reasoning ||
                       "Orbit did not find a confident tag or collection match. Keep it here or organize it manually."
-                    : "Run Scan from the Orbit toolbar or start an Organization Sprint from Discovery. Nothing changes without your approval."}
+                    : "Run Scan from the Orbit toolbar or start a review from Discovery. Nothing changes without your approval."}
                 </p>
               </div>
             )}

@@ -24,6 +24,7 @@ const bookmarkSelect = {
   authorUsername: true,
   authorDisplayName: true,
   bookmarkedAt: true,
+  urls: true,
   tags: { select: { tagId: true } },
   collectionItems: {
     select: {
@@ -151,6 +152,7 @@ export async function buildOrbitGraphPayload(
         formatBookmarkDisplayText({
           tweetText: bookmark.tweetText,
           authorUsername: bookmark.authorUsername,
+          urls: bookmark.urls,
         })
       ),
       authorUsername: bookmark.authorUsername,

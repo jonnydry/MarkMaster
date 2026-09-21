@@ -125,10 +125,10 @@ export function OrbitReviewOverlay({
                 <CheckCircle2 className="size-6" aria-hidden="true" />
               </span>
               <p className="mt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-primary">
-                Organization Sprint
+                Orbit review
               </p>
               <h2 className="mt-1 heading-font text-2xl font-bold text-foreground">
-                Sprint complete
+                Review complete
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                 You reviewed {completion.reviewedCount} bookmark
@@ -536,7 +536,7 @@ export function OrbitReviewOverlay({
                   />
                 </div>
                 <p className="text-center text-2xs text-muted-foreground/70">
-                  J/K move · S use suggestion · A apply · X keep
+                  J/K move · A accept · S skip · Enter apply edits
                 </p>
               </div>
             </aside>

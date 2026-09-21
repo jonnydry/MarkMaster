@@ -7,6 +7,7 @@ import { sendJson } from "@/lib/fetch-json";
 import { invalidateTagsQuery } from "@/lib/query-invalidation";
 import {
   findCaseDuplicateTagGroups,
+  findPunctuationDuplicateTagGroups,
   pickCanonicalTag,
 } from "@/lib/tag-merge-groups";
 import { assignBalancedTagColors } from "@/lib/tag-colors";
@@ -38,6 +39,10 @@ export function useSettingsTags() {
 
   const duplicateTagGroups = useMemo(
     () => findCaseDuplicateTagGroups(tags),
+    [tags]
+  );
+  const punctuationDuplicateTagGroups = useMemo(
+    () => findPunctuationDuplicateTagGroups(tags),
     [tags]
   );
 
@@ -210,6 +215,7 @@ export function useSettingsTags() {
     balancedTagColorUpdates,
     filteredTags,
     duplicateTagGroups,
+    punctuationDuplicateTagGroups,
     handleDeleteTag,
     handleMergeTags,
     handleMergeDuplicateGroup,

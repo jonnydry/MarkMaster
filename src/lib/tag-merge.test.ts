@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findCaseDuplicateTagGroups,
+  findPunctuationDuplicateTagGroups,
   pickCanonicalTag,
 } from "@/lib/tag-merge-groups";
 
@@ -16,6 +17,22 @@ describe("findCaseDuplicateTagGroups", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0]?.map((tag) => tag.name).sort()).toEqual(["MEMES", "Memes"]);
+  });
+});
+
+describe("findPunctuationDuplicateTagGroups", () => {
+  it("groups punctuation twins and leaves case twins and distinct names alone", () => {
+    const groups = findPunctuationDuplicateTagGroups([
+      { id: "1", name: "AI" },
+      { id: "2", name: "A.I." },
+      { id: "3", name: "Ai Art" },
+      { id: "4", name: "Memes" },
+      { id: "5", name: "MEMES" },
+      { id: "6", name: "Go" },
+      { id: "7", name: "Golang" },
+    ]);
+
+    expect(groups).toEqual([[{ id: "1", name: "AI" }, { id: "2", name: "A.I." }]]);
   });
 });
 

@@ -1,7 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { createContext, useContext, type ComponentType, type ReactNode } from "react";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { StatusBadge } from "@/components/ui/chip";
@@ -204,7 +203,7 @@ export function SettingsSection({
   tone = "default",
 }: {
   id: string;
-  icon?: LucideIcon;
+  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
   title: string;
   description?: string;
   badge?: React.ReactNode;

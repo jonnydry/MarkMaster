@@ -46,6 +46,7 @@ export function SettingsTagsSection({
   balancedTagColorUpdates,
   filteredTags,
   duplicateTagGroups,
+  punctuationDuplicateTagGroups,
   handleDeleteTag,
   handleUpdateTag,
   handleStartEdit,
@@ -91,6 +92,34 @@ export function SettingsTagsSection({
                   ? `${group[0]?.name} and ${group[1]?.name}`
                   : group.map((tag) => tag.name).join(", ")}{" "}
                 look like the same tag.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-hairline-soft text-xs"
+                onClick={() => void handleMergeDuplicateGroup(group)}
+              >
+                <GitMerge className="size-3.5" />
+                Merge
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {punctuationDuplicateTagGroups.length > 0 ? (
+        <div className="mb-3 space-y-2">
+          {punctuationDuplicateTagGroups.map((group) => (
+            <div
+              key={group.map((tag) => tag.id).join("-")}
+              className="flex flex-wrap items-center gap-2 surface-inset px-3 py-2"
+            >
+              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                {group.length === 2
+                  ? `${group[0]?.name} and ${group[1]?.name}`
+                  : group.map((tag) => tag.name).join(", ")}{" "}
+                differ only by punctuation.
               </p>
               <Button
                 type="button"

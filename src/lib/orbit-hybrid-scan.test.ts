@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
 import {
+  assignAndRefineOrbitJev,
   chunkItems,
   computeOrbitHybridScanMetrics,
   mergeLeftoverSuggestion,
@@ -18,11 +19,16 @@ import {
 import type { OrbitBookmarkForScan } from "@/lib/orbit-grok-schemas";
 
 const assignSpy = vi.hoisted(() => vi.fn());
+const proposeSpy = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/orbit-jev-assign", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/orbit-jev-assign")>();
   return { ...actual, assignOrbitBookmarksWithJev: assignSpy };
 });
+
+vi.mock("@/lib/orbit-grok-vocab", () => ({
+  proposeOrbitVocabWithXai: proposeSpy,
+}));
 
 function scanBookmark(id: string): OrbitBookmarkForScan {
   return {
@@ -56,6 +62,8 @@ function abstainAssignment(bookmarkId: string): OrbitJevAssignment {
 
 beforeEach(() => {
   assignSpy.mockReset();
+  proposeSpy.mockReset();
+  proposeSpy.mockResolvedValue({ tags: [], collections: [] });
 });
 
 describe("computeOrbitHybridScanMetrics", () => {
@@ -382,7 +390,9 @@ describe("runHybridOrbitScan", () => {
       escalatedToGrok: 4,
     });
     const summaryMatches =
-      result.plan.overview.summary.match(/Escalated 4 leftovers to Grok\./g) ?? [];
+      result.plan.overview.summary.match(
+        /Suggested tags for 4 bookmarks with no existing match\./g
+      ) ?? [];
     expect(summaryMatches).toHaveLength(1);
     expect(result.model).toContain("+");
   });
@@ -410,6 +420,109 @@ describe("runHybridOrbitScan", () => {
       refinedLeftovers: 0,
       recoveredOnRefine: 0,
       escalatedToGrok: 0,
+    });
+  });
+
+  it("asks Grok for tag options only after Jev leaves gaps", async () => {
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) =>
+        call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id))
+    );
+    const escalate = vi.fn(
+      async (bookmarks: Array<{ id: string }>) => ({
+        overview: {
+          summary: "Tag options",
+          taggingStrategy: "From the post",
+          collectionStrategy: "None",
+        },
+        suggestions: bookmarks.map((bookmark) => ({
+          bookmarkId: bookmark.id,
+          confidence: "medium" as const,
+          reasoning: "No existing tag fit.",
+          tags: [{ name: "Compilers", color: "#64748b", reason: "post topic" }],
+          collection: null,
+        })),
+      })
+    );
+
+    await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 4 }],
+      existingCollections: [],
+      escalateLeftovers: escalate,
+    });
+
+    expect(proposeSpy).not.toHaveBeenCalled();
+    expect(assignSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      escalate.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+    expect(escalate).toHaveBeenCalledTimes(1);
+    expect(escalate.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ id: "bm-1" }),
+    ]);
+  });
+});
+
+describe("assignAndRefineOrbitJev", () => {
+  it("leaves first-pass batch vocabulary unset unless the caller supplies it", async () => {
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) =>
+        call.bookmarks.map((bookmark) => ({
+          ...abstainAssignment(bookmark.id),
+          tags: [{ name: "AI", color: "#1d9bf0", reason: "match" }],
+          abstain: false,
+          confidence: "high" as const,
+        }))
+    );
+
+    const result = await assignAndRefineOrbitJev({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 4 }],
+      existingCollections: [],
+      pool: { tags: [], collections: [] },
+    });
+
+    expect(assignSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ batchVocabulary: undefined })
+    );
+    expect(result.firstPassLeftovers).toBe(0);
+    expect(proposeSpy).not.toHaveBeenCalled();
+  });
+
+  it("counts leftovers from the first pass and keeps warm vocabulary off the refine pass", async () => {
+    assignSpy
+      .mockImplementationOnce(
+        async (call: { bookmarks: Array<{ id: string }> }) =>
+          call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id))
+      )
+      .mockImplementationOnce(
+        async (call: { bookmarks: Array<{ id: string }> }) =>
+          call.bookmarks.map((bookmark) => ({
+            ...abstainAssignment(bookmark.id),
+            tags: [{ name: "AI", color: "#1d9bf0", reason: "match" }],
+            abstain: false,
+            confidence: "high" as const,
+          }))
+      );
+
+    const result = await assignAndRefineOrbitJev({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 4 }],
+      existingCollections: [],
+      pool: { tags: [{ name: "Warm", existing: true }], collections: [] },
+      firstPassBatchVocabulary: { tags: ["Warm"], collections: [] },
+    });
+
+    expect(result.firstPassLeftovers).toBe(1);
+    expect(result.assignments[0]?.abstain).toBe(false);
+    expect(assignSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        batchVocabulary: { tags: ["Warm"], collections: [] },
+      })
+    );
+    expect(assignSpy.mock.calls[1]?.[0]?.batchVocabulary).toEqual({
+      tags: [],
+      collections: [],
     });
   });
 });

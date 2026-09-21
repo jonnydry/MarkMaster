@@ -219,7 +219,7 @@ export function AnalyticsHero({
               "shrink-0 gap-1"
             )}
           >
-            {rawHighlightsCount > 0 ? "Start Organization Sprint" : "Organize in Orbit"}
+            {rawHighlightsCount > 0 ? "Review in Orbit" : "Organize in Orbit"}
             <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         ) : null}
@@ -290,7 +290,7 @@ const SOURCE_LABELS: Record<string, string> = {
   library_control: "Library health",
   digest: "Discovery",
   "weekly-gems": "Discovery",
-  "organization-sprint": "Organization Sprint",
+  "organization-sprint": "Orbit review",
   direct: "Direct",
 };
 
@@ -339,8 +339,8 @@ export function FlywheelSignalsPanel({ analytics }: { analytics: AnalyticsData }
       </p>
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatRow size="base" label="Bookmarks opened in Orbit" value={cta.toLocaleString()} />
-        <StatRow size="base" label="Organization Sprint starts" value={digestCta.toLocaleString()} />
-        <StatRow size="base" label="Sprint sessions" value={sessions.toLocaleString()} />
+        <StatRow size="base" label="Orbit reviews started" value={digestCta.toLocaleString()} />
+        <StatRow size="base" label="Review sessions" value={sessions.toLocaleString()} />
         <StatRow size="base" label="Suggestions reviewed" value={orbitTotal.toLocaleString()} />
         <StatRow size="base" label="Accepted as suggested" value={orbitAccepted.toLocaleString()} />
         <StatRow size="base" label="Edited before applying" value={orbitEdited.toLocaleString()} />

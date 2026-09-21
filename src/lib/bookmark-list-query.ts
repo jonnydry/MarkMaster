@@ -36,8 +36,8 @@ export const bookmarkListSelect = {
 
 /**
  * Compact bookmark row for feed/grid cards.
- * Drops `urls` (not rendered in cards) and small unused columns
- * (`userId`, `authorId`, `syncedAt`) to shrink the JSON payload.
+ * Keeps url entities so t.co-only cards can show a stored title.
+ * Drops quotedTweet, xMetadata, and small unused columns.
  */
 export const bookmarkCompactSelect = {
   id: true,
@@ -49,6 +49,7 @@ export const bookmarkCompactSelect = {
   tweetText: true,
   publicMetrics: true,
   media: true,
+  urls: true,
   tweetCreatedAt: true,
   bookmarkedAt: true,
   tags: bookmarkListInclude.tags,
