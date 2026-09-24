@@ -62,7 +62,7 @@ export function ShareDialog({
         <div className="space-y-5" aria-live="polite">
           {/* Share link */}
           <div>
-            <h3 className={cn(t.sectionLabel, "mb-2")}>Public Link</h3>
+            <h3 className={cn(t.sectionLabel, "mb-2")}>Public link</h3>
             <div className="flex items-center gap-2">
               <code className="flex-1 surface-inset px-3 py-2 text-xs truncate">
                 {shareContent.shareUrl}
@@ -96,8 +96,8 @@ export function ShareDialog({
           <div>
             <h3 className={cn(t.sectionLabel, "mb-2")}>
               {isSmallCollection
-                ? "Post to X (Single Tweet)"
-                : "Post to X (Summary + Link)"}
+                ? "Post to X"
+                : "Post to X (summary and link)"}
             </h3>
             <div className="surface-inset p-3 text-sm whitespace-pre-wrap mb-2">
               {shareContent.summaryTweet}
@@ -109,11 +109,11 @@ export function ShareDialog({
                 rel="noopener noreferrer"
                 className={cn(
                   buttonVariants({ variant: "default", size: "sm" }),
-                  "gap-1.5 hover:bg-primary/80"
+                  "gap-1.5"
                 )}
               >
                 <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-                Open X Compose
+                Open in X
               </a>
               <Button
                 variant="outline"
@@ -128,7 +128,7 @@ export function ShareDialog({
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
-                Copy Tweet
+                Copy post
               </Button>
             </div>
           </div>
@@ -137,10 +137,10 @@ export function ShareDialog({
           {isSmallCollection && shareContent.thread.length > 1 && (
             <div>
               <h3 className={cn(t.sectionLabel, "mb-2")}>
-                Full Thread ({shareContent.thread.length} tweets)
+                Full thread ({shareContent.thread.length} posts)
               </h3>
               <p className="text-xs text-muted-foreground mb-2">
-                Copy the thread content below, then post each tweet manually on X.
+                Copy the thread below, then post each part on X.
               </p>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {shareContent.thread.map((tweet, i) => (
@@ -149,7 +149,7 @@ export function ShareDialog({
                     className="surface-inset p-3 text-sm whitespace-pre-wrap"
                   >
                     <span className="text-xs text-muted-foreground block mb-1">
-                      Tweet {i + 1}
+                      Post {i + 1}
                     </span>
                     {tweet.text}
                   </div>
@@ -171,18 +171,18 @@ export function ShareDialog({
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
-                Copy Full Thread
+                Copy full thread
               </Button>
             </div>
           )}
 
           {/* Info for large collections */}
           {!isSmallCollection && (
-            <div className="surface-inset p-3 text-xs text-muted-foreground">
+            <p className="text-xs leading-5 text-muted-foreground">
               This collection has {shareContent.itemCount} bookmarks. For better
               readability on X, we recommend sharing the public link with a summary
-              tweet. The full collection is always viewable at the link above.
-            </div>
+              post. The full collection is always viewable at the link above.
+            </p>
           )}
         </div>
       </DialogContent>

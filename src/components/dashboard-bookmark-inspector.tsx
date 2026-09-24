@@ -64,11 +64,12 @@ function InspectorAction({
   return (
     <Button
       type="button"
-      variant="secondary"
+      variant="ghost"
+      size="sm"
       onClick={onClick}
       className={cn(
-        "h-14 min-w-0 flex-col gap-1 rounded-sm border-hairline-soft px-1.5 text-2xs font-semibold text-muted-foreground hover:border-primary/35 hover:bg-accent-soft hover:text-foreground",
-        active && "border-primary/35 bg-primary/10 text-primary"
+        "min-w-0 gap-1.5 rounded-sm px-2 text-xs font-medium text-muted-foreground hover:bg-hover hover:text-foreground",
+        active && "text-primary hover:text-primary"
       )}
     >
       <Icon className="size-4" aria-hidden="true" />
@@ -114,12 +115,12 @@ export function DashboardBookmarkInspector({
       <aside
         aria-label="Bookmark preview"
         className={cn(
-          "flex min-h-72 items-center justify-center surface-solid p-6 text-center",
+          "flex min-h-72 items-center justify-center border-l border-hairline-soft bg-background p-6 text-center",
           className
         )}
       >
         <div>
-          <ImageIcon className="mx-auto size-5 text-muted-foreground/60" aria-hidden="true" />
+          <ImageIcon className="mx-auto size-5 text-muted-foreground" aria-hidden="true" />
           <p className="mt-3 text-sm font-semibold text-foreground">Select a bookmark</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             Its full post, metadata, and tools will stay ready here.
@@ -136,17 +137,15 @@ export function DashboardBookmarkInspector({
       aria-label={`Previewing bookmark from ${displayName}`}
       aria-live="polite"
       data-dashboard-bookmark-inspector={bookmark.id}
-      className={cn("surface-solid", className)}
+      className={cn("border-l border-hairline-soft bg-background", className)}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between surface-inset-strong px-4 py-2.5">
-        <div>
-          <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Bookmark preview
-          </p>
-          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground/70">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline-soft bg-background px-4 py-2">
+        <p className="text-[13px] font-semibold text-foreground">
+          Preview{" "}
+          <span className="ml-1 text-xs font-normal tabular-nums text-muted-foreground">
             {activeIndex + 1} of {bookmarks.length}
-          </p>
-        </div>
+          </span>
+        </p>
         <div className="flex items-center gap-1">
           <Button
             type="button"
@@ -155,7 +154,7 @@ export function DashboardBookmarkInspector({
             disabled={!hasPrevious}
             onClick={() => hasPrevious && onSelect(bookmarks[activeIndex - 1]!.id)}
             aria-label="Preview previous bookmark"
-            className="rounded-sm border border-hairline-soft text-muted-foreground"
+            className="rounded-sm text-muted-foreground hover:bg-hover hover:text-foreground"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Button>
@@ -166,7 +165,7 @@ export function DashboardBookmarkInspector({
             disabled={!hasNext}
             onClick={() => hasNext && onSelect(bookmarks[activeIndex + 1]!.id)}
             aria-label="Preview next bookmark"
-            className="rounded-sm border border-hairline-soft text-muted-foreground"
+            className="rounded-sm text-muted-foreground hover:bg-hover hover:text-foreground"
           >
             <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
@@ -192,7 +191,7 @@ export function DashboardBookmarkInspector({
             galleryClassName="mt-0 surface-inset"
           />
         ) : (
-          <div className="flex h-24 items-center justify-center surface-inset text-muted-foreground/60">
+          <div className="flex h-24 items-center justify-center surface-inset text-muted-foreground">
             <ImageIcon className="size-5" aria-hidden="true" />
             <span className="sr-only">Text bookmark</span>
           </div>
@@ -229,7 +228,7 @@ export function DashboardBookmarkInspector({
               <span className="truncate">@{bookmark.authorUsername}</span>
               <span aria-hidden="true">·</span>
               <span className="shrink-0">{formatPostDate(bookmark.tweetCreatedAt)}</span>
-              <XLogoMark className="size-3 shrink-0 text-muted-foreground/55" title="Post from X" />
+              <XLogoMark className="size-3 shrink-0 text-muted-foreground" title="Post from X" />
             </div>
           </div>
         </div>
@@ -238,7 +237,10 @@ export function DashboardBookmarkInspector({
           {formatBookmarkDisplayText(bookmark)}
         </p>
 
-        <div className="mt-4 grid grid-cols-4 gap-2" aria-label="Bookmark actions">
+        <div
+          className="mt-4 flex min-w-0 flex-wrap items-center gap-1 border-y border-hairline-soft py-1.5"
+          aria-label="Bookmark actions"
+        >
           <InspectorAction
             icon={ArrowUpRight}
             label="Open"
@@ -252,14 +254,14 @@ export function DashboardBookmarkInspector({
           />
           <InspectorAction
             icon={FolderInput}
-            label={bookmark.collectionItems.length > 0 ? "Collections" : "Add to shelf"}
+            label={bookmark.collectionItems.length > 0 ? "Collections" : "Add to collection"}
             active={bookmark.collectionItems.length > 0}
             onClick={() => onAddToCollection(bookmark.id)}
           />
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="More bookmark actions"
-              className="inline-flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-sm border border-hairline-soft bg-secondary px-1.5 text-2xs font-semibold text-muted-foreground hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+              className="ml-auto inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             >
               <MoreHorizontal className="size-4" aria-hidden="true" />
               <span>More</span>
@@ -296,7 +298,7 @@ export function DashboardBookmarkInspector({
         <BookmarkOverlayCollectionsSection
           collections={bookmark.collectionItems}
           actionLabel={
-            bookmark.collectionItems.length > 0 ? "Edit shelves" : "Add to shelf"
+            bookmark.collectionItems.length > 0 ? "Edit collections" : "Add to collection"
           }
           onAction={() => onAddToCollection(bookmark.id)}
         />

@@ -123,7 +123,7 @@ export function CollectionDetailBookmarkList({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
+                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-hover hover:text-foreground"
                 disabled={reordering || (page === 1 && index === 0)}
                 onClick={() => onMoveItem(index, -1)}
                 aria-label="Move bookmark up"
@@ -134,7 +134,7 @@ export function CollectionDetailBookmarkList({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground"
+                className="border border-transparent text-muted-foreground hover:border-hairline-soft hover:bg-hover hover:text-foreground"
                 disabled={
                   reordering ||
                   (page === totalPages && index === sortedItems.length - 1)
@@ -212,9 +212,9 @@ export function CollectionDetailLoadingState() {
     <AppPageCenter>
       <div className="mx-auto w-full max-w-4xl space-y-4 px-6">
         <div className="h-8 w-48 rounded-sm skeleton-shimmer" />
-        <div className="space-y-3">
+        <div>
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="surface-solid px-4 py-4">
+            <div key={index} className="border-b border-hairline-soft px-4 py-4">
               <div className="flex gap-3">
                 <div className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
                 <div className="flex-1 space-y-2">

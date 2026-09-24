@@ -32,10 +32,10 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
               title={theme.description}
               onClick={() => onChange(theme.id)}
               className={cn(
-                "group flex min-w-0 flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+                "group flex min-w-0 flex-col items-center gap-1.5 rounded-sm border px-2 py-2 transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 selected
                   ? highlightSurfaceActiveClass
-                  : "border-hairline-soft bg-surface-2/45 hover:border-primary/20 hover:bg-accent-soft/40"
+                  : "border-hairline-soft bg-transparent hover:bg-hover"
               )}
             >
               <span
@@ -47,8 +47,8 @@ export function ColorThemePicker({ value, onChange, className }: ColorThemePicke
               />
               <span
                 className={cn(
-                  "text-2xs font-medium leading-none",
-                  selected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                  "text-xs font-medium leading-none",
+                  selected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )}
               >
                 {theme.name}

@@ -9,12 +9,12 @@ import {
   appToolbarControlCompactHeightClassName,
   appToolbarControlExpandedClassName,
   appToolbarControlExpandedHeightClassName,
+  appToolbarSurfaceShellClassName,
 } from "@/lib/app-chrome";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import {
   highlightActiveClass,
   highlightIdleClass,
-  highlightInteractiveClass,
   highlightSearchShellClass,
   highlightSegmentActiveClass,
 } from "@/lib/highlight-chrome";
@@ -49,8 +49,9 @@ export function ToolbarSearchField({
     return (
       <div
         className={cn(
-          "min-w-0 flex-1 bg-background/35",
+          "min-w-0 flex-1",
           highlightSearchShellClass,
+          appToolbarSurfaceShellClassName,
           maxWidthClassName,
           className
         )}
@@ -87,7 +88,7 @@ export function ToolbarSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
         className={cn(
-          "w-full rounded-sm border border-hairline-strong bg-background/35 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+          "w-full rounded-sm border border-transparent bg-surface-2 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground transition-colors hover:bg-surface-3 focus-visible:border-ring focus-visible:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
           heightClass
         )}
       />
@@ -146,8 +147,8 @@ export function ToolbarSegmentControl<T extends string>({
         "inline-flex shrink-0 items-center rounded-sm border p-0.5",
         shellHeight,
         variant === "library"
-          ? "border-hairline-soft bg-background/35"
-          : cn(orbitHairlineBorder(), "bg-background/35"),
+          ? "border-hairline-soft bg-transparent"
+          : cn(orbitHairlineBorder(), "bg-transparent"),
         className
       )}
     >
@@ -166,7 +167,7 @@ export function ToolbarSegmentControl<T extends string>({
               ? highlightSegmentActiveClass
               : variant === "library"
                 ? highlightIdleClass
-                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                : "text-muted-foreground hover:bg-hover hover:text-foreground"
           )}
         >
           {option.label}
@@ -222,11 +223,7 @@ export function ToolbarIconButton({
         boxClassName,
         isActive
           ? highlightActiveClass
-          : cn(
-              "border-hairline-strong bg-background/35 text-muted-foreground",
-              highlightInteractiveClass,
-              "hover:text-foreground"
-            ),
+          : "border-transparent text-muted-foreground hover:bg-hover hover:text-foreground",
         className
       )}
     >

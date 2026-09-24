@@ -40,7 +40,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           actionButton:
             "rounded-sm bg-primary text-primary-foreground hover:bg-primary/90",
           cancelButton:
-            "rounded-sm border border-hairline-soft bg-transparent text-muted-foreground hover:bg-accent-soft",
+            "rounded-sm border border-hairline-soft bg-transparent text-muted-foreground hover:bg-hover",
         },
       }}
       icons={{

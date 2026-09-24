@@ -50,13 +50,13 @@ export function ShareBookmarkRow({
           />
         ) : null}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-sm">{authorDisplayName}</span>
-            <span className="text-muted-foreground text-sm">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-semibold text-sm">{authorDisplayName}</span>
+            <span className="truncate text-muted-foreground text-sm">
               @{authorUsername}
             </span>
             <span className="text-muted-foreground text-sm">·</span>
-            <span className="text-muted-foreground text-xs">
+            <span className="shrink-0 text-muted-foreground text-xs">
               {formatDistanceToNow(createdAt, { addSuffix: true })}
             </span>
           </div>
@@ -71,7 +71,7 @@ export function ShareBookmarkRow({
             galleryClassName="!mt-2"
           />
           {tags.length > 0 ? (
-            <div className="flex gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-1.5 mt-2">
               {tags.map(({ tag }) => (
                 <span
                   key={tag.id}

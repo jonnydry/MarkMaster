@@ -69,7 +69,7 @@ export function OrbitModeSwitch({
               buttonHeight,
               isActive
                 ? highlightSegmentActiveClass
-                : "text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                : "text-muted-foreground hover:bg-hover hover:text-foreground"
             )}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />

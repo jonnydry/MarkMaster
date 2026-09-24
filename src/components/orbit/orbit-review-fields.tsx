@@ -123,7 +123,7 @@ export function OrbitReviewTagField({
     <div className="space-y-2">
       <div className="flex min-h-8 flex-wrap gap-1.5">
         {parsed.length === 0 ? (
-          <span className="text-xs text-muted-foreground/70">No tags yet</span>
+          <span className="text-xs text-muted-foreground">No tags yet</span>
         ) : (
           parsed.map((label, idx) => (
             <span
@@ -138,7 +138,7 @@ export function OrbitReviewTagField({
               {label}
               <button
                 type="button"
-                className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                className="rounded-sm p-0.5 text-muted-foreground hover:bg-hover hover:text-foreground"
                 aria-label={`Remove ${label}`}
                 disabled={!included}
                 onClick={() =>
@@ -157,7 +157,7 @@ export function OrbitReviewTagField({
             disabled={!included || atTagCap}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "border-hairline-soft bg-surface-2 text-foreground hover:bg-accent-soft"
+              "border-hairline-soft bg-surface-2 text-foreground hover:bg-hover"
             )}
           >
             From library
@@ -277,7 +277,7 @@ export function OrbitReviewCollectionField({
             disabled={!included}
             className={cn(
               buttonVariants({ variant: "outline", size: "default" }),
-              "h-9 shrink-0 border-hairline-soft bg-surface-2 px-2.5 text-foreground hover:bg-accent-soft"
+              "h-9 shrink-0 border-hairline-soft bg-surface-2 px-2.5 text-foreground hover:bg-hover"
             )}
           >
             Pick
@@ -298,7 +298,7 @@ export function OrbitReviewCollectionField({
           </PopoverContent>
         </Popover>
       </div>
-      <p className="text-2xs leading-snug text-muted-foreground">
+      <p className="text-xs leading-snug text-muted-foreground">
         Pick an existing folder or type a new name in the field.
       </p>
       <Textarea

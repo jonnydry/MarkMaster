@@ -4,7 +4,6 @@ import { Image, Video, Link, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FilterChip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
-import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { useTypography } from "@/hooks/use-typography";
 import type { MediaFilter, TagWithCount } from "@/types";
@@ -61,7 +60,7 @@ export function FilterPanel({
         "space-y-3",
         isRail
           ? "px-0 py-0"
-          : cn("border-b border-hairline-soft px-5 py-3", appChromeFrostedClassName)
+          : "border-t border-hairline-soft px-4 py-3 sm:px-5"
       )}
     >
       {/* In the rail, the surrounding card already provides the "Filters" title. */}
@@ -163,7 +162,7 @@ export function FilterPanel({
                   onClick={() => onTagToggle(tag.id)}
                 >
                   {tag.name}
-                  <span className="ml-1 opacity-60">{tag._count.bookmarks}</span>
+                  <span className="ml-1 tabular-nums text-muted-foreground">{tag._count.bookmarks}</span>
                 </FilterChip>
               ))}
             </div>

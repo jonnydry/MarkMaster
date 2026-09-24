@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DiscoveryCelebrationData {
@@ -18,12 +18,12 @@ export function DiscoveryCelebration({
   return (
     <div
       className={cn(
-        "rounded-sm border border-emerald-400/20 bg-emerald-400/5 text-sm",
+        "rounded-sm bg-success/10 text-sm",
         className
       )}
     >
-      <div className="flex items-center gap-2 text-emerald-200">
-        <Sparkles className="h-4 w-4 shrink-0" />
+      <div className="flex items-center gap-2 text-success">
+        <Check className="size-4 shrink-0" aria-hidden />
         <span>
           {prefix ? (
             <>

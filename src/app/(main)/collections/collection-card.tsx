@@ -2,20 +2,9 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowRight,
-  ArchiveX,
-  Copy,
-  FolderOpen,
-  Globe2,
-  Layers2,
-  LockKeyhole,
-} from "lucide-react";
+import { ArchiveX, Copy, Globe2, LockKeyhole } from "lucide-react";
 import type { CollectionWithCount } from "@/types";
 
-import { HighlightProgress } from "@/components/highlight-progress";
-import { useTypography } from "@/hooks/use-typography";
-import { highlightSurfaceActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 
 const collectionDateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -40,8 +29,17 @@ function itemLabel(count: number) {
   return `${count.toLocaleString()} ${count === 1 ? "bookmark" : "bookmarks"}`;
 }
 
-const compactCardClassName =
-  "group relative flex min-h-[5.4rem] items-stretch gap-1 overflow-hidden surface-card p-1.5 text-left transition-colors hover:border-primary/25 hover:bg-surface-1 [content-visibility:auto] [contain-intrinsic-size:88px]";
+const compactCardBaseClassName =
+  "group relative flex min-h-[4.5rem] items-stretch gap-1 overflow-hidden p-1.5 text-left transition-colors [content-visibility:auto] [contain-intrinsic-size:72px]";
+
+function cardClassName(selected: boolean) {
+  return cn(
+    compactCardBaseClassName,
+    selected
+      ? "rounded-sm border border-hairline-soft state-selected"
+      : "surface-card hover:bg-hover"
+  );
+}
 
 const collectionCardMainButtonClassName =
   "absolute inset-1.5 z-0 cursor-pointer rounded-sm border border-transparent focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45";
@@ -51,7 +49,26 @@ const collectionCardContentClassName =
 
 function getScaleWidth(itemCount: number, maxItems: number) {
   if (itemCount <= 0 || maxItems <= 0) return 0;
-  return Math.max(8, Math.round((itemCount / maxItems) * 100));
+  return Math.max(4, Math.round((itemCount / maxItems) * 100));
+}
+
+/** Quiet 2px underline comparing this collection's size to the largest one. */
+function RelativeSizeBar({ percent, name }: { percent: number; name: string }) {
+  return (
+    <div
+      className="mt-2 h-0.5 w-full overflow-hidden rounded-[2px] bg-surface-3"
+      role="meter"
+      aria-label={`${name} size relative to your largest collection`}
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div
+        className="h-full rounded-[2px] bg-primary/50 transition-colors group-hover:bg-primary/70"
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
 }
 
 export const UserCollectionCard = React.memo(function UserCollectionCard({
@@ -61,7 +78,6 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
   onDelete,
   selected = false,
 }: UserCollectionCardProps) {
-  const t = useTypography();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
@@ -69,10 +85,7 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
   return (
     <article
       data-collection-id={collection.id}
-      className={cn(
-        compactCardClassName,
-        selected && highlightSurfaceActiveClass
-      )}
+      className={cardClassName(selected)}
     >
       <button
         type="button"
@@ -82,26 +95,19 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
         onClick={() => onNavigate(collection.id)}
       />
       <div className={collectionCardContentClassName}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary">
-          <Layers2 className="h-4 w-4" aria-hidden="true" />
-        </div>
-
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">
               {collection.name}
             </h3>
             <span
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-2xs font-semibold",
-                "border border-hairline-soft bg-transparent text-muted-foreground"
-              )}
+              className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"
               title={collection.isPublic ? "Public collection" : "Private collection"}
             >
               {collection.isPublic ? (
-                <Globe2 className="h-3 w-3 text-success" aria-hidden="true" />
+                <Globe2 className="size-3" aria-hidden="true" />
               ) : (
-                <LockKeyhole className="h-3 w-3" aria-hidden="true" />
+                <LockKeyhole className="size-3" aria-hidden="true" />
               )}
               {collection.isPublic ? "Public" : "Private"}
             </span>
@@ -122,23 +128,8 @@ export const UserCollectionCard = React.memo(function UserCollectionCard({
               </>
             ) : null}
           </div>
-          <HighlightProgress
-            className="mt-2"
-            percent={scaleWidth}
-            label={`${collection.name} size relative to the largest shelf`}
-          />
+          <RelativeSizeBar percent={scaleWidth} name={collection.name} />
         </div>
-
-        <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
-          <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
-            {itemCount.toLocaleString()}
-          </p>
-          <p className={cn("mt-1", t.label, "font-semibold")}>
-            saved
-          </p>
-        </div>
-
-        <ArrowRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
       </div>
 
       <div className="relative z-20 flex shrink-0 items-center">
@@ -171,7 +162,6 @@ export const XFolderCard = React.memo(function XFolderCard({
   onCopy,
   selected = false,
 }: XFolderCardProps) {
-  const t = useTypography();
   const itemCount = collection._count?.items ?? 0;
   const createdAt = formatCollectionDate(collection.createdAt);
   const scaleWidth = getScaleWidth(itemCount, maxItems);
@@ -179,10 +169,7 @@ export const XFolderCard = React.memo(function XFolderCard({
   return (
     <article
       data-collection-id={collection.id}
-      className={cn(
-        compactCardClassName,
-        selected && highlightSurfaceActiveClass
-      )}
+      className={cardClassName(selected)}
     >
       <button
         type="button"
@@ -192,17 +179,13 @@ export const XFolderCard = React.memo(function XFolderCard({
         onClick={() => onNavigate(collection.id)}
       />
       <div className={collectionCardContentClassName}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-note/15 bg-note/10 text-note">
-          <FolderOpen className="h-4 w-4" aria-hidden="true" />
-        </div>
-
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">
               {collection.name}
             </h3>
-            <span className="inline-flex shrink-0 rounded-sm border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-2xs font-semibold text-primary">
-              X Folder
+            <span className="shrink-0 text-xs text-muted-foreground">
+              X folder
             </span>
           </div>
 
@@ -221,24 +204,8 @@ export const XFolderCard = React.memo(function XFolderCard({
               </>
             ) : null}
           </div>
-          <HighlightProgress
-            className="mt-2"
-            percent={scaleWidth}
-            tone="note"
-            label={`${collection.name} size relative to the largest shelf`}
-          />
+          <RelativeSizeBar percent={scaleWidth} name={collection.name} />
         </div>
-
-        <div className="hidden min-w-[4.75rem] shrink-0 text-right sm:block">
-          <p className="heading-font text-lg font-bold leading-none tabular-nums text-foreground">
-            {itemCount.toLocaleString()}
-          </p>
-          <p className={cn("mt-1", t.label, "font-semibold")}>
-            synced
-          </p>
-        </div>
-
-        <ArrowRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary sm:block" />
       </div>
 
       <div className="relative z-20 flex shrink-0 items-center">

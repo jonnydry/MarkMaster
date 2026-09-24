@@ -98,7 +98,7 @@ export function useDashboardPage() {
     [queryClient, createCollectionQuick]
   );
 
-  const { viewMode, setViewMode } = useBookmarkViewMode("grid");
+  const { viewMode, setViewMode } = useBookmarkViewMode("feed");
   const [showFilters, setShowFilters] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
@@ -445,7 +445,7 @@ export function useDashboardPage() {
 
   const primaryFilterLabel =
     filters.mediaFilter === "all"
-      ? "All Bookmarks"
+      ? "All bookmarks"
       : MEDIA_FILTER_LABELS[filters.mediaFilter] || filters.mediaFilter;
   const primaryFilterCompactLabel =
     filters.mediaFilter === "all" ? "All" : primaryFilterLabel;

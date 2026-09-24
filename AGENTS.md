@@ -10,35 +10,57 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Design language contract
 
-MarkMaster's UI is sharp, flat, and technical. These rules are enforced by ESLint
-(`no-restricted-syntax` in `eslint.config.mjs`); follow them when writing any UI code.
+MarkMaster's UI is simple, flat, and precise: X.com structure (single reading column,
+borderless rows split by 1px dividers, weight-driven hierarchy) with square geometry and
+one light source — a state glow derived from the accent. Rules are enforced by ESLint
+(`no-restricted-syntax` in `eslint.config.mjs`) where practical; follow them in all UI code.
+
+## Color
+Neutrals are neutral. The accent (`--primary`) appears only on interactive and selected
+state: primary buttons, links, focus rings, `accent-soft` selection tints, and the glow.
+Never `color-mix` the accent into backgrounds, surfaces, or borders.
+- Hovers use `bg-hover` (neutral wash) — never `hover:bg-accent-soft`/`hover:bg-primary/*`.
+- Muted text is `text-muted-foreground` (AA on every surface). Don't fade text further
+  with `/NN` opacity.
+- Status colors: `success`, `warning`, `destructive` tokens — never hard-coded
+  `emerald-*`/`amber-*`/`red-*`, never `dark:text-white/*` overrides.
 
 ## Surfaces
-Use the six `surface-*` utilities defined in `src/app/globals.css` — never hand-roll
-`border border-hairline-* bg-surface-*` pairings:
-- `surface-card` — primary content card (`surface-1/70`)
-- `surface-veil` — translucent card; ambient background reads through (`surface-1/55`)
-- `surface-solid` — fully opaque card
-- `surface-inset` — nested well inside a card (`surface-2/45`)
-- `surface-inset-strong` — stronger well: strips, stat tiles (`surface-2/70`)
-- `surface-overlay` — large overlay shells (hairline-strong, /78, stage shadow)
-Compose padding/hover/focus at the call site.
+Surfaces are opaque. Use the `surface-*` utilities in `src/app/globals.css` — never
+hand-roll `border border-hairline-* bg-surface-*` pairings:
+- `surface-card` — card (hairline + `bg-card`). `surface-veil`/`surface-solid` are aliases.
+- `surface-inset` — borderless tonal well inside a card (`bg-surface-2`)
+- `surface-inset-strong` — strips, sticky subbars (hairline + `bg-surface-2`)
+- `surface-overlay` — large overlay shells (opaque popover + the one stage shadow)
+- `surface-glass` — sticky chrome bars (opaque background)
+Prefer divider rows (`border-b border-hairline-soft`) over boxes. Cards are for things you
+pick up (collections, dialogs) — not for stats or sections. No boxes-in-boxes, no tinted
+"icon tiles" behind icons: use a bare icon.
+No `backdrop-blur` except the sticky page header chrome (`src/lib/app-chrome.ts`) and the
+modal backdrop (`appOverlayBackdropClassName`).
+
+## Glow (the one light source)
+`state-selected` (rows/items) and `.menu-selection-active` (nav) paint a 2px accent rail +
+soft wash *inside* the element with background layers — no box-shadow, no pseudo-elements,
+so it can't be clipped, bleed into neighbours, collide with focus rings, or shift layout.
+`--glow` is lightness-clamped per mode so every accent theme reads. Use it only for
+selected / active / focused state and live progress. Never on backgrounds, hover, cards,
+chips, or search. No decorative gradients, watermarks, beams, or shimmer effects.
 
 ## Typography
-Labels go through the contract, not ad-hoc classes: `useTypography()` (client) or the
-constants in `src/lib/typography.ts`. Only three tracking values exist:
-`tracking-[0.08em]` (micro labels), `tracking-wider` (section labels),
-`tracking-[0.14em]` (chrome labels — sidebar, map strips). Micro text sizes:
-`text-2xs` (10px) and `text-xs` — nothing smaller.
-Sanctioned exception: the sidebar "MarkMaster" wordmark uses `tracking-[-0.02em]`
-as deliberate brand tightening — do not copy that value anywhere else.
+Geist (UI + reading) and Geist Mono (data) by default; alternate presets live in
+`src/lib/typography-presets.ts`. Hierarchy comes from size and weight, not tracking:
+labels are sentence case `text-xs font-medium text-muted-foreground` (`SANS_LABEL` /
+`useTypography()`), section labels `text-[13px] font-semibold text-muted-foreground`. Post text is 15px.
+No new `uppercase` + tracking micro labels. `text-2xs` (10px) is for dense metadata/badges
+only, never for labels. Tracking values: `tracking-[0.08em]`, `tracking-wider`,
+`tracking-[0.14em]` (mono preset chrome) — plus the sidebar wordmark's `tracking-[-0.02em]`.
 
 ## Focus
 One recipe: `focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45`
-(destructive controls may use the `ring-destructive/*` variants). Never `ring-primary`,
-never `ring-[3px]`/`ring-3`. `ring-primary` is banned for focus indication only —
-decorative selection states (e.g. selected cards/swatches) may use it; that is the
-sanctioned exception.
+(destructive controls may use `ring-destructive/*`; list rows use `ring-inset`). Never
+`ring-primary` for focus, never `ring-[3px]`/`ring-3`. Selected cards/swatches may use
+`ring-primary` decoratively.
 
 ## Shape
 Square aesthetic — no pills:
@@ -46,15 +68,20 @@ Square aesthetic — no pills:
 - `rounded-[2px]` for micro-elements (meter fills, switch thumbs, scroll thumbs)
 - `rounded-full` only for true circles (avatars, dots, swatches, spinners)
 
+## Buttons
+`default` = the single primary action in a view; `outline` = secondary; `ghost` =
+tertiary/toolbar; `secondary` = filled neutral; `highlight` = toggled/selected state only.
+
 ## Elevation
 Borders, not shadows. Floating surfaces (menus, dialogs, tooltips) use
 `border-hairline-strong` on `bg-popover`, flat. The only sanctioned shadow is
 `surface-overlay`'s stage shadow.
 
 ## Orbit map chrome
-The map canvas always paints space-black regardless of theme. Chrome floating over it
-uses `.map-glass` (literal white/black alpha is intentional there — nowhere else).
-Anything outside the canvas must remain theme-aware (light mode exists).
+The map canvas is dark in dark mode and tinted in light mode (`src/lib/orbit-map-palette.ts`).
+Chrome floating over it uses `.map-glass` (`src/styles/orbit.css`): theme-aware, near-opaque
+popover, no blur. `.map-glass-accent` (thin accent top edge) is reserved for the map console.
+The Pixi hub/cluster glows are the app's signature — keep them in the scene, not in CSS.
 
 # Viewport layout contract
 
@@ -87,7 +114,7 @@ Pages inside `(main)` should use `AppPageShell`, not another fixed viewport wrap
 
 - `layout="scroll"` (default) — sticky header scrolls with feed content.
 - `layout="column"` — header + flex body; no inner scroll wrapper (Orbit map only).
-- `sidebar`, `watermark`, `mainTop`, `scrollRef`, `mainProps` — compose at the call site.
+- `sidebar`, `mainTop`, `scrollRef`, `mainProps` — compose at the call site.
 - Portals/dialogs render as siblings outside `AppPageShell` (fragment wrapper).
 
 Orbit routes may pass `className="orbit-route-default"`; do not reintroduce

@@ -17,7 +17,6 @@ import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
-import { hasFeedPageWatermark } from "@/lib/feed-page-watermark";
 import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { TagDot } from "@/components/tag-dot";
@@ -88,7 +87,7 @@ export interface SidebarProps {
 const NAV_ITEMS = [
   { href: "/dashboard", icon: Bookmark, label: "Bookmarks" },
   { href: "/orbit", icon: OrbitLogoMark, label: "Orbit" },
-  { href: "/orbit/map", icon: Network, label: "Orbit Map" },
+  { href: "/orbit/map", icon: Network, label: "Orbit map" },
   { href: "/collections", icon: FolderOpen, label: "Collections" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/settings", icon: Settings, label: "Settings" },
@@ -113,7 +112,6 @@ export function Sidebar({
   const prefetchGraph = useCallback(() => {
     prefetchOrbitGraph(queryClient);
   }, [queryClient]);
-  const glassSidebar = hasFeedPageWatermark(pathname);
   const { expanded: ctxExpanded, toggle: ctxToggle } = useSidebar();
   const [localExpanded, setLocalExpanded] = useState(false);
   const expanded = forceExpanded
@@ -182,7 +180,6 @@ export function Sidebar({
       aria-label={showToggle ? "Sidebar navigation" : undefined}
       className={cn(
         "sidebar-embedded flex h-full min-h-0 shrink-0 flex-col overflow-hidden py-3 transition-[width,padding,background-color] duration-300 ease-out motion-reduce:transition-none",
-        glassSidebar && "sidebar-embedded-glass",
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5",
         showToggle && "cursor-default"
       )}
@@ -190,7 +187,7 @@ export function Sidebar({
       <button
         type="button"
         onClick={showToggle ? toggle : undefined}
-        className={`group mb-4 flex cursor-pointer items-center rounded-sm border border-transparent transition-colors hover:border-sidebar-border hover:bg-accent-soft/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
+        className={`group mb-4 flex cursor-pointer items-center rounded-sm border border-transparent transition-colors hover:bg-hover focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
           expanded
             ? "min-h-12 gap-3 self-stretch px-2 py-1"
             : "size-12 justify-center"
@@ -219,16 +216,14 @@ export function Sidebar({
               className={cn(
                 "flex items-center rounded-sm border border-transparent transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 isActive
-                  ? "menu-selection-active font-semibold"
-                  : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground",
-                expanded ? "h-10 gap-3 px-2.5" : "h-10 w-10 justify-center"
+                  ? "menu-selection-active font-semibold text-foreground"
+                  : "font-normal text-foreground hover:bg-hover",
+                expanded ? "h-10 gap-3.5 px-2.5" : "h-10 w-10 justify-center"
               )}
             >
-              <Icon
-                className="size-5 shrink-0"
-              />
+              <Icon className="size-5 shrink-0" aria-hidden />
               {expanded && (
-                <span className={cn(t.bodyStrong, "leading-none")}>{label}</span>
+                <span className="truncate text-[15px] leading-none">{label}</span>
               )}
             </Link>
           );
@@ -265,8 +260,8 @@ export function Sidebar({
                           aria-pressed={isSelected}
                           className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isSelected
-                              ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
-                              : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
+                              ? "menu-selection-active font-semibold"
+                              : "text-muted-foreground hover:bg-hover hover:text-foreground"
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
@@ -274,9 +269,7 @@ export function Sidebar({
                               name={tag.name}
                               color={tag.color}
                               size={6}
-                              className={`shrink-0 transition-transform motion-reduce:transition-none ${
-                                isSelected ? "ring-2 ring-primary/25 scale-110" : ""
-                              }`}
+                              className="shrink-0"
                             />
                             <span className="truncate">{tag.name}</span>
                           </span>
@@ -290,7 +283,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllTags((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllTags ? "Show less" : `Show all ${tags.length}`}
@@ -308,14 +301,14 @@ export function Sidebar({
 
               <SidebarSection
                 id="collections"
-                title="My Collections"
+                title="Collections"
                 count={userCollections.length}
                 action={
                   <button
                     type="button"
                     onClick={onCreateCollection}
                     aria-label="Create collection"
-                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-hairline-soft text-muted-foreground/60 transition-colors hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                    className="flex h-6 w-6 items-center justify-center rounded-sm border border-transparent text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                   >
                     <Plus className="size-3.5" aria-hidden />
                   </button>
@@ -347,8 +340,8 @@ export function Sidebar({
                           href={`/collections/${collection.id}`}
                           className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
-                              ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
-                              : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
+                              ? "menu-selection-active font-semibold"
+                              : "text-muted-foreground hover:bg-hover hover:text-foreground"
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
@@ -365,7 +358,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllCollections((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllCollections
@@ -386,7 +379,7 @@ export function Sidebar({
               {xFolders.length > 0 && (
                 <SidebarSection
                   id="x-folders"
-                  title="X Folders"
+                  title="X folders"
                   count={xFolders.length}
                 >
                   <div className="space-y-0.5">
@@ -399,8 +392,8 @@ export function Sidebar({
                           href={`/collections/${collection.id}`}
                           className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
-                              ? "menu-selection-active font-semibold [&_.sidebar-item-count]:text-primary/70"
-                              : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground"
+                              ? "menu-selection-active font-semibold"
+                              : "text-muted-foreground hover:bg-hover hover:text-foreground"
                           }`}
                         >
                           <span className="flex min-w-0 items-center gap-2">
@@ -417,7 +410,7 @@ export function Sidebar({
                       <button
                         type="button"
                         onClick={() => setShowAllFolders((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                        className="flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                       >
                         <span>
                           {showAllFolders

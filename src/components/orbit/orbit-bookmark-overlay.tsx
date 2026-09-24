@@ -52,12 +52,12 @@ function SuggestionBadge({
   return (
     <span
       className={cn(
-        "inline-flex rounded-sm border px-1.5 py-0.5 text-2xs font-medium uppercase tracking-[0.08em]",
+        "inline-flex rounded-sm border px-1.5 py-0.5 text-xs font-medium",
         tone === "primary" && "border-primary/30 bg-primary/10 text-primary",
         tone === "success" &&
-          "border-emerald-400/30 bg-emerald-400/10 text-emerald-500",
+          "border-success/30 bg-success/10 text-success",
         tone === "neutral" &&
-          "border-hairline-soft bg-surface-2/70 text-muted-foreground"
+          "border-hairline-soft bg-surface-2 text-muted-foreground"
       )}
     >
       {children}
@@ -132,7 +132,7 @@ export function OrbitBookmarkOverlay({
                 closeLabel="Close Orbit review"
                 badges={
                   <>
-                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-primary">
+                    <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5 text-xs font-semibold text-primary">
                       <OrbitLogoMark className="size-3" aria-hidden="true" />
                       Orbit
                     </span>
@@ -161,7 +161,7 @@ export function OrbitBookmarkOverlay({
               <div className="mt-5 rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-primary/80">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-primary/80">
                       <OrbitLogoMark className="size-3.5" />
                       Orbit suggestion
                     </div>
@@ -200,7 +200,7 @@ export function OrbitBookmarkOverlay({
               </div>
             ) : (
               <div className="mt-5 surface-inset p-3">
-                <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                   <OrbitLogoMark className="size-3.5" />
                   {hasDecision ? "Orbit abstained" : "Not scanned yet"}
                 </div>
@@ -311,7 +311,7 @@ export function OrbitBookmarkOverlay({
             <BookmarkOverlayCollectionsSection
               collections={bookmark.collectionItems}
               actionLabel={
-                bookmark.collectionItems.length > 0 ? "Edit shelves" : "Add to shelf"
+                bookmark.collectionItems.length > 0 ? "Edit collections" : "Add to collection"
               }
               onAction={
                 onAddToCollection

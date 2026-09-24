@@ -11,16 +11,16 @@ export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
   if (viewMode === "grid") {
     return (
       <div
-        className="space-y-1 p-3"
+        className="pb-3"
         role="status"
         aria-live="polite"
         aria-label="Loading bookmarks"
       >
-        <div className="h-8 w-full surface-inset-strong skeleton-shimmer" />
+        <div className="h-8 w-full border-b border-hairline-soft" />
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className={`flex min-h-[92px] items-center gap-3 surface-solid p-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
+            className={`flex min-h-[92px] items-center gap-3 border-b border-hairline-soft px-4 py-3 ${getStaggerClass(i, "animate-fade-in") ?? ""}`}
           >
             <div className="h-[68px] w-24 shrink-0 rounded-sm skeleton-shimmer" />
             <div className="min-w-0 flex-1 space-y-2">

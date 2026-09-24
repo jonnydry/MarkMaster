@@ -3,9 +3,7 @@
 import { Check, ChevronDown, Lock } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  orbitLabelClass,
-  orbitMetaMuted} from "@/lib/orbit-route-chrome";
+import { orbitLabelClass } from "@/lib/orbit-route-chrome";
 import {
   ORBIT_SCAN_BATCH_PROFILES,
   type OrbitScanBatchMode,
@@ -78,7 +76,7 @@ export function OrbitBatchMenu({
         disabled={disabled}
         aria-label={`Scan batch size: ${triggerLabel}`}
         className={cn(
-          "inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-hairline-strong bg-background/35 px-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft disabled:pointer-events-none disabled:opacity-50"
+          "inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-hairline-strong bg-background/35 px-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-hover disabled:pointer-events-none disabled:opacity-50"
         )}
         title={`Batch size — ${triggerLabel}`}
       >
@@ -95,7 +93,7 @@ export function OrbitBatchMenu({
           className={cn(
             orbitLabelClass(),
             "px-2 pb-1 pt-1.5 text-2xs",
-            orbitMetaMuted()
+            "text-muted-foreground"
           )}
         >
           Scan batch size
@@ -137,7 +135,7 @@ export function OrbitBatchMenu({
                 <span
                   className={cn(
                     "block text-2xs leading-4",
-                    orbitMetaMuted()
+                    "text-muted-foreground"
                   )}
                 >
                   {locked ? lockedReason : option.detail}

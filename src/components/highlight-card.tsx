@@ -71,7 +71,7 @@ export function HighlightCard({
         onOrbitReview(bookmark.id);
       }}
       className={cn(
-        "self-start rounded-sm border border-transparent text-2xs uppercase tracking-[0.08em] text-primary hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        "self-start rounded-sm border border-transparent text-xs text-primary hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         t.monoNative && t.label
       )}
     >
@@ -96,7 +96,7 @@ export function HighlightCard({
         </button>
       </span>
     ) : feedback === "not_relevant" ? (
-      <span className="text-amber-600 dark:text-amber-300">
+      <span className="text-warning">
         Not relevant to you
         <button
           type="button"
@@ -120,11 +120,11 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Boosted for future Highlights & Digests");
           }}
-          className="text-success hover:text-success/80 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Good
         </button>
-        <span className="text-muted-foreground/40">·</span>
+        <span className="text-muted-foreground" aria-hidden>·</span>
         <button
           type="button"
           onClick={(e) => {
@@ -133,7 +133,7 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Deprioritized in future Highlights");
           }}
-          className="text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200 hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
         >
           Not relevant
         </button>
@@ -155,11 +155,11 @@ export function HighlightCard({
         }
       }}
       className={cn(
-        "group flex h-full flex-col rounded-sm border bg-surface-1/55 text-left transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 cursor-pointer",
+        "group flex h-full flex-col rounded-sm border bg-card text-left transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 cursor-pointer",
         isCarouselLayout ? "min-h-[10rem] p-3.5" : "min-h-[8.5rem] p-3",
         active
-          ? "border-primary/45 bg-accent-soft/60 hover:bg-accent-soft/70"
-          : "border-hairline-soft hover:border-primary/35 hover:bg-surface-1/70",
+          ? "state-selected border-hairline-soft"
+          : "border-hairline-soft hover:bg-hover",
         className
       )}
       aria-label={`Open highlighted bookmark ${index + 1} from ${bookmark.authorDisplayName}`}
@@ -168,7 +168,7 @@ export function HighlightCard({
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             className={cn(
-              "truncate text-2xs font-bold uppercase tracking-[0.08em] text-primary",
+              "truncate text-xs font-medium text-muted-foreground",
               t.monoNative && t.label
             )}
           >
@@ -177,8 +177,7 @@ export function HighlightCard({
           {itemLabel ? (
             <span
               className={cn(
-                "rounded-sm px-1.5 py-px",
-                "border border-amber-400/20 bg-amber-400/10 text-2xs uppercase tracking-wider text-amber-700 dark:text-amber-200"
+                "shrink-0 rounded-sm bg-warning/10 px-1.5 py-px text-xs text-warning"
               )}
               title={
                 itemLabel.includes("Resurfaced")
@@ -190,7 +189,7 @@ export function HighlightCard({
             </span>
           ) : null}
         </div>
-        <span className={cn(t.data, "text-2xs font-bold text-muted-foreground")}>
+        <span className={cn(t.data, "text-xs text-muted-foreground")}>
           #{index + 1}
         </span>
       </div>
@@ -198,7 +197,7 @@ export function HighlightCard({
         className={cn(
           isCarouselLayout
             ? "mt-2 line-clamp-2 min-h-10 text-[13px] font-semibold leading-5 text-foreground sm:text-sm"
-            : "mt-2 line-clamp-3 text-sm font-bold leading-5 text-foreground",
+            : "mt-2 line-clamp-3 text-sm font-semibold leading-5 text-foreground",
           t.monoNative && "text-mono-data"
         )}
       >
@@ -208,15 +207,15 @@ export function HighlightCard({
       <div
         className={cn(
           isCarouselLayout
-            ? "mt-1.5 line-clamp-1 text-2xs text-muted-foreground"
-            : "mt-1 text-2xs text-muted-foreground",
+            ? "mt-1.5 line-clamp-1 text-xs text-muted-foreground"
+            : "mt-1 text-xs text-muted-foreground",
           t.monoNative && t.label,
           "normal-case"
         )}
       >
         {isRawMode
-          ? "High X engagement • untouched — strong triage candidate"
-          : "Top performer across your library by X saves & discussion"}
+          ? "High engagement on X, not yet organized"
+          : "One of the most engaged posts in your library"}
       </div>
 
       <div
@@ -235,12 +234,12 @@ export function HighlightCard({
               width={24}
               height={24}
               sizes="24px"
-              className="h-6 w-6 shrink-0 rounded-full border border-background/70"
+              className="h-6 w-6 shrink-0 rounded-full"
             />
           ) : (
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-2xs font-bold text-muted-foreground",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-muted-foreground",
                 t.monoNative && t.data
               )}
             >
@@ -259,10 +258,10 @@ export function HighlightCard({
         </div>
         <span
           className={cn(
-            "shrink-0 text-2xs text-muted-foreground",
+            "shrink-0 text-xs text-muted-foreground",
             isCarouselLayout
               ? "normal-case tracking-normal"
-              : "uppercase tracking-[0.08em]",
+              : "",
             t.monoNative && t.data
           )}
         >
@@ -273,7 +272,7 @@ export function HighlightCard({
       {isCarouselLayout ? (
         <div
           className={cn(
-            "mt-2 flex items-center justify-between gap-3 text-2xs uppercase tracking-[0.08em] text-muted-foreground",
+            "mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground",
             t.monoNative && t.label
           )}
           onClick={(e) => e.stopPropagation()}
@@ -286,7 +285,7 @@ export function HighlightCard({
           {reviewButton ? <div className="mt-1">{reviewButton}</div> : null}
           <div
             className={cn(
-              "mt-1.5 flex items-center gap-2 text-2xs uppercase tracking-[0.08em] text-muted-foreground",
+              "mt-1.5 flex items-center gap-2 text-xs text-muted-foreground",
               t.monoNative && t.label
             )}
             onClick={(e) => e.stopPropagation()}

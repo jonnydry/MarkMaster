@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { FolderOpen, Layers, Plus } from "lucide-react";
+import { Layers, Plus } from "lucide-react";
 
 import { AppPageShell } from "@/components/app-page-shell";
+import { bookmarkLabel } from "@/lib/collections-presentation";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
@@ -22,7 +23,6 @@ import { CollectionsSection } from "./collections-section";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { PageWatermark } from "@/components/page-watermark";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -74,10 +74,15 @@ export default function CollectionsPage() {
     handleCreateCollectionOpen,
   } = page;
 
+  const libraryBookmarkCount = libraryStats?.libraryBookmarkCount;
+  const headerDescription =
+    collectionsSummary && libraryBookmarkCount !== undefined
+      ? `${bookmarkLabel(libraryBookmarkCount)} · ${collectionsSummary}`
+      : collectionsSummary;
+
   return (
     <>
     <AppPageShell
-      watermark={<PageWatermark variant="collections" />}
       sidebar={
         <Sidebar
           tags={tags}
@@ -94,7 +99,7 @@ export default function CollectionsPage() {
           <PageHeader
             sticky
             title="Collections"
-            description={collectionsSummary}
+            description={headerDescription}
             leading={
               <div className="md:hidden">
                 <MobileSidebar
@@ -117,13 +122,12 @@ export default function CollectionsPage() {
                   description="Collection browsing, filtering, and creation shortcuts."
                 />
                 <Button
-                  variant="highlight"
                   size="sm"
                   onClick={handleCreateCollectionOpen}
                   className="h-9 gap-2 px-3 text-sm"
                 >
                   <Plus className="size-4" />
-                  New
+                  New<span className="hidden sm:inline"> collection</span>
                 </Button>
                 {session?.dbUser ? <UserNavDynamic user={session.dbUser} /> : null}
               </>
@@ -161,7 +165,6 @@ export default function CollectionsPage() {
                 description="Create a collection to start curating your bookmarks."
                 action={
                   <Button
-                    variant="highlight"
                     onClick={handleCreateCollectionOpen}
                     className="mt-5 gap-2"
                   >
@@ -178,16 +181,9 @@ export default function CollectionsPage() {
                     libraryStats?.organizedBookmarkCount ?? 0
                   }
                   isLibraryStatsLoading={isLibraryStatsLoading}
-                  totalCollections={collections.length}
-                  userCollections={userCollections.length}
-                  xFolders={xFolders.length}
                   publicCollections={collectionStats.publicCount}
                   emptyCollections={collectionStats.emptyCount}
-                  largestCollection={collectionStats.largestCollection}
-                  maxItems={collectionStats.maxItems}
-                  onCreateCollection={handleCreateCollectionOpen}
                   onOrganizeUnshelved={handleOrganizeUnshelved}
-                  onOpenCollection={handleNavigate}
                 />
 
                 <CollectionsControlBar
@@ -211,10 +207,8 @@ export default function CollectionsPage() {
                   <div className="space-y-6">
                     {visibleUserCollections.length > 0 && (
                       <CollectionsSection
-                        icon={Layers}
-                        title="My Collections"
+                        title="My collections"
                         count={visibleUserCollections.length}
-                        meta="Bars compare shelf size"
                       >
                         {visibleUserCollections.map((col) => (
                           <UserCollectionCard
@@ -231,10 +225,8 @@ export default function CollectionsPage() {
 
                     {visibleXFolders.length > 0 && (
                       <CollectionsSection
-                        icon={FolderOpen}
-                        title="X Folders"
+                        title="X folders"
                         count={visibleXFolders.length}
-                        meta="Bars compare shelf size"
                       >
                         {visibleXFolders.map((col) => (
                           <XFolderCard

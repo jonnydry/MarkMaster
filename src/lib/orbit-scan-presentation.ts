@@ -27,9 +27,9 @@ export function getScanFailurePresentation(error: OrbitScanFailure): {
       return {
         Icon: KeyRound,
         label: "Auth",
-        badgeClassName: "border-amber-300/30 bg-amber-300/10 text-amber-100",
-        panelClassName: "border-amber-300/25 bg-amber-300/10",
-        iconClassName: "text-amber-200",
+        badgeClassName: "border-destructive/30 bg-destructive/10 text-destructive",
+        panelClassName: "border-destructive/25 bg-destructive/10",
+        iconClassName: "text-destructive",
         helper: "Check the server xAI key and model access, then retry.",
       };
     case "model":
@@ -45,9 +45,9 @@ export function getScanFailurePresentation(error: OrbitScanFailure): {
       return {
         Icon: Gauge,
         label: "Rate limit",
-        badgeClassName: "border-orange-300/30 bg-orange-300/10 text-orange-100",
-        panelClassName: "border-orange-300/25 bg-orange-300/10",
-        iconClassName: "text-orange-200",
+        badgeClassName: "border-warning/30 bg-warning/10 text-warning",
+        panelClassName: "border-warning/25 bg-warning/10",
+        iconClassName: "text-warning",
         helper: retryAfter
           ? `xAI asked MarkMaster to wait about ${retryAfter}. A smaller selected pass may clear sooner.`
           : "xAI asked MarkMaster to slow down. A smaller selected pass may clear sooner.",

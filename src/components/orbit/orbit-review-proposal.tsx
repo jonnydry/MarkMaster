@@ -9,19 +9,10 @@ import type {
   OrbitTagSuggestion,
 } from "@/types";
 
+/** Subtle marker for names the scan would create; reused names get none. */
 function ReuseBadge({ reuseExisting }: { reuseExisting: boolean }) {
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded-sm border px-1 py-px text-2xs font-medium uppercase tracking-[0.08em]",
-        reuseExisting
-          ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
-          : "border-primary/25 bg-primary/10 text-primary/80"
-      )}
-    >
-      {reuseExisting ? "Lib" : "New"}
-    </span>
-  );
+  if (reuseExisting) return null;
+  return <span className="shrink-0 text-xs text-primary">new</span>;
 }
 
 function TagChip({
@@ -39,10 +30,10 @@ function TagChip({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1.5 text-xs",
         muted
-          ? "border-hairline-soft/60 bg-surface-2/35 text-muted-foreground/70 line-through decoration-muted-foreground/40"
-          : "border-hairline-soft bg-surface-2/70 text-foreground"
+          ? "border-hairline-soft bg-transparent text-muted-foreground line-through decoration-muted-foreground/40"
+          : "border-hairline-soft bg-surface-2 text-foreground"
       )}
     >
       <span
@@ -50,7 +41,7 @@ function TagChip({
         style={{ backgroundColor: color }}
         aria-hidden
       />
-      <TagIcon className="size-3 shrink-0 text-primary/70" aria-hidden />
+      <TagIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
       <span className={cn("min-w-0 truncate font-medium", compact && "max-w-[8rem]")}>
         {tag.name}
       </span>
@@ -76,13 +67,13 @@ function CollectionChip({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1.5 text-xs",
         muted
-          ? "border-hairline-soft/60 bg-surface-2/35 text-muted-foreground/70 line-through decoration-muted-foreground/40"
-          : "border-hairline-soft bg-surface-2/70 text-foreground"
+          ? "border-hairline-soft bg-transparent text-muted-foreground line-through decoration-muted-foreground/40"
+          : "border-hairline-soft bg-surface-2 text-foreground"
       )}
     >
-      <FolderInput className="size-3 shrink-0 text-primary/70" aria-hidden />
+      <FolderInput className="size-3 shrink-0 text-muted-foreground" aria-hidden />
       <span className={cn("min-w-0 truncate font-medium", compact && "max-w-[8rem]")}>
         {collection.name}
       </span>
@@ -111,7 +102,7 @@ export function OrbitReviewGrokProposal({
   const hasCollection = Boolean(original.collection);
   if (!hasTags && !hasCollection) {
     return (
-      <p className={cn("text-xs text-muted-foreground/80", className)}>
+      <p className={cn("text-xs text-muted-foreground", className)}>
         Orbit suggests keeping this bookmark in Orbit unchanged.
       </p>
     );
@@ -121,7 +112,7 @@ export function OrbitReviewGrokProposal({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+      <div className="text-xs font-medium text-muted-foreground">
         {declined ? "Orbit proposed (not applying)" : "Orbit proposed"}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -196,7 +187,7 @@ export function OrbitReviewBatchImpactChips({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
+      <div className="text-xs font-medium text-muted-foreground">
         Batch impact
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -231,7 +222,7 @@ export function OrbitReviewQueueProposalChips({
         <TagChip key={name} tag={{ name }} compact />
       ))}
       {tagNames.length > 2 ? (
-        <span className="self-center text-2xs text-muted-foreground">
+        <span className="self-center text-xs text-muted-foreground">
           +{tagNames.length - 2} more
         </span>
       ) : null}

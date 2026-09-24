@@ -1,62 +1,27 @@
 import { cn } from "@/lib/utils";
 
-/** Classic void keeps softer corners; default Button uses rounded-sm. */
-export function orbitControlRadius() {
-  return "rounded-sm";
-}
-
+/** Sentence-case Orbit label (matches the shared SANS_LABEL contract). */
 export function orbitLabelClass(extra?: string) {
-  return cn(
-    "text-2xs font-medium uppercase tracking-[0.14em] text-muted-foreground",
-    extra
-  );
+  return cn("text-xs font-medium text-muted-foreground", extra);
 }
 
 export function orbitDataClass(extra?: string) {
   return cn("font-mono text-2xs tabular-nums", extra);
 }
 
-export function orbitSectionLabelClass(extra?: string) {
-  return orbitLabelClass(extra);
-}
-
 export function orbitHairlineBorder() {
   return "border-hairline-soft";
 }
 
-export function orbitMetaMuted() {
-  return "text-muted-foreground";
-}
-
-export function orbitMetaSoft() {
-  return "text-muted-foreground";
-}
-
-export function orbitForeground() {
-  return "text-foreground dark:text-white";
-}
-
-export function orbitPanelClass(extra?: string) {
-  return cn("surface-inset-strong", extra);
-}
-
 export function orbitBannerClass(extra?: string) {
   return cn(
-    "rounded-sm border border-primary/30 bg-primary/10",
+    "rounded-sm border border-warning/30 bg-warning/10",
     extra
   );
 }
 
-export function orbitHoverRowClass() {
-  return "hover:bg-accent-soft/60 dark:hover:bg-white/[0.03]";
-}
-
 export function orbitGhostButtonClass() {
-  return "surface-inset-strong text-foreground hover:bg-accent-soft";
-}
-
-export function orbitMapLinkClass() {
-  return "inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap surface-inset-strong px-3 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground";
+  return "surface-inset-strong text-foreground hover:bg-hover";
 }
 
 export function orbitSelectionBarClass(extra?: string) {

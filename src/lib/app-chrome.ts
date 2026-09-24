@@ -1,20 +1,23 @@
-/** Frosted chrome for sticky page headers and the dashboard search strip (shared visual language). */
+/**
+ * Sticky page-header chrome. One deliberate frost layer (X-style): opaque
+ * without backdrop-filter support, near-opaque with it, so scrolling media
+ * never shows through as more than a soft ghost.
+ */
 export const appChromeFrostedClassName =
-  "bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75";
+  "bg-background supports-[backdrop-filter]:bg-background/85 supports-[backdrop-filter]:backdrop-blur-xl";
 
-/** Lighter feed-header chrome — dashboard / Orbit toolbars; background marks show through. */
-export const appFeedHeaderFrostedClassName =
-  "bg-background/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/50";
+/** Feed-header chrome — dashboard / Orbit toolbars. Same single frost layer. */
+export const appFeedHeaderFrostedClassName = appChromeFrostedClassName;
 
-/** Translucent wells for search bars, segments, and icon tiles in feed toolbars. */
-export const appToolbarSurfaceClassName =
-  "bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm";
+/** Toolbar controls sit directly on the header — no wells behind icons. */
+export const appToolbarSurfaceClassName = "";
 
+/** Search field — filled, borderless-looking well; focus lights the border. */
 export const appToolbarSurfaceShellClassName =
-  "toolbar-search-shell surface-veil border-hairline-strong backdrop-blur-xl backdrop-saturate-150";
+  "toolbar-search-shell rounded-sm border border-transparent bg-surface-2";
 
-export const appToolbarSurfaceGroupClassName =
-  "border-hairline-soft bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm";
+/** Segmented control group — one hairline, no fill. */
+export const appToolbarSurfaceGroupClassName = "border-hairline-soft bg-transparent";
 
 /** Frosted shell for compact floating search over scrolling feed media. */
 export const appFloatingSearchShellClassName =

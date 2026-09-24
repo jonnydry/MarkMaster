@@ -12,8 +12,8 @@ type ChipTone = "neutral" | "primary" | "success" | "warning";
 const statusToneClassName: Record<ChipTone, string> = {
   neutral: "border-hairline-soft bg-surface-2 text-muted-foreground",
   primary: cn(highlightActiveClass, "border"),
-  success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-100",
+  success: "border-success/25 bg-success/10 text-success",
+  warning: "border-warning/30 bg-warning/10 text-warning",
 };
 
 export function FilterChip({

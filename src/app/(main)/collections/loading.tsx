@@ -6,7 +6,7 @@ export default function Loading() {
       <div
         role="status"
         aria-label="Loading"
-        className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+        className="size-5 animate-spin rounded-full border-2 border-hairline-strong border-t-muted-foreground"
       />
     </AppPageCenter>
   );

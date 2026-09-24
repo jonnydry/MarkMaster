@@ -37,9 +37,9 @@ export function EmptyState({
     layout === "page"
       ? "text-xl font-semibold tracking-tight"
       : layout === "panel"
-        ? "text-lg font-medium"
+        ? "text-lg font-semibold tracking-tight"
         : "text-base font-semibold",
-    isStage && "text-lg font-medium text-foreground",
+    isStage && "text-lg font-semibold tracking-tight text-foreground",
     !isStage && "heading-font text-foreground"
   );
 
@@ -48,18 +48,15 @@ export function EmptyState({
     isStage ? "max-w-md text-sm text-muted-foreground" : "text-muted-foreground"
   );
 
-  const iconWrapClass = cn(
-    "flex items-center justify-center rounded-sm border text-primary",
-    layout === "panel" ? "mx-auto mb-4 h-12 w-12" : "mx-auto mb-4 h-12 w-12",
-    "border-primary/15 bg-primary/10"
-  );
+  // Bare glyph, no tinted tile — the title carries the weight.
+  const iconWrapClass = "mx-auto mb-3 flex items-center justify-center text-muted-foreground";
 
   return (
     <div className={cn(layoutShell[layout], className)}>
       {leading}
       {Icon ? (
         <div className={iconWrapClass}>
-          <Icon className="h-6 w-6" aria-hidden="true" />
+          <Icon className="size-7" strokeWidth={1.5} aria-hidden="true" />
         </div>
       ) : null}
       <h2 className={titleClass}>{title}</h2>

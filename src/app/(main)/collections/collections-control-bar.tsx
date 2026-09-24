@@ -42,12 +42,12 @@ export function CollectionsControlBar({
     { value: "all", label: "All", count: totalCount },
     { value: "mine", label: "Mine", count: userCount },
     { value: "public", label: "Public", count: publicCount },
-    { value: "x_folders", label: "X", count: xFolderCount },
+    { value: "x_folders", label: "X folders", count: xFolderCount },
   ];
 
   return (
     <section className="flex flex-col gap-3 border-y border-hairline-soft py-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-background/35 px-3 text-sm text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/45 lg:max-w-md">
+      <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-sm border border-hairline-strong bg-transparent px-3 text-sm text-muted-foreground focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/45 lg:max-w-md">
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
         <input
           ref={searchInputRef}
@@ -55,12 +55,12 @@ export function CollectionsControlBar({
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search collections..."
-          className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+          className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
         {searchQuery ? (
           <button
             type="button"
-            className="rounded-sm border border-transparent p-1 text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="rounded-sm border border-transparent p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             onClick={() => onSearchChange("")}
             aria-label="Clear search"
           >
@@ -72,7 +72,8 @@ export function CollectionsControlBar({
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <div
           aria-label="Collection filters"
-          className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-sm border border-hairline-soft bg-background/35 p-0.5"
+          role="group"
+          className="inline-flex max-w-full flex-wrap items-center gap-1"
         >
           {filters.map((filter) => {
             const active = filter.value === activeFilter;
@@ -83,13 +84,7 @@ export function CollectionsControlBar({
                 onClick={() => onFilterChange(filter.value)}
               >
                 <span>{filter.label}</span>
-                <span
-                  className={`tabular-nums ${
-                    active
-                      ? "text-muted-foreground/80"
-                      : "text-muted-foreground/60"
-                  }`}
-                >
+                <span className="tabular-nums text-muted-foreground">
                   {filter.count}
                 </span>
               </FilterChip>
@@ -97,7 +92,7 @@ export function CollectionsControlBar({
           })}
         </div>
 
-        <span className="text-xs tabular-nums text-muted-foreground/70">
+        <span className="text-xs tabular-nums text-muted-foreground">
           {filteredCount.toLocaleString()} shown
         </span>
 

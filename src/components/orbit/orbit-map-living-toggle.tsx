@@ -36,7 +36,7 @@ export function OrbitMapLivingToggle({
       title={enabled ? "Living motion on" : "Living motion off"}
       onClick={() => onEnabledChange(!enabled)}
       className={cn(
-        "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         enabled ? "text-foreground" : "text-muted-foreground",
         className
       )}

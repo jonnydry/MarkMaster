@@ -55,13 +55,6 @@ export function HighlightProgress({
         className={cn(fillClass[tone], durationClass)}
         style={{ width: `${clamped}%` }}
       >
-        <span
-          aria-hidden
-          className={cn(
-            "highlight-progress-shimmer",
-            tone === "note" && "highlight-progress-shimmer--note"
-          )}
-        />
         {clamped > 0 ? (
           <span
             aria-hidden

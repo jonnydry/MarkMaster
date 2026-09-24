@@ -40,7 +40,7 @@ function WorkspaceThumbnail({ bookmark }: { bookmark: BookmarkWithRelations }) {
           className="object-cover"
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-muted-foreground/55">
+        <div className="flex size-full items-center justify-center text-muted-foreground">
           <ImageIcon className="size-4" aria-hidden="true" />
           <span className="sr-only">Text bookmark</span>
         </div>
@@ -80,7 +80,7 @@ function WorkspaceAuthor({ bookmark }: { bookmark: BookmarkWithRelations }) {
             <BadgeCheck className="size-3 shrink-0 text-primary" aria-label="Verified account" />
           ) : null}
         </div>
-        <span className="block truncate text-2xs text-muted-foreground">
+        <span className="block truncate text-xs text-muted-foreground">
           @{bookmark.authorUsername}
         </span>
       </div>
@@ -121,9 +121,10 @@ function WorkspaceBookmarkRow({
       data-dashboard-bookmark-id={bookmark.id}
       data-workspace-bookmark-row={bookmark.id}
       className={cn(
-        "group relative grid min-w-0 cursor-pointer grid-cols-1 gap-3 surface-solid px-3 py-3 text-left transition-colors hover:border-primary/30 hover:bg-accent-soft/45 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem] min-[860px]:items-center",
-        active && !selectionMode && "border-primary/60 bg-primary/10",
-        selected && selectionMode && "border-primary/60 bg-primary/10"
+        "group relative grid min-w-0 cursor-pointer grid-cols-1 gap-3 border-b border-hairline-soft px-4 py-3 text-left transition-colors min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem] min-[860px]:items-center",
+        (active && !selectionMode) || (selected && selectionMode)
+          ? "state-selected"
+          : "hover:bg-hover"
       )}
     >
       <button
@@ -149,11 +150,11 @@ function WorkspaceBookmarkRow({
             {formatBookmarkDisplayText(bookmark)}
           </p>
           <div className="mt-2 flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-2xs text-muted-foreground min-[860px]:hidden">
+            <span className="truncate text-xs text-muted-foreground min-[860px]:hidden">
               @{bookmark.authorUsername}
             </span>
             <XLogoMark
-              className="size-3 shrink-0 text-muted-foreground/55 min-[860px]:hidden"
+              className="size-3 shrink-0 text-muted-foreground min-[860px]:hidden"
               title="Post from X"
             />
             {primaryTag ? (
@@ -167,7 +168,7 @@ function WorkspaceBookmarkRow({
                 className="pointer-events-auto max-w-[9rem]"
               />
             ) : (
-              <span className="text-2xs text-muted-foreground/65">Untagged</span>
+              <span className="text-xs text-muted-foreground">Untagged</span>
             )}
           </div>
         </div>
@@ -181,7 +182,7 @@ function WorkspaceBookmarkRow({
         <span className="block text-xs tabular-nums text-muted-foreground">
           {formatPostDate(bookmark.tweetCreatedAt)}
         </span>
-        <span className="mt-0.5 block text-2xs text-muted-foreground/65">
+        <span className="mt-0.5 block text-xs text-muted-foreground">
           Saved {formatPostDate(bookmark.bookmarkedAt)}
         </span>
       </div>
@@ -201,17 +202,11 @@ export function DashboardBookmarkWorkspace({
   const t = useTypography();
 
   return (
-    <section aria-label="Bookmark workspace" className="min-w-0 px-3 pb-3 pt-3">
-      <div className="sticky top-[var(--header-height)] z-20 grid grid-cols-1 surface-inset-strong px-3 py-2 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem]">
-        <span className={cn(t.label, "font-semibold")}>
-          Item
-        </span>
-        <span className={cn("hidden min-[860px]:block", t.label, "font-semibold")}>
-          Author
-        </span>
-        <span className={cn("hidden min-[860px]:block", t.label, "font-semibold")}>
-          Date
-        </span>
+    <section aria-label="Bookmark workspace" className="min-w-0 pb-3">
+      <div className="sticky top-[var(--header-height)] z-20 grid grid-cols-1 gap-3 border-b border-hairline-soft bg-background px-4 py-2 min-[860px]:grid-cols-[minmax(0,1fr)_8.5rem_5.5rem]">
+        <span className={t.label}>Item</span>
+        <span className={cn("hidden min-[860px]:block", t.label)}>Author</span>
+        <span className={cn("hidden min-[860px]:block", t.label)}>Date</span>
       </div>
       <div>
         {bookmarks.map((bookmark) => (

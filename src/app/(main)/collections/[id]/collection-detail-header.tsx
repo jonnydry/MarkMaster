@@ -18,7 +18,6 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { isShareLinkExpired } from "@/lib/share-content";
 import { cn } from "@/lib/utils";
 import type { CollectionDetail } from "@/hooks/use-collection-detail-page";
@@ -101,10 +100,7 @@ export function CollectionDetailHeaderActions({
     <>
       {isSyncedFromX && (
         <>
-          <Badge
-            variant="outline"
-            className={cn("gap-1.5 text-primary", highlightActiveClass)}
-          >
+          <Badge variant="outline" className="gap-1.5 border-hairline-soft">
             Synced from X
           </Badge>
           <Button
@@ -114,16 +110,16 @@ export function CollectionDetailHeaderActions({
             onClick={onCopyAsCollection}
           >
             <Copy className="size-4" />
-            Copy as Collection
+            Copy as collection
           </Button>
         </>
       )}
       {isUserCollection && (
-        <Badge variant="outline" className="gap-1.5 border-hairline-soft bg-surface-2/70">
+        <Badge variant="outline" className="gap-1.5 border-hairline-soft">
           {collection.isPublic ? (
-            <Globe className="h-3 w-3 text-success" />
+            <Globe className="size-3" />
           ) : (
-            <Lock className="h-3 w-3" />
+            <Lock className="size-3" />
           )}
           {collection.isPublic ? "Public" : "Private"}
         </Badge>
@@ -136,7 +132,7 @@ export function CollectionDetailHeaderActions({
             className="border-hairline-soft bg-transparent px-3 text-sm"
             onClick={onTogglePublic}
           >
-            {collection.isPublic ? "Make Private" : "Make Public"}
+            {collection.isPublic ? "Make private" : "Make public"}
           </Button>
           {collection.isPublic && collection.shareSlug && (
             <>
@@ -151,13 +147,13 @@ export function CollectionDetailHeaderActions({
                 onClick={onCopyShareLink}
               >
                 <Copy className="size-4" />
-                Copy Link
+                Copy link
               </Button>
               <a
                 href={`/share/${collection.shareSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                className="inline-flex size-9 items-center justify-center rounded-sm border border-hairline-soft bg-transparent transition-colors hover:bg-hover focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                 aria-label="Open public collection page"
                 title="Open public collection page"
               >
@@ -232,7 +228,7 @@ export function CollectionDetailTitle({
       {isSyncedFromX ? (
         <FolderOpen className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden />
       ) : (
-        <Layers className="h-6 w-6 shrink-0 text-primary" aria-hidden />
+        <Layers className="h-6 w-6 shrink-0 text-muted-foreground" aria-hidden />
       )}
       {isSyncedFromX || !isUserCollection ? (
         collection.name
