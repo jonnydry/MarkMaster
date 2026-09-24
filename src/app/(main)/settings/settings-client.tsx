@@ -349,7 +349,7 @@ export default function SettingsPage() {
                     id="orbit-grok"
                     icon={BrainCircuit}
                     title="Orbit scanning"
-                    description="Scan queue matches your existing tags first and only invents names when needed. Sweep reviews 72 at once. Classify library drains untagged bookmarks in the background (safe matches only)."
+                    description="Scan queue matches your existing tags first and only invents names when needed. Sweep reviews 72 at once. Tag the whole library from Orbit."
                     badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
                   >
                     <OrbitGrokStatusPanel

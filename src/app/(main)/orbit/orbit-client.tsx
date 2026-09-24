@@ -49,6 +49,7 @@ import {
 } from "@/lib/orbit-route-chrome";
 import { appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import { useOrbitLibraryTag } from "@/hooks/use-orbit-library-tag";
 import { useOrbitPage } from "@/hooks/use-orbit-page";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,7 @@ const OrbitBookmarkOverlay = dynamic(
 export default function OrbitPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { queue, session, interactions, selection } = useOrbitPage();
+  const libraryTag = useOrbitLibraryTag();
   const scan = session.scan;
   const getScanDecision = scan.getDecision;
   const {
@@ -351,6 +353,10 @@ export default function OrbitPage() {
               mapHref={orbitMapHref}
               onBatchModeChange={setScanBatchMode}
               onScan={handleScan}
+              libraryUntaggedCount={libraryTag.count}
+              libraryTagBusy={libraryTag.busy}
+              libraryTagStatus={libraryTag.status}
+              onTagLibrary={() => void libraryTag.start()}
               search={search}
               onSearchChange={handleSearchChange}
               visibleStatusLabel={visibleStatusLabel}

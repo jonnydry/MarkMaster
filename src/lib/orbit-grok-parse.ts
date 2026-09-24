@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import { logWarn } from "@/lib/logger";
 import { PRESET_COLORS } from "@/lib/constants";
 import { getTagColorSpectrum } from "@/lib/tag-colors";
@@ -24,6 +25,11 @@ import {
   tagLookupKeys,
   truncateText,
 } from "@/lib/orbit-grok-normalize";
+import {
+  VIDEO_TAG_NAME,
+  VIDEO_TAG_REASON,
+  mediaIncludesVideo,
+} from "@/lib/orbit-video-tag";
 import type {
   OrbitCollectionRollup,
   OrbitScanSummary,
@@ -181,12 +187,47 @@ export function extractXaiResponsesOutputText(payload: unknown): string | null {
     : null;
 }
 
+function ensureVideoTag(
+  tags: OrbitScanPlan["suggestions"][number]["tags"],
+  media: unknown,
+  helpers: {
+    resolveExistingTag: (name: string) => OrbitTagContext | undefined;
+    palette: readonly string[];
+  }
+) {
+  if (!mediaIncludesVideo(media)) return;
+
+  const existing = helpers.resolveExistingTag(VIDEO_TAG_NAME);
+  const name = existing?.name ?? VIDEO_TAG_NAME;
+  const already = tags.findIndex((tag) => normalizeKey(tag.name) === "video");
+  if (already >= 0) {
+    const current = tags[already]!;
+    tags[already] = {
+      ...current,
+      name,
+      color: existing?.color ?? current.color,
+      reason: VIDEO_TAG_REASON,
+      reuseExisting: current.reuseExisting || Boolean(existing),
+    };
+    return;
+  }
+
+  if (tags.length >= ORBIT_MAX_TAGS_PER_BOOKMARK) tags.pop();
+  tags.unshift({
+    name,
+    color: existing?.color ?? normalizeColor(VIDEO_TAG_NAME, undefined, helpers.palette),
+    reason: VIDEO_TAG_REASON,
+    reuseExisting: Boolean(existing),
+  });
+}
+
 export function normalizeOrbitScanPlan(
   rawPlan: OrbitScanPlanFromXai,
   context: {
     bookmarkIds: string[];
     existingTags: OrbitTagContext[];
     existingCollections: OrbitCollectionContext[];
+    bookmarks?: Array<{ id: string; media: unknown }>;
   }
 ): OrbitScanPlan {
   const bookmarkIdSet = new Set(context.bookmarkIds);
@@ -211,7 +252,7 @@ export function normalizeOrbitScanPlan(
   const palette = getTagColorSpectrum(
     Math.max(
       PRESET_COLORS.length,
-      context.existingTags.length + rawPlan.suggestions.length * 3
+      context.existingTags.length + rawPlan.suggestions.length * ORBIT_MAX_TAGS_PER_BOOKMARK
     )
   );
   const resolveExistingTag = (normalizedName: string) => {
@@ -238,6 +279,9 @@ export function normalizeOrbitScanPlan(
     collectionSuggestionBookmarkIds.set(key, bookmarkIds);
   }
 
+  const mediaByBookmarkId = new Map(
+    (context.bookmarks ?? []).map((bookmark) => [bookmark.id, bookmark.media])
+  );
   const suggestionMap = new Map<string, OrbitScanPlan["suggestions"][number]>();
 
   for (const suggestion of rawPlan.suggestions) {
@@ -266,7 +310,7 @@ export function normalizeOrbitScanPlan(
         };
       })
       .filter(Boolean)
-      .slice(0, 3) as OrbitScanPlan["suggestions"][number]["tags"];
+      .slice(0, ORBIT_MAX_TAGS_PER_BOOKMARK) as OrbitScanPlan["suggestions"][number]["tags"];
 
     let normalizedCollection: OrbitScanPlan["suggestions"][number]["collection"] = null;
     if (suggestion.collection) {
@@ -325,6 +369,11 @@ export function normalizeOrbitScanPlan(
       }
     }
 
+    ensureVideoTag(normalizedTags, mediaByBookmarkId.get(suggestion.bookmarkId), {
+      resolveExistingTag,
+      palette,
+    });
+
     const hasApplyable =
       normalizedTags.length > 0 || normalizedCollection !== null;
     let reasoning: string;
@@ -361,9 +410,17 @@ export function normalizeOrbitScanPlan(
         truncateText(rawPlan.overview.collectionStrategy, 240) ||
         "Collections are only suggested when there is a clear home for the bookmark.",
     },
-    suggestions: context.bookmarkIds.map(
-      (bookmarkId) => suggestionMap.get(bookmarkId) ?? buildDefaultSuggestion(bookmarkId)
-    ),
+    suggestions: context.bookmarkIds.map((bookmarkId) => {
+      const suggestion =
+        suggestionMap.get(bookmarkId) ?? buildDefaultSuggestion(bookmarkId);
+      if (!suggestionMap.has(bookmarkId)) {
+        ensureVideoTag(suggestion.tags, mediaByBookmarkId.get(bookmarkId), {
+          resolveExistingTag,
+          palette,
+        });
+      }
+      return suggestion;
+    }),
   };
 }
 

@@ -395,6 +395,10 @@ async function fetchOrbitScanFromXai(
     bookmarkIds: args.bookmarks.map((bookmark) => bookmark.id),
     existingTags: args.existingTags,
     existingCollections: args.existingCollections,
+    bookmarks: args.bookmarks.map((bookmark) => ({
+      id: bookmark.id,
+      media: bookmark.media,
+    })),
   });
   const requestedCount = args.bookmarks.length;
   const batch: OrbitScanBatchMetadata =

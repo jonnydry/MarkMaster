@@ -6,6 +6,7 @@ import {
   Loader2,
   MoreHorizontal,
   RefreshCw,
+  Tags,
 } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
@@ -90,6 +91,10 @@ export interface OrbitCommandBarProps {
   mapHref: string;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
   onScan: () => void;
+  libraryUntaggedCount: number | null;
+  libraryTagBusy: boolean;
+  libraryTagStatus: string | null;
+  onTagLibrary: () => void;
   scanError?: ReactNode;
 
   // Utility
@@ -135,6 +140,10 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       mapHref,
       onBatchModeChange,
       onScan,
+      libraryUntaggedCount,
+      libraryTagBusy,
+      libraryTagStatus,
+      onTagLibrary,
       scanError,
       search,
       onSearchChange,
@@ -212,50 +221,80 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       </>
     ) : null;
 
+    const showLibraryTag =
+      libraryTagBusy || (libraryUntaggedCount != null && libraryUntaggedCount > 0);
+    const libraryTagButton = showLibraryTag ? (
+      <Button
+        variant="outline"
+        size="sm"
+        className={cn(
+          "gap-1.5 px-2.5 text-xs",
+          appToolbarControlHeightClassName(compact),
+          orbitControlRadius()
+        )}
+        disabled={libraryTagBusy}
+        title="Tags every bookmark that has no tags yet. Rename or delete a tag to change the ones that wear it."
+        onClick={onTagLibrary}
+      >
+        {libraryTagBusy ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Tags className="size-3.5" />
+        )}
+        <span className="hidden sm:inline">
+          {libraryTagBusy ? "Tagging…" : "Tag library"}
+        </span>
+        <span className="sm:hidden">{libraryTagBusy ? "…" : "Tag"}</span>
+      </Button>
+    ) : null;
+
     const toolbarActions = canSelect ? (
       <>
-        {hasScanPlan ? (
-          <ToolbarIconButton
-            label={scanButtonLabel}
-            icon={RefreshCw}
-            disabled={scanBusy || scanTargetCount === 0}
-            onClick={onScan}
-            size={compact ? "compact" : "default"}
-            className={appToolbarSurfaceClassName}
-          />
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="highlight"
-              size="sm"
-              className={cn(
-                "gap-1.5 px-2.5 text-xs",
-                appToolbarControlHeightClassName(compact),
-                orbitControlRadius()
-              )}
+        <div className="flex items-center gap-1.5">
+          {hasScanPlan ? (
+            <ToolbarIconButton
+              label={scanButtonLabel}
+              icon={RefreshCw}
               disabled={scanBusy || scanTargetCount === 0}
               onClick={onScan}
-            >
-              {scanBusy ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <OrbitLogoMark className="size-3.5" />
-              )}
-              <span className="hidden sm:inline">{scanButtonLabel}</span>
-              <span className="sm:hidden">Scan</span>
-            </Button>
-            <OrbitBatchMenu
-              batchMode={batchMode}
-              resolvedBatchProfile={resolvedBatchProfile}
-              deepUnlocked={deepUnlocked}
-              deepLockedReason={deepLockedReason}
-              sweepUnlocked={sweepUnlocked}
-              sweepLockedReason={sweepLockedReason}
-              disabled={scanBusy}
-              onBatchModeChange={onBatchModeChange}
+              size={compact ? "compact" : "default"}
+              className={appToolbarSurfaceClassName}
             />
-          </div>
-        )}
+          ) : (
+            <>
+              <Button
+                variant="highlight"
+                size="sm"
+                className={cn(
+                  "gap-1.5 px-2.5 text-xs",
+                  appToolbarControlHeightClassName(compact),
+                  orbitControlRadius()
+                )}
+                disabled={scanBusy || scanTargetCount === 0}
+                onClick={onScan}
+              >
+                {scanBusy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <OrbitLogoMark className="size-3.5" />
+                )}
+                <span className="hidden sm:inline">{scanButtonLabel}</span>
+                <span className="sm:hidden">Scan</span>
+              </Button>
+              <OrbitBatchMenu
+                batchMode={batchMode}
+                resolvedBatchProfile={resolvedBatchProfile}
+                deepUnlocked={deepUnlocked}
+                deepLockedReason={deepLockedReason}
+                sweepUnlocked={sweepUnlocked}
+                sweepLockedReason={sweepLockedReason}
+                disabled={scanBusy}
+                onBatchModeChange={onBatchModeChange}
+              />
+            </>
+          )}
+          {libraryTagButton}
+        </div>
         <OrbitModeSwitch
           active="queue"
           size={compact ? "sm" : "md"}
@@ -312,7 +351,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       </>
     ) : null;
 
-    const scanProgress = scanning ? (
+    const scanProgress = scanning || libraryTagBusy ? (
       <ScrollingProgressBar className="absolute inset-x-0 top-0" />
     ) : null;
 
@@ -334,7 +373,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <span className={cn(orbitDataClass(), "normal-case")}>
             {visibleStatusLabel}
           </span>
-          {showTriageProgress ? (
+          {libraryTagStatus ? (
+            <span className={cn(orbitDataClass(), "normal-case")}>
+              {libraryTagStatus}
+            </span>
+          ) : showTriageProgress ? (
             <span className={cn(orbitDataClass(), "normal-case")}>
               {triagedCount} / {passTotal} triaged
             </span>
@@ -371,11 +414,16 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 actions={toolbarActions}
                 userNav={userNav}
                 progress={scanProgress}
-                aria-busy={scanning}
+                aria-busy={scanning || libraryTagBusy}
               />
             ) : null}
           </FeedCompactToolbarShell>
           <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
+          {libraryTagStatus ? (
+            <p className={cn("px-4 pb-1 text-xs text-muted-foreground sm:px-5")}>
+              {libraryTagStatus}
+            </p>
+          ) : null}
           {scanErrorBlock}
         </>
       );
@@ -387,7 +435,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           "feed-toolbar relative w-full min-w-0 space-y-1.5 py-2",
           appContentGutterClassName
         )}
-        aria-busy={scanning}
+        aria-busy={scanning || libraryTagBusy}
       >
         {scanProgress}
         <FeedToolbarSearchRow

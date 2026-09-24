@@ -19,6 +19,7 @@ import { TagDot } from "@/components/tag-dot";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import type { TagWithCount, CollectionWithCount } from "@/types";
 import type { OrbitReviewDecision } from "@/lib/orbit-review";
+import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import { splitTagNames } from "@/lib/orbit-review";
 
 const REVIEW_DECISION_OPTIONS: Array<{
@@ -74,7 +75,7 @@ export function OrbitReviewTagField({
   const [customDraft, setCustomDraft] = useState("");
 
   const parsed = useMemo(() => splitTagNames(tagNames), [tagNames]);
-  const atTagCap = parsed.length >= 3;
+  const atTagCap = parsed.length >= ORBIT_MAX_TAGS_PER_BOOKMARK;
 
   const tagColorForDisplay = useCallback(
     (label: string) => {
@@ -186,7 +187,9 @@ export function OrbitReviewTagField({
           }}
           disabled={!included || atTagCap}
           placeholder={
-            atTagCap ? "Max 3 tags" : "New tag, press Enter"
+            atTagCap
+              ? `Max ${ORBIT_MAX_TAGS_PER_BOOKMARK} tags`
+              : "New tag, press Enter"
           }
           className="min-w-0 flex-1 border-hairline-soft bg-surface-1 text-foreground placeholder:text-muted-foreground/60"
         />

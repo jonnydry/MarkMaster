@@ -5,91 +5,21 @@ import {
   ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
   ORBIT_LIBRARY_CLASSIFY_PAGES_PER_INVOCATION,
 } from "@/lib/orbit-config";
-import { getAuthorPriorHintsForScan } from "@/lib/orbit-author-history";
-import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
+import { isVideoFormatTag } from "@/lib/orbit-video-tag";
 import { applyOrbitScanPlan, OrbitScanError } from "@/lib/orbit-grok";
-import { normalizeOrbitScanPlan } from "@/lib/orbit-grok-parse";
-import { batchVocabularyFromPool, jevAssignmentsToRawPlan } from "@/lib/orbit-jev-assign";
-import { assignAndRefineOrbitJev } from "@/lib/orbit-hybrid-scan";
-import {
-  buildSeedOrbitLabelPool,
-  labelPoolFromAppliedNames,
-  mergeOrbitLabelPool,
-} from "@/lib/orbit-label-pool";
-import type { OrbitLabelPool } from "@/lib/orbit-jev-assign";
-import {
-  orbitScanBookmarkInclude,
-  withOrbitFolderHints,
-} from "@/lib/orbit-scan-bookmarks";
-import { getOrbitNeighborHintsForScan } from "@/lib/orbit-scan-neighbors";
+import { planLibraryAssignments } from "@/lib/orbit-library-assign";
+import { ensureLibraryVocabulary } from "@/lib/orbit-library-vocabulary";
 import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { isTypeSafeConfigured } from "@/lib/typesafe";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
-import type { OrbitApplyResult, OrbitLibraryClassifyResult } from "@/types";
+import type { OrbitLibraryClassifyResult } from "@/types";
 
 export type OrbitLibraryClassifyCursor = {
   bookmarkedAt: string;
   id: string;
 };
-
-type OrbitLibraryCatalog = {
-  tags: Array<{
-    id: string;
-    name: string;
-    color: string;
-    bookmarkCount: number;
-  }>;
-  collections: Array<{
-    id: string;
-    name: string;
-    description: string | null;
-    bookmarkCount: number;
-  }>;
-};
-
-async function loadOrbitLibraryCatalog(
-  userId: string
-): Promise<OrbitLibraryCatalog> {
-  const [tags, collections] = await Promise.all([
-    prisma.tag.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        _count: { select: { bookmarks: true } },
-      },
-      orderBy: { bookmarks: { _count: "desc" } },
-    }),
-    prisma.collection.findMany({
-      where: { userId, type: "user_collection" },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        _count: { select: { items: true } },
-      },
-      orderBy: { items: { _count: "desc" } },
-    }),
-  ]);
-
-  return {
-    tags: tags.map((tag) => ({
-      id: tag.id,
-      name: tag.name,
-      color: tag.color,
-      bookmarkCount: tag._count.bookmarks,
-    })),
-    collections: collections.map((collection) => ({
-      id: collection.id,
-      name: collection.name,
-      description: collection.description,
-      bookmarkCount: collection._count.items,
-    })),
-  };
-}
 
 const untaggedOrbitWhere = (userId: string, cursor?: OrbitLibraryClassifyCursor) => ({
   userId,
@@ -134,13 +64,19 @@ export function filterSafeLibraryClassifyPlan<
   return {
     ...plan,
     suggestions: plan.suggestions
-      .filter(isSafeAutoApplySuggestion)
-      .map((suggestion) => ({
-        ...suggestion,
-        tags: suggestion.tags.filter((tag) => tag.reuseExisting),
-        collection:
-          suggestion.collection?.reuseExisting ? suggestion.collection : null,
-      }))
+      .map((suggestion) => {
+        const safe = isSafeAutoApplySuggestion(suggestion);
+        return {
+          ...suggestion,
+          tags: suggestion.tags.filter(
+            (tag) => isVideoFormatTag(tag) || (safe && tag.reuseExisting)
+          ),
+          collection:
+            safe && suggestion.collection?.reuseExisting
+              ? suggestion.collection
+              : null,
+        };
+      })
       .filter(
         (suggestion) => suggestion.tags.length > 0 || suggestion.collection
       ),
@@ -224,6 +160,15 @@ export async function classifyOrbitLibraryRun(args: {
   continueInBackground?: boolean;
   pagesLeft?: number;
 }): Promise<OrbitLibraryClassifyResult> {
+  if (!isTypeSafeConfigured()) {
+    throw new OrbitScanError(
+      "Set TYPESAFE_API_KEY before tagging the library.",
+      503,
+      "typesafe_auth"
+    );
+  }
+
+  const vocabulary = await ensureLibraryVocabulary(args.userId);
   let cursor = args.cursor;
   let processed = 0;
   let applied = 0;
@@ -231,8 +176,6 @@ export async function classifyOrbitLibraryRun(args: {
   let remaining = 0;
   let queueCount: number | undefined;
   let lastCursor = cursor;
-  let warmPool: OrbitLabelPool | undefined;
-  let catalog: OrbitLibraryCatalog | undefined;
   let remainingEstimate: number | undefined;
   let pagesLeft = args.pagesLeft ?? ORBIT_LIBRARY_CLASSIFY_MAX_PAGES;
   const pagesToRun = Math.min(
@@ -240,18 +183,26 @@ export async function classifyOrbitLibraryRun(args: {
     Math.max(0, pagesLeft)
   );
 
+  if (vocabulary.length === 0) {
+    return {
+      processed: 0,
+      applied: 0,
+      skippedReview: 0,
+      remaining: 0,
+      continued: false,
+      queueCount: 0,
+      pagesLeft,
+    };
+  }
+
   for (let page = 0; page < pagesToRun; page += 1) {
-    const result = await classifyOrbitLibraryPage({
+    const result = await indexUntaggedLibraryPage({
       userId: args.userId,
       cursor,
-      continueInBackground: false,
+      vocabulary,
       pagesLeft: pagesLeft - 1,
-      warmPool,
-      catalog,
       remainingEstimate,
     });
-    warmPool = result.warmPool ?? warmPool;
-    catalog = result.catalog ?? catalog;
     remainingEstimate = result.remaining;
     processed += result.processed;
     applied += result.applied;
@@ -287,38 +238,26 @@ export async function classifyOrbitLibraryRun(args: {
   };
 }
 
-export async function classifyOrbitLibraryPage(args: {
+export async function indexUntaggedLibraryPage(args: {
   userId: string;
+  vocabulary: Array<{ name: string; color: string }>;
   cursor?: OrbitLibraryClassifyCursor;
-  continueInBackground?: boolean;
   pagesLeft?: number;
-  warmPool?: OrbitLabelPool;
-  catalog?: OrbitLibraryCatalog;
   remainingEstimate?: number;
-}): Promise<
-  OrbitLibraryClassifyResult & {
-    warmPool?: OrbitLabelPool;
-    catalog?: OrbitLibraryCatalog;
-  }
-> {
-  if (!isTypeSafeConfigured()) {
-    throw new OrbitScanError(
-      "Set TYPESAFE_API_KEY before classifying the Orbit library.",
-      503,
-      "typesafe_auth"
-    );
-  }
-
-  const [bookmarks, catalog, remainingAfterPage] = await Promise.all([
+}): Promise<OrbitLibraryClassifyResult> {
+  const [bookmarks, remainingAfterPage] = await Promise.all([
     prisma.bookmark.findMany({
       where: untaggedOrbitWhere(args.userId, args.cursor),
-      include: orbitScanBookmarkInclude,
+      select: {
+        id: true,
+        tweetText: true,
+        media: true,
+        xMetadata: true,
+        bookmarkedAt: true,
+      },
       orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
       take: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
     }),
-    args.catalog
-      ? Promise.resolve(args.catalog)
-      : loadOrbitLibraryCatalog(args.userId),
     args.remainingEstimate != null
       ? Promise.resolve(args.remainingEstimate)
       : prisma.bookmark.count({
@@ -333,71 +272,18 @@ export async function classifyOrbitLibraryPage(args: {
       skippedReview: 0,
       remaining: 0,
       continued: false,
-      queueCount: 0,
-      catalog,
+      queueCount: remainingAfterPage,
     };
   }
 
-  const bookmarksWithFolderHints = bookmarks.map(withOrbitFolderHints);
-  const existingTags = catalog.tags;
-  const existingCollections = catalog.collections;
-
-  const [authorPriorHints, learningHints, neighborHints] = await Promise.all([
-    getAuthorPriorHintsForScan(
-      args.userId,
-      bookmarksWithFolderHints.map((bookmark) => bookmark.authorUsername)
-    ),
-    getOrbitLearningHintsForScan({
-      userId: args.userId,
-      bookmarks: bookmarksWithFolderHints,
-    }),
-    getOrbitNeighborHintsForScan({
-      userId: args.userId,
-      bookmarks: bookmarksWithFolderHints,
-    }),
-  ]);
-
-  const seed = buildSeedOrbitLabelPool({
-    bookmarks: bookmarksWithFolderHints,
-    existingTags,
-    existingCollections,
-    authorPriorHints,
-    learningHints,
-    neighborHints,
+  const plan = await planLibraryAssignments({
+    bookmarks,
+    vocabulary: args.vocabulary,
   });
-  // Warm-pool names were applied on earlier pages of this run, so they are
-  // genuinely existing labels — merge without the proposed-name cap and prefer
-  // them in the first-pass shortlist.
-  const pool = args.warmPool
-    ? mergeOrbitLabelPool(seed, args.warmPool, { asProposed: false })
-    : seed;
-
-  const { assignments } = await assignAndRefineOrbitJev({
-    bookmarks: bookmarksWithFolderHints,
-    existingTags,
-    existingCollections,
-    pool,
-    authorPriorHints,
-    learningHints,
-    neighborHints,
-    firstPassBatchVocabulary: args.warmPool
-      ? batchVocabularyFromPool(args.warmPool)
-      : undefined,
-  });
-
-  const plan = normalizeOrbitScanPlan(jevAssignmentsToRawPlan(assignments), {
-    bookmarkIds: bookmarks.map((bookmark) => bookmark.id),
-    existingTags,
-    existingCollections,
-  });
-  const safePlan = filterSafeLibraryClassifyPlan(plan);
-  const skippedReview = plan.suggestions.length - safePlan.suggestions.length;
-
-  let appliedResult: OrbitApplyResult | null = null;
-  if (safePlan.suggestions.length > 0) {
-    appliedResult = await applyOrbitScanPlan({
+  if (plan.suggestions.length > 0) {
+    await applyOrbitScanPlan({
       userId: args.userId,
-      plan: safePlan,
+      plan,
       createCollections: false,
     });
     await invalidateUserResponseCache(args.userId);
@@ -413,44 +299,15 @@ export async function classifyOrbitLibraryPage(args: {
   };
   const remaining = Math.max(0, remainingAfterPage - bookmarks.length);
   const pagesLeft = args.pagesLeft ?? ORBIT_LIBRARY_CLASSIFY_MAX_PAGES - 1;
-  const continued = remaining > 0 && pagesLeft > 0;
-
-  if (args.continueInBackground && continued) {
-    await kickOrbitLibraryClassifyWorker({
-      userId: args.userId,
-      cursor,
-      pagesLeft: pagesLeft - 1,
-    });
-  }
 
   return {
     processed: bookmarks.length,
-    applied: safePlan.suggestions.length,
-    skippedReview,
+    applied: plan.suggestions.length,
+    skippedReview: bookmarks.length - plan.suggestions.length,
     remaining,
-    continued,
+    continued: remaining > 0 && pagesLeft > 0,
     queueCount: remainingAfterPage,
     cursor,
-    appliedResult,
-    catalog,
-    warmPool: mergeOrbitLabelPool(
-      args.warmPool ?? { tags: [], collections: [] },
-      labelPoolFromAppliedNames({
-        tags: safePlan.suggestions.flatMap((suggestion) =>
-          suggestion.tags.map((tag) => tag.name)
-        ),
-        collections: safePlan.suggestions.flatMap((suggestion) =>
-          suggestion.collection
-            ? [
-                {
-                  name: suggestion.collection.name,
-                  description: suggestion.collection.description,
-                },
-              ]
-            : []
-        ),
-      }),
-      { asProposed: false }
-    ),
+    pagesLeft,
   };
 }

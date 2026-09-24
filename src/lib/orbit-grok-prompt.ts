@@ -1,3 +1,4 @@
+import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import type { OrbitLearningHint, OrbitNeighborHint } from "@/lib/orbit-signal-extraction";
 import {
   rankCollectionsForOrbitPrompt,
@@ -128,7 +129,7 @@ export function buildOrbitPromptPayload(args: {
  * dynamic palette, existing vocabulary, and bookmarks.
  */
 export const ORBIT_STATIC_INSTRUCTIONS = {
-  goal: "For each bookmark, assign up to 3 tags and, only when it clearly fits, one collection home so the user can re-find the post by topic.",
+  goal: `For each bookmark, assign up to ${ORBIT_MAX_TAGS_PER_BOOKMARK} tags and, only when it clearly fits, one collection home so the user can re-find the post by topic.`,
 
   signalPriority: [
     "Read signals.primaryText first — it is the best available tweet text (note_tweet when present).",
@@ -167,7 +168,8 @@ export const ORBIT_STATIC_INSTRUCTIONS = {
     "Prefer abstention over weak tags. Only tag when tweet/quote/note/url context supports a specific topic.",
     "If you propose a collection, also include at least one tag for the same topic or content type.",
     "Pick new-tag colors from the palette. Use the same color for related new tags when reasonable.",
-    "Max 3 tags. No near-duplicates (LLM/LLMs, AI/Artificial Intelligence) unless both add recall value.",
+    `Max ${ORBIT_MAX_TAGS_PER_BOOKMARK} tags. No near-duplicates (LLM/LLMs, AI/Artificial Intelligence) unless both add recall value.`,
+    "When the bookmark media includes a video or GIF, include the tag Video.",
     "Prefer topic or content-type tags over stylistic or sentiment tags.",
     "Never use generic or source labels: General, Misc, Other, Interesting, Saved, Bookmark, Post, Tweet, X, Link, Article, Resource, domain names, or URL fragments. Thread only as an intentional content-type tag.",
     "Sparse bookmarks: at most one precise tag. If the topic is only guessed from a title or excerpt, use medium or low confidence.",

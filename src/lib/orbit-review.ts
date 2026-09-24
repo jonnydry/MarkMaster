@@ -7,6 +7,7 @@ import type {
   TagWithCount,
 } from "@/types";
 import type { AuthorDecisionHistory } from "@/lib/orbit-author-history";
+import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import type { SimilarCollectionItem, SimilarCollections } from "@/lib/orbit-similar-collections";
 
 const DEFAULT_REVIEW_TAG_COLORS = [
@@ -61,7 +62,7 @@ export function splitTagNames(value: string): string[] {
     deduped.set(key, name);
   }
 
-  return Array.from(deduped.values()).slice(0, 3);
+  return Array.from(deduped.values()).slice(0, ORBIT_MAX_TAGS_PER_BOOKMARK);
 }
 
 export function orbitReviewDecisionUsesTags(
@@ -326,7 +327,9 @@ export function getQuickSmartPatch(
 
   // History tag steering (conservative: no override of high-conf keep)
   if (hasStrongHistory && realHistory && realHistory.tags.length > 0) {
-    const topTags = realHistory.tags.slice(0, 3).join(", ");
+    const topTags = realHistory.tags
+      .slice(0, ORBIT_MAX_TAGS_PER_BOOKMARK)
+      .join(", ");
     const canSteerToTags =
       orbitReviewDecisionUsesTags(decision) || origConf !== "high";
     if (canSteerToTags) {
@@ -363,6 +366,20 @@ export function getQuickSmartPatch(
       if (!orbitReviewDecisionUsesCollection(decision)) {
         decision = orbitReviewDecisionUsesTags(decision) ? "tags_collection" : "collection";
       }
+    }
+  }
+
+  const videoTag = original.tags.find(
+    (tag) => tag.name.trim().toLowerCase() === "video"
+  );
+  if (videoTag) {
+    const names = splitTagNames(tagNames);
+    const rest = names.filter((name) => name.trim().toLowerCase() !== "video");
+    tagNames = splitTagNames([videoTag.name, ...rest].join(", ")).join(", ");
+    if (!orbitReviewDecisionUsesTags(decision)) {
+      decision = orbitReviewDecisionUsesCollection(decision)
+        ? "tags_collection"
+        : "tags";
     }
   }
 

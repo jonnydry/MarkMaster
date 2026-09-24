@@ -5,6 +5,7 @@ import type {
   OrbitScanConfidence,
   OrbitScanPlan,
 } from "@/types";
+import { isVideoFormatTag } from "@/lib/orbit-video-tag";
 
 /** Grok returns tri-state confidence only — surface qualitative labels, not fake percentages. */
 const CONFIDENCE_LABEL: Record<OrbitScanConfidence, string> = {
@@ -40,8 +41,9 @@ export function isSafeAutoApplySuggestion(
 ): boolean {
   if (suggestion.confidence !== "high") return false;
 
+  const topicalTags = suggestion.tags.filter((tag) => !isVideoFormatTag(tag));
   const hasReusableTag =
-    suggestion.tags.length > 0 && suggestion.tags.every((tag) => tag.reuseExisting);
+    topicalTags.length > 0 && topicalTags.every((tag) => tag.reuseExisting);
   const hasReusableCollection = Boolean(
     suggestion.collection && suggestion.collection.reuseExisting
   );
