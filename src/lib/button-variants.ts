@@ -11,19 +11,19 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
+        default: "bg-primary text-primary-foreground hover:bg-primary/88 active:bg-primary/80",
         highlight: cn(
           highlightActiveClass,
           highlightInteractiveClass,
           "border font-semibold [a]:hover:opacity-100"
         ),
         outline:
-          "border-hairline-strong bg-transparent hover:border-primary/35 hover:bg-accent-soft hover:text-foreground aria-expanded:border-primary/25 aria-expanded:bg-primary/10 aria-expanded:text-foreground",
+          "border-hairline-strong bg-transparent hover:bg-hover hover:text-foreground aria-expanded:bg-hover aria-expanded:text-foreground",
         secondary:
-          "border-hairline-soft bg-transparent text-secondary-foreground hover:border-primary/25 hover:bg-accent-soft aria-expanded:bg-accent-soft aria-expanded:text-accent-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground",
         ghost:
-          "hover:bg-accent-soft hover:text-foreground aria-expanded:bg-accent-soft aria-expanded:text-foreground",
-        ink: "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+          "hover:bg-hover hover:text-foreground aria-expanded:bg-hover aria-expanded:text-foreground",
+        ink: "bg-primary text-primary-foreground hover:bg-primary/88 active:bg-primary/80",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",

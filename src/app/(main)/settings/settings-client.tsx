@@ -8,14 +8,10 @@ import dynamic from "next/dynamic";
 import {
   Braces,
   Check,
-  Download,
-  Sun,
-  Moon,
   LogOut,
   BrainCircuit,
   KeyRound,
   ShieldCheck,
-  RefreshCw,
   Table2,
   type LucideIcon,
 } from "lucide-react";
@@ -99,21 +95,6 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     ],
   },
 ];
-
-function AppearanceModeIcon({
-  className,
-  "aria-hidden": ariaHidden,
-}: {
-  className?: string;
-  "aria-hidden"?: boolean | "true";
-}) {
-  return (
-    <span className="inline-flex" aria-hidden={ariaHidden}>
-      <Moon className={cn(className, "hidden dark:block")} />
-      <Sun className={cn(className, "dark:hidden")} />
-    </span>
-  );
-}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -299,17 +280,16 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="connection"
-                    icon={ShieldCheck}
                     title="Connection"
                     description="Read-only X access. Sync imports bookmarks — nothing is posted for you."
                   >
                     <ul className="space-y-1.5 text-xs text-muted-foreground">
                       <li className="flex items-start gap-2">
-                        <KeyRound className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                        <KeyRound className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                         Tokens are encrypted before storage.
                       </li>
                       <li className="flex items-start gap-2">
-                        <BrainCircuit className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                        <BrainCircuit className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                         Scan matches your existing tags first. Grok only fills gaps you approve.
                       </li>
                     </ul>
@@ -317,9 +297,8 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="sync"
-                    icon={RefreshCw}
                     title="Sync"
-                    description="Pull new bookmarks from X. Head sync is fast; optional folder scanning takes longer."
+                    description="Pull new bookmarks from X. A regular sync is quick; scanning X folders takes longer."
                   >
                     <div className="surface-inset px-4">
                       <SettingsRow
@@ -347,9 +326,8 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="orbit-grok"
-                    icon={BrainCircuit}
                     title="Orbit scanning"
-                    description="Scan queue matches your existing tags first and only invents names when needed. Sweep reviews 72 at once. Tag the whole library from Orbit."
+                    description="Orbit suggests tags from the ones you already use and only proposes new names when nothing fits. Nothing changes until you approve it."
                     badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
                   >
                     <OrbitGrokStatusPanel
@@ -362,7 +340,6 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="appearance"
-                    icon={AppearanceModeIcon}
                     title="Appearance"
                   >
                     <div className="surface-inset px-4">
@@ -400,7 +377,6 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="export"
-                    icon={Download}
                     title="Export"
                     description="Download bookmarks with tags and notes."
                   >
@@ -420,7 +396,6 @@ export default function SettingsPage() {
 
                   <SettingsSection
                     id="account"
-                    icon={LogOut}
                     title="Account"
                     tone="danger"
                   >
@@ -499,10 +474,10 @@ function TypographyPresetPicker({
             onClick={() => onChange(preset.id)}
             className={cn(
               "min-h-[6.25rem] rounded-sm border p-3 text-left font-sans transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               selected
                 ? highlightSurfaceActiveClass
-                : "border-hairline-soft bg-background/30 hover:border-primary/25 hover:bg-accent-soft/50"
+                : "border-hairline-soft bg-transparent hover:bg-hover"
             )}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -541,7 +516,7 @@ function TypographyPresetPicker({
               </span>
             </div>
 
-            <p className="font-label mt-2 truncate text-2xs font-medium uppercase text-primary">
+            <p className="font-label mt-2 truncate text-xs font-medium text-primary">
               {preset.bodyFace} / {preset.dataFace}
             </p>
           </button>
@@ -565,7 +540,7 @@ function ExportLink({
       href={href}
       className={cn(
         "inline-flex flex-1 items-center gap-2 rounded-sm border border-hairline-soft px-3 py-2.5 text-sm font-medium transition-colors",
-        "hover:border-primary/25 hover:bg-accent-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        "hover:border-primary/25 hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       )}
     >
       <Icon className="size-4 text-primary" aria-hidden />

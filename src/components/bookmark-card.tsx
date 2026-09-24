@@ -12,7 +12,6 @@ import {
   Maximize2,
   Minimize2,
   BadgeCheck} from "lucide-react";
-import { XLogoMark } from "@/components/brands/x-logo-mark";
 import {
   X_POST_METRIC_ICON_CLASS,
   XPostLikeIcon,
@@ -47,7 +46,6 @@ interface BookmarkCardProps {
   selectionMode?: boolean;
   onSelectionChange?: (bookmarkId: string, selected: boolean) => void;
   className?: string;
-  rank?: number;
   /** First above-the-fold card with media: set so the hero image is not lazy-loaded (LCP). */
   priorityMedia?: boolean;
   /** The card is the currently focused performance highlight (single-item triage view). */
@@ -57,37 +55,6 @@ interface BookmarkCardProps {
   onCompactExpandedChange?: (bookmarkId: string, expanded: boolean) => void;
   /** Opens the shared full bookmark overlay used by the grid view. */
   onOpenExpanded?: (bookmarkId: string) => void;
-}
-
-function BookmarkRank({
-  rank,
-  compact = false}: {
-  rank?: number;
-  compact?: boolean;
-
-}) {
-  if (typeof rank !== "number") return null;
-
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "tabular-nums text-muted-foreground/55",
-        "flex shrink-0 flex-col items-center",
-        compact ? "w-7 pt-0.5" : "w-8 pt-1"
-      )}
-    >
-      <span
-        className={cn(
-          "font-bold text-muted-foreground/55",
-          compact ? "text-xs leading-4" : "text-sm leading-4"
-        )}
-      >
-        {rank}
-      </span>
-      <span className="mt-1 h-1.5 w-1.5 rounded-[2px] bg-surface-2" />
-    </div>
-  );
 }
 
 export const BookmarkCard = memo(function BookmarkCard({
@@ -105,7 +72,6 @@ export const BookmarkCard = memo(function BookmarkCard({
   selectionMode = false,
   onSelectionChange,
   className,
-  rank,
   priorityMedia = false,
   isPerformanceHighlight = false,
   compactExpanded = false,
@@ -179,16 +145,16 @@ export const BookmarkCard = memo(function BookmarkCard({
   if (viewMode === "compact" && !compactExpanded) {
     return (
       <div
-        className={`flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:80px] hover:bg-accent-soft/40 ${
-          isInteractive ? "cursor-pointer" : ""
-        } ${
-          selected
-            ? "border-l-2 border-l-primary bg-primary/[0.04]"
-            : ""
-        }${className ? ` ${className}` : ""}`}
+        className={cn(
+          "flex items-start gap-3 border-b border-hairline-soft px-4 py-3 transition-colors duration-150 hover:bg-hover",
+          "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 aria-[current=true]:focus-visible:ring-0",
+          isInteractive && "cursor-pointer",
+          selected && "state-selected",
+          className
+        )}
         data-dashboard-bookmark-id={bookmark.id}
         tabIndex={isInteractive ? 0 : undefined}
-        aria-current={isInteractive && selected ? "true" : undefined}
+        aria-current={isInteractive && selected && !selectionMode ? "true" : undefined}
         aria-expanded={canExpandCompact ? false : undefined}
         aria-label={
           isInteractive
@@ -200,7 +166,6 @@ export const BookmarkCard = memo(function BookmarkCard({
         onClick={isInteractive ? handleCardClick : undefined}
         onKeyDown={handleCardKeyDown}
       >
-        <BookmarkRank rank={rank} compact  />
         {selectionMode && (
           <BookmarkCardSelectionToggle
             selected={selected}
@@ -226,15 +191,11 @@ export const BookmarkCard = memo(function BookmarkCard({
               {formatDistanceToNow(new Date(bookmark.tweetCreatedAt), {
                 addSuffix: true})}
             </span>
-            <XLogoMark
-              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              title="Post from X"
-            />
           </div>
           {isPerformanceHighlight && (
             <div
               className={
-                "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-2xs font-semibold uppercase tracking-[0.08em] text-primary"
+                "-mt-0.5 mb-1.5 inline-flex items-center gap-1 rounded-sm bg-primary/10 px-2 py-px text-xs font-semibold text-primary"
               }
             >
               Performance highlight • Top engagement unsorted
@@ -274,22 +235,17 @@ export const BookmarkCard = memo(function BookmarkCard({
 
   return (
     <div
-      className={`group border-b border-hairline-soft px-5 py-3.5 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:188px] hover:bg-accent-soft/40 ${
-        isInteractive ? "cursor-pointer" : ""
-      } ${
-        selected || isPerformanceHighlight
-          ? isPerformanceHighlight
-            ? "border-l-[3px] border-l-primary bg-primary/[0.06] ring-1 ring-inset ring-primary/20"
-            : "border-l-2 border-l-primary bg-primary/[0.04]"
-          : ""
-      } ${
-        compactExpanded
-          ? "bg-surface-1/80 ring-1 ring-inset ring-primary/15"
-          : ""
-      }${className ? ` ${className}` : ""}`}
+      className={cn(
+        "group border-b border-hairline-soft px-4 py-3 transition-colors duration-150 hover:bg-hover",
+        "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45 aria-[current=true]:focus-visible:ring-0",
+        isInteractive && "cursor-pointer",
+        compactExpanded && "bg-surface-1",
+        (selected || isPerformanceHighlight) && "state-selected",
+        className
+      )}
       data-dashboard-bookmark-id={bookmark.id}
       tabIndex={isInteractive ? 0 : undefined}
-      aria-current={isInteractive && selected ? "true" : undefined}
+      aria-current={isInteractive && selected && !selectionMode ? "true" : undefined}
       aria-expanded={canExpandCompact ? compactExpanded : undefined}
       aria-label={
         isInteractive
@@ -310,7 +266,6 @@ export const BookmarkCard = memo(function BookmarkCard({
       onKeyDown={isInteractive ? handleCardKeyDown : undefined}
     >
       <div className="flex gap-3">
-        <BookmarkRank rank={rank}  />
         {selectionMode && (
           <BookmarkCardSelectionToggle
             selected={selected}
@@ -339,9 +294,9 @@ export const BookmarkCard = memo(function BookmarkCard({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-x-2 gap-y-0.5 overflow-hidden">
-              <span className="font-semibold text-sm text-foreground truncate">
+          <div className="flex min-w-0 items-center gap-2 text-[15px] leading-5">
+            <div className="flex min-w-0 flex-1 items-center gap-x-1.5 gap-y-0.5 overflow-hidden">
+              <span className="truncate font-bold text-foreground">
                 {highlightedAuthorName}
               </span>
               {bookmark.authorVerified && (
@@ -359,13 +314,9 @@ export const BookmarkCard = memo(function BookmarkCard({
                   addSuffix: true})}
               </span>
             </div>
-            <XLogoMark
-              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              title="Post from X"
-            />
           </div>
 
-          <div className={cn("mt-2", FEED_POST_TEXT)}>
+          <div className={cn("mt-1", FEED_POST_TEXT)}>
             {highlightedText}
           </div>
 
@@ -425,7 +376,7 @@ export const BookmarkCard = memo(function BookmarkCard({
 
           <div
             data-bookmark-card-actions
-            className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft pt-2.5"
+            className="mt-2 -mb-1 flex items-center justify-between gap-3"
           >
             {metrics ? (
               <dl className="flex min-w-0 items-center gap-3 text-muted-foreground">
@@ -451,9 +402,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             <div
               className={cn(
                 "flex shrink-0 items-center gap-1 opacity-100 transition-opacity",
-                compactExpanded
-                  ? "sm:opacity-100"
-                  : "sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                "-mr-1.5"
               )}
             >
               {compactExpanded && canExpandCompact && (

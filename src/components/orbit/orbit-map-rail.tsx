@@ -26,8 +26,7 @@ import {
   orbitGhostButtonClass,
   orbitHairlineBorder,
   orbitLabelClass,
-  orbitMetaMuted,
-  orbitMetaSoft} from "@/lib/orbit-route-chrome";
+} from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import { TagDot } from "@/components/tag-dot";
@@ -61,7 +60,7 @@ interface OrbitMapRailProps {
 /** Shared panel surface for both rail and overlay variants, theme-aware. */
 function panelClass( isOverlay: boolean) {
   if (isOverlay) return "min-w-0 shrink-0";
-  return "min-w-0 shrink-0 surface-inset-strong p-4 backdrop-blur-sm dark:bg-white/[0.04]";
+  return "min-w-0 shrink-0 surface-inset-strong p-4";
 }
 
 function pluralize(count: number, singular: string, plural?: string) {
@@ -112,10 +111,10 @@ export function OrbitMapRail({
       className={cn(
         variant === "overlay" &&
           cn(
-            "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 animate-orbit-slide-in-right backdrop-blur-2xl [scrollbar-width:thin]",
+            "pointer-events-auto flex flex-col overflow-x-hidden overflow-y-auto rounded-sm border p-4 animate-orbit-slide-in-right [scrollbar-width:thin]",
             appOverlayPanelClassName,
             orbitHairlineBorder(),
-            "bg-surface-1/90"
+            "bg-popover"
           ),
         variant === "dock" &&
           "map-glass pointer-events-auto flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-sm p-4 animate-orbit-slide-in-right [scrollbar-width:thin]",
@@ -186,8 +185,8 @@ function SelectedClusterBody({
   onClearSelection,
   copyingCollectionId,
   isOverlay}: SelectedClusterBodyProps) {
-  const kicker = cn(orbitLabelClass(), orbitMetaSoft());
-  const bodyText = cn("min-w-0 break-words text-sm", orbitMetaMuted());
+  const kicker = cn(orbitLabelClass(), "text-muted-foreground");
+  const bodyText = cn("min-w-0 break-words text-sm", "text-muted-foreground");
 
   if (!node) {
     return (
@@ -205,12 +204,12 @@ function SelectedClusterBody({
     return (
       <div className="min-w-0 space-y-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+          <span className="mt-0.5 inline-flex shrink-0 text-primary">
             <OrbitLogoMark className="size-4" />
           </span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">Orbit index</p>
-            <p className={cn("text-xs", orbitMetaMuted())}>
+            <p className={cn("text-xs", "text-muted-foreground")}>
               Central anchor for loose bookmarks
             </p>
           </div>
@@ -228,7 +227,7 @@ function SelectedClusterBody({
           />
         </div>
         {stats.truncatedBookmarks > 0 && (
-          <p className={cn("text-xs", orbitMetaMuted())}>
+          <p className={cn("text-xs", "text-muted-foreground")}>
             Some loose bookmarks are hidden by the map cap.
           </p>
         )}
@@ -300,7 +299,7 @@ function SelectedClusterBody({
           />
         </div>
         {!selectedBookmarkId && (
-          <p className={cn("text-xs", orbitMetaMuted())}>
+          <p className={cn("text-xs", "text-muted-foreground")}>
             Select a bookmark on the map, or drag one onto this hub.
           </p>
         )}
@@ -327,7 +326,7 @@ function SelectedClusterBody({
     return (
       <div className="min-w-0 space-y-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary">
+          <span className="mt-0.5 inline-flex shrink-0 text-primary">
             <Icon className="size-4" />
           </span>
           <div className="min-w-0">
@@ -341,7 +340,7 @@ function SelectedClusterBody({
         </div>
         <p className={bodyText}>{pluralize(node.count, "bookmark")}</p>
         {actionState.readOnlyReason && (
-          <p className={cn("text-xs leading-5", orbitMetaMuted())}>
+          <p className={cn("text-xs leading-5", "text-muted-foreground")}>
             {actionState.readOnlyReason}
           </p>
         )}
@@ -398,7 +397,7 @@ function SelectedClusterBody({
           )}
         </div>
         {!selectedBookmarkId && !actionState.readOnlyReason && (
-          <p className={cn("text-xs", orbitMetaMuted())}>
+          <p className={cn("text-xs", "text-muted-foreground")}>
             Select a bookmark on the map, or drag one onto this hub.
           </p>
         )}
@@ -429,7 +428,7 @@ function SelectedClusterBody({
     return (
       <div className="min-w-0 space-y-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-primary/10 text-primary/80">
+          <span className="mt-0.5 inline-flex shrink-0 text-muted-foreground">
             <GrokMark className="size-4" title="Grok" />
           </span>
           <div className="min-w-0">
@@ -488,7 +487,7 @@ function SelectedClusterBody({
 
         {tagConnections.length > 0 || collectionConnections.length > 0 ? (
           <div className="min-w-0 space-y-2 overflow-x-hidden surface-veil p-3">
-            <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
+            <p className={cn(orbitLabelClass(), "text-muted-foreground")}>
               Relationships
             </p>
             {tagConnections.length > 0 && (
@@ -497,7 +496,7 @@ function SelectedClusterBody({
                   t.kind === "tag" ? (
                     <span
                       key={t.id}
-                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground/85"
+                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground"
                     >
                       <TagDot name={t.name} color={t.color} size={8} />
                       <span className="min-w-0 truncate">{t.name}</span>
@@ -512,7 +511,7 @@ function SelectedClusterBody({
                   c.kind === "collection" ? (
                     <span
                       key={c.id}
-                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground/85"
+                      className="inline-flex max-w-full min-w-0 items-center gap-1 surface-inset-strong px-2 py-1 text-xs text-foreground"
                     >
                       <Folder className="size-3 shrink-0 text-primary" />
                       <span className="min-w-0 truncate">{c.name}</span>
@@ -523,7 +522,7 @@ function SelectedClusterBody({
             )}
           </div>
         ) : (
-          <p className={cn("text-xs", orbitMetaSoft())}>
+          <p className={cn("text-xs", "text-muted-foreground")}>
             Not yet tagged or collected
           </p>
         )}
@@ -533,11 +532,11 @@ function SelectedClusterBody({
         ) : focusedBookmark ? (
           <div className="min-w-0 space-y-2 overflow-x-hidden surface-veil p-3">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
+              <p className={cn(orbitLabelClass(), "text-muted-foreground")}>
                 Evidence
               </p>
               {hasMedia && (
-                <span className={cn("text-2xs", orbitMetaSoft())}>
+                <span className={cn("text-xs", "text-muted-foreground")}>
                   Media attached
                 </span>
               )}
@@ -556,7 +555,7 @@ function SelectedClusterBody({
               className="min-w-0"
               textClassName={cn(
                 "min-w-0 break-words line-clamp-4 whitespace-pre-wrap text-sm leading-5",
-                orbitMetaMuted()
+                "text-muted-foreground"
               )}
               galleryClassName="!mt-2 min-w-0 w-full border-hairline-soft/70"
             />
@@ -584,7 +583,7 @@ function ClearSelectionControl({ onClear }: { onClear: () => void }) {
       type="button"
       className={cn(
         "text-xs underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
-        orbitMetaSoft(),
+        "text-muted-foreground",
         "hover:text-foreground"
       )}
       onClick={onClear}
@@ -622,8 +621,8 @@ function BookmarkInspectorStatus({
     "min-w-0 overflow-hidden surface-veil px-2 py-2";
   const labelClass = cn(
     orbitLabelClass(),
-    orbitMetaSoft(),
-    "truncate tracking-[0.14em]"
+    "text-muted-foreground",
+    "truncate"
   );
 
   return (
@@ -679,7 +678,7 @@ function ConnectedList({
 
   return (
     <div className="min-w-0 space-y-2 pt-1">
-      <p className={cn(orbitLabelClass(), orbitMetaMuted())}>
+      <p className={cn(orbitLabelClass(), "text-muted-foreground")}>
         {title} ·{" "}
         {visible.length < bookmarks.length
           ? `${visible.length} of ${bookmarks.length}`
@@ -699,7 +698,7 @@ function ConnectedList({
                 <button
                   type="button"
                   onClick={() => onOpenBookmark(b.id)}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                 >
                   <span
                     className={cn(
@@ -719,7 +718,7 @@ function ConnectedList({
             onClick={() =>
               setVisibleCount((count) => count + CONNECTED_LIST_PAGE)
             }
-            className="flex w-full items-center justify-center border-t border-hairline-soft px-2 py-1.5 text-2xs font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+            className="flex w-full items-center justify-center border-t border-hairline-soft px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
           >
             Show {Math.min(CONNECTED_LIST_PAGE, remaining)} more
           </button>
@@ -738,7 +737,7 @@ function RailMetric({
 }) {
   return (
     <div className="min-w-0 overflow-hidden surface-veil p-3">
-      <p className={cn(orbitLabelClass(), orbitMetaSoft(), "truncate")}>
+      <p className={cn(orbitLabelClass(), "text-muted-foreground", "truncate")}>
         {label}
       </p>
       <p className="mt-1 truncate text-lg font-semibold tracking-tight text-foreground">

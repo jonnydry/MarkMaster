@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Hash } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { HighlightProgress } from "@/components/highlight-progress";
 import type { AnalyticsData } from "@/types";
@@ -34,7 +34,6 @@ export const TagRankCard = React.memo(function TagRankCard({
     <ChartShell variant={variant}>
       <SectionHeading
         title="Most used tags"
-        icon={<Hash className="h-4 w-4" />}
         meta={tags.length > 0 ? `${tags.length} tags` : undefined}
         variant={variant}
       />

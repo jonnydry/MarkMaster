@@ -24,7 +24,7 @@ export function PageHeaderCompactToggle({ className }: PageHeaderCompactTogglePr
       aria-label={compact ? "Use expanded header" : "Use compact header"}
       title={compact ? "Expanded header" : "Compact header"}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-sm border text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        "inline-flex shrink-0 items-center justify-center rounded-sm border border-transparent text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         appToolbarControlCompactClassName,
         appToolbarSurfaceClassName,
         className

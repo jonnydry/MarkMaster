@@ -136,7 +136,7 @@ export function MobileSidebar({
             id={panelId}
             className={cn(
               appFixedViewportClassName,
-              "fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border bg-sidebar/95 backdrop-blur-xl transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden dark:bg-sidebar/80",
+              "fixed left-0 top-0 z-50 w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-out motion-reduce:transition-none md:hidden",
               open ? "translate-x-0" : "-translate-x-full"
             )}
             role="dialog"

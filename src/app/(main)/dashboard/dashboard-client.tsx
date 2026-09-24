@@ -23,10 +23,8 @@ import {
   appDashboardRailMediaQuery,
 } from "@/lib/app-layout";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
-import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
-import { PageWatermark } from "@/components/page-watermark";
 import { BookmarkList } from "./bookmark-list";
 import { DashboardSkeleton } from "./dashboard-skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -189,13 +187,14 @@ function DashboardContent() {
   const railOpen = !railCollapsed;
   // Rail is only mounted (and its authors query only fires) when actually visible.
   const railVisible = railOpen && isWideViewport;
+  const resultsUpdating =
+    (isFetching || filters.isSearchPending) && !isLoading;
   const workspaceBookmark = activeBookmark ?? bookmarks[0] ?? null;
   const workspaceBookmarkId = workspaceBookmark?.id ?? null;
 
   return (
     <>
     <AppPageShell
-      watermark={<PageWatermark variant="markmaster" />}
       sidebar={
         <Sidebar
           tags={tags}
@@ -279,14 +278,14 @@ function DashboardContent() {
                   onToggleRail={() => setRailCollapsed(!railCollapsed)}
                 />
 
-                {(isFetching || filters.isSearchPending) && !isLoading && (
-                  <p
-                    role="status"
-                    className="animate-slide-down-fade px-4 pb-1.5 text-xs text-muted-foreground sm:px-5"
-                  >
-                    Updating results...
-                  </p>
-                )}
+                {/* Refresh indicator paints over the header's bottom edge (absolute,
+                    no layout) so --app-header-height never churns mid-scroll. */}
+                <p role="status" aria-live="polite" className="sr-only">
+                  {resultsUpdating ? "Updating results…" : ""}
+                </p>
+                {resultsUpdating ? (
+                  <ScrollingProgressBar className="top-auto bottom-0 z-10 h-0.5 bg-transparent" />
+                ) : null}
                 {selectionMode && (
                   <SelectionToolbar
                     selectedCount={visibleSelectedBookmarkIds.length}
@@ -297,14 +296,6 @@ function DashboardContent() {
                     onHide={handleBulkHide}
                   />
                 )}
-                {libraryDataUnavailable && !isError ? (
-                  <p
-                    role="status"
-                    className="px-4 pb-1.5 text-xs text-muted-foreground sm:px-5"
-                  >
-                    Some library details are temporarily unavailable.
-                  </p>
-                ) : null}
                 {showFilters && (
                   <div id="dashboard-filter-panel" className="animate-slide-down-fade">
                     <FilterPanel
@@ -335,6 +326,17 @@ function DashboardContent() {
             )}
           >
             <div className="min-w-0 flex-1">
+          {libraryDataUnavailable && !isError ? (
+            <p
+              role="status"
+              className={cn(
+                "border-b border-hairline-soft px-4 py-2 text-xs text-muted-foreground sm:px-5",
+                bookmarkFeedColumnClassName
+              )}
+            >
+              Some library details are temporarily unavailable.
+            </p>
+          ) : null}
           {!isError && viewMode !== "grid" && (
             <DashboardDiscovery
               feedReady={feedReady}
@@ -362,12 +364,12 @@ function DashboardContent() {
                 layout="panel"
                 icon={Bookmark}
                 title={
-                  filters.search || filters.hasActiveFilters ? "No matches" : "Nothing in Orbit"
+                  filters.search || filters.hasActiveFilters ? "No matches" : "No bookmarks yet"
                 }
                 description={
                   filters.search || filters.hasActiveFilters
                     ? "Try a different search or adjust the filters."
-                    : "Library ready. Highlights will surface the next standouts for Orbit review."
+                    : "Sync your X bookmarks to start building your library."
                 }
                 action={
                   filters.search || filters.hasActiveFilters ? (
@@ -390,25 +392,28 @@ function DashboardContent() {
           ) : (
             <>
               {performanceFocusedId && (
-                <div className={cn("animate-slide-down-fade pb-2", bookmarkFeedColumnClassName)}>
-                  <div className={cn("flex flex-wrap items-center gap-2 rounded-sm border px-3 py-1.5 text-sm", highlightActiveClass)}>
-                    <span className="text-2xs font-bold uppercase tracking-[0.08em] text-primary">
-                      Performance Highlight
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      Focused for quick tagging &amp; categorization
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBookmarkId("");
-                        setActiveBookmarkId(null);
-                      }}
-                      className="ml-auto rounded-sm border border-transparent px-2 py-0.5 text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
-                    >
-                      Exit focus
-                    </button>
-                  </div>
+                <div
+                  className={cn(
+                    "flex items-center gap-2 border-b border-hairline-soft px-4 py-2 text-sm sm:px-5",
+                    bookmarkFeedColumnClassName
+                  )}
+                >
+                  <span className="text-xs font-semibold text-foreground">
+                    Performance highlight
+                  </span>
+                  <span className="min-w-0 truncate text-xs text-muted-foreground">
+                    Focused for quick tagging
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookmarkId("");
+                      setActiveBookmarkId(null);
+                    }}
+                    className="ml-auto shrink-0 rounded-sm border border-transparent px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                  >
+                    Exit focus
+                  </button>
                 </div>
               )}
 
@@ -588,10 +593,10 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        // Match the data-loading skeleton (default view mode is "grid") so the
+        // Match the data-loading skeleton (default view mode is "feed") so the
         // first paint doesn't pop from a bare spinner to skeleton rows.
         <AppPageCenter className="items-stretch justify-start overflow-hidden">
-          <DashboardSkeleton viewMode="grid" />
+          <DashboardSkeleton viewMode="feed" />
         </AppPageCenter>
       }
     >

@@ -88,9 +88,9 @@ export function OrbitGrokStatusPanel({
   return (
     <div className="space-y-3">
       {status.issues.length > 0 ? (
-        <div className="rounded-sm border border-amber-500/25 bg-amber-500/10 px-3 py-2.5">
+        <div className="rounded-sm border border-warning/25 bg-warning/10 px-3 py-2.5">
           <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-800 dark:text-amber-100" />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="space-y-2">
               {status.issues.map((issue) => (
                 <div key={issue.code}>
@@ -126,7 +126,7 @@ export function OrbitGrokStatusPanel({
           size="sm"
           headingFont={false}
           tabularNums={false}
-          className={cn(!status.apiKeyConfigured && "text-amber-800 dark:text-amber-100")}
+          className={cn(!status.apiKeyConfigured && "text-warning")}
           valueClassName="break-words text-foreground"
           label="xAI key"
           value={status.apiKeyConfigured ? "Configured" : "Missing"}
@@ -136,7 +136,7 @@ export function OrbitGrokStatusPanel({
           headingFont={false}
           tabularNums={false}
           className={cn(
-            !status.typesafe.apiKeyConfigured && "text-amber-800 dark:text-amber-100"
+            !status.typesafe.apiKeyConfigured && "text-warning"
           )}
           valueClassName="break-words text-foreground"
           label="TypeSafe key"

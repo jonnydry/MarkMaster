@@ -70,7 +70,7 @@ export function ViewModeControls({
               compact ? "size-7 px-0" : "h-8 px-2.5",
               selected
                 ? cn(highlightActiveClass, "border")
-                : cn(highlightIdleClass, "hover:border-hairline-soft")
+                : highlightIdleClass
             )}
             title={`${label} view`}
             onClick={() => onViewModeChange(value)}

@@ -106,7 +106,7 @@ export function HighlightScrollStrip({
               />
             ))}
           </div>
-          <span className="text-2xs tabular-nums text-muted-foreground/70">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {activeIndex + 1} / {itemCount}
           </span>
         </div>

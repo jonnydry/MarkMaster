@@ -12,11 +12,10 @@ export const MONO_DISPLAY = "text-mono-display";
 export const MONO_SECTION_LABEL =
   "text-mono-label text-primary/60 tracking-[0.14em] mb-1.5";
 
-export const SANS_LABEL =
-  "text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground";
+export const SANS_LABEL = "text-xs font-medium text-muted-foreground";
 export const SANS_DATA = "tabular-nums text-foreground";
 export const SANS_SECTION_LABEL =
-  "text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5";
+  "text-[13px] font-semibold text-muted-foreground mb-1.5";
 
 export type FontMode = TypographyPresetId;
 
@@ -63,6 +62,6 @@ export const MONO_BODY_STRONG =
 export const SANS_BODY_STRONG = "text-[15px] font-medium";
 
 /** Post-text presets for bookmark cards — one source of truth across view modes. */
-export const FEED_POST_TEXT = "text-[15px] leading-7 text-foreground whitespace-pre-wrap";
+export const FEED_POST_TEXT = "text-[15px] leading-6 text-foreground whitespace-pre-wrap";
 export const GRID_POST_TEXT_MEDIA = "text-sm leading-5 text-foreground";
 export const GRID_POST_TEXT_ONLY = "text-[15px] font-medium leading-6 text-foreground";

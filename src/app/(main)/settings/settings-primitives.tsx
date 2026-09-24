@@ -78,8 +78,8 @@ export function SettingsNav({
             className={cn(
               "block rounded-sm px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               active
-                ? cn(highlightActiveClass, "text-foreground font-medium")
-                : "text-muted-foreground hover:bg-accent-soft/70 hover:text-foreground"
+                ? "menu-selection-active font-medium text-foreground"
+                : "text-muted-foreground hover:bg-hover hover:text-foreground"
             )}
           >
             {label}
@@ -119,8 +119,8 @@ export function SettingsMobileNav({
             className={cn(
               "inline-flex h-8 shrink-0 items-center rounded-sm border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               active
-                ? "border-primary/30 bg-primary/10 text-foreground"
-                : "border-hairline-soft text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+                ? cn(highlightActiveClass, "border")
+                : "border-hairline-soft text-muted-foreground hover:bg-hover hover:text-foreground"
             )}
           >
             {label}
@@ -179,7 +179,7 @@ export function SettingsHero({
         </p>
         <p className="truncate text-sm text-muted-foreground">
           {user?.username ? `@${user.username}` : "Connect X to sync bookmarks"}
-          <span className="text-muted-foreground/60"> · </span>
+          <span aria-hidden="true"> · </span>
           {lastSyncLabel}
         </p>
       </div>
@@ -193,7 +193,6 @@ export function SettingsHero({
 
 export function SettingsSection({
   id,
-  icon: Icon,
   title,
   description,
   badge,
@@ -203,6 +202,7 @@ export function SettingsSection({
   tone = "default",
 }: {
   id: string;
+  /** @deprecated Section headers no longer render icons; kept for call-site compatibility. */
   icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
   title: string;
   description?: string;
@@ -220,15 +220,6 @@ export function SettingsSection({
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            {Icon ? (
-              <Icon
-                className={cn(
-                  "size-4 shrink-0",
-                  tone === "danger" ? "text-destructive" : "text-muted-foreground"
-                )}
-                aria-hidden
-              />
-            ) : null}
             <h2
               className={cn(
                 "text-sm font-semibold heading-font",
@@ -323,7 +314,7 @@ export function OrbitReadyBadge({
       tone={ready ? "success" : "warning"}
       dot={
         <span
-          className={cn("size-1.5 rounded-full", ready ? "bg-emerald-500" : "bg-amber-500")}
+          className={cn("size-1.5 rounded-full", ready ? "bg-success" : "bg-warning")}
           aria-hidden
         />
       }

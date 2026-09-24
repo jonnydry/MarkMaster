@@ -48,10 +48,10 @@ export function PaginationControls({
           disabled={page <= 1}
           aria-label="Previous page"
           className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
+            "inline-flex h-8 w-8 items-center justify-center rounded-sm border text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "bg-transparent hover:border-primary/30 hover:bg-accent-soft"
-              : "bg-surface-1 hover:bg-surface-2 hover:border-primary/30"
+              ? "border-hairline-soft bg-transparent hover:bg-hover"
+              : "border-hairline-soft bg-surface-1 hover:bg-hover"
           )}
         >
           <ChevronLeft className="size-4" aria-hidden />
@@ -68,7 +68,7 @@ export function PaginationControls({
             <>
               <span className="sr-only">Page </span>
               {page}{" "}
-              <span className="text-muted-foreground/50" aria-hidden>
+              <span className="text-muted-foreground" aria-hidden>
                 of
               </span>{" "}
               <span className="sr-only">of</span> {totalPages}
@@ -88,10 +88,10 @@ export function PaginationControls({
           disabled={page >= totalPages}
           aria-label="Next page"
           className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-sm border border-hairline-soft text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
+            "inline-flex h-8 w-8 items-center justify-center rounded-sm border text-foreground transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30",
             isLibrary
-              ? "bg-transparent hover:border-primary/30 hover:bg-accent-soft"
-              : "bg-surface-1 hover:bg-surface-2 hover:border-primary/30"
+              ? "border-hairline-soft bg-transparent hover:bg-hover"
+              : "border-hairline-soft bg-surface-1 hover:bg-hover"
           )}
         >
           <ChevronRight className="size-4" aria-hidden />

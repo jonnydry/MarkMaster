@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Layers } from "lucide-react";
 
 import type { AnalyticsData } from "@/types";
 import { SimpleBarChart } from "@/components/charts/simple-bar-chart";
@@ -57,7 +56,6 @@ export const ContentMixCard = React.memo(function ContentMixCard({
     <ChartShell variant={variant}>
       <SectionHeading
         title="Content mix"
-        icon={<Layers className="h-4 w-4" />}
         meta={total > 0 ? `${total.toLocaleString()} bookmarks` : undefined}
         variant={variant}
       />

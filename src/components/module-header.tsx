@@ -36,7 +36,7 @@ export function ModuleHeader({
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <div
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-primary/15 bg-primary/10 text-primary",
+            "flex h-5 shrink-0 items-center text-muted-foreground",
             iconClassName
           )}
         >
@@ -58,7 +58,7 @@ export function ModuleHeader({
               {description}
             </p>
           ) : null}
-          {meta ? <p className="mt-1 text-2xs text-muted-foreground/70">{meta}</p> : null}
+          {meta ? <p className="mt-1 text-xs text-muted-foreground">{meta}</p> : null}
         </div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}

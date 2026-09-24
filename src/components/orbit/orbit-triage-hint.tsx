@@ -6,7 +6,7 @@ import { Sparkles, X } from "lucide-react";
 import {
   dismissOrbitTriageHint,
   isOrbitTriageHintDismissed} from "@/lib/orbit-triage-hint";
-import { orbitMetaMuted } from "@/lib/orbit-route-chrome";
+
 import { cn } from "@/lib/utils";
 
 const TRIAGE_HINT_CHANGE_EVENT = "markmaster-orbit-triage-hint-change";
@@ -32,17 +32,17 @@ export function OrbitTriageHint({ className }: { className?: string }) {
 
   if (dismissed) return null;
 
-  const strong = "font-medium text-foreground/85 dark:text-white/85";
+  const strong = "font-medium text-foreground";
 
   return (
     <div
       className={cn(
         "animate-slide-down-fade flex items-center gap-2 surface-inset px-3 py-2 text-xs leading-relaxed",
-        orbitMetaMuted(),
+        "text-muted-foreground",
         className
       )}
     >
-      <Sparkles className="size-3.5 shrink-0 text-primary/70" aria-hidden />
+      <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <p className="min-w-0 flex-1">
         <span className={strong}>Scan</span>, then{" "}
         <span className={strong}>Accept</span> ·{" "}
@@ -59,7 +59,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
         }}
         className={cn(
           "shrink-0 rounded-sm border border-transparent p-0.5",
-          "text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 dark:text-white/40 dark:hover:text-white/70"
+          "text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
         aria-label="Dismiss triage tips"
       >

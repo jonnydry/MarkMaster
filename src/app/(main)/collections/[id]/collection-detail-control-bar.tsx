@@ -31,7 +31,7 @@ export function CollectionDetailControlBar({
   onSortChange: (value: CollectionDetailSort) => void;
 }) {
   return (
-    <div className="my-3 surface-veil p-3">
+    <div className="mb-3 border-b border-hairline-soft py-3">
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <ToolbarSearchField
           value={search}
@@ -55,7 +55,7 @@ export function CollectionDetailControlBar({
           ) : null}
         </div>
       </div>
-      <p className="mt-2 flex items-center gap-1.5 text-2xs text-muted-foreground">
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         {sort === "oldest" ? (
           <>
             <RotateCcw className="size-3" aria-hidden="true" />
@@ -64,7 +64,7 @@ export function CollectionDetailControlBar({
         ) : sort === "newest" ? (
           "Most recently saved bookmarks are first."
         ) : (
-          "Custom order is active; move controls remain available."
+          "Your custom order. Use the arrows on each bookmark to move it."
         )}
       </p>
     </div>

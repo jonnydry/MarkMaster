@@ -61,7 +61,7 @@ export function SelectionToolbar({
           onClick={onAddToCollection}
         >
           <FolderPlus className="size-4" />
-          Add to Collection
+          Add to collection
         </Button>
         <Button
           variant="destructive"

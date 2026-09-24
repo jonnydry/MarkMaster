@@ -8,7 +8,7 @@ import { orbital } from "@/components/orbital";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { OrbitScanFailure } from "@/hooks/use-orbit-scan";
 import { getScanFailurePresentation } from "@/lib/orbit-scan-presentation";
-import { orbitMetaMuted } from "@/lib/orbit-route-chrome";
+
 import { cn } from "@/lib/utils";
 
 export function OrbitScanFailureNotice({
@@ -40,15 +40,13 @@ export function OrbitScanFailureNotice({
       )}
     >
       <div className="flex min-w-0 gap-3">
-        <div className="surface-inset-strong mt-0.5 flex size-8 shrink-0 items-center justify-center">
-          <Icon className={cn("size-4", presentation.iconClassName)} />
-        </div>
+        <Icon className={cn("mt-0.5 size-4 shrink-0", presentation.iconClassName)} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
                 orbital.label,
-                "inline-flex items-center rounded-sm border px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.14em]",
+                "inline-flex items-center rounded-sm border px-2 py-0.5 text-xs font-medium",
                 presentation.badgeClassName
               )}
             >
@@ -61,7 +59,7 @@ export function OrbitScanFailureNotice({
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {error.message}
           </p>
-          <p className={cn("mt-1 text-xs leading-5", orbitMetaMuted())}>
+          <p className={cn("mt-1 text-xs leading-5", "text-muted-foreground")}>
             {presentation.helper}
           </p>
         </div>
@@ -72,7 +70,7 @@ export function OrbitScanFailureNotice({
           type="button"
           size="sm"
           variant="outline"
-          className="surface-inset-strong h-9 text-foreground hover:bg-accent-soft"
+          className="surface-inset-strong h-9 text-foreground hover:bg-hover"
           disabled={scanning || retryTargetCount === 0}
           onClick={onRetry}
         >
@@ -89,7 +87,7 @@ export function OrbitScanFailureNotice({
             href={error.recoveryHref}
             className={cn(
               buttonVariants({ size: "sm", variant: "outline" }),
-              "surface-inset-strong h-9 text-foreground hover:bg-accent-soft"
+              "surface-inset-strong h-9 text-foreground hover:bg-hover"
             )}
           >
             <Settings2 className="size-3.5" />

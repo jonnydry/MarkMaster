@@ -186,7 +186,7 @@ function SearchResultButton({
         "flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
         active
           ? "bg-accent-soft text-foreground"
-          : "text-foreground/85 hover:bg-accent-soft hover:text-foreground"
+          : "text-foreground/85 hover:bg-hover hover:text-foreground"
       )}
     >
       {node.kind === "tag" && (
@@ -223,7 +223,7 @@ function SearchResultButton({
 
 function ResultKindLabel({ children }: { children: string }) {
   return (
-    <span className="ml-auto text-2xs uppercase tracking-wider text-muted-foreground/70">
+    <span className="ml-auto text-xs text-muted-foreground">
       {children}
     </span>
   );

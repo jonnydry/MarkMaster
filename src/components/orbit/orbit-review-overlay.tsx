@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   FolderInput,
-  ListChecks,
   Loader2,
   RotateCcw,
   Sparkles,
@@ -70,7 +69,7 @@ export function OrbitReviewOverlay({
 }: OrbitReviewOverlayProps) {
   const { open, onOpenChange } = sessionArgs;
   const session = useOrbitReviewSession(sessionArgs);
-  const [batchOpen, setBatchOpen] = useState(true);
+  const [batchOpen, setBatchOpen] = useState(false);
   const t = useTypography();
 
   const {
@@ -121,10 +120,8 @@ export function OrbitReviewOverlay({
         {completion ? (
           <div className="flex min-h-0 flex-1 items-center justify-center p-5 sm:p-8">
             <div className="w-full max-w-xl surface-solid p-5 text-center sm:p-7">
-              <span className="mx-auto flex size-12 items-center justify-center rounded-full border border-success/25 bg-success/10 text-success">
-                <CheckCircle2 className="size-6" aria-hidden="true" />
-              </span>
-              <p className="mt-4 text-2xs font-semibold uppercase tracking-[0.14em] text-primary">
+              <CheckCircle2 className="mx-auto size-8 text-success" aria-hidden="true" />
+              <p className="mt-4 text-xs font-semibold text-primary">
                 Orbit review
               </p>
               <h2 className="mt-1 heading-font text-2xl font-bold text-foreground">
@@ -136,7 +133,7 @@ export function OrbitReviewOverlay({
                 and the next resurfacing mix can use these decisions.
               </p>
 
-              <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <dl className="mt-5 grid grid-cols-2 gap-y-4 border-y border-hairline-soft py-4 sm:grid-cols-4">
                 <CompletionMetric label="Reviewed" value={completion.reviewedCount} />
                 <CompletionMetric label="Tag assignments" value={completion.tagAssignments} />
                 <CompletionMetric
@@ -169,7 +166,7 @@ export function OrbitReviewOverlay({
                 <Link
                   href="/collections"
                   onClick={() => onOpenChange(false)}
-                  className={buttonVariants({ variant: "highlight" })}
+                  className={buttonVariants({ variant: "default" })}
                 >
                   See improved collections
                 </Link>
@@ -191,20 +188,20 @@ export function OrbitReviewOverlay({
                   closeLabel="Close review"
                   badges={
                     <>
-                      <span className={cn("inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/[0.08] px-2 py-0.5", t.label, "font-semibold text-primary")}>
+                      <span className={cn("inline-flex items-center gap-1.5", t.label, "font-semibold text-primary")}>
                         <OrbitLogoMark className="size-3" aria-hidden="true" />
                         {title}
                       </span>
-                      <span className="font-mono text-2xs tabular-nums text-muted-foreground">
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
                         {activePositionLabel}
                       </span>
                       {activeOriginal?.confidence ? (
-                        <span className={cn("rounded-sm border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5", t.label, "text-emerald-500")}>
+                        <span className={cn("rounded-sm bg-success/10 px-1.5 py-0.5", t.label, "text-success")}>
                           {confidenceLabel(activeOriginal.confidence)}
                         </span>
                       ) : null}
                       {activeHasChanges ? (
-                        <span className="text-2xs text-amber-500">Edited</span>
+                        <span className="text-xs text-warning">Edited</span>
                       ) : null}
                     </>
                   }
@@ -213,63 +210,36 @@ export function OrbitReviewOverlay({
             />
 
             {/* Review sidebar */}
-            <aside className="flex min-h-0 flex-col border-t border-hairline-soft bg-surface-2/45 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
+            <aside className="flex min-h-0 flex-col border-t border-hairline-soft lg:border-l lg:border-t-0">
               <div className="scrollbar-native min-h-0 flex-1 overflow-y-auto px-4 py-4">
                 {/* Collapsed batch summary */}
                 {plan && effectiveDrafts.length > 1 ? (
-                  <div className="mb-4 surface-veil">
+                  <div className="-mx-4 -mt-4 mb-4 border-b border-hairline-soft">
                     <button
                       type="button"
                       onClick={() => setBatchOpen((v) => !v)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-hover"
                       aria-expanded={batchOpen}
                     >
                       {batchOpen ? (
-                        <ChevronDown className="size-3.5 shrink-0 text-primary/70" />
+                        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="size-3.5 shrink-0 text-primary/70" />
+                        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
                       )}
-                      <ListChecks className="size-3.5 shrink-0 text-primary/70" />
-                      <span className={cn(t.label, "font-semibold")}>
+                      <span className={cn(t.label, "font-semibold text-foreground")}>
                         Batch
                       </span>
-                      <span className="ml-auto font-mono text-2xs tabular-nums text-muted-foreground">
+                      <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
+                        {plan.summary.bookmarkCount} suggested ·{" "}
                         {plan.summary.bookmarksWithTags} tagged ·{" "}
                         {plan.summary.bookmarksWithCollections} collected
                       </span>
                     </button>
                     {batchOpen ? (
-                      <div className="border-t border-hairline-soft px-3 pb-3 pt-2">
-                        <div className="grid grid-cols-3 gap-1.5 text-center">
-                          <div className="surface-inset px-1 py-1.5">
-                            <div className="text-sm font-semibold text-foreground">
-                              {plan.summary.bookmarkCount}
-                            </div>
-                            <div className={t.label}>
-                              suggested
-                            </div>
-                          </div>
-                          <div className="surface-inset px-1 py-1.5">
-                            <div className="text-sm font-semibold text-foreground">
-                              {plan.summary.bookmarksWithTags}
-                            </div>
-                            <div className={t.label}>
-                              tagged
-                            </div>
-                          </div>
-                          <div className="surface-inset px-1 py-1.5">
-                            <div className="text-sm font-semibold text-foreground">
-                              {plan.summary.bookmarksWithCollections}
-                            </div>
-                            <div className={t.label}>
-                              collected
-                            </div>
-                          </div>
-                        </div>
+                      <div className="px-4 pb-3">
                         <OrbitReviewBatchImpactChips
                           tagNames={batchImpactSummary.tagNames}
                           collectionNames={batchImpactSummary.collectionNames}
-                          className="mt-2"
                         />
                       </div>
                     ) : null}
@@ -310,9 +280,9 @@ export function OrbitReviewOverlay({
                 </div>
 
                 {/* Orbit suggestion */}
-                <div className="rounded-sm border border-primary/20 bg-primary/[0.07] p-3">
-                  <div className={cn("flex items-center gap-2", t.label, "font-semibold text-primary/80")}>
-                    <OrbitLogoMark className="size-3.5" />
+                <div className="surface-inset p-3">
+                  <div className={cn("flex items-center gap-2", t.label, "font-semibold text-foreground")}>
+                    <OrbitLogoMark className="size-3.5 text-primary" />
                     Orbit suggestion
                   </div>
                   {activeOriginal?.reasoning ? (
@@ -325,7 +295,7 @@ export function OrbitReviewOverlay({
                     decision={activeDraft.decision}
                     className="mt-3"
                   />
-                  <div className="mt-3 surface-inset px-2.5 py-2">
+                  <div className="mt-3 border-t border-hairline-soft pt-2">
                     <OrbitReviewDraftImpactLine
                       tagNames={activeDraftImpact?.tagNames ?? []}
                       collectionName={activeDraftImpact?.collectionName ?? null}
@@ -431,8 +401,8 @@ export function OrbitReviewOverlay({
                     <div className={cn("mb-2", t.label, "font-semibold")}>
                       Queue
                     </div>
-                    <div className="scrollbar-native max-h-36 overflow-y-auto">
-                      <div className="space-y-1.5 pr-2">
+                    <div className="scrollbar-native max-h-36 overflow-y-auto border-t border-hairline-soft">
+                      <div>
                         {effectiveDrafts.map((draft, index) => {
                           const bookmark =
                             sessionArgs.bookmarks.find(
@@ -448,10 +418,8 @@ export function OrbitReviewOverlay({
                               type="button"
                               onClick={() => selectDraft(draft.bookmarkId)}
                               className={cn(
-                                "w-full rounded-sm border p-2 text-left transition-colors",
-                                selected
-                                  ? "border-primary/45 bg-primary/10"
-                                  : "border-hairline-soft bg-surface-1/55 hover:border-primary/25"
+                                "w-full border-b border-hairline-soft px-2 py-2 text-left transition-colors",
+                                selected ? "state-selected" : "hover:bg-hover"
                               )}
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -461,18 +429,16 @@ export function OrbitReviewOverlay({
                                       bookmark.authorUsername
                                     : "Bookmark"}
                                 </span>
-                                <span className="shrink-0 font-mono text-2xs text-muted-foreground">
+                                <span className="shrink-0 font-mono text-xs text-muted-foreground">
                                   {index + 1}
                                 </span>
                               </div>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                <span className="surface-inset-strong px-1 py-0.5 text-2xs text-muted-foreground">
+                              <div className="mt-0.5 flex flex-wrap gap-1.5 text-xs">
+                                <span className="text-muted-foreground">
                                   {getDecisionLabel(draft.decision)}
                                 </span>
                                 {draftHasChanges(draft) ? (
-                                  <span className="text-2xs text-amber-500">
-                                    edited
-                                  </span>
+                                  <span className="text-warning">edited</span>
                                 ) : null}
                               </div>
                               <OrbitReviewQueueProposalChips
@@ -489,7 +455,7 @@ export function OrbitReviewOverlay({
               </div>
 
               {/* Sticky actions */}
-              <div className="shrink-0 space-y-2 border-t border-hairline-soft bg-background/80 px-4 py-4">
+              <div className="shrink-0 space-y-2 border-t border-hairline-soft px-4 py-3">
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
@@ -498,12 +464,11 @@ export function OrbitReviewOverlay({
                     onClick={() => void handleKeepCurrent()}
                     disabled={applying}
                   >
-                    <OrbitLogoMark className="size-3.5" />
                     Keep in Orbit
                   </Button>
                   <Button
                     type="button"
-                    className="h-9 gap-1.5 bg-primary text-xs text-primary-foreground hover:bg-primary/90"
+                    className="h-9 gap-1.5 text-xs"
                     onClick={() => void handleApplyCurrent()}
                     disabled={applying}
                   >
@@ -518,8 +483,9 @@ export function OrbitReviewOverlay({
                 {canApplyAll ? (
                   <Button
                     type="button"
-                    variant="secondary"
-                    className="h-9 w-full gap-1.5 text-xs"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
                     onClick={() => void handleApplyAll()}
                     disabled={applying}
                   >
@@ -527,7 +493,7 @@ export function OrbitReviewOverlay({
                   </Button>
                 ) : null}
                 <div className="flex items-center justify-between gap-3 pt-1">
-                  <span className="text-2xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Create new collections
                   </span>
                   <Switch
@@ -535,7 +501,7 @@ export function OrbitReviewOverlay({
                     onCheckedChange={setCreateCollections}
                   />
                 </div>
-                <p className="text-center text-2xs text-muted-foreground/70">
+                <p className="text-center text-xs text-muted-foreground">
                   J/K move · A accept · S skip · Enter apply edits
                 </p>
               </div>
@@ -557,7 +523,7 @@ function CompletionMetric({ label, value }: { label: string; value: number }) {
   const t = useTypography();
 
   return (
-    <div className="flex flex-col surface-inset-strong px-2 py-3">
+    <div className="flex flex-col px-2">
       <dt className={cn("order-2 mt-1", t.label)}>
         {label}
       </dt>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
-import { orbitHairlineBorder, orbitMetaMuted } from "@/lib/orbit-route-chrome";
+import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
 export function OrbitMapUnsupportedState() {
@@ -22,7 +22,7 @@ export function OrbitMapUnsupportedState() {
         <h2 className="mt-4 text-base font-semibold text-foreground">
           Graph requires a modern browser
         </h2>
-        <p className={cn("mt-2 text-sm leading-6", orbitMetaMuted())}>
+        <p className={cn("mt-2 text-sm leading-6", "text-muted-foreground")}>
           Orbit Graph uses a worker-powered canvas for smooth navigation. Update
           your browser or return to the Orbit queue.
         </p>

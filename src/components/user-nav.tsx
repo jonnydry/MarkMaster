@@ -36,7 +36,7 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
         aria-label="Account menu"
         className={cn(
           "outline-none inline-flex items-center gap-1.5 rounded-full p-0.5 transition-colors",
-          "hover:bg-secondary/80 dark:hover:bg-secondary/60",
+          "hover:bg-hover",
           "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
       >
@@ -89,7 +89,7 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
               >
                 {option.name}
                 {typographyPreset === option.id && (
-                  <span className="ml-auto text-2xs font-medium uppercase tracking-wider text-primary">
+                  <span className="ml-auto text-xs font-medium text-primary">
                     ON
                   </span>
                 )}
@@ -114,7 +114,7 @@ export function UserNav({ user, avatarSize = "xl" }: UserNavProps) {
                 />
                 {option.name}
                 {colorTheme === option.id && (
-                  <span className="ml-auto text-2xs font-medium uppercase tracking-wider text-primary">
+                  <span className="ml-auto text-xs font-medium text-primary">
                     ON
                   </span>
                 )}

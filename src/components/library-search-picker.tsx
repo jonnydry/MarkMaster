@@ -130,7 +130,7 @@ export function LibrarySearchPicker({
         className={cn(
           "flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden select-none",
           "text-popover-foreground disabled:pointer-events-none disabled:opacity-50",
-          selected ? "bg-accent-soft" : "hover:bg-accent-soft",
+          selected ? "bg-accent-soft" : "hover:bg-hover",
           item.className
         )}
         onMouseEnter={() => {
@@ -158,14 +158,14 @@ export function LibrarySearchPicker({
       <div className="border-b border-hairline-soft p-2">
         <div className="relative">
           <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground/70"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Input
             value={query}
             onChange={handleQueryChange}
             placeholder={placeholder}
-            className="h-8 border-hairline-soft bg-surface-1 pl-8 text-popover-foreground placeholder:text-muted-foreground/70"
+            className="h-8 border-hairline-soft bg-transparent pl-8 text-popover-foreground placeholder:text-muted-foreground"
             autoFocus
             role="combobox"
             aria-expanded="true"

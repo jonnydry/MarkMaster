@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   PanelRight,
   SlidersHorizontal,
+  Table2,
 } from "lucide-react";
 import { SearchBar } from "@/components/search-bar";
 import { SortControls } from "@/components/sort-controls";
@@ -28,6 +29,7 @@ import {
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import { cn } from "@/lib/utils";
 import { ToolbarIconButton } from "@/components/toolbar/toolbar-primitives";
@@ -104,10 +106,15 @@ export function DashboardToolbar({
   const { hidden: discoveryHidden, setHidden: setDiscoveryHidden } =
     useDiscoveryHidden();
   const showDiscovery = !discoveryHidden;
-  const discoveryCountLabel =
-    discoveryUntouchedCount > 0
-      ? ` (${discoveryUntouchedCount.toLocaleString()} untouched)`
-      : "";
+  // Filters live inline from sm up; below that they move into the More menu.
+  // Render menu items conditionally (not CSS-hidden) so the menu is never empty
+  // and hidden items can't catch arrow-key navigation.
+  const isSmUp = useMediaQuery("(min-width: 640px)");
+  const showFiltersMenuItem = !isSmUp;
+  const showDiscoveryMenuItem = discoveryAvailable && viewMode !== "grid";
+  const showShortcutsMenuItem = viewMode !== "grid";
+  const hasMoreMenuItems =
+    showFiltersMenuItem || showDiscoveryMenuItem || showShortcutsMenuItem;
 
   const searchField = (
     <FeedSearchFieldShell embedded={compact}>
@@ -128,15 +135,13 @@ export function DashboardToolbar({
       onClick={onResetPrimaryFilter}
       aria-label={`${primaryFilterLabel} (${total.toLocaleString()})`}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-l-2 border-l-primary px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
-        appToolbarControlHeightClassName(compact),
-        highlightActiveClass,
-        highlightInteractiveClass
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-sm border border-transparent px-2 text-[15px] font-semibold text-foreground transition-colors hover:bg-hover focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        appToolbarControlHeightClassName(compact)
       )}
     >
       <span className="hidden sm:inline">{primaryFilterLabel}</span>
       <span className="sm:hidden">{primaryFilterCompactLabel}</span>
-      <span className="tabular-nums text-2xs font-medium text-muted-foreground">
+      <span className="tabular-nums text-xs font-normal text-muted-foreground">
         {total.toLocaleString()}
       </span>
     </button>
@@ -155,7 +160,7 @@ export function DashboardToolbar({
       )}
     >
       #{tag.name}
-      <span className="text-primary/60" aria-hidden>
+      <span className="text-muted-foreground" aria-hidden>
         ×
       </span>
     </button>
@@ -170,49 +175,17 @@ export function DashboardToolbar({
 
   const toolbarActions = (
     <>
-      <div className="hidden sm:contents">
-        <div className="relative">
-          <ToolbarIconButton
-            active={showFilters}
-            label={showFilters ? "Hide filters" : "Show filters"}
-            icon={SlidersHorizontal}
-            onClick={onToggleFilters}
-            pressed={showFilters}
-            aria-controls="dashboard-filter-panel"
-            showIndicator={hasActiveFilters}
-            size={compact ? "compact" : "default"}
-            className={appToolbarSurfaceClassName}
-          />
-        </div>
-
-        {discoveryAvailable && viewMode !== "grid" ? (
-          <ToolbarIconButton
-            active={showDiscovery}
-            label={
-              showDiscovery
-                ? `Hide Discovery${discoveryCountLabel}`
-                : `Show Discovery${discoveryCountLabel}`
-            }
-            icon={Compass}
-            onClick={() => setDiscoveryHidden(!discoveryHidden)}
-            pressed={showDiscovery}
-            aria-controls="dashboard-discovery-panel"
-            showIndicator={discoveryHidden}
-            size={compact ? "compact" : "default"}
-            className={appToolbarSurfaceClassName}
-          />
-        ) : null}
-
-        {viewMode !== "grid" ? (
-          <ToolbarIconButton
-            label="Keyboard shortcuts"
-            icon={Keyboard}
-            onClick={onOpenKeyboardShortcuts}
-            size={compact ? "compact" : "default"}
-            className={appToolbarSurfaceClassName}
-          />
-        ) : null}
-      </div>
+      <ToolbarIconButton
+        active={showFilters}
+        label={showFilters ? "Hide filters" : "Show filters"}
+        icon={SlidersHorizontal}
+        onClick={onToggleFilters}
+        pressed={showFilters}
+        aria-controls="dashboard-filter-panel"
+        showIndicator={hasActiveFilters}
+        size={compact ? "compact" : "default"}
+        className={cn(appToolbarSurfaceClassName, "hidden sm:inline-flex")}
+      />
 
       <ToolbarIconButton
         active={selectionMode}
@@ -244,33 +217,44 @@ export function DashboardToolbar({
         onSortFieldChange={onSortFieldChange}
         onViewModeChange={onViewModeChange}
         gridLabel="Workspace"
-        gridIcon={PanelRight}
+        gridIcon={Table2}
       />
 
+      {hasMoreMenuItems ? (
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="More bookmark tools"
           className={cn(
-            "inline-flex items-center justify-center rounded-sm border border-hairline-strong bg-background/35 text-muted-foreground hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 sm:hidden",
+            "relative inline-flex shrink-0 items-center justify-center rounded-sm border border-transparent text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
             compact ? "size-8" : "size-9",
             appToolbarSurfaceClassName
           )}
         >
           <MoreHorizontal className="size-4" aria-hidden="true" />
+          {showDiscoveryMenuItem && discoveryHidden ? (
+            <span className="absolute right-1 top-1 size-2 rounded-full bg-primary" aria-hidden />
+          ) : null}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onClick={onToggleFilters}>
-            <SlidersHorizontal />
-            {showFilters ? "Hide filters" : "Show filters"}
-            {hasActiveFilters ? <span className="ml-auto text-primary">Active</span> : null}
-          </DropdownMenuItem>
-          {discoveryAvailable && viewMode !== "grid" ? (
-            <DropdownMenuItem onClick={() => setDiscoveryHidden(!discoveryHidden)}>
-              <Compass />
-              {showDiscovery ? "Hide Discovery" : "Show Discovery"}
+        <DropdownMenuContent align="end" className="w-56">
+          {showFiltersMenuItem ? (
+            <DropdownMenuItem onClick={onToggleFilters}>
+              <SlidersHorizontal />
+              {showFilters ? "Hide filters" : "Show filters"}
+              {hasActiveFilters ? <span className="ml-auto text-primary">Active</span> : null}
             </DropdownMenuItem>
           ) : null}
-          {viewMode !== "grid" ? (
+          {showDiscoveryMenuItem ? (
+            <DropdownMenuItem onClick={() => setDiscoveryHidden(!discoveryHidden)}>
+              <Compass />
+              {showDiscovery ? "Hide discovery" : "Show discovery"}
+              {discoveryUntouchedCount > 0 ? (
+                <span className="ml-auto tabular-nums text-xs text-muted-foreground">
+                  {discoveryUntouchedCount.toLocaleString()}
+                </span>
+              ) : null}
+            </DropdownMenuItem>
+          ) : null}
+          {showShortcutsMenuItem ? (
             <DropdownMenuItem onClick={onOpenKeyboardShortcuts}>
               <Keyboard />
               Keyboard shortcuts
@@ -278,6 +262,7 @@ export function DashboardToolbar({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+      ) : null}
 
       {viewMode !== "grid" || compact ? (
         <PageHeaderCompactToggle

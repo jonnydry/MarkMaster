@@ -254,7 +254,7 @@ export function SyncButton({
   const statusDotClass = syncStatusError
     ? "bg-destructive"
     : (statusCopy?.dotClass ??
-      (lastSyncAt ? "bg-emerald" : "bg-muted-foreground/40"));
+      (lastSyncAt ? "bg-success" : "bg-muted-foreground/40"));
   const buttonLabel = isRateLimited
     ? `Rate limited${countdown ? ` ${countdown}` : ""}`
     : isAnySyncRunning
@@ -281,7 +281,7 @@ export function SyncButton({
                 ? "Reconnect X — session expired"
                 : syncTitle
           }
-          variant="highlight"
+          variant="outline"
           disabled={!online || (isRateLimited && !needsReconnect)}
           className="highlight-search-shell relative h-10 w-10 overflow-hidden p-0 disabled:opacity-70"
         >
@@ -310,7 +310,7 @@ export function SyncButton({
         <Button
           type="button"
           onClick={handleReconnect}
-          variant="highlight"
+          variant="outline"
           className="highlight-search-shell relative h-9 w-full gap-2 overflow-hidden text-sm"
         >
           <XLogoMark className="size-4 shrink-0" title={undefined} />
@@ -333,12 +333,12 @@ export function SyncButton({
   }
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-sm border border-sidebar-border bg-transparent p-2">
+    <div className="flex w-full shrink-0 flex-col gap-1.5">
       <Button
         type="button"
         onClick={handleSync}
         aria-busy={isAnySyncRunning}
-        variant="highlight"
+        variant="outline"
         title={
           !online
             ? "Offline — syncing is unavailable until the connection returns"
@@ -372,7 +372,7 @@ export function SyncButton({
           <span className="min-w-0 text-xs leading-snug text-muted-foreground truncate">
             {statusCopy.label}
             {bookmarkCount !== undefined ? (
-              <span className="text-muted-foreground/60">
+              <span className="text-muted-foreground">
                 {" · "}
                 {bookmarkCount.toLocaleString()} bookmarks
               </span>
@@ -382,13 +382,13 @@ export function SyncButton({
       ) : (
         <div className="flex items-center gap-1.5 px-0.5" aria-live="polite">
           <div
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-emerald" : "bg-muted-foreground/40"}`}
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${lastSyncAt ? "bg-success" : "bg-muted-foreground/40"}`}
           />
           <span className="text-xs text-muted-foreground">
             {lastSyncAt ? "Up to date" : "Not synced"}
           </span>
           {(lastSyncAt || bookmarkCount !== undefined) && (
-            <span className="text-xs text-muted-foreground/60">
+            <span className="min-w-0 truncate text-xs text-muted-foreground">
               {[
                 lastSyncRelative,
                 bookmarkCount !== undefined &&
@@ -452,14 +452,14 @@ function getSyncStatusCopy(
     const resumeNote = latestRun.resumeToken ? " · More to sync" : "";
 
     return {
-      dotClass: latestRun.resumeToken ? "bg-note" : "bg-emerald",
+      dotClass: latestRun.resumeToken ? "bg-note" : "bg-success",
       label: `${summary}${relative ? ` ${relative}` : ""}${resumeNote}`,
     };
   }
 
   if (lastSyncRelative) {
     return {
-      dotClass: "bg-emerald",
+      dotClass: "bg-success",
       label: lastSyncRelative,
     };
   }

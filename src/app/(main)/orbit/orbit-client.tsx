@@ -30,7 +30,6 @@ const OrbitReviewOverlay = dynamic(
 );
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
-import { PageWatermark } from "@/components/page-watermark";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 import { OrbitScanFailureNotice } from "@/components/orbit/orbit-scan-failure-notice";
 import { OrbitList } from "@/components/orbit/orbit-list";
@@ -42,7 +41,6 @@ import {
 import {
   clampMenuPosition,
   orbitBannerClass,
-  orbitControlRadius,
   orbitGhostButtonClass,
   orbitLabelClass,
   orbitSelectionBarClass,
@@ -289,7 +287,6 @@ export default function OrbitPage() {
     <>
     <AppPageShell
       className="orbit-route-default"
-      watermark={<PageWatermark variant="orbit" />}
       sidebar={
         <Sidebar
           tags={tags}
@@ -408,7 +405,7 @@ export default function OrbitPage() {
                     orbitBannerClass()
                   )}
                 >
-                  <p className="text-sm text-primary/95">
+                  <p className="text-sm text-foreground">
                     This scan was run on a different search, page, or
                     selection. Review or dismiss it before trusting the
                     suggestions.
@@ -416,8 +413,8 @@ export default function OrbitPage() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="highlight"
-                    className="h-9 shrink-0 text-primary"
+                    variant="outline"
+                    className="h-9 shrink-0"
                     onClick={handleClearScanPlan}
                   >
                     Dismiss plan
@@ -434,19 +431,13 @@ export default function OrbitPage() {
                 >
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span
-                      className={cn(
-                        orbitLabelClass(),
-                        "text-foreground/80 dark:text-white/80"
-                      )}
+                      className={orbitLabelClass("text-foreground")}
                     >
                       {selectedBookmarkIds.size} selected
                     </span>
                     {hasSelectionOverflow ? (
                       <span
-                        className={cn(
-                          "text-2xs",
-                          "text-amber-700 dark:text-amber-200/90"
-                        )}
+                        className="text-xs text-warning"
                       >
                         Orbit will process the first{" "}
                         {scanBatchLimit} selected.
@@ -457,10 +448,7 @@ export default function OrbitPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className={cn(
-                        "h-8 text-xs",
-                        "text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
-                      )}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
                       onClick={handleSelectAllOnPage}
                       disabled={bookmarks.length === 0}
                     >
@@ -468,8 +456,8 @@ export default function OrbitPage() {
                     </Button>
                     <Button
                       size="sm"
-                      variant="highlight"
-                      className="h-8 gap-1.5 text-primary"
+                      variant="outline"
+                      className="h-8 gap-1.5"
                       onClick={handleScan}
                       disabled={scan.scanning || scanTargetIds.length === 0}
                     >
@@ -543,13 +531,7 @@ export default function OrbitPage() {
                           size="sm"
                           tone="cyan"
                         />
-                        <OrbitLogoMark
-                          className="relative size-8 text-primary"
-                          style={{
-                            filter:
-                              "drop-shadow(0 0 18px color-mix(in srgb, var(--primary) 35%, transparent))",
-                          }}
-                        />
+                        <OrbitLogoMark className="relative size-8 text-primary" />
                       </div>
                     )
                   }
@@ -564,7 +546,7 @@ export default function OrbitPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className={orbitControlRadius()}
+                        className="rounded-sm"
                         onClick={() => handleSearchChange("")}
                       >
                         Clear search
@@ -575,7 +557,7 @@ export default function OrbitPage() {
                           href="/orbit/map"
                           className={cn(
                             buttonVariants({ size: "sm" }),
-                            orbitControlRadius()
+                            "rounded-sm"
                           )}
                         >
                           <MapIcon className="size-3.5" aria-hidden />
@@ -584,7 +566,7 @@ export default function OrbitPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className={orbitControlRadius()}
+                          className="rounded-sm"
                           onClick={() => router.push("/dashboard")}
                         >
                           Search bookmarks
@@ -593,7 +575,7 @@ export default function OrbitPage() {
                           href="/collections"
                           className={cn(
                             buttonVariants({ size: "sm", variant: "outline" }),
-                            orbitControlRadius()
+                            "rounded-sm"
                           )}
                         >
                           Open collections

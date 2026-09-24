@@ -3,9 +3,7 @@
 import { Check, ChevronDown } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  orbitLabelClass,
-  orbitMetaMuted} from "@/lib/orbit-route-chrome";
+import { orbitLabelClass } from "@/lib/orbit-route-chrome";
 import {
   highlightIdleClass,
   highlightSegmentActiveClass,
@@ -50,7 +48,7 @@ export function OrbitMapScopeMenu({
         disabled={isLoading}
         aria-label={`Graph view: ${activeOption.label}`}
         className={cn(
-          "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-50",
           className
         )}
       >
@@ -65,7 +63,7 @@ export function OrbitMapScopeMenu({
           className={cn(
             orbitLabelClass(),
             "px-2 pb-1 pt-1.5 text-2xs",
-            orbitMetaMuted()
+            "text-muted-foreground"
           )}
         >
           Graph view
@@ -96,7 +94,7 @@ export function OrbitMapScopeMenu({
                 <span
                   className={cn(
                     "block text-2xs leading-4",
-                    orbitMetaMuted()
+                    "text-muted-foreground"
                   )}
                 >
                   {option.detail}

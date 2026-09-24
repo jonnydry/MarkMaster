@@ -3,10 +3,7 @@
 import { Info } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  orbitLabelClass,
-  orbitMetaMuted,
-  orbitMetaSoft} from "@/lib/orbit-route-chrome";
+import { orbitLabelClass } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
 interface OrbitMapLegendButtonProps {
@@ -20,7 +17,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
       <PopoverTrigger
         aria-label="Graph legend"
         className={cn(
-          "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+          "inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
           className
         )}
       >
@@ -29,10 +26,10 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 gap-3 p-3">
         <div>
-          <p className={cn(orbitLabelClass(), orbitMetaSoft())}>
+          <p className={cn(orbitLabelClass(), "text-muted-foreground")}>
             Legend
           </p>
-          <ul className={cn("mt-3 space-y-3 text-sm", orbitMetaMuted())}>
+          <ul className={cn("mt-3 space-y-3 text-sm", "text-muted-foreground")}>
             <li className="flex items-center gap-3">
               <span
                 className="inline-block size-3 rounded-full bg-primary"
@@ -71,7 +68,7 @@ export function OrbitMapLegendButton({ className }: OrbitMapLegendButtonProps) {
             </li>
           </ul>
         </div>
-        <p className={cn("border-t border-hairline-soft pt-2 text-2xs", orbitMetaMuted())}>
+        <p className={cn("border-t border-hairline-soft pt-2 text-2xs", "text-muted-foreground")}>
           Scroll to zoom · drag to pan · click to inspect · drag a bookmark onto
           a hub to assign · double-click a bookmark to open · Esc to clear ·
           Motion keeps hubs drifting

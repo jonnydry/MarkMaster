@@ -49,7 +49,7 @@ export const TagRow = React.memo(function TagRow({
           <Popover>
             <PopoverTrigger
               aria-label={`Merge tag ${tag.name} into another tag`}
-              className="inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+              className="inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             >
               <GitMerge className="size-3.5" />
             </PopoverTrigger>
@@ -57,7 +57,7 @@ export const TagRow = React.memo(function TagRow({
               align="end"
               className="w-56 p-1"
             >
-              <p className="px-2 py-1.5 text-2xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              <p className="px-2 py-1.5 text-xs font-medium tracking-[0.08em] text-muted-foreground">
                 Merge into
               </p>
               <div className="max-h-48 overflow-y-auto">
@@ -65,7 +65,7 @@ export const TagRow = React.memo(function TagRow({
                   <button
                     key={target.id}
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent-soft focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-hover focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                     onClick={() => onMerge(tag.id, target.id)}
                   >
                     <TagDot name={target.name} color={target.color} size={10} />
@@ -79,7 +79,7 @@ export const TagRow = React.memo(function TagRow({
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+          className="size-8 text-muted-foreground hover:bg-hover hover:text-foreground"
           aria-label={`Edit tag ${tag.name}`}
           onClick={() => onStartEdit(tag)}
         >

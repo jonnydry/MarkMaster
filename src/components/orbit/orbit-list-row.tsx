@@ -13,13 +13,7 @@ import {
   getOrbitRowSuggestion,
   type OrbitRowQueueStatus,
 } from "@/lib/orbit-row-status";
-import {
-  orbitDataClass,
-  orbitHairlineBorder,
-  orbitHoverRowClass,
-  orbitLabelClass,
-  orbitMetaMuted,
-} from "@/lib/orbit-route-chrome";
+import { orbitDataClass, orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { OrbitActionPill } from "./orbit-quick-actions";
 
 const EMPTY_ID_SET = new Set<string>();
@@ -89,9 +83,9 @@ export const OrbitListRow = memo(function OrbitListRow({
   const showSuggestion = queueStatus === "hasSuggestion" && Boolean(suggestion);
   const confidenceDotClass =
     suggestion?.confidence === "high"
-      ? "bg-emerald-500"
+      ? "bg-success"
       : suggestion?.confidence === "medium"
-        ? "bg-amber-500"
+        ? "bg-warning"
         : "bg-muted-foreground/50";
 
   const handleRowClick = () => {
@@ -110,17 +104,17 @@ export const OrbitListRow = memo(function OrbitListRow({
     authorUsername: bookmark.authorUsername,
     tweetId: bookmark.tweetId};
 
+  const isHighlighted = selectionMode ? bulkSelected : selected;
+
   return (
     <article
       data-orbit-row-id={bookmark.id}
       className={cn(
-        "group relative flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-all",
+        "group relative flex cursor-pointer items-stretch gap-3 border-b px-5 py-2.5 text-sm [content-visibility:auto] [contain-intrinsic-size:auto_112px] transition-colors",
         orbitHairlineBorder(),
-        orbitHoverRowClass(),
-        !selectionMode &&
-          selected &&
-          ("border-primary/20 bg-primary/10 dark:border-primary/10 dark:bg-surface-1"),
-        selectionMode && bulkSelected && "bg-primary/5",
+        // Selected rows carry the app's one light source (accent rail + wash,
+        // painted inside the box so it never shifts layout).
+        isHighlighted ? "state-selected" : "hover:bg-hover",
         queueStatus === "dismissed" && "opacity-50",
         queueStatus === "applied" && "opacity-70"
       )}
@@ -152,46 +146,35 @@ export const OrbitListRow = memo(function OrbitListRow({
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "pointer-events-none relative z-10 mt-1 w-[3px] shrink-0 self-stretch rounded-none transition-all",
-          selected
-            ? "bg-primary"
-            : "bg-transparent group-hover:bg-primary/25",
-          queueStatus === "hasSuggestion" && !selected && "bg-primary/40"
-        )}
-      />
+      {queueStatus === "hasSuggestion" && !isHighlighted ? (
+        // Quiet rail for rows with a pending suggestion; absolutely placed
+        // so it never shifts the row's content.
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-primary/40"
+        />
+      ) : null}
 
       <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col gap-1.5">
         <div
-          className={cn(
-            "flex min-w-0 items-center gap-1.5 truncate text-2xs",
-            "text-muted-foreground",
-            orbitMetaMuted()
-          )}
+          className="flex min-w-0 items-center gap-1.5 truncate text-xs text-muted-foreground"
         >
-          <span
-            className={cn(
-              orbitLabelClass(),
-              "shrink-0 normal-case font-medium tracking-normal",
-              "text-foreground/90"
-            )}
-          >
+          <span className="shrink-0 font-medium text-foreground">
             {author}
           </span>
           {handle ? (
             <>
-              <span className={"text-muted-foreground/50"}>
+              <span className="text-muted-foreground/50">
                 ·
               </span>
-              <span className={cn(orbitDataClass(), "truncate normal-case")}>
+              <span className={cn(orbitDataClass(), "truncate")}>
                 {handle}
               </span>
             </>
           ) : null}
           {savedLabel ? (
             <>
-              <span className={"text-muted-foreground/50"}>
+              <span className="text-muted-foreground/50">
                 ·
               </span>
               <span className={cn(orbitDataClass(), "shrink-0 tabular-nums")}>
@@ -201,15 +184,11 @@ export const OrbitListRow = memo(function OrbitListRow({
           ) : null}
           {engagement ? (
             <>
-              <span className={"text-muted-foreground/50"}>
+              <span className="text-muted-foreground/50">
                 ·
               </span>
               <span
-                className={cn(
-                  orbitDataClass(),
-                  "hidden shrink-0 tabular-nums sm:inline",
-                  orbitMetaMuted()
-                )}
+                className={cn(orbitDataClass(), "hidden shrink-0 sm:inline")}
               >
                 {engagement}
               </span>
@@ -242,8 +221,7 @@ export const OrbitListRow = memo(function OrbitListRow({
             {showSuggestion && suggestion ? (
               <span
                 className={cn(
-                  "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-sm border py-0.5 pl-1.5 pr-1 text-xs",
-                  "border-primary/20 bg-primary/[0.06] text-foreground/90 dark:border-primary/25 dark:bg-primary/[0.08]"
+                  "inline-flex min-w-0 max-w-full items-center gap-1.5 surface-inset-strong py-0.5 pl-1.5 pr-1.5 text-xs text-foreground"
                 )}
                 title={`Orbit suggests: ${
                   suggestion.kind === "collection" ? "add to" : "tag as"
@@ -254,7 +232,7 @@ export const OrbitListRow = memo(function OrbitListRow({
                   aria-hidden
                 />
                 {suggestion.kind === "collection" ? (
-                  <FolderInput className="size-3 shrink-0 text-primary/70" aria-hidden />
+                  <FolderInput className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                 ) : (
                   <TagIcon
                     className="size-3 shrink-0"
@@ -265,28 +243,21 @@ export const OrbitListRow = memo(function OrbitListRow({
                 <span className="min-w-0 max-w-[12rem] truncate font-medium">
                   {suggestion.label}
                 </span>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-sm border px-1 py-px text-2xs font-medium uppercase tracking-[0.08em]",
-                    suggestion.reuseExisting
-                      ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-600 dark:text-emerald-300"
-                      : "border-primary/25 bg-primary/10 text-primary/80"
-                  )}
-                >
-                  {suggestion.reuseExisting ? "Lib" : "New"}
-                </span>
+                {suggestion.reuseExisting ? null : (
+                  <span className="shrink-0 text-primary">new</span>
+                )}
               </span>
             ) : null}
             {queueStatus === "applied" ? (
               <span
-                className="inline-flex items-center gap-0.5 text-2xs text-emerald-400/90"
+                className="inline-flex items-center gap-0.5 text-xs text-success"
                 aria-label="Suggestion applied"
               >
                 <Check className="size-3" aria-hidden />
                 Applied
               </span>
             ) : queueStatus === "dismissed" ? (
-              <span className={cn("text-2xs", orbitMetaMuted())}>Skipped</span>
+              <span className="text-xs text-muted-foreground">Skipped</span>
             ) : null}
           </div>
 
@@ -312,8 +283,7 @@ export const OrbitListRow = memo(function OrbitListRow({
               }}
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-sm border border-transparent transition-colors",
-                "text-muted-foreground hover:border-primary/20 hover:bg-accent-soft hover:text-primary focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
-                orbitMetaMuted()
+                "text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
               )}
               title="More actions"
               aria-label="More actions"

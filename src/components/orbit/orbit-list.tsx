@@ -4,6 +4,7 @@ import { type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import { useScrollElement } from "@/hooks/use-scroll-element";
+import { useListScrollMargin } from "@/hooks/use-list-scroll-margin";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
@@ -104,10 +105,12 @@ export function OrbitList({
   appliedBookmarkIds,
 }: OrbitListProps) {
   const scrollElement = useScrollElement(scrollRef);
+  const { listRef, scrollMargin } = useListScrollMargin(scrollElement);
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
     getScrollElement: () => scrollElement,
+    scrollMargin,
     estimateSize: () => ORBIT_ROW_ESTIMATE_PX,
     overscan: 5,
   });
@@ -156,6 +159,7 @@ export function OrbitList({
   return (
     <div className={cn("relative w-full", className)}>
       <div
+        ref={listRef}
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
@@ -168,7 +172,7 @@ export function OrbitList({
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
               className="absolute top-0 left-0 w-full"
-              style={{ transform: `translateY(${virtualRow.start}px)` }}
+              style={{ transform: `translateY(${virtualRow.start - scrollMargin}px)` }}
             >
               <OrbitListRow
                 bookmark={bookmark}

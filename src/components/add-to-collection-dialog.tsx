@@ -73,7 +73,7 @@ export function AddToCollectionDialog({
           <DialogTitle>
             {isBulk
               ? `Add ${bookmarkIds.length} bookmarks to a collection`
-              : "Add to Collection"}
+              : "Add to collection"}
           </DialogTitle>
           <DialogDescription>
             {isBulk
@@ -141,14 +141,14 @@ export function AddToCollectionDialog({
                       isIn
                         ? "menu-selection-active"
                         : isManaged
-                          ? "cursor-not-allowed bg-muted/60 text-muted-foreground opacity-60"
-                          : "text-foreground hover:bg-accent-soft disabled:opacity-60"
+                          ? "cursor-not-allowed text-muted-foreground"
+                          : "text-foreground hover:bg-hover disabled:opacity-60"
                     )}
                   >
-                    <FolderOpen className="w-4 h-4 shrink-0" />
+                    <FolderOpen className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <span className="truncate">{col.name}</span>
                     {isManaged && (
-                      <span className={cn(t.label, "text-primary")}>Sync</span>
+                      <span className={t.label}>Synced from X</span>
                     )}
                     <span className="ml-auto text-xs text-muted-foreground">
                       {col._count.items}
