@@ -61,12 +61,12 @@ export function BookmarkCardActionButton({
         "rounded-sm border border-transparent",
         active
           ? highlightIndicatorActiveClass
-          : "text-muted-foreground hover:border-hairline-soft hover:bg-accent-soft hover:text-foreground",
+          : "text-muted-foreground hover:bg-hover hover:text-foreground",
         className
       )}
       title={shortcut ? `${label} (${shortcut})` : label}
     >
-      <Icon className="size-3.5" aria-hidden="true" />
+      <Icon className="size-4" aria-hidden="true" />
     </Button>
   );
 }
@@ -99,9 +99,9 @@ export function BookmarkTagChip({
       }}
       title={title ?? name}
       className={cn(
-        "relative inline-flex h-5 max-w-full items-center gap-1 px-1.5 text-2xs font-medium text-muted-foreground transition-colors after:absolute after:-inset-x-1 after:-inset-y-3 hover:border-primary/35 hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
-        density === "strong" ? "surface-inset-strong" : "surface-inset",
-        uppercase ? "uppercase tracking-[0.08em]" : "normal-case",
+        "relative inline-flex h-5 max-w-full items-center gap-1 px-1.5 text-xs font-medium text-muted-foreground transition-colors after:absolute after:-inset-x-1 after:-inset-y-3 hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+        density === "strong" ? "surface-inset bg-surface-3" : "surface-inset",
+        uppercase ? "" : "normal-case",
         className
       )}
     >
@@ -114,7 +114,7 @@ export function BookmarkTagChip({
       ) : null}
       <span className="truncate">{name}</span>
       {extraCount ? (
-        <span className="text-muted-foreground/65">+{extraCount}</span>
+        <span className="text-muted-foreground">+{extraCount}</span>
       ) : null}
     </button>
   );

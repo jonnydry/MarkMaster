@@ -7,7 +7,7 @@ type OrbitPageIdentityBaseProps = {
   className?: string;
 };
 
-/** Shared text-only module label — the page watermark carries the Orbit mark. */
+/** Shared module title — Orbit's identity lives here, not in background art. */
 export function OrbitPageIdentityBase({
   title,
   subtitle,
@@ -19,11 +19,11 @@ export function OrbitPageIdentityBase({
       className={cn("min-w-0 shrink-0", className)}
       aria-label={ariaLabel}
     >
-      <p className="heading-font truncate text-sm font-bold tracking-tight text-foreground">
+      <p className="heading-font truncate text-lg leading-6 font-bold tracking-tight text-foreground">
         {title}
       </p>
       {subtitle ? (
-        <p className="hidden truncate text-2xs font-medium tabular-nums text-muted-foreground sm:block">
+        <p className="hidden truncate text-xs tabular-nums text-muted-foreground sm:block">
           {subtitle}
         </p>
       ) : null}

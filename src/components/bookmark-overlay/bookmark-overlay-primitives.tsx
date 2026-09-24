@@ -50,7 +50,7 @@ export function BookmarkOverlayToolButton({
         tone === "danger"
           ? "destructive"
           : tone === "primary"
-            ? "highlight"
+            ? "outline"
             : "secondary"
       }
       size="sm"
@@ -58,7 +58,7 @@ export function BookmarkOverlayToolButton({
       className={cn(
         "h-9 justify-start gap-2 rounded-sm text-xs",
         tone === "neutral" &&
-          "border-hairline-soft bg-surface-1/55 text-foreground hover:border-primary/30 hover:bg-accent-soft"
+          "border-hairline-soft bg-transparent text-foreground hover:bg-hover"
       )}
     >
       <Icon className="size-3.5" aria-hidden="true" />
@@ -73,34 +73,22 @@ export function BookmarkOverlayMetricsGrid({
   metrics: NonNullable<BookmarkWithRelations["publicMetrics"]>;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <div className="surface-veil p-2">
-        <XPostLikeIcon className={X_POST_METRIC_ICON_CLASS} />
-        <div className="mt-1 text-sm font-semibold text-foreground">
-          {formatCompactCount(metrics.like_count)}
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-y border-hairline-soft py-2.5 text-sm">
+      {(
+        [
+          { Icon: XPostLikeIcon, value: metrics.like_count, label: "Likes" },
+          { Icon: XPostRepostIcon, value: metrics.retweet_count, label: "Reposts" },
+          { Icon: XPostReplyIcon, value: metrics.reply_count, label: "Replies" },
+        ] as const
+      ).map(({ Icon, value, label }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <Icon className={X_POST_METRIC_ICON_CLASS} />
+          <span className="font-semibold tabular-nums text-foreground">
+            {formatCompactCount(value)}
+          </span>
+          <span className="text-muted-foreground">{label}</span>
         </div>
-        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
-          Likes
-        </div>
-      </div>
-      <div className="surface-veil p-2">
-        <XPostRepostIcon className={X_POST_METRIC_ICON_CLASS} />
-        <div className="mt-1 text-sm font-semibold text-foreground">
-          {formatCompactCount(metrics.retweet_count)}
-        </div>
-        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
-          Reposts
-        </div>
-      </div>
-      <div className="surface-veil p-2">
-        <XPostReplyIcon className={X_POST_METRIC_ICON_CLASS} />
-        <div className="mt-1 text-sm font-semibold text-foreground">
-          {formatCompactCount(metrics.reply_count)}
-        </div>
-        <div className="text-2xs uppercase tracking-[0.08em] text-muted-foreground">
-          Replies
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -115,7 +103,7 @@ export function BookmarkOverlaySectionLabel({
   return (
     <div
       className={cn(
-        "mb-2 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+        "mb-2 text-[13px] font-semibold text-foreground",
         className
       )}
     >
@@ -142,7 +130,7 @@ function BookmarkOverlaySectionHeader({
           variant="ghost"
           size="sm"
           onClick={onAction}
-          className="h-7 gap-1 px-2 text-2xs text-muted-foreground"
+          className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:bg-hover hover:text-foreground"
         >
           <Plus className="size-3" aria-hidden="true" />
           {actionLabel}
@@ -154,7 +142,7 @@ function BookmarkOverlaySectionHeader({
 
 export function BookmarkOverlayTagPill({ name, color }: { name: string; color: string }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 surface-veil px-2 py-1 text-xs text-muted-foreground">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-sm bg-surface-2 px-2 py-1 text-xs text-foreground">
       <span
         aria-hidden
         className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -191,7 +179,7 @@ export function BookmarkOverlayTagsSection({
             <BookmarkOverlayTagPill key={tag.id} name={tag.name} color={tag.color} />
           ))
         ) : (
-          <span className="text-xs text-muted-foreground/70">{emptyLabel}</span>
+          <span className="text-xs text-muted-foreground">{emptyLabel}</span>
         )}
       </div>
     </div>
@@ -219,13 +207,13 @@ export function BookmarkOverlayCollectionsSection({
           collections.map(({ collection }) => (
             <span
               key={collection.id}
-              className="rounded-sm border border-primary/20 bg-primary/10 px-2 py-1 text-xs text-primary"
+              className="rounded-sm bg-surface-2 px-2 py-1 text-xs text-foreground"
             >
               {collection.name}
             </span>
           ))
         ) : (
-          <span className="text-xs text-muted-foreground/70">Not in a collection</span>
+          <span className="text-xs text-muted-foreground">Not in a collection</span>
         )}
       </div>
     </div>
@@ -249,11 +237,11 @@ export function BookmarkOverlayNotesSection({
         onAction={onAction}
       />
       {notes.length > 0 ? (
-        <div className="rounded-sm border-l-2 border-l-note bg-surface-1/45 px-3 py-2 text-sm leading-6 text-muted-foreground">
+        <div className="border-l-2 border-l-note bg-surface-2 px-3 py-2 text-sm leading-6 text-foreground">
           {notes[0]?.content}
         </div>
       ) : (
-        <span className="text-xs text-muted-foreground/70">No notes yet</span>
+        <span className="text-xs text-muted-foreground">No notes yet</span>
       )}
     </div>
   );
@@ -320,7 +308,7 @@ export function BookmarkOverlayAuthorHeader({
           <span className="text-sm text-muted-foreground">
             {formatPostDate(bookmark.tweetCreatedAt)}
           </span>
-          <XLogoMark className="h-3.5 w-3.5 text-muted-foreground/60" title="Post from X" />
+          <XLogoMark className="h-3.5 w-3.5 text-muted-foreground" title="Post from X" />
         </div>
         {badges ? <div className="mt-1 flex flex-wrap items-center gap-2">{badges}</div> : null}
       </div>
@@ -330,7 +318,7 @@ export function BookmarkOverlayAuthorHeader({
         size="icon-sm"
         onClick={onClose}
         aria-label={closeLabel}
-        className="surface-inset-strong text-muted-foreground hover:bg-accent-soft hover:text-foreground"
+        className="surface-inset-strong text-muted-foreground hover:bg-hover hover:text-foreground"
       >
         <X className="size-4" aria-hidden="true" />
       </Button>
@@ -416,7 +404,7 @@ export function BookmarkOverlayPostColumn({
 
 export function BookmarkOverlaySidebar({ children }: { children: ReactNode }) {
   return (
-    <aside className="scrollbar-native min-h-0 overflow-y-auto border-t border-hairline-soft bg-surface-2/45 px-4 py-4 supports-[backdrop-filter]:backdrop-blur-xl lg:border-l lg:border-t-0">
+    <aside className="scrollbar-native min-h-0 overflow-y-auto border-t border-hairline-soft bg-transparent px-4 py-4 lg:border-l lg:border-t-0">
       {children}
     </aside>
   );

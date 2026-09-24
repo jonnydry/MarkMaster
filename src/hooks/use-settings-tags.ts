@@ -82,7 +82,7 @@ export function useSettingsTags() {
       });
       await invalidateTagsQuery(queryClient);
       setEditingTag(null);
-      toast.success("Tag updated");
+      toast.success("Tag updated on every bookmark that wears it");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not update tag"

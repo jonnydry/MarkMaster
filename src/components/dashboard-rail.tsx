@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck } from "lucide-react";
 import { useRelativeTime } from "@/hooks/use-relative-time";
-import { FilterPanel } from "@/components/filter-panel";
 import { BookmarkTagChip } from "@/components/bookmark-card-chrome";
 import { StatRow } from "@/components/ui/stat-row";
 import { fetchJson } from "@/lib/fetch-json";
@@ -47,7 +46,7 @@ interface DashboardRailProps {
 const TOP_TAG_LIMIT = 8;
 const TOP_AUTHOR_LIMIT = 6;
 
-function RailCard({
+function RailSection({
   title,
   action,
   children,
@@ -58,8 +57,8 @@ function RailCard({
 }) {
   const t = useTypography();
   return (
-    <section className="surface-card p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <section className="border-b border-hairline-soft py-4 last:border-b-0">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
         <h2 className={cn(t.sectionLabel, "mb-0")}>{title}</h2>
         {action}
       </div>
@@ -126,15 +125,14 @@ export function DashboardRail({
     );
 
   return (
-    <div id={id} className="space-y-3 pt-3 pb-6 pr-1" aria-label="Dashboard rail">
-      <RailCard title="Library health">
+    <div id={id} className="pb-6 pr-1" aria-label="Dashboard rail">
+      <RailSection title="Library health">
         {dataUnavailable ? (
           <p className="text-xs leading-5 text-muted-foreground" role="status">
             Library details are temporarily unavailable. Your bookmark feed is unchanged.
           </p>
         ) : (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <StatRow size="sm" headingFont={false} label="Total" value={statValue(libraryTotal.toLocaleString())} />
           <StatRow
             size="sm"
             headingFont={false}
@@ -152,29 +150,11 @@ export function DashboardRail({
           />
         </dl>
         )}
-      </RailCard>
+      </RailSection>
 
-      <RailCard title="Filters">
-        <FilterPanel
-          variant="rail"
-          mediaFilter={filters.mediaFilter}
-          onMediaFilterChange={filters.setMediaFilter}
-          authorFilter={filters.authorFilter}
-          onAuthorFilterChange={filters.setAuthorFilter}
-          dateFrom={filters.dateFrom}
-          dateTo={filters.dateTo}
-          onDateFromChange={filters.setDateFrom}
-          onDateToChange={filters.setDateTo}
-          selectedTags={filters.selectedTags}
-          onTagToggle={filters.toggleTag}
-          tags={tags}
-          onClearAll={filters.clearFilters}
-          hasActiveFilters={filters.hasActiveFilters}
-        />
-      </RailCard>
 
       {topTags.length > 0 ? (
-        <RailCard title="Top tags">
+        <RailSection title="Top tags">
           <div className="flex flex-wrap gap-1.5">
             {topTags.map((tag) => (
               <BookmarkTagChip
@@ -188,10 +168,10 @@ export function DashboardRail({
               />
             ))}
           </div>
-        </RailCard>
+        </RailSection>
       ) : null}
 
-      <RailCard title="Top authors">
+      <RailSection title="Top authors">
         {authorsLoading ? (
           <div className="space-y-2" aria-hidden>
             {Array.from({ length: 4 }).map((_, i) => (
@@ -199,7 +179,7 @@ export function DashboardRail({
             ))}
           </div>
         ) : authorsError ? (
-          <p className="px-2 text-xs text-muted-foreground" role="status">
+          <p className="text-xs text-muted-foreground" role="status">
             Authors are temporarily unavailable.
           </p>
         ) : topAuthors.length > 0 ? (
@@ -209,15 +189,15 @@ export function DashboardRail({
                 <button
                   type="button"
                   onClick={() => filters.setAuthorFilter(author.author)}
-                  className="flex w-full items-center gap-2 rounded-sm border border-transparent px-2 py-1 text-left text-sm transition-colors hover:border-hairline-soft hover:bg-accent-soft/50 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+                  className="flex w-full items-center gap-2 rounded-sm border border-transparent px-2 py-1.5 text-left text-sm transition-colors hover:bg-hover focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
                 >
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  <span className="min-w-0 flex-1 truncate text-foreground">
                     @{author.author}
                   </span>
                   {author.verified ? (
                     <BadgeCheck className="size-3.5 shrink-0 text-primary" aria-label="Verified" />
                   ) : null}
-                  <span className={cn("shrink-0 text-xs text-muted-foreground/60", t.data)}>
+                  <span className={cn("shrink-0 text-xs text-muted-foreground", t.data)}>
                     {author.count.toLocaleString()}
                   </span>
                 </button>
@@ -225,11 +205,11 @@ export function DashboardRail({
             ))}
           </ul>
         ) : (
-          <p className="px-2 text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             No authors yet.
           </p>
         )}
-      </RailCard>
+      </RailSection>
     </div>
   );
 }

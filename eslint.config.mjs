@@ -72,6 +72,26 @@ const eslintConfig = defineConfig([
             "Dark-modified surface hand-roll — rely on surface-* utilities and theme tokens instead of dark:bg-white/... overrides.",
         },
         {
+          selector: "Literal[value=/hover:bg-accent-soft/]",
+          message:
+            "Accent hover wash — hovers are neutral: use hover:bg-hover. The accent is reserved for selected state.",
+        },
+        {
+          selector: "TemplateElement[value.raw=/hover:bg-accent-soft/]",
+          message:
+            "Accent hover wash — hovers are neutral: use hover:bg-hover. The accent is reserved for selected state.",
+        },
+        {
+          selector: "Literal[value=/\\buppercase\\s+tracking-/]",
+          message:
+            "Uppercase tracked micro-label — labels are sentence case (SANS_LABEL / useTypography()).",
+        },
+        {
+          selector: "TemplateElement[value.raw=/\\buppercase\\s+tracking-/]",
+          message:
+            "Uppercase tracked micro-label — labels are sentence case (SANS_LABEL / useTypography()).",
+        },
+        {
           selector: "Literal[value=/(?:^|\\s)shadow-[\\[]/]",
           message:
             "Custom arbitrary shadow — use surface-overlay or a sanctioned surface utility; only surface-overlay's stage shadow is permitted.",

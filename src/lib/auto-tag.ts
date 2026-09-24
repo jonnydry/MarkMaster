@@ -1,7 +1,14 @@
+import { hasVideoLikeMedia, type BookmarkMediaJson } from "@/lib/bookmark-media";
+
 interface TagRule {
   name: string;
   color: string;
   test: (text: string, media: unknown[] | null, urls: unknown[] | null) => boolean;
+}
+
+function isVideoMedia(media: unknown[] | null): boolean {
+  if (!Array.isArray(media)) return false;
+  return hasVideoLikeMedia(media as BookmarkMediaJson[]);
 }
 
 const TAG_RULES: TagRule[] = [
@@ -24,9 +31,15 @@ const TAG_RULES: TagRule[] = [
     test: (text) => /🧵|\bthread\b/i.test(text) || /\b1\/\d+\b/.test(text),
   },
   {
+    name: "Video",
+    color: "#2563eb",
+    test: (_text, media) => isVideoMedia(media),
+  },
+  {
     name: "Media",
     color: "#2563eb",
-    test: (_text, media) => Array.isArray(media) && media.length > 0,
+    test: (_text, media) =>
+      Array.isArray(media) && media.length > 0 && !isVideoMedia(media),
   },
   {
     name: "Question",

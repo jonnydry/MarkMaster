@@ -70,7 +70,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
     const defaultHint = !value && (
       <Kbd
         aria-hidden="true"
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
       >
         /
       </Kbd>

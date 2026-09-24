@@ -1,5 +1,7 @@
 import {
   DM_Sans,
+  Geist,
+  Geist_Mono,
   IBM_Plex_Mono,
   IBM_Plex_Sans,
   Inter,
@@ -10,23 +12,37 @@ import {
 
 import type { TypographyPresetId } from "@/lib/typography-presets";
 
-/** Orbit (default) + mono preset — loaded globally in root layout. */
+/** Orbit (default) preset — Geist for UI and reading, Geist Mono for data. */
+export const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+export const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+/** Mono + editorial presets — declared globally, not preloaded. */
 export const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-ibm-plex-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  preload: false,
 });
 
 export const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  preload: false,
 });
 
 export const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  preload: false,
 });
 
 /** Classic preset — lazy-loaded when selected. */
@@ -57,6 +73,8 @@ export const newsreader = Newsreader({
 });
 
 export const defaultFontVariables = [
+  geistSans.variable,
+  geistMono.variable,
   ibmPlexSans.variable,
   jetbrainsMono.variable,
   ibmPlexMono.variable,

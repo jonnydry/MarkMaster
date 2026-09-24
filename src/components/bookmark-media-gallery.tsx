@@ -312,7 +312,7 @@ function MediaTile({
           onActivate();
         }}
         className={cn(
-          "flex items-center justify-center rounded-sm border border-hairline-soft bg-muted/40 text-2xs text-muted-foreground hover:bg-muted/60",
+          "flex items-center justify-center surface-inset-strong text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground",
           isCompact ? layout.compactTileClass : "aspect-video w-full min-h-[120px]"
         )}
       >

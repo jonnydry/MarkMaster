@@ -113,7 +113,7 @@ export function AddTagDialog({
       <DialogContent className="min-w-0 overflow-x-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isBulk ? `Tag ${bookmarkIds.length} bookmarks` : "Manage Tags"}
+            {isBulk ? `Tag ${bookmarkIds.length} bookmarks` : "Manage tags"}
           </DialogTitle>
           <DialogDescription>
             {isBulk

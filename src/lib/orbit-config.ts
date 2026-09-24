@@ -59,6 +59,9 @@ export const ORBIT_GROK_MAX_PROPOSED_TAGS = 15;
 /** Grok may invent this many new collection names per scan batch. */
 export const ORBIT_GROK_MAX_PROPOSED_COLLECTIONS = 4;
 
+/** Tags applied to one bookmark from a scan suggestion or a review edit. */
+export const ORBIT_MAX_TAGS_PER_BOOKMARK = 5;
+
 /** Include a tag in the Orbit plan when Jev's noul is at least this. */
 export const ORBIT_JEV_TAG_INCLUDE_THRESHOLD = 0.55;
 
@@ -93,6 +96,21 @@ export const ORBIT_JEV_ASSIGN_CONCURRENCY = parseBoundedIntEnv(
   1,
   32
 );
+
+/** Tags learned from one untagged library. The assignment list stays this short. */
+export const ORBIT_LIBRARY_VOCAB_MAX = 24;
+
+/** Bookmarks read to build a stratified sample. The model only sees the sample. */
+export const ORBIT_LIBRARY_SAMPLE_POOL = 240;
+
+/** Posts sent in the one vocabulary call. */
+export const ORBIT_LIBRARY_SAMPLE_SIZE = 36;
+
+/** Posts scored together in one Jev call against the closed tag list. */
+export const ORBIT_LIBRARY_PACK_SIZE = 6;
+
+/** Packed Jev calls in flight during a library page. */
+export const ORBIT_LIBRARY_PACK_CONCURRENCY = 3;
 
 /** Untagged bookmarks processed per library-classify worker page. */
 export const ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE = 48;

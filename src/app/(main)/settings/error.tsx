@@ -10,6 +10,6 @@ export default function SettingsError({
   reset: () => void;
 }) {
   return (
-    <AppRouteError error={error} reset={reset} title="Failed to load settings" />
+    <AppRouteError error={error} reset={reset} title="Settings couldn’t load" />
   );
 }

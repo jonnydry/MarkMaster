@@ -17,7 +17,6 @@ import {
   orbitMapInspectorOverlayZoomClass,
 } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
-import { PageWatermark } from "@/components/page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import {
@@ -182,7 +181,6 @@ export default function OrbitMapPage() {
     <AppPageShell
       className="orbit-route-default"
       layout="column"
-      watermark={<PageWatermark variant="orbit" />}
       mainTop={
         syncProgressVisible ? (
           <ScrollingProgressBar className="relative z-50" />
@@ -311,12 +309,12 @@ export default function OrbitMapPage() {
           ) : null}
 
           {graph && !selection ? (
-            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 overflow-hidden rounded-sm px-3 py-2 text-2xs font-medium text-foreground/70 sm:flex">
+            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 overflow-hidden rounded-sm px-3 py-2 text-xs font-medium text-muted-foreground sm:flex">
               <MousePointer2 className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
               <span className="whitespace-nowrap">Click to inspect</span>
-              <span className="text-foreground/30" aria-hidden="true">·</span>
+              <span className="text-muted-foreground/50" aria-hidden="true">·</span>
               <span className="whitespace-nowrap">Scroll to zoom</span>
-              <span className="hidden text-foreground/30 md:inline" aria-hidden="true">·</span>
+              <span className="hidden text-muted-foreground/50 md:inline" aria-hidden="true">·</span>
               <span className="hidden whitespace-nowrap md:inline">Drag to pan</span>
             </div>
           ) : null}

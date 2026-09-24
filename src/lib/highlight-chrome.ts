@@ -14,11 +14,11 @@ export const highlightSegmentActiveClass =
   "bg-primary/10 text-foreground shadow-none";
 
 export const highlightIdleClass =
-  "border-transparent text-muted-foreground transition-[color,background-color,border-color] duration-150 hover:bg-accent-soft hover:text-foreground";
+  "border-transparent text-muted-foreground transition-[color,background-color,border-color] duration-150 hover:bg-hover hover:text-foreground";
 
 /** Hover affordance for highlight-styled controls. */
 export const highlightInteractiveClass =
-  "hover:border-primary/30 hover:bg-primary/15";
+  "hover:border-primary/35 hover:bg-primary/15";
 
 /** Compact checkbox / radio indicator when selected. */
 export const highlightIndicatorActiveClass =
@@ -26,13 +26,13 @@ export const highlightIndicatorActiveClass =
 
 /** Card or tile selection (settings presets, theme swatches). */
 export const highlightSurfaceActiveClass =
-  "border-primary/40 bg-primary/10 text-foreground shadow-none ring-1 ring-primary/20";
+  "border-primary bg-accent-soft text-foreground shadow-none";
 
 /** Hollow glass track — matches toolbar wells / highlight button shells. */
 export const highlightProgressTrackClass =
-  "overflow-hidden rounded-[2px] border border-hairline-soft bg-background/20 supports-[backdrop-filter]:bg-background/16 backdrop-blur-sm shadow-none";
+  "overflow-hidden rounded-[2px] bg-surface-3 shadow-none";
 
-/** Luminous fill shell — pairs with .highlight-progress-shimmer in globals.css. */
+/** Flat accent fill for highlight progress meters. */
 export const highlightProgressFillPrimaryClass =
   "highlight-progress-fill highlight-progress-fill--primary relative h-full overflow-hidden rounded-[2px] bg-primary/30 shadow-none transition-[width] ease-out";
 

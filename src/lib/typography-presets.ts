@@ -24,11 +24,11 @@ export const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
   {
     id: "orbit",
     name: "Orbit",
-    description: "Technical, readable, and a little less generic.",
-    bodyFace: "IBM Plex Sans",
-    headingFace: "IBM Plex Sans",
-    labelFace: "IBM Plex Mono",
-    dataFace: "JetBrains Mono",
+    description: "Clean, precise, and quietly technical.",
+    bodyFace: "Geist",
+    headingFace: "Geist",
+    labelFace: "Geist",
+    dataFace: "Geist Mono",
     previewCopy: "Clear reading with precise metadata.",
   },
   {

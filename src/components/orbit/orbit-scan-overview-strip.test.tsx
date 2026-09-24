@@ -122,7 +122,9 @@ describe("OrbitScanOverviewStrip", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /Orbit pass/i }));
+    await user.click(screen.getByRole("button", { name: /details/i }));
+    // Engine telemetry lives behind the Details disclosure.
+    expect(screen.getByText(/Orbit pass/)).toBeInTheDocument();
     const outcomeLine = screen.getByText(
       /Couldn't match: 8 · Fixed on retry: 5 · Sent to Grok for new names: 3/
     );
@@ -159,7 +161,7 @@ describe("OrbitScanOverviewStrip", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /Orbit pass/i }));
+    await user.click(screen.getByRole("button", { name: /details/i }));
     expect(screen.queryByText(/Couldn't match/)).not.toBeInTheDocument();
   });
 });

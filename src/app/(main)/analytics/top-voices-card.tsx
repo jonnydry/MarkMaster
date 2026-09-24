@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, BadgeCheck, Users } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BadgeCheck } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HighlightProgress } from "@/components/highlight-progress";
@@ -53,7 +53,6 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
     <ChartShell variant={variant}>
       <SectionHeading
         title="Top voices"
-        icon={<Users className="h-4 w-4" />}
         meta={authors.length > 0 ? `${authors.length} authors` : undefined}
         variant={variant}
       />
@@ -130,7 +129,7 @@ export const TopVoicesCard = React.memo(function TopVoicesCard({
                       <span className="text-sm font-medium tabular-nums">
                         {a.count.toLocaleString()}
                       </span>
-                      <span className="text-2xs tabular-nums text-muted-foreground">
+                      <span className="text-xs tabular-nums text-muted-foreground">
                         {libraryShare.toFixed(1)}%
                       </span>
                     </div>

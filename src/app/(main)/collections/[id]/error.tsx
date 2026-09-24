@@ -10,6 +10,6 @@ export default function CollectionDetailError({
   reset: () => void;
 }) {
   return (
-    <AppRouteError error={error} reset={reset} title="Failed to load collection" />
+    <AppRouteError error={error} reset={reset} title="This collection couldn’t load" />
   );
 }

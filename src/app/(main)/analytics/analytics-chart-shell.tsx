@@ -30,13 +30,11 @@ export function ChartShell({
 
 export function SectionHeading({
   title,
-  icon,
   meta,
   aside,
   variant = "card",
 }: {
   title: string;
-  icon: ReactNode;
   meta?: string;
   aside?: ReactNode;
   variant?: ChartVariant;
@@ -54,17 +52,7 @@ export function SectionHeading({
   }
   return (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-sm",
-            "border border-primary/15 bg-primary/10 text-primary"
-          )}
-        >
-          {icon}
-        </span>
-        <h2 className="min-w-0 text-base font-semibold heading-font">{title}</h2>
-      </div>
+      <h2 className="min-w-0 text-base font-semibold heading-font">{title}</h2>
       {(meta || aside) && (
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end">
           {meta ? (
@@ -83,7 +71,7 @@ export function EmptyBox({ height = 180 }: { height?: number }) {
       role="status"
       style={{ height }}
       className={cn(
-        "surface-inset flex items-center justify-center border-dashed text-sm text-muted-foreground"
+        "surface-inset flex items-center justify-center text-sm text-muted-foreground"
       )}
     >
       Nothing here yet

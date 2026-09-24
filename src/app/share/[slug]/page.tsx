@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
-import { cache, type ReactElement } from "react";
+import { cache } from "react";
+import { Bookmark, Users } from "lucide-react";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,7 +18,6 @@ import {
 } from "@/lib/public-share-cache";
 import { isShareLinkExpired } from "@/lib/share-content";
 import { AppPublicPage } from "@/components/app-page-shell";
-import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 import { TagDot } from "@/components/tag-dot";
 
@@ -254,7 +254,7 @@ export default async function PublicSharePage({
 
   return (
     <AppPublicPage className="bg-background">
-      <header className={cn("border-b border-hairline-soft", appChromeFrostedClassName)}>
+      <header className="border-b border-hairline-soft bg-background">
         <div
           className={cn(
             bookmarkFeedColumnClassName,
@@ -263,86 +263,80 @@ export default async function PublicSharePage({
         >
           <Link href="/" className="flex items-center gap-2">
             <MarkMasterLogo width={28} height={28} className="shrink-0" />
-            <span className="font-bold tracking-tight">MarkMaster</span>
+            <span className="font-semibold">MarkMaster</span>
           </Link>
           <Link
             href={returnToShareHref}
             className={buttonVariantClassName("outline", "sm")}
           >
-            Sign in to MarkMaster
+            Sign in
           </Link>
         </div>
       </header>
 
       <main className={cn(bookmarkFeedColumnClassName, "px-6 py-8")}>
-        <section className="mb-8 border-b border-border pb-8">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="mb-4 flex items-center gap-3">
-                {collection.user.profileImageUrl && (
-                  <Image
-                    src={collection.user.profileImageUrl}
-                    alt={`${collection.user.displayName} avatar`}
-                    width={36}
-                    height={36}
-                    className="size-9 rounded-full"
-                  />
-                )}
-                <div>
-                  <p className="text-sm font-medium">
-                    {collection.user.displayName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    @{collection.user.username}
-                  </p>
-                </div>
-              </div>
-              <h1 className="heading-font text-3xl font-bold tracking-tight sm:text-4xl">
-                {collection.name}
-              </h1>
-              {collection.description && (
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  {collection.description}
-                </p>
+        <section className="mb-2 border-b border-hairline-soft pb-6">
+          <div className="min-w-0">
+            <div className="mb-4 flex items-center gap-3">
+              {collection.user.profileImageUrl && (
+                <Image
+                  src={collection.user.profileImageUrl}
+                  alt={`${collection.user.displayName} avatar`}
+                  width={36}
+                  height={36}
+                  className="size-9 rounded-full"
+                />
               )}
+              <div>
+                <p className="text-sm font-medium">
+                  {collection.user.displayName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  @{collection.user.username}
+                </p>
+              </div>
             </div>
-            <Link
-              href={returnToShareHref}
-              className={buttonVariantClassName(undefined, undefined, "gap-2")}
-            >
-              Sign in to organize yours
-              <ExternalLinkIcon className="size-3.5" />
-            </Link>
+            <h1 className="heading-font text-3xl font-bold sm:text-4xl">
+              {collection.name}
+            </h1>
+            {collection.description && (
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {collection.description}
+              </p>
+            )}
           </div>
 
-          <div className="mt-6 grid gap-2 sm:grid-cols-3">
-            <ShareStat
-              icon={BookmarkIcon}
-              label="Bookmarks"
-              value={pagination.totalItems.toLocaleString()}
-            />
-            <ShareStat
-              icon={UsersIcon}
-              label="Authors"
-              value={authorCount.toLocaleString()}
-            />
-            <ShareStat
-              icon={TagIcon}
-              label="Top tags"
-              value={topTags.length.toLocaleString()}
-            />
-          </div>
+          <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Bookmark className="size-3.5" aria-hidden="true" />
+              <span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {pagination.totalItems.toLocaleString()}
+                </span>{" "}
+                {pagination.totalItems === 1 ? "bookmark" : "bookmarks"}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Users className="size-3.5" aria-hidden="true" />
+              <span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {authorCount.toLocaleString()}
+                </span>{" "}
+                {authorCount === 1 ? "author" : "authors"}
+              </span>
+            </span>
+          </p>
 
           {topTags.length > 0 ? (
-            <div className="mt-5 flex flex-wrap gap-1.5">
+            <div className="mt-4 flex flex-wrap gap-1.5">
               {topTags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-hairline-soft px-2 py-1 text-xs font-medium text-muted-foreground"
                 >
                   <TagDot name={tag.name} color={tag.color} size={8} />
                   {tag.name}
-                  <span className="text-muted-foreground/60">{tag.count}</span>
+                  <span className="tabular-nums">{tag.count}</span>
                 </span>
               ))}
             </div>
@@ -384,41 +378,17 @@ export default async function PublicSharePage({
         ) : null}
       </main>
 
-      <footer className="mt-12 border-t border-border px-6 py-8">
+      <footer className="mt-12 border-t border-hairline-soft px-6 py-10">
         <div className={cn(bookmarkFeedColumnClassName, "text-center")}>
           <p className="mb-4 text-sm text-muted-foreground">
-            Curated with MarkMaster
+            Curated with MarkMaster — built for people who save too much.
           </p>
           <Link href="/login" className={buttonVariantClassName(undefined, "sm")}>
-            Start organizing your bookmarks
+            Organize your X bookmarks
           </Link>
         </div>
       </footer>
     </AppPublicPage>
-  );
-}
-
-type ShareStatIcon = (props: { className?: string }) => ReactElement;
-
-function ShareStat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ShareStatIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="surface-inset-strong px-3 py-2.5">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
-      </div>
-      <p className="heading-font mt-1 text-lg font-semibold tabular-nums">
-        {value}
-      </p>
-    </div>
   );
 }
 
@@ -438,7 +408,7 @@ function SharePagination({
   return (
     <nav
       aria-label="Shared collection pagination"
-      className="mt-6 flex items-center justify-between border-t border-border pt-4"
+      className="mt-6 flex items-center justify-between border-t border-hairline-soft pt-4"
     >
       {hasPrevious ? (
         <Link
@@ -466,79 +436,5 @@ function SharePagination({
         <span aria-hidden className="h-9 w-20" />
       )}
     </nav>
-  );
-}
-
-function BookmarkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function TagIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
-      <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M15 3h6v6" />
-      <path d="M10 14 21 3" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
   );
 }

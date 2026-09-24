@@ -237,26 +237,26 @@ export function AnalyticsHero({
         />
         <p className="mt-2 text-xs text-muted-foreground">
           {syncLabel}
-          <span className="text-muted-foreground/50"> · </span>
+          <span aria-hidden="true"> · </span>
           {totalTags.toLocaleString()} {totalTags === 1 ? "tag" : "tags"}
-          <span className="text-muted-foreground/50"> · </span>
+          <span aria-hidden="true"> · </span>
           {totalCollections.toLocaleString()}{" "}
           {totalCollections === 1 ? "collection" : "collections"}
           {rawHighlightsCount > 0 ? (
             <>
-              <span className="text-muted-foreground/50"> · </span>
+              <span aria-hidden="true"> · </span>
               {rawHighlightsCount.toLocaleString()} in Discovery
             </>
           ) : null}
           {oldestLabel && !allTriaged ? (
             <>
-              <span className="text-muted-foreground/50"> · </span>
+              <span aria-hidden="true"> · </span>
               Oldest waiting since {oldestLabel}
             </>
           ) : null}
           {orbitQueueCount > 0 ? (
             <>
-              <span className="text-muted-foreground/50"> · </span>
+              <span aria-hidden="true"> · </span>
               <Link href={orbitHref} className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline">
                 Organize in Orbit
               </Link>

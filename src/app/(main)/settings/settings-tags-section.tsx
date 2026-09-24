@@ -60,7 +60,7 @@ export function SettingsTagsSection({
       id="tags"
       icon={Tag}
       title="Tags"
-      description="Rename, recolor, merge, or balance tags across your library."
+      description="Rename or delete a tag to change every bookmark that wears it. Recolor, merge, or balance colors across the library."
       action={
         tags.length > 1 ? (
           <Button

@@ -7,11 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-ibm-plex-sans);
-  --font-mono: var(--font-jetbrains-mono);
-  --font-heading: var(--font-ibm-plex-sans);
-  --font-label: var(--font-ibm-plex-mono);
-  --font-data: var(--font-jetbrains-mono);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+  --font-label: var(--font-geist-sans);
+  --font-data: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,8 +49,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-note: var(--note);
-  --color-emerald: var(--emerald);
   --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-hover: var(--hover);
+  --color-glow: var(--glow);
   --color-bronze: var(--bronze);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -65,54 +67,48 @@
 
 :root {
   color-scheme: light;
-  /* Neutral bases washed with a sliver of the active accent — every color
-     theme tints the whole shell, not just its buttons. Percentages are tuned
-     so the default Horizon blue reproduces the original palette. */
-  --background: color-mix(in srgb, #ffffff 96.5%, var(--primary));
-  --foreground: #0b0f19;
+  /* Neutral foundations. The accent lives only on interactive and selected
+     state (primary, ring, accent-soft, glow) — never mixed into the shell. */
+  --background: #ffffff;
+  --foreground: #0f1419;
   --card: #ffffff;
-  --card-foreground: #0b0f19;
+  --card-foreground: #0f1419;
   --popover: #ffffff;
-  --popover-foreground: #0b0f19;
+  --popover-foreground: #0f1419;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: color-mix(in srgb, #fcfcfc 93%, var(--primary));
-  --secondary-foreground: #172033;
-  --muted: color-mix(in srgb, #fcfcfc 93%, var(--primary));
-  --muted-foreground: #5f6b7a;
-  --accent: color-mix(in srgb, #fcfcfc 90%, var(--primary));
-  --accent-foreground: #0b0f19;
-  --destructive: #ef4444;
-  --border: color-mix(in srgb, #e9e9e9 91%, var(--primary));
-  --input: color-mix(in srgb, #e9e9e9 91%, var(--primary));
-  --ring: #2563eb;
+  --secondary: #f4f5f6;
+  --secondary-foreground: #1d242c;
+  --muted: #f4f5f6;
+  --muted-foreground: #56606b;
+  --accent: #f0f2f4;
+  --accent-foreground: #0f1419;
+  --destructive: #dc2626;
+  --border: #e3e6e9;
+  --input: #dcdfe3;
   --note: #0f172a;
-  --emerald: #0d9488;
   --chart-1: #2563eb;
   --chart-2: #0d9488;
   --chart-3: #0f172a;
   --chart-4: #6366f1;
   --chart-5: #e11d74;
   --radius: 0.25rem;
-  --sidebar: color-mix(in srgb, #fcfcfc 93%, var(--primary));
-  --sidebar-foreground: #0b0f19;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(37, 99, 235, 0.1);
-  --sidebar-accent-foreground: #1d4ed8;
-  --sidebar-border: color-mix(in srgb, #e9e9e9 91%, var(--primary));
-  --sidebar-ring: #2563eb;
+  --sidebar: var(--background);
+  --sidebar-foreground: #0f1419;
+  --sidebar-border: var(--border);
   --surface-1: #ffffff;
-  --surface-2: color-mix(in srgb, #fcfcfc 96%, var(--primary));
-  --surface-3: color-mix(in srgb, #f8f8f8 91%, var(--primary));
+  --surface-2: #f7f8f9;
+  --surface-3: #eff1f3;
   --surface-elevated: #ffffff;
-  --hairline-soft: rgba(11, 15, 25, 0.08);
-  --hairline-strong: rgba(11, 15, 25, 0.14);
-  --accent-soft: rgba(37, 99, 235, 0.1);
-  --page-shell-depth-top: #ffffff;
-  --page-shell-depth-bottom: color-mix(in srgb, #fcfcfc 93%, var(--primary));
-  --page-shell-ambient: rgba(37, 99, 235, 0.08);
-  --page-shell-highlight: rgba(255, 255, 255, 0.78);
+  --hairline-soft: rgba(15, 20, 25, 0.09);
+  --hairline-strong: rgba(15, 20, 25, 0.15);
+  /* Neutral hover wash — hovers stay quiet; the accent is reserved for state. */
+  --hover: rgba(15, 20, 25, 0.045);
+  /* State glow — one light source, derived from the accent. Lightness is
+     clamped (below) so dark and near-black accents still read as a glow. */
+  --glow: var(--primary);
+  --glow-wash: color-mix(in srgb, var(--glow) 9%, transparent);
+  --glow-tint: color-mix(in srgb, var(--glow) 4%, transparent);
   --app-header-height: 72px;
   --header-height: var(--app-header-height);
   --app-overlay-inset: 0.75rem;
@@ -122,91 +118,100 @@
   --z-sticky-header: 20;
   --z-overlay: 30;
   --z-modal: 50;
-  --success: #22c55e;
+  --success: #15803d;
+  --warning: #b45309;
   --markmaster-logo-hue: 0deg;
   --markmaster-logo-saturate: 1;
   --markmaster-logo-brightness: 1;
+  --ring: var(--primary);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: color-mix(in srgb, var(--primary) 10%, transparent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-ring: var(--primary);
+  --accent-soft: color-mix(in srgb, var(--primary) 10%, transparent);
   --bronze: #c9aa6c;
 }
 
 .dark {
   color-scheme: dark;
-  /* Near-black bases with a faint wash of the active accent — dark mode picks
-     up the theme's temperature instead of staying dead neutral. */
-  --background: color-mix(in srgb, #0a0a0a 97.5%, var(--primary));
-  --foreground: #f0ebe3;
-  --card: color-mix(in srgb, #111111 96.5%, var(--primary));
-  --card-foreground: #f0ebe3;
-  --popover: color-mix(in srgb, #111111 96.5%, var(--primary));
-  --popover-foreground: #f0ebe3;
+  /* Neutral near-black (not #000: avoids OLED smear and the seam around the
+     #0a0a0a map canvas). */
+  --background: #0a0a0a;
+  --foreground: #ececec;
+  --card: #111111;
+  --card-foreground: #ececec;
+  --popover: #141414;
+  --popover-foreground: #ececec;
+  /* Keep white-on-primary at AA; --glow lifts the lightness for the light source. */
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: color-mix(in srgb, #151515 95.5%, var(--primary));
-  --secondary-foreground: #c8c0b4;
-  --muted: color-mix(in srgb, #151515 95.5%, var(--primary));
-  --muted-foreground: #7a7570;
-  --accent: color-mix(in srgb, #151515 95.5%, var(--primary));
-  --accent-foreground: #c8c0b4;
-  --destructive: #ef4444;
-  --border: color-mix(in srgb, #202020 94.5%, var(--primary));
-  --input: color-mix(in srgb, #181818 95.5%, var(--primary));
-  --ring: #2563eb;
+  --secondary: #171717;
+  --secondary-foreground: #c9ccd1;
+  --muted: #171717;
+  --muted-foreground: #8d9299;
+  --accent: #1a1a1a;
+  --accent-foreground: #ececec;
+  --destructive: #f05252;
+  --border: #242424;
+  --input: #2a2a2a;
   --note: #93c5fd;
-  --emerald: #14b8a6;
-  --chart-1: #2563eb;
+  --chart-1: #3b82f6;
   --chart-2: #2dd4bf;
   --chart-3: #93c5fd;
   --chart-4: #a5b4fc;
   --chart-5: #f472b6;
-  --sidebar: color-mix(in srgb, #0d0d0d 96.5%, var(--primary));
-  --sidebar-foreground: #c8c0b4;
-  --sidebar-primary: #2563eb;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(37, 99, 235, 0.12);
-  --sidebar-accent-foreground: #60a5fa;
-  --sidebar-border: color-mix(in srgb, #202020 94.5%, var(--primary));
-  --sidebar-ring: #2563eb;
-  --surface-1: color-mix(in srgb, #111111 96.5%, var(--primary));
-  --surface-2: color-mix(in srgb, #151515 95.5%, var(--primary));
-  --surface-3: color-mix(in srgb, #1a1a1c 95.5%, var(--primary));
-  --surface-elevated: color-mix(in srgb, #1d1d20 95.5%, var(--primary));
-  --hairline-soft: rgba(255, 255, 255, 0.05);
-  --hairline-strong: rgba(255, 255, 255, 0.08);
-  --accent-soft: rgba(37, 99, 235, 0.12);
-  --page-shell-depth-top: color-mix(in srgb, #0d0d0d 95.5%, var(--primary));
-  --page-shell-depth-bottom: color-mix(in srgb, #0a0a0a 98%, var(--primary));
-  --page-shell-ambient: rgba(37, 99, 235, 0.09);
-  --page-shell-highlight: rgba(255, 255, 255, 0.035);
+  --sidebar: var(--background);
+  --sidebar-foreground: #c9ccd1;
+  --sidebar-border: var(--border);
+  --surface-1: #111111;
+  --surface-2: #161616;
+  --surface-3: #1c1c1c;
+  --surface-elevated: #1f1f1f;
+  --hairline-soft: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+  --hover: rgba(255, 255, 255, 0.045);
+  --glow-wash: color-mix(in srgb, var(--glow) 14%, transparent);
+  --glow-tint: color-mix(in srgb, var(--glow) 6%, transparent);
   --success: #4ade80;
+  --warning: #fbbf24;
   --markmaster-logo-hue: 0deg;
   --markmaster-logo-saturate: 1.05;
+  --ring: var(--primary);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: color-mix(in srgb, var(--primary) 12%, transparent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-ring: var(--primary);
+  --accent-soft: color-mix(in srgb, var(--primary) 13%, transparent);
   --markmaster-logo-brightness: 1.04;
 }
 
+/* Normalise glow lightness so every accent (incl. graphite and deep blues)
+   produces a visible, non-muddy light source. Falls back to raw --primary. */
+@supports (color: oklch(from red l c h)) {
+  :root {
+    --glow: oklch(from var(--primary) clamp(0.55, l, 0.66) c h);
+  }
+  .dark {
+    --glow: oklch(from var(--primary) clamp(0.66, l, 0.8) c h);
+  }
+}
+
 /* === Accent color themes (opt-in via data-color-theme on html) ===
-   Each block only overrides accent tokens; surfaces derive from --primary via
-   the color-mix recipes in :root / .dark, so the whole shell picks up a faint
-   wash of the active accent automatically.
+   Each block only overrides the accent and its charts/logo tint. Neutrals stay
+   neutral; accent-soft, sidebar-accent, ring and --glow derive from --primary.
    "horizon" (default blue) needs no attribute — omit data-color-theme.
 */
 
 :root[data-color-theme="aurora"] {
-  --primary: #0d9488;
+  --primary: #0f766e;
   --primary-foreground: #ffffff;
-  --ring: #0d9488;
-  --sidebar-primary: #0d9488;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(13, 148, 136, 0.1);
-  --sidebar-accent-foreground: #0f766e;
-  --sidebar-ring: #0d9488;
-  --accent-soft: rgba(13, 148, 136, 0.1);
-  --page-shell-ambient: rgba(13, 148, 136, 0.08);
   --chart-1: #0d9488;
   --chart-2: #14b8a6;
   --chart-3: #0e7490;
   --chart-4: #6366f1;
   --chart-5: #d97706;
-  --emerald: #0d9488;
   --markmaster-logo-hue: -52deg;
   --markmaster-logo-saturate: 1.15;
   --markmaster-logo-brightness: 1.02;
@@ -215,42 +220,24 @@
 .dark[data-color-theme="aurora"] {
   --primary: #2dd4bf;
   --primary-foreground: #042f2e;
-  --ring: #2dd4bf;
-  --sidebar-primary: #2dd4bf;
-  --sidebar-primary-foreground: #042f2e;
-  --sidebar-accent: rgba(45, 212, 191, 0.12);
-  --sidebar-accent-foreground: #5eead4;
-  --sidebar-ring: #2dd4bf;
-  --accent-soft: rgba(45, 212, 191, 0.12);
-  --page-shell-ambient: rgba(45, 212, 191, 0.09);
   --chart-1: #2dd4bf;
   --chart-2: #5eead4;
   --chart-3: #7dd3fc;
   --chart-4: #a5b4fc;
   --chart-5: #fbbf24;
-  --emerald: #2dd4bf;
   --markmaster-logo-hue: -48deg;
   --markmaster-logo-saturate: 1.28;
   --markmaster-logo-brightness: 1.08;
 }
 
 :root[data-color-theme="ember"] {
-  --primary: #ea580c;
+  --primary: #c2410c;
   --primary-foreground: #ffffff;
-  --ring: #ea580c;
-  --sidebar-primary: #ea580c;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(234, 88, 12, 0.1);
-  --sidebar-accent-foreground: #c2410c;
-  --sidebar-ring: #ea580c;
-  --accent-soft: rgba(234, 88, 12, 0.1);
-  --page-shell-ambient: rgba(234, 88, 12, 0.08);
   --chart-1: #ea580c;
   --chart-2: #f97316;
   --chart-3: #b45309;
   --chart-4: #e11d48;
   --chart-5: #0d9488;
-  --emerald: #ea580c;
   --markmaster-logo-hue: -194deg;
   --markmaster-logo-saturate: 1.22;
   --markmaster-logo-brightness: 1.03;
@@ -259,20 +246,11 @@
 .dark[data-color-theme="ember"] {
   --primary: #fb923c;
   --primary-foreground: #431407;
-  --ring: #fb923c;
-  --sidebar-primary: #fb923c;
-  --sidebar-primary-foreground: #431407;
-  --sidebar-accent: rgba(251, 146, 60, 0.12);
-  --sidebar-accent-foreground: #fdba74;
-  --sidebar-ring: #fb923c;
-  --accent-soft: rgba(251, 146, 60, 0.12);
-  --page-shell-ambient: rgba(251, 146, 60, 0.09);
   --chart-1: #fb923c;
   --chart-2: #fdba74;
   --chart-3: #fbbf24;
   --chart-4: #fb7185;
   --chart-5: #2dd4bf;
-  --emerald: #fb923c;
   --markmaster-logo-hue: -188deg;
   --markmaster-logo-saturate: 1.32;
   --markmaster-logo-brightness: 1.08;
@@ -281,20 +259,11 @@
 :root[data-color-theme="nebula"] {
   --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --ring: #7c3aed;
-  --sidebar-primary: #7c3aed;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(124, 58, 237, 0.1);
-  --sidebar-accent-foreground: #6d28d9;
-  --sidebar-ring: #7c3aed;
-  --accent-soft: rgba(124, 58, 237, 0.1);
-  --page-shell-ambient: rgba(124, 58, 237, 0.08);
   --chart-1: #7c3aed;
   --chart-2: #8b5cf6;
   --chart-3: #4338ca;
   --chart-4: #c026d3;
   --chart-5: #0ea5e9;
-  --emerald: #7c3aed;
   --markmaster-logo-hue: 38deg;
   --markmaster-logo-saturate: 1.18;
   --markmaster-logo-brightness: 1.02;
@@ -303,42 +272,24 @@
 .dark[data-color-theme="nebula"] {
   --primary: #a78bfa;
   --primary-foreground: #2e1065;
-  --ring: #a78bfa;
-  --sidebar-primary: #a78bfa;
-  --sidebar-primary-foreground: #2e1065;
-  --sidebar-accent: rgba(167, 139, 250, 0.12);
-  --sidebar-accent-foreground: #c4b5fd;
-  --sidebar-ring: #a78bfa;
-  --accent-soft: rgba(167, 139, 250, 0.12);
-  --page-shell-ambient: rgba(167, 139, 250, 0.09);
   --chart-1: #a78bfa;
   --chart-2: #c4b5fd;
   --chart-3: #818cf8;
   --chart-4: #e879f9;
   --chart-5: #38bdf8;
-  --emerald: #a78bfa;
   --markmaster-logo-hue: 42deg;
   --markmaster-logo-saturate: 1.28;
   --markmaster-logo-brightness: 1.08;
 }
 
 :root[data-color-theme="canopy"] {
-  --primary: #16a34a;
+  --primary: #15803d;
   --primary-foreground: #ffffff;
-  --ring: #16a34a;
-  --sidebar-primary: #16a34a;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(22, 163, 74, 0.1);
-  --sidebar-accent-foreground: #15803d;
-  --sidebar-ring: #16a34a;
-  --accent-soft: rgba(22, 163, 74, 0.1);
-  --page-shell-ambient: rgba(22, 163, 74, 0.08);
   --chart-1: #16a34a;
   --chart-2: #22c55e;
   --chart-3: #65a30d;
   --chart-4: #0d9488;
   --chart-5: #ca8a04;
-  --emerald: #16a34a;
   --markmaster-logo-hue: -79deg;
   --markmaster-logo-saturate: 1.16;
   --markmaster-logo-brightness: 1.02;
@@ -347,20 +298,11 @@
 .dark[data-color-theme="canopy"] {
   --primary: #4ade80;
   --primary-foreground: #052e16;
-  --ring: #4ade80;
-  --sidebar-primary: #4ade80;
-  --sidebar-primary-foreground: #052e16;
-  --sidebar-accent: rgba(74, 222, 128, 0.12);
-  --sidebar-accent-foreground: #86efac;
-  --sidebar-ring: #4ade80;
-  --accent-soft: rgba(74, 222, 128, 0.12);
-  --page-shell-ambient: rgba(74, 222, 128, 0.09);
   --chart-1: #4ade80;
   --chart-2: #86efac;
   --chart-3: #a3e635;
   --chart-4: #2dd4bf;
   --chart-5: #facc15;
-  --emerald: #4ade80;
   --markmaster-logo-hue: -74deg;
   --markmaster-logo-saturate: 1.26;
   --markmaster-logo-brightness: 1.08;
@@ -369,20 +311,11 @@
 :root[data-color-theme="pulse"] {
   --primary: #db2777;
   --primary-foreground: #ffffff;
-  --ring: #db2777;
-  --sidebar-primary: #db2777;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(219, 39, 119, 0.1);
-  --sidebar-accent-foreground: #be185d;
-  --sidebar-ring: #db2777;
-  --accent-soft: rgba(219, 39, 119, 0.1);
-  --page-shell-ambient: rgba(219, 39, 119, 0.08);
   --chart-1: #db2777;
   --chart-2: #ec4899;
   --chart-3: #a21caf;
   --chart-4: #f43f5e;
   --chart-5: #6366f1;
-  --emerald: #db2777;
   --markmaster-logo-hue: 108deg;
   --markmaster-logo-saturate: 1.2;
   --markmaster-logo-brightness: 1.03;
@@ -391,20 +324,11 @@
 .dark[data-color-theme="pulse"] {
   --primary: #f472b6;
   --primary-foreground: #500724;
-  --ring: #f472b6;
-  --sidebar-primary: #f472b6;
-  --sidebar-primary-foreground: #500724;
-  --sidebar-accent: rgba(244, 114, 182, 0.12);
-  --sidebar-accent-foreground: #f9a8d4;
-  --sidebar-ring: #f472b6;
-  --accent-soft: rgba(244, 114, 182, 0.12);
-  --page-shell-ambient: rgba(244, 114, 182, 0.09);
   --chart-1: #f472b6;
   --chart-2: #f9a8d4;
   --chart-3: #e879f9;
   --chart-4: #fb7185;
   --chart-5: #a5b4fc;
-  --emerald: #f472b6;
   --markmaster-logo-hue: 112deg;
   --markmaster-logo-saturate: 1.3;
   --markmaster-logo-brightness: 1.08;
@@ -413,20 +337,11 @@
 :root[data-color-theme="graphite"] {
   --primary: #27272a;
   --primary-foreground: #ffffff;
-  --ring: #27272a;
-  --sidebar-primary: #27272a;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(39, 39, 42, 0.1);
-  --sidebar-accent-foreground: #3f3f46;
-  --sidebar-ring: #27272a;
-  --accent-soft: rgba(39, 39, 42, 0.1);
-  --page-shell-ambient: rgba(39, 39, 42, 0.06);
   --chart-1: #3f3f46;
   --chart-2: #52525b;
   --chart-3: #71717a;
   --chart-4: #a1a1aa;
   --chart-5: #18181b;
-  --emerald: #52525b;
   --note: #18181b;
   --markmaster-logo-hue: 0deg;
   --markmaster-logo-saturate: 0;
@@ -436,20 +351,11 @@
 .dark[data-color-theme="graphite"] {
   --primary: #d4d4d8;
   --primary-foreground: #18181b;
-  --ring: #d4d4d8;
-  --sidebar-primary: #d4d4d8;
-  --sidebar-primary-foreground: #18181b;
-  --sidebar-accent: rgba(212, 212, 216, 0.12);
-  --sidebar-accent-foreground: #e4e4e7;
-  --sidebar-ring: #d4d4d8;
-  --accent-soft: rgba(212, 212, 216, 0.12);
-  --page-shell-ambient: rgba(212, 212, 216, 0.06);
   --chart-1: #d4d4d8;
   --chart-2: #a1a1aa;
   --chart-3: #71717a;
   --chart-4: #52525b;
   --chart-5: #fafafa;
-  --emerald: #a1a1aa;
   --note: #e4e4e7;
   --markmaster-logo-hue: 0deg;
   --markmaster-logo-saturate: 0;
@@ -458,11 +364,11 @@
 
 /* Typography presets keep body, headings, labels, and data cohesive. */
 [data-typography-preset="orbit"] {
-  --font-sans: var(--font-ibm-plex-sans);
-  --font-heading: var(--font-ibm-plex-sans);
-  --font-label: var(--font-ibm-plex-mono);
-  --font-data: var(--font-jetbrains-mono);
-  --font-mono: var(--font-jetbrains-mono);
+  --font-sans: var(--font-geist-sans);
+  --font-heading: var(--font-geist-sans);
+  --font-label: var(--font-geist-sans);
+  --font-data: var(--font-geist-mono);
+  --font-mono: var(--font-geist-mono);
 }
 
 [data-typography-preset="classic"] {
@@ -555,41 +461,58 @@
 }
 
 /* === Surface chrome contract — the canonical card/panel recipes. ===
-   These six utilities are the only sanctioned surface treatments. Compose
-   extras (padding, hover, focus) at the call site; never re-derive the
-   border/background pairing by hand. */
+   Surfaces are opaque: nothing translucent stacks over nothing. Hierarchy
+   comes from a single hairline and one step of surface lightness, never from
+   blur or layered alpha. Compose padding/hover/focus at the call site. */
 @utility surface-card {
-  /* Primary content card over the page shell. */
-  @apply rounded-sm border border-hairline-soft bg-surface-1/70;
+  /* Primary content card. */
+  @apply rounded-sm border border-hairline-soft bg-card;
 }
 @utility surface-veil {
-  /* Translucent card — ambient background and watermarks read through. */
-  @apply rounded-sm border border-hairline-soft bg-surface-1/55;
+  /* Legacy alias of surface-card (translucency retired). */
+  @apply rounded-sm border border-hairline-soft bg-card;
 }
 @utility surface-solid {
   /* Fully opaque card (hover swap-ins, surfaces that must mask content). */
-  @apply rounded-sm border border-hairline-soft bg-surface-1;
+  @apply rounded-sm border border-hairline-soft bg-card;
 }
 @utility surface-inset {
-  /* Nested well inside a card — settings rows, field groups. */
-  @apply rounded-sm border border-hairline-soft bg-surface-2/45;
+  /* Nested well inside a card — borderless tonal step. The transparent
+     border keeps box metrics identical to the other surfaces. */
+  @apply rounded-sm border border-transparent bg-surface-2;
 }
 @utility surface-inset-strong {
-  /* Stronger well — strips, stat tiles, emphasized insets. */
-  @apply rounded-sm border border-hairline-soft bg-surface-2/70;
+  /* Strips, stat tiles, sticky subbars — opaque, one hairline. */
+  @apply rounded-sm border border-hairline-soft bg-surface-2;
 }
 @utility surface-overlay {
-  /* Large overlay shells (bookmark/review overlays, oversized dialogs). */
+  /* Large overlay shells (bookmark/review overlays, oversized dialogs).
+     Opaque; the stage shadow is the only sanctioned elevation. */
   border: 1px solid var(--hairline-strong);
-  background-color: color-mix(in srgb, var(--surface-1) 78%, transparent);
-  box-shadow: 0 30px 120px -50px rgba(0, 0, 0, 0.95);
-  @supports (backdrop-filter: blur(1px)) {
-    backdrop-filter: blur(40px);
-  }
+  background-color: var(--popover);
+  box-shadow: 0 24px 80px -32px rgba(0, 0, 0, 0.55);
 }
 @utility surface-glass {
-  /* Frosted chrome bar — sticky subbars, selection bars, etc. */
-  @apply rounded-sm border border-hairline-soft bg-surface-1/95 backdrop-blur-md;
+  /* Sticky chrome bars (selection bars, subbars) — opaque. */
+  @apply rounded-sm border border-hairline-soft bg-background;
+}
+
+/* State glow — the app's one light source. Painted entirely inside the
+   element's own box with background layers (no box-shadow, no pseudo
+   elements), so it can't be clipped by scrollers, bleed into neighbouring
+   rows, collide with focus rings, or shift layout. */
+@utility state-selected {
+  /* All three layers live in background-image, so any bg-* color utility
+     (bg-card, hover:bg-hover, …) sits underneath instead of replacing the tint. */
+  background-image:
+    linear-gradient(90deg, var(--glow) 0 2px, transparent 2px),
+    linear-gradient(90deg, var(--glow-wash) 0, transparent 72%),
+    linear-gradient(var(--glow-tint), var(--glow-tint));
+  background-repeat: no-repeat;
+  @media (forced-colors: active) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 @layer base {
@@ -638,29 +561,10 @@
   }
   .app-shell-bg {
     background-color: var(--background);
-    background-image:
-      linear-gradient(
-        180deg,
-        var(--page-shell-depth-top) 0%,
-        var(--background) 44%,
-        var(--page-shell-depth-bottom) 100%
-      );
   }
   .sidebar-embedded {
-    background: color-mix(in srgb, var(--background) 92%, var(--sidebar) 8%);
+    background: var(--sidebar);
     box-shadow: inset -1px 0 0 var(--sidebar-border);
-  }
-  /* Dashboard / Orbit — frosted sidebar so page watermarks read through. */
-  .sidebar-embedded-glass {
-    background: color-mix(in srgb, var(--background) 58%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sidebar-border) 65%, transparent);
-  }
-  @supports (backdrop-filter: blur(1px)) {
-    .sidebar-embedded-glass {
-      background: color-mix(in srgb, var(--background) 40%, transparent);
-    }
   }
 
   .app-viewport {
@@ -738,46 +642,21 @@
     font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
 
-  /* Passive selection chrome — mirrors @/lib/highlight-chrome (theme via --primary). */
-  .highlight-active {
-    @apply border-primary/25 bg-primary/10 text-foreground shadow-none;
-  }
-  .highlight-segment-active {
-    @apply bg-primary/10 text-foreground shadow-none;
-  }
-  .highlight-surface-active {
-    @apply border-primary/40 bg-primary/10 text-foreground shadow-none ring-1 ring-primary/20;
-  }
-  .highlight-indicator-active {
-    @apply border-primary/35 bg-primary/10 text-primary shadow-none;
-  }
-  .highlight-idle {
-    @apply border-transparent text-muted-foreground transition-[color,background-color,border-color] duration-150 hover:bg-accent-soft hover:text-foreground;
-  }
-  .highlight-interactive {
-    @apply hover:border-primary/30 hover:bg-primary/15;
-  }
-
+  /* Active nav / menu row — same light source as .state-selected. */
   .menu-selection-active {
-    position: relative;
-    overflow: hidden;
-    background-color: color-mix(in srgb, var(--primary) 8%, transparent);
     color: var(--foreground);
+    background-image:
+      linear-gradient(90deg, var(--glow) 0 2px, transparent 2px),
+      linear-gradient(90deg, var(--glow-wash) 0, transparent 80%),
+      linear-gradient(var(--glow-tint), var(--glow-tint));
+    background-repeat: no-repeat;
     box-shadow: none;
   }
-  .menu-selection-active::before {
-    content: "";
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    width: 2px;
-    border-radius: 0;
-    background: var(--primary);
-    z-index: 0;
-  }
-  .menu-selection-active > * {
-    position: relative;
-    z-index: 1;
+  @media (forced-colors: active) {
+    .menu-selection-active {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
   }
   .stagger-1 { animation-delay: 50ms; }
   .stagger-2 { animation-delay: 100ms; }
@@ -815,11 +694,7 @@
     }
   }
 
-  /* Highlight progress — hollow track + one-shot shimmer on hover */
-  @keyframes highlight-progress-shimmer-once {
-    from { transform: translate3d(-110%, 0, 0); }
-    to { transform: translate3d(320%, 0, 0); }
-  }
+  /* Highlight progress — flat fill; hover deepens it slightly. */
   .highlight-progress:hover .highlight-progress-fill--primary,
   .group:hover .highlight-progress-fill--primary,
   .group:focus-within .highlight-progress-fill--primary {
@@ -830,148 +705,21 @@
   .group:focus-within .highlight-progress-fill--note {
     background-color: color-mix(in srgb, var(--note) 38%, transparent);
   }
-  .highlight-progress-shimmer {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .highlight-progress-shimmer::after {
-    content: "";
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    width: 50%;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      color-mix(in srgb, var(--primary) 55%, transparent) 42%,
-      color-mix(in srgb, var(--primary) 78%, white 10%) 50%,
-      color-mix(in srgb, var(--primary) 55%, transparent) 58%,
-      transparent 100%
-    );
-    transform: translate3d(-110%, 0, 0);
-    will-change: transform;
-  }
-  .highlight-progress-shimmer--note::after {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      color-mix(in srgb, var(--note) 55%, transparent) 42%,
-      color-mix(in srgb, var(--note) 78%, white 10%) 50%,
-      color-mix(in srgb, var(--note) 55%, transparent) 58%,
-      transparent 100%
-    );
-  }
-  .highlight-progress:hover .highlight-progress-shimmer::after,
-  .group:hover .highlight-progress-shimmer::after,
-  .group:focus-within .highlight-progress-shimmer::after {
-    animation: highlight-progress-shimmer-once 2.2s linear 1;
-    animation-delay: 0s;
-  }
   .highlight-progress-edge {
     position: absolute;
     inset-block: 0;
     right: 0;
     width: 1px;
-    background: color-mix(in srgb, var(--primary) 80%, white 20%);
-    opacity: 0.95;
+    background: var(--primary);
     pointer-events: none;
   }
   .highlight-progress-edge--note {
-    background: color-mix(in srgb, var(--note) 80%, white 20%);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .highlight-progress:hover .highlight-progress-shimmer::after,
-    .group:hover .highlight-progress-shimmer::after,
-    .group:focus-within .highlight-progress-shimmer::after {
-      animation: none;
-    }
+    background: var(--note);
   }
 
-  /* Highlight search — one-shot lightbar trace along the shell outline */
-  @property --highlight-search-beam-angle {
-    syntax: "<angle>";
-    inherits: false;
-    initial-value: 90deg;
-  }
-  @keyframes highlight-search-perimeter-once {
-    0% {
-      top: -1px;
-      left: -32%;
-      width: 32%;
-      height: 1px;
-      --highlight-search-beam-angle: 90deg;
-      opacity: 1;
-    }
-    23% {
-      top: -1px;
-      left: 100%;
-      width: 32%;
-      height: 1px;
-      --highlight-search-beam-angle: 90deg;
-      opacity: 1;
-    }
-    24% {
-      top: -32%;
-      left: 100%;
-      width: 1px;
-      height: 32%;
-      --highlight-search-beam-angle: 180deg;
-      opacity: 1;
-    }
-    47% {
-      top: 100%;
-      left: 100%;
-      width: 1px;
-      height: 32%;
-      --highlight-search-beam-angle: 180deg;
-      opacity: 1;
-    }
-    48% {
-      top: 100%;
-      left: 100%;
-      width: 32%;
-      height: 1px;
-      --highlight-search-beam-angle: 270deg;
-      opacity: 1;
-    }
-    71% {
-      top: 100%;
-      left: -32%;
-      width: 32%;
-      height: 1px;
-      --highlight-search-beam-angle: 270deg;
-      opacity: 1;
-    }
-    72% {
-      top: 100%;
-      left: -1px;
-      width: 1px;
-      height: 32%;
-      --highlight-search-beam-angle: 0deg;
-      opacity: 1;
-    }
-    95% {
-      top: -32%;
-      left: -1px;
-      width: 1px;
-      height: 32%;
-      --highlight-search-beam-angle: 0deg;
-      opacity: 1;
-    }
-    100% {
-      top: -32%;
-      left: -1px;
-      width: 1px;
-      height: 32%;
-      --highlight-search-beam-angle: 0deg;
-      opacity: 0;
-    }
-  }
-  .highlight-search-shell:hover,
+  /* Search shell — quiet filled well; focus lights the border. */
   .highlight-search-shell:focus-within {
-    border-color: color-mix(in srgb, var(--primary) 52%, var(--hairline-strong));
+    border-color: var(--primary);
   }
   .toolbar-search-shell .text-muted-foreground {
     color: color-mix(in srgb, var(--foreground) 72%, var(--muted-foreground));
@@ -979,13 +727,11 @@
   .toolbar-search-shell {
     transition: background-color 150ms;
   }
-  .toolbar-search-shell:hover,
+  .toolbar-search-shell:hover {
+    background-color: var(--surface-3);
+  }
   .toolbar-search-shell:focus-within {
-    background-color: color-mix(
-      in srgb,
-      var(--primary) 12%,
-      color-mix(in srgb, var(--surface-1) 55%, transparent)
-    );
+    background-color: var(--background);
   }
   .toolbar-search-shell input::placeholder {
     color: color-mix(in srgb, var(--foreground) 64%, var(--muted-foreground));
@@ -1003,41 +749,6 @@
   .floating-search-shell input::placeholder {
     color: color-mix(in srgb, var(--foreground) 56%, var(--muted-foreground));
   }
-  .highlight-search-shell::before {
-    content: "";
-    position: absolute;
-    z-index: 1;
-    pointer-events: none;
-    opacity: 0;
-    background: linear-gradient(
-      var(--highlight-search-beam-angle),
-      transparent 0%,
-      color-mix(in srgb, var(--primary) 72%, white 8%) 14%,
-      color-mix(in srgb, var(--primary) 88%, white 12%) 50%,
-      color-mix(in srgb, var(--primary) 72%, white 8%) 86%,
-      transparent 100%
-    );
-    box-shadow:
-      0 0 12px 3px color-mix(in srgb, var(--primary) 68%, white 14%),
-      0 0 22px 6px color-mix(in srgb, var(--primary) 38%, white 8%);
-    will-change: top, left, width, height, opacity;
-  }
-  .highlight-search-shell > * {
-    position: relative;
-    z-index: 2;
-  }
-  .highlight-search-shell:hover::before,
-  .highlight-search-shell:focus-within::before {
-    animation: highlight-search-perimeter-once 2.2s linear 1;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .highlight-search-shell:hover::before,
-    .highlight-search-shell:focus-within::before {
-      animation: none;
-      opacity: 0;
-    }
-  }
-
   .animate-slide-down-fade {
     animation: slide-down-fade 0.25s ease-out both;
   }
@@ -1145,21 +856,12 @@
     font-family: var(--font-heading), var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
 
-  /* Theme tint only — for watermark-scale logos where the glow would wash. */
-  .markmaster-logo-flat {
-    filter:
-      hue-rotate(var(--markmaster-logo-hue, 0deg))
-      saturate(var(--markmaster-logo-saturate, 1))
-      brightness(var(--markmaster-logo-brightness, 1));
-  }
-
   /* MarkMaster rocket logo — tint to match active accent theme */
   .markmaster-logo {
     filter:
       hue-rotate(var(--markmaster-logo-hue, 0deg))
       saturate(var(--markmaster-logo-saturate, 1))
-      brightness(var(--markmaster-logo-brightness, 1))
-      drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 42%, transparent));
+      brightness(var(--markmaster-logo-brightness, 1));
     transition: filter 220ms ease;
   }
   @media (prefers-reduced-motion: reduce) {

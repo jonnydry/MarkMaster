@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, Sparkles, RotateCcw, Plus, RefreshCw } from "lucide-react";
+import { Compass, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import {
@@ -21,7 +21,6 @@ import { useTypography } from "@/hooks/use-typography";
 import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
-import { appChromeFrostedClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import type { BookmarkWithRelations } from "@/types";
 import type { ViewMode } from "@/types";
@@ -93,7 +92,7 @@ function DiscoveryHeaderActions({
         <>
           <Button
             type="button"
-            variant="highlight"
+            variant="outline"
             size="sm"
             onClick={onReview}
             className={btnClass}
@@ -286,15 +285,14 @@ export function DashboardDiscovery({
       >
         <div
           className={cn(
-            "surface-veil border-primary/20 hover:border-primary/30",
+            "surface-card",
             "relative flex h-full min-h-[10rem] flex-col items-center justify-center p-3.5 text-center"
           )}
         >
           <div className="flex max-w-full items-center justify-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
             <span
               className={cn(
-                "truncate text-2xs font-bold uppercase tracking-[0.08em] text-primary",
+                "truncate text-xs font-medium text-muted-foreground",
                 t.monoNative && t.label
               )}
             >
@@ -306,7 +304,7 @@ export function DashboardDiscovery({
           </p>
           <p
             className={cn(
-              "mt-1.5 line-clamp-1 max-w-md text-2xs text-muted-foreground/65",
+              "mt-1.5 line-clamp-1 max-w-md text-xs text-muted-foreground",
               t.monoNative && t.label
             )}
           >
@@ -320,18 +318,18 @@ export function DashboardDiscovery({
           <div className="mt-3 flex w-full max-w-sm flex-wrap items-center justify-center gap-1.5 border-t border-hairline-soft pt-2.5">
             <Button
               size="sm"
-              variant="highlight"
-              className="h-7 gap-1 px-2.5 text-2xs text-primary"
+              variant="outline"
+              className="h-7 gap-1 px-2.5 text-xs"
               onClick={() => setSprintOpen(true)}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Start sprint
+              Start review
             </Button>
             {onSaveAsCollection ? (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1 px-2.5 text-2xs"
+                className="h-7 gap-1 px-2.5 text-xs"
                 onClick={handleSaveAsCollection}
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -387,8 +385,7 @@ export function DashboardDiscovery({
       >
         <div
           className={cn(
-            "overflow-hidden rounded-sm border border-hairline-strong pb-4",
-            appChromeFrostedClassName
+            "surface-card overflow-hidden pb-4"
           )}
         >
           <div className="border-b border-hairline-soft px-4 py-3 sm:px-5">

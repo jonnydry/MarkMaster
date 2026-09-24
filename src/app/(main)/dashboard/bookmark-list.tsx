@@ -6,11 +6,12 @@ import { BookmarkCard } from "@/components/bookmark-card";
 import { GridBookmarkCard } from "@/components/grid-bookmark-card";
 import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
 import { useScrollElement } from "@/hooks/use-scroll-element";
+import { useListScrollMargin } from "@/hooks/use-list-scroll-margin";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
 import { getStaggerClass } from "@/lib/stagger";
 import type { ViewMode, BookmarkWithRelations } from "@/types";
 
-const FEED_ROW_ESTIMATE_PX = 168;
+const FEED_ROW_ESTIMATE_PX = 156;
 const COMPACT_ROW_ESTIMATE_PX = 72;
 
 interface BookmarkListProps {
@@ -65,6 +66,7 @@ function VirtualizedBookmarkRows({
   onCompactExpandedChange,
 }: BookmarkRowListProps) {
   const scrollElement = useScrollElement(scrollRef);
+  const { listRef, scrollMargin } = useListScrollMargin(scrollElement);
   const rowEstimate =
     viewMode === "compact" ? COMPACT_ROW_ESTIMATE_PX : FEED_ROW_ESTIMATE_PX;
 
@@ -74,6 +76,7 @@ function VirtualizedBookmarkRows({
   const virtualizer = useVirtualizer({
     count: bookmarks.length,
     getScrollElement: () => scrollElement,
+    scrollMargin,
     estimateSize: () => rowEstimate,
     overscan: 4,
   });
@@ -117,6 +120,7 @@ function VirtualizedBookmarkRows({
   return (
     <div className={listContainerClass}>
       <div
+        ref={listRef}
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
@@ -130,13 +134,12 @@ function VirtualizedBookmarkRows({
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
               className="absolute top-0 left-0 w-full"
-              style={{ transform: `translateY(${virtualRow.start}px)` }}
+              style={{ transform: `translateY(${virtualRow.start - scrollMargin}px)` }}
             >
               <BookmarkCard
                 bookmark={bookmark}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
-                rank={index + 1}
                 priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
                 selected={
                   selectionMode
@@ -202,7 +205,6 @@ function StaticBookmarkRows({
           bookmark={bookmark}
           viewMode={viewMode}
           searchQuery={searchQuery}
-          rank={index + 1}
           priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
           selected={
             selectionMode

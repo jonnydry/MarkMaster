@@ -1,120 +1,25 @@
 "use client";
 
 // Canonical Orbital primitives + thin reusable components
-// Import: import { orbital, OrbitalCard, TelemetryStat, ... } from '@/components/orbital'
+// Import: import { orbital, OrbitalMenu, OrbitalRings } from '@/components/orbital'
 
 import { cn } from "@/lib/utils";
 import { orbitalTypography } from "@/lib/typography";
-import { useTypography } from "@/hooks/use-typography";
 import React from "react";
 
 export type OrbitalTone = "cyan" | "bronze" | "emerald";
 
-/** Shared surface primitives for elevated panels and auth chrome. */
+/** Shared Orbit chrome primitives (row menu, action pill, labels). */
 export const orbital = {
-  glass: "surface-card backdrop-blur-xl",
   label: orbitalTypography.label,
   data: orbitalTypography.data,
-  badge: (tone: OrbitalTone) =>
-    tone === "cyan"
-      ? "border-primary/40 bg-primary/10 text-primary"
-      : tone === "bronze"
-        ? "border-bronze/30 bg-bronze/10 text-bronze"
-        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-600",
-  pill: "inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs text-primary",
-  icon: "bg-primary/10 text-primary",
-  menu: "rounded-sm surface-overlay py-1 text-[13px] min-w-[136px]",
+  // Flat floating menu: popover + strong hairline, no shadow or blur.
+  menu: "rounded-sm border border-hairline-strong bg-popover py-1 text-[13px] min-w-[136px]",
   menuItem:
-    "flex items-center gap-2.5 px-3 py-1.5 text-[var(--foreground)] hover:bg-primary/5 active:bg-primary/10 cursor-pointer transition-colors",
+    "flex items-center gap-2.5 px-3 py-1.5 text-foreground hover:bg-hover active:bg-hover cursor-pointer transition-colors",
   actionPill:
-    "inline-flex items-center gap-px rounded-sm border border-primary/20 bg-surface-1/95 px-1 py-0.5 backdrop-blur",
-  sectionLabel: orbitalTypography.sectionLabel,
-  slideIn:
-    "surface-card backdrop-blur-xl border-l-2 border-primary/40",
+    "inline-flex items-center gap-px rounded-sm border border-hairline-soft bg-popover px-1 py-0.5",
 };
-
-export function OrbitalCard({
-  children,
-  className,
-  ...props
-}: {
-  children: React.ReactNode;
-  className?: string;
-  [key: string]: unknown;
-}) {
-  return (
-    <div className={cn(orbital.glass, className)} {...props}>
-      {children}
-    </div>
-  );
-}
-
-export function TelemetryStat({
-  value,
-  label,
-  className,
-}: {
-  value: React.ReactNode;
-  label: string;
-  /** Reserved for future tone-specific stat styling */
-  tone?: OrbitalTone;
-  className?: string;
-}) {
-  const t = useTypography();
-  return (
-    <div className={cn("flex flex-col gap-0.5", className)}>
-      <div className={cn(t.data, "text-lg font-medium leading-none")}>{value}</div>
-      <div className={cn(t.label, "text-2xs text-primary/70")}>{label}</div>
-    </div>
-  );
-}
-
-export function OrbitalBadge({
-  children,
-  tone = "cyan",
-  className,
-}: {
-  children: React.ReactNode;
-  tone?: OrbitalTone;
-  className?: string;
-}) {
-  const t = useTypography();
-  return (
-    <span
-      className={cn(
-        orbital.badge(tone),
-        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-2xs font-medium uppercase tracking-[0.08em]",
-        t.monoNative && t.label,
-        className
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-export function MissionControlHeader({
-  title,
-  right,
-  className,
-}: {
-  title: string;
-  right?: React.ReactNode;
-  className?: string;
-}) {
-  const t = useTypography();
-  return (
-    <div
-      className={cn(
-        "mb-3 flex items-center justify-between border-b border-primary/20 pb-2",
-        className
-      )}
-    >
-      <div className={cn(t.label, "text-primary/80")}>{title}</div>
-      {right}
-    </div>
-  );
-}
 
 export interface OrbitalRingsProps {
   className?: string;
@@ -135,7 +40,7 @@ export function OrbitalRings({
     tone === "bronze"
       ? "text-bronze"
       : tone === "emerald"
-        ? "text-emerald-400"
+        ? "text-success"
         : "text-primary";
   const sizeClass =
     size === "sm" ? "h-24 w-32" : size === "lg" ? "h-80 w-[28rem]" : "h-48 w-64";
@@ -196,7 +101,6 @@ export function OrbitalRings({
   );
 }
 
-export { orbital as primitives };
 
 export function OrbitalMenu({
   children,
@@ -224,7 +128,7 @@ export function OrbitalActionPill({
   [key: string]: unknown;
 }) {
   return (
-    <div className={cn(orbital.actionPill, "orbital-action-pill", className)} {...props}>
+    <div className={cn(orbital.actionPill, className)} {...props}>
       {children}
     </div>
   );

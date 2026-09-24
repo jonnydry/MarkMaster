@@ -35,23 +35,14 @@
     }
   }
 
-  /* Floating chrome over the Orbit map canvas — theme-aware popover shell. */
+  /* Floating chrome over the Orbit map canvas — theme-aware popover shell.
+     Near-opaque and flat: no backdrop blur (the canvas is the only glow). */
   .map-glass {
     border: 1px solid var(--hairline-soft);
-    background: color-mix(in srgb, var(--popover) 88%, transparent);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: color-mix(in srgb, var(--popover) 94%, transparent);
   }
-
-  .orbital-action-pill {
-    transition: transform 0.12s ease;
-  }
-  .orbital-action-pill:hover {
-    transform: translateY(-0.5px);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .orbital-action-pill:hover {
-      transform: none;
-    }
+  /* The one Orbit-specific highlight: a thin accent top edge on the console. */
+  .map-glass-accent {
+    border-top-color: color-mix(in srgb, var(--primary) 45%, var(--hairline-soft));
   }
 }

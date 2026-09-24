@@ -17,6 +17,20 @@ import {
 } from "@/lib/app-chrome";
 import { cn } from "@/lib/utils";
 
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "bookmarkedAt", label: "Newest saved" },
+  { value: "tweetCreatedAt", label: "Date posted" },
+  { value: "likes", label: "Most liked" },
+  { value: "retweets", label: "Most reposted" },
+  { value: "replies", label: "Most replies" },
+  { value: "performance", label: "Performance" },
+  { value: "authorUsername", label: "Author" },
+];
+
+function sortLabel(field: SortField): string {
+  return SORT_OPTIONS.find((option) => option.value === field)?.label ?? "Sort";
+}
+
 interface SortControlsProps {
   sortField: SortField;
   viewMode: ViewMode;
@@ -51,30 +65,30 @@ export function SortControls({
         onValueChange={(v: string | null) => v && onSortFieldChange(v as SortField)}
       >
         <SelectTrigger
-          aria-label="Sort bookmarks"
+          aria-label={`Sort bookmarks: ${sortLabel(sortField)}`}
           size="default"
           className={cn(
-            "dashboard-sort-trigger gap-1.5 rounded-sm border-hairline-strong font-semibold hover:border-primary/30",
+            "dashboard-sort-trigger gap-1.5 rounded-sm border-transparent font-semibold hover:bg-hover",
             appToolbarSurfaceClassName,
             compact
               ? cn(
                   appToolbarControlCompactHeightClassName,
-                  "w-8 shrink-0 justify-center p-0 sm:min-w-[7.5rem] sm:justify-start sm:px-3"
+                  "w-8 shrink-0 justify-center p-0 sm:w-auto sm:justify-start sm:px-2.5"
                 )
               : cn(appToolbarControlExpandedHeightClassName, "min-w-[100px] flex-1 sm:flex-none")
           )}
         >
           <ArrowDownUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className={cn(compact && "hidden sm:inline")}>Sort</span>
+          <span className={cn("whitespace-nowrap", compact && "hidden sm:inline")}>
+            {sortLabel(sortField)}
+          </span>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="tweetCreatedAt">Date Tweeted</SelectItem>
-          <SelectItem value="bookmarkedAt">Newest Saved</SelectItem>
-          <SelectItem value="likes">Most Liked</SelectItem>
-          <SelectItem value="retweets">Most Retweeted</SelectItem>
-          <SelectItem value="replies">Most Replied</SelectItem>
-          <SelectItem value="performance">Performance</SelectItem>
-          <SelectItem value="authorUsername">Author</SelectItem>
+          {SORT_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <ViewModeControls

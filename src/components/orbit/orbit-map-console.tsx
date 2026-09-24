@@ -43,7 +43,7 @@ export interface OrbitMapConsoleProps {
 }
 
 const controlOnGlassClass =
-  "h-8 border-transparent bg-transparent hover:bg-accent-soft";
+  "h-8 border-transparent bg-transparent hover:bg-hover";
 
 /**
  * The Orbit map's chrome, dissolved out of a top toolbar into two floating
@@ -85,7 +85,7 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
           <div
             className={cn(
               orbitMapFloatingShellClass(),
-              "pointer-events-auto flex min-w-0 items-center gap-2 px-2 py-1.5"
+              "map-glass-accent pointer-events-auto flex min-w-0 items-center gap-2 px-2 py-1.5"
             )}
           >
             <span className="flex size-6 shrink-0 items-center justify-center text-primary">

@@ -43,8 +43,8 @@ export function KeyboardShortcutsHelpButton({
         variant="outline"
         size={toolbarSize === "compact" ? "icon" : "icon-lg"}
         className={cn(
-          "shrink-0 border-hairline-strong text-muted-foreground hover:border-primary/30 hover:bg-accent-soft hover:text-foreground",
-          toolbarSize === "compact" ? appToolbarSurfaceClassName : "border-hairline-soft bg-transparent",
+          "shrink-0 border-transparent bg-transparent text-muted-foreground hover:bg-hover hover:text-foreground",
+          toolbarSize === "compact" && appToolbarSurfaceClassName,
           toolbarSize === "compact" && appToolbarControlBoxClassName(true),
           className
         )}

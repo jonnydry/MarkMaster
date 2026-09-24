@@ -1,7 +1,5 @@
 "use client";
 
-import { Keyboard } from "lucide-react";
-
 import {
   Dialog,
   DialogContent,
@@ -37,17 +35,8 @@ export function KeyboardShortcutsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={appOverlayDialogSmClassName}>
         <DialogHeader className="border-b border-hairline-soft px-4 py-4">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-sm border border-primary/20 bg-primary/10 text-primary">
-              <Keyboard className="size-4" aria-hidden />
-            </span>
-            <div>
-              <DialogTitle>Keyboard shortcuts</DialogTitle>
-              <DialogDescription className="mt-1 text-xs">
-                {description}
-              </DialogDescription>
-            </div>
-          </div>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription className="text-xs">{description}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 px-4 pb-4">

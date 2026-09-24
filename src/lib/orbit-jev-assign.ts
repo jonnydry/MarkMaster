@@ -14,6 +14,7 @@ import {
   ORBIT_JEV_ASSIGN_CONCURRENCY,
   ORBIT_JEV_COLLECTION_CONFIDENCE_THRESHOLD,
   ORBIT_JEV_MAX_TAG_SHORTLIST,
+  ORBIT_MAX_TAGS_PER_BOOKMARK,
   ORBIT_JEV_NEEDS_NEW_LABEL_THRESHOLD,
   ORBIT_JEV_SHORTLIST_LEXICAL_RESERVE,
   ORBIT_JEV_SHORTLIST_PROPOSED_CAP,
@@ -408,7 +409,7 @@ export function buildJevAssignmentFromAnswers(args: {
         : `Matched ${tagReasons.length} existing tag${
             tagReasons.length === 1 ? "" : "s"
           } from your library.`,
-    tags: tagReasons.slice(0, 3),
+    tags: tagReasons.slice(0, ORBIT_MAX_TAGS_PER_BOOKMARK),
     collection: pickedCollection
       ? {
           name: pickedCollection.name,

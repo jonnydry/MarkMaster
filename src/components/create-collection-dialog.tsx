@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -33,6 +34,7 @@ export function CreateCollectionDialog({
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const fieldId = useId();
 
   const handleCreate = async () => {
     if (!name.trim() || submitting) return;
@@ -54,15 +56,18 @@ export function CreateCollectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New Collection</DialogTitle>
+          <DialogTitle>New collection</DialogTitle>
           <DialogDescription>
             Create a themed home for related bookmarks.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label className="mb-1.5">Name</Label>
+            <Label htmlFor={`${fieldId}-name`} className="mb-1.5">
+              Name
+            </Label>
             <Input
+              id={`${fieldId}-name`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Collection name"
@@ -73,8 +78,11 @@ export function CreateCollectionDialog({
             />
           </div>
           <div>
-            <Label className="mb-1.5">Description</Label>
+            <Label htmlFor={`${fieldId}-description`} className="mb-1.5">
+              Description
+            </Label>
             <Textarea
+              id={`${fieldId}-description`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What's this collection about?"
@@ -83,27 +91,28 @@ export function CreateCollectionDialog({
               maxLength={280}
             />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <Label>Public</Label>
+              <Label htmlFor={`${fieldId}-public`}>Public</Label>
               <p className="text-xs text-muted-foreground">
-                Public collections get a shareable link
+                Public collections get a shareable link.
               </p>
             </div>
-            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!name.trim() || submitting}
-            >
-              {submitting ? "Creating…" : "Create"}
-            </Button>
+            <Switch
+              id={`${fieldId}-public`}
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
+            />
           </div>
         </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || submitting}>
+            {submitting ? "Creating…" : "Create collection"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

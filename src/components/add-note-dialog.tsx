@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -74,7 +75,7 @@ function NoteForm({
         className="min-h-[120px] resize-none"
         disabled={busy}
       />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <DialogFooter className="sm:justify-between">
         {existingNoteId && onDelete ? (
           confirmDelete ? (
             <div className="flex items-center gap-2">
@@ -106,10 +107,10 @@ function NoteForm({
           ) : (
             <Button
               type="button"
-              variant="destructive"
+              variant="ghost"
               onClick={() => setConfirmDelete(true)}
               disabled={busy}
-              className="justify-center gap-1.5 sm:justify-start"
+              className="justify-center gap-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:justify-start"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Delete note
@@ -127,7 +128,7 @@ function NoteForm({
             Save
           </Button>
         </div>
-      </div>
+      </DialogFooter>
     </div>
   );
 }
@@ -146,7 +147,7 @@ export function AddNoteDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {existingNote ? "Edit Note" : "Add Note"}
+            {existingNote ? "Edit note" : "Add note"}
           </DialogTitle>
           <DialogDescription>
             {existingNote

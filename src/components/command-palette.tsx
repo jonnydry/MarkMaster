@@ -112,7 +112,7 @@ export function CommandPalette({
       const typographyActions = TYPOGRAPHY_PRESETS.map((preset) => ({
         kind: "action" as const,
         id: `typography-${preset.id}`,
-        label: `Use ${preset.name} Typography`,
+        label: `Use ${preset.name} typography`,
         description: `${preset.bodyFace} body, ${preset.dataFace} data`,
         action: () => setTypographyPreset(preset.id),
         icon: Type,
@@ -242,7 +242,7 @@ export function CommandPalette({
             value={query}
             onChange={handleQueryChange}
             placeholder="Search or type a command..."
-            className="border-0 p-0 h-auto text-sm bg-transparent placeholder:text-muted-foreground/50 focus:ring-0 focus:outline-none"
+            className="border-0 p-0 h-auto text-sm bg-transparent placeholder:text-muted-foreground focus:ring-0 focus:outline-none"
             autoFocus
             role="combobox"
             aria-expanded="true"
@@ -252,7 +252,7 @@ export function CommandPalette({
             }
           />
           <Kbd className="shrink-0">
-            ESC
+            Esc
           </Kbd>
         </div>
 
@@ -279,7 +279,7 @@ export function CommandPalette({
               <div key={item.kind === "media" ? item.value : item.id}>
                 {showAppearanceHeading && (
                   <p className={cn(
-                    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                    "px-2 py-1.5 text-xs font-semibold ",
                     t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Appearance
@@ -287,15 +287,15 @@ export function CommandPalette({
                 )}
                 {showQuickFiltersHeading && (
                   <p className={cn(
-                    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wider",
+                    "px-2 py-1.5 text-xs font-semibold ",
                     t.monoNative ? t.label : "text-muted-foreground"
                   )}>
-                    Quick Filters
+                    Quick filters
                   </p>
                 )}
                 {(showTagsHeading || showSearchTagsHeading) && (
                   <p className={cn(
-                    "px-2 py-1.5 mt-2 border-t border-hairline-soft text-xs font-semibold uppercase tracking-wider",
+                    "px-2 py-1.5 mt-2 border-t border-hairline-soft text-xs font-semibold ",
                     t.monoNative ? t.label : "text-muted-foreground"
                   )}>
                     Tags
@@ -316,7 +316,7 @@ export function CommandPalette({
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-all hover:bg-accent-soft",
+                    "flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm transition-all hover:bg-hover",
                     isFocused && "menu-selection-active pr-5"
                   )}
                 >
@@ -343,13 +343,13 @@ export function CommandPalette({
                         <div className="flex items-center gap-2">
                           <span>{item.label}</span>
                           {item.active && (
-                            <span className="rounded-sm border border-primary/30 bg-primary/10 px-1.5 py-0 text-2xs font-medium uppercase tracking-wider text-primary">
+                            <span className="text-xs font-medium text-primary">
                               Active
                             </span>
                           )}
                         </div>
                         {item.description && (
-                          <div className="text-2xs text-muted-foreground/70 mt-0.5">
+                          <div className="mt-0.5 text-xs text-muted-foreground">
                             {item.description}
                           </div>
                         )}

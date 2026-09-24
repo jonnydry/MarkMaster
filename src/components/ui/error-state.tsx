@@ -32,11 +32,11 @@ export function ErrorState({
 
   const titleClass = cn(
     layout === "panel"
-      ? "text-sm font-medium text-foreground"
+      ? "text-base font-semibold text-foreground"
       : layout === "inline"
         ? "font-medium"
         : "text-lg font-semibold",
-    isStage && "text-lg font-medium text-foreground",
+    isStage && "text-lg font-semibold tracking-tight text-foreground",
     !isStage && layout !== "inline" && layout !== "panel" && "heading-font text-foreground"
   );
 
@@ -48,8 +48,8 @@ export function ErrorState({
   return (
     <div className={cn(layoutShell[layout], className)} role="alert">
       {showIcon ? (
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-sm border border-destructive/15 bg-destructive/10 text-destructive">
-          <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+        <div className="mb-3 flex items-center justify-center text-destructive">
+          <AlertTriangle className="size-7" strokeWidth={1.5} aria-hidden="true" />
         </div>
       ) : null}
 

@@ -20,7 +20,6 @@ import {
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
 import { openBookmarkOnX } from "@/lib/bookmark-url";
 import { formatCompactCount } from "@/lib/format-metrics";
-import { highlightActiveClass } from "@/lib/highlight-chrome";
 import { GRID_POST_TEXT_MEDIA, GRID_POST_TEXT_ONLY } from "@/lib/typography";
 import { cn } from "@/lib/utils";
 import { useBookmarkHighlighting } from "@/hooks/use-bookmark-highlighting";
@@ -122,13 +121,11 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   return (
     <div
       className={cn(
-        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden surface-card text-left [content-visibility:auto] [contain-intrinsic-size:auto_280px] transition-[border-color,background-color] duration-200 hover:border-primary/30 hover:bg-accent-soft/40",
+        "group relative mb-3 inline-block w-full break-inside-avoid overflow-hidden surface-card text-left [content-visibility:auto] [contain-intrinsic-size:auto_280px] transition-[border-color,background-color] duration-200",
         isInteractive && "cursor-pointer",
         selected || isPerformanceHighlight
-          ? isPerformanceHighlight
-            ? "border-primary/70 ring-2 ring-primary/35"
-            : "border-primary/45 ring-1 ring-primary/35"
-          : "",
+          ? "state-selected border-primary/60"
+          : "hover:bg-hover",
         className
       )}
       role={isInteractive ? "button" : undefined}
@@ -172,12 +169,12 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             }}
           />
           <div className="pointer-events-none absolute left-2 top-2">
-            <span className="rounded-sm border border-white/15 bg-black/45 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-[0.08em] text-white/85 backdrop-blur-sm">
+            <span className="rounded-sm bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
               {getGridMediaLabel(mediaItems)}
             </span>
           </div>
           {mediaCount > 1 || likeLabel ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/65 via-black/20 to-transparent p-2 pt-8 text-2xs font-medium text-white/80">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/65 via-black/20 to-transparent p-2 pt-8 text-xs font-medium text-white">
               <span>{likeLabel}</span>
               {mediaCount > 1 ? <span>+{mediaCount - 1}</span> : null}
             </div>
@@ -197,7 +194,7 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
             />
           ) : (
             <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-2xs font-semibold text-muted-foreground"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-muted-foreground"
               role="img"
               aria-label={`${bookmark.authorDisplayName} avatar`}
             >
@@ -224,13 +221,13 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
                 })}
               </span>
               <XLogoMark
-                className="h-3 w-3 shrink-0 text-muted-foreground/55"
+                className="h-3 w-3 shrink-0 text-muted-foreground"
                 title="Post from X"
               />
             </div>
           </div>
           {!hasVisual && likeLabel ? (
-            <span className="shrink-0 text-2xs font-medium text-muted-foreground/75">
+            <span className="shrink-0 text-xs text-muted-foreground">
               {likeLabel}
             </span>
           ) : null}
@@ -257,12 +254,12 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               />
             ) : null}
             {hasCollection ? (
-              <span className={cn("inline-flex h-5 items-center px-1.5 text-2xs font-medium", highlightActiveClass)}>
+              <span className="inline-flex h-5 items-center rounded-sm bg-surface-2 px-1.5 text-xs text-muted-foreground">
                 In collection
               </span>
             ) : null}
             {hasNote ? (
-              <span className="inline-flex h-5 items-center surface-inset-strong px-1.5 text-2xs font-medium text-muted-foreground">
+              <span className="inline-flex h-5 items-center rounded-sm bg-surface-2 px-1.5 text-xs text-muted-foreground">
                 Note
               </span>
             ) : null}

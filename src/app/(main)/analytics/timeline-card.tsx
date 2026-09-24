@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Activity } from "lucide-react";
 
 import type { AnalyticsData } from "@/types";
 import { cn } from "@/lib/utils";
@@ -49,7 +48,6 @@ export const TimelineCard = React.memo(function TimelineCard({
     <ChartShell variant={variant}>
       <SectionHeading
         title="Bookmarks over time"
-        icon={<Activity className="h-4 w-4" />}
         meta={
           rangeTotal > 0 ? `${rangeTotal.toLocaleString()} in ${rangeLabel(range)}` : undefined
         }

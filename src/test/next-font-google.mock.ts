@@ -15,6 +15,8 @@ function createMockFont(id: string) {
   });
 }
 
+export const Geist = createMockFont("geist-sans");
+export const Geist_Mono = createMockFont("geist-mono");
 export const IBM_Plex_Sans = createMockFont("ibm-plex-sans");
 export const JetBrains_Mono = createMockFont("jetbrains-mono");
 export const IBM_Plex_Mono = createMockFont("ibm-plex-mono");

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+  ORBIT_MAX_TAGS_PER_BOOKMARK,
   ORBIT_SCAN_BATCH_PROFILES,
 } from "@/lib/orbit-config";
 import {
@@ -112,7 +113,7 @@ export function mergeLeftoverSuggestion(
     bookmarkId: jev.bookmarkId,
     confidence,
     reasoning: reasoning.slice(0, 180),
-    tags: tags.slice(0, 3),
+    tags: tags.slice(0, ORBIT_MAX_TAGS_PER_BOOKMARK),
     collection: jev.collection ?? grok.collection,
   };
 }
@@ -363,6 +364,10 @@ export async function runHybridOrbitScan(args: {
     bookmarkIds: args.bookmarks.map((bookmark) => bookmark.id),
     existingTags: args.existingTags,
     existingCollections: args.existingCollections,
+    bookmarks: args.bookmarks.map((bookmark) => ({
+      id: bookmark.id,
+      media: bookmark.media,
+    })),
   });
 
   const runtime = getOrbitXaiRuntimeStatus();

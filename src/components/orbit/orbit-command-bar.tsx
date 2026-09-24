@@ -1,11 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { forwardRef, type ReactNode } from "react";
 import {
   CheckSquare,
+  Keyboard,
   Loader2,
   MoreHorizontal,
+  PanelTopClose,
+  PanelTopOpen,
   RefreshCw,
+  Tags,
 } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
@@ -14,7 +19,6 @@ import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
-import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { OrbitBatchMenu } from "@/components/orbit/orbit-batch-menu";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { ToolbarIconButton, ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
@@ -28,12 +32,11 @@ import {
 } from "@/components/feed-toolbar-layout";
 import {
   appContentGutterClassName,
-  appToolbarControlExpandedClassName,
   appToolbarControlHeightClassName,
   appToolbarSurfaceClassName,
   appToolbarSurfaceGroupClassName,
 } from "@/lib/app-chrome";
-import { orbitControlRadius, orbitDataClass } from "@/lib/orbit-route-chrome";
+import { orbitDataClass } from "@/lib/orbit-route-chrome";
 import {
   type OrbitScanBatchMode,
   type OrbitScanBatchProfileId,
@@ -44,7 +47,6 @@ import {
   type OrbitView,
 } from "@/lib/orbit-navigation";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
-import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { usePageHeaderCompact } from "@/hooks/use-page-header-compact";
 import type { DbUser } from "@/lib/auth";
@@ -53,8 +55,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const KeyboardShortcutsDialog = dynamic(
+  () =>
+    import("@/components/keyboard-shortcuts-dialog").then(
+      (m) => m.KeyboardShortcutsDialog
+    ),
+  { ssr: false }
+);
 
 export interface OrbitCommandBarProps {
   mobileSidebar?: ReactNode;
@@ -90,6 +102,10 @@ export interface OrbitCommandBarProps {
   mapHref: string;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
   onScan: () => void;
+  libraryUntaggedCount: number | null;
+  libraryTagBusy: boolean;
+  libraryTagStatus: string | null;
+  onTagLibrary: () => void;
   scanError?: ReactNode;
 
   // Utility
@@ -103,7 +119,7 @@ export interface OrbitCommandBarProps {
 }
 
 const countBadgeClass =
-  "text-2xs font-medium tabular-nums text-muted-foreground/80";
+  "text-xs font-medium tabular-nums text-muted-foreground";
 
 export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps>(
   function OrbitCommandBar(
@@ -135,6 +151,10 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       mapHref,
       onBatchModeChange,
       onScan,
+      libraryUntaggedCount,
+      libraryTagBusy,
+      libraryTagStatus,
+      onTagLibrary,
       scanError,
       search,
       onSearchChange,
@@ -147,7 +167,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     searchRef
   ) {
     const scanBusy = queueIsLoading || scanning;
-    const { compact } = usePageHeaderCompact();
+    const { compact, toggleCompact } = usePageHeaderCompact();
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
 
     const searchField = (
@@ -212,107 +232,131 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       </>
     ) : null;
 
+    const showLibraryTag =
+      libraryTagBusy || (libraryUntaggedCount != null && libraryUntaggedCount > 0);
     const toolbarActions = canSelect ? (
       <>
-        {hasScanPlan ? (
-          <ToolbarIconButton
-            label={scanButtonLabel}
-            icon={RefreshCw}
-            disabled={scanBusy || scanTargetCount === 0}
-            onClick={onScan}
-            size={compact ? "compact" : "default"}
-            className={appToolbarSurfaceClassName}
-          />
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="highlight"
-              size="sm"
-              className={cn(
-                "gap-1.5 px-2.5 text-xs",
-                appToolbarControlHeightClassName(compact),
-                orbitControlRadius()
-              )}
+        <div className="flex items-center gap-1.5">
+          {hasScanPlan ? (
+            <ToolbarIconButton
+              label={scanButtonLabel}
+              icon={RefreshCw}
               disabled={scanBusy || scanTargetCount === 0}
               onClick={onScan}
-            >
-              {scanBusy ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <OrbitLogoMark className="size-3.5" />
-              )}
-              <span className="hidden sm:inline">{scanButtonLabel}</span>
-              <span className="sm:hidden">Scan</span>
-            </Button>
-            <OrbitBatchMenu
-              batchMode={batchMode}
-              resolvedBatchProfile={resolvedBatchProfile}
-              deepUnlocked={deepUnlocked}
-              deepLockedReason={deepLockedReason}
-              sweepUnlocked={sweepUnlocked}
-              sweepLockedReason={sweepLockedReason}
-              disabled={scanBusy}
-              onBatchModeChange={onBatchModeChange}
+              size={compact ? "compact" : "default"}
+              className={appToolbarSurfaceClassName}
             />
-          </div>
-        )}
+          ) : (
+            <>
+              <Button
+                size="sm"
+                className={cn(
+                  "gap-1.5 px-2.5 text-xs",
+                  appToolbarControlHeightClassName(compact)
+                )}
+                disabled={scanBusy || scanTargetCount === 0}
+                onClick={onScan}
+              >
+                {scanBusy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <OrbitLogoMark className="size-3.5" />
+                )}
+                <span className="hidden sm:inline">{scanButtonLabel}</span>
+                <span className="sm:hidden">Scan</span>
+              </Button>
+              <OrbitBatchMenu
+                batchMode={batchMode}
+                resolvedBatchProfile={resolvedBatchProfile}
+                deepUnlocked={deepUnlocked}
+                deepLockedReason={deepLockedReason}
+                sweepUnlocked={sweepUnlocked}
+                sweepLockedReason={sweepLockedReason}
+                disabled={scanBusy}
+                onBatchModeChange={onBatchModeChange}
+              />
+            </>
+          )}
+        </div>
         <OrbitModeSwitch
           active="queue"
           size={compact ? "sm" : "md"}
           mapHref={mapHref}
           className={appToolbarSurfaceClassName}
         />
-        <div className="hidden sm:contents">
+        {selectionMode ? (
+          // Selection mode lives in the "more" menu; while it's on, keep a
+          // visible, pressed exit control in the bar.
           <ToolbarIconButton
-            active={selectionMode}
-            pressed={selectionMode}
-            label={
-              selectionMode ? "Exit selection mode" : "Enter selection mode"
-            }
+            active
+            pressed
+            label="Exit selection mode"
             icon={CheckSquare}
             onClick={onToggleSelectionMode}
             size={compact ? "compact" : "default"}
             className={appToolbarSurfaceClassName}
           />
-          <KeyboardShortcutsHelpButton
-            open={keyboardShortcutsOpen}
-            onOpenChange={onKeyboardShortcutsOpenChange}
-            groups={shortcutGroups}
-            description="Orbit queue navigation and review actions."
-            toolbarSize={compact ? "compact" : "default"}
-          />
-          <PageHeaderCompactToggle
-            className={cn(
-              appToolbarSurfaceClassName,
-              !compact && appToolbarControlExpandedClassName
-            )}
-          />
-        </div>
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="More Orbit tools"
             className={cn(
-              "inline-flex items-center justify-center rounded-sm border border-hairline-strong bg-background/35 text-muted-foreground hover:bg-accent-soft hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 sm:hidden",
+              "relative inline-flex items-center justify-center rounded-sm border border-transparent bg-transparent text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               compact ? "size-8" : "size-9",
               appToolbarSurfaceClassName
             )}
           >
             <MoreHorizontal className="size-4" aria-hidden="true" />
+            {showLibraryTag && !libraryTagBusy ? (
+              <span className="absolute right-1 top-1 size-2 rounded-full bg-primary" aria-hidden />
+            ) : null}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuContent align="end" className="w-56">
+            {showLibraryTag ? (
+              <>
+                <DropdownMenuItem
+                  disabled={libraryTagBusy}
+                  title="Tags every bookmark that has no tags yet. Rename or delete a tag to change the ones that wear it."
+                  onClick={onTagLibrary}
+                >
+                  {libraryTagBusy ? <Loader2 className="animate-spin" /> : <Tags />}
+                  {libraryTagBusy ? "Tagging library…" : "Tag library"}
+                  {!libraryTagBusy && libraryUntaggedCount ? (
+                    <DropdownMenuShortcut className="tracking-normal tabular-nums">
+                      {libraryUntaggedCount.toLocaleString()} untagged
+                    </DropdownMenuShortcut>
+                  ) : null}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            ) : null}
             <DropdownMenuItem onClick={onToggleSelectionMode}>
               <CheckSquare />
               {selectionMode ? "Exit selection mode" : "Select bookmarks"}
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={toggleCompact}>
+              {compact ? <PanelTopOpen /> : <PanelTopClose />}
+              {compact ? "Expanded header" : "Compact header"}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onKeyboardShortcutsOpenChange(true)}>
+              <Keyboard />
               Keyboard shortcuts
+              <DropdownMenuShortcut className="tracking-normal">?</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {keyboardShortcutsOpen ? (
+          <KeyboardShortcutsDialog
+            open
+            onOpenChange={onKeyboardShortcutsOpenChange}
+            groups={shortcutGroups}
+            description="Orbit queue navigation and review actions."
+          />
+        ) : null}
       </>
     ) : null;
 
-    const scanProgress = scanning ? (
+    const scanProgress = scanning || libraryTagBusy ? (
       <ScrollingProgressBar className="absolute inset-x-0 top-0" />
     ) : null;
 
@@ -334,7 +378,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           <span className={cn(orbitDataClass(), "normal-case")}>
             {visibleStatusLabel}
           </span>
-          {showTriageProgress ? (
+          {libraryTagStatus ? (
+            <span className={cn(orbitDataClass(), "normal-case")}>
+              {libraryTagStatus}
+            </span>
+          ) : showTriageProgress ? (
             <span className={cn(orbitDataClass(), "normal-case")}>
               {triagedCount} / {passTotal} triaged
             </span>
@@ -371,11 +419,16 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
                 actions={toolbarActions}
                 userNav={userNav}
                 progress={scanProgress}
-                aria-busy={scanning}
+                aria-busy={scanning || libraryTagBusy}
               />
             ) : null}
           </FeedCompactToolbarShell>
           <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
+          {libraryTagStatus ? (
+            <p className={cn("px-4 pb-1 text-xs text-muted-foreground sm:px-5")}>
+              {libraryTagStatus}
+            </p>
+          ) : null}
           {scanErrorBlock}
         </>
       );
@@ -387,7 +440,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           "feed-toolbar relative w-full min-w-0 space-y-1.5 py-2",
           appContentGutterClassName
         )}
-        aria-busy={scanning}
+        aria-busy={scanning || libraryTagBusy}
       >
         {scanProgress}
         <FeedToolbarSearchRow

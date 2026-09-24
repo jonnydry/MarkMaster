@@ -31,11 +31,7 @@ export function OrbitContextualMenu({
   };
 
   return (
-    <OrbitalMenu className="py-1 text-[12.5px]" role="menu" aria-label="Row actions">
-      <div className={cn(orbital.label, "px-3 py-1 text-2xs text-primary/50")}>
-        More
-      </div>
-
+    <OrbitalMenu role="menu" aria-label="Row actions">
       <button
         type="button"
         role="menuitem"
@@ -46,7 +42,7 @@ export function OrbitContextualMenu({
           "w-full focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
       >
-        <ExternalLink className="size-3.5 text-primary/70" />
+        <ExternalLink className="size-3.5 text-muted-foreground" />
         <span className="flex-1 text-left">Open on X</span>
       </button>
 
@@ -60,7 +56,7 @@ export function OrbitContextualMenu({
           "w-full focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
       >
-        <Link2 className="size-3.5 text-primary/70" />
+        <Link2 className="size-3.5 text-muted-foreground" />
         <span className="flex-1 text-left">Copy link</span>
       </button>
 
@@ -73,7 +69,7 @@ export function OrbitContextualMenu({
         onClick={() => handleAction("discard")}
         className={cn(
           orbital.menuItem,
-          "w-full text-primary/70 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-destructive/45"
+          "w-full text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-destructive/45"
         )}
       >
         <X className="size-3.5" />
@@ -117,7 +113,7 @@ export function OrbitActionPill({
     actions.push({
       key: "edit",
       label: "Edit in review",
-      icon: <SlidersHorizontal className="size-3.5 text-primary" />,
+      icon: <SlidersHorizontal className="size-3.5" />,
     });
   }
 
@@ -125,9 +121,9 @@ export function OrbitActionPill({
     key: "keep",
     label: skipLabel,
     icon: suggestionDismissed ? (
-      <RotateCcw className="size-3.5 text-primary" />
+      <RotateCcw className="size-3.5" />
     ) : (
-      <CircleSlash2 className="size-3.5 text-primary" />
+      <CircleSlash2 className="size-3.5" />
     ),
   });
 
@@ -135,12 +131,12 @@ export function OrbitActionPill({
     actions.push({
       key: "tag",
       label: "Add tag",
-      icon: <Tag className="size-3.5 text-bronze" />,
+      icon: <Tag className="size-3.5" />,
     });
   }
 
   return (
-    <OrbitalActionPill className="orbital-action-pill">
+    <OrbitalActionPill>
       {actions.map((action) => (
         <button
           key={action.key}
@@ -151,14 +147,11 @@ export function OrbitActionPill({
             onAction?.(bookmarkId, action.key);
           }}
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-sm transition-all",
-            "hover:bg-primary/10 active:bg-primary/15",
+            "flex h-9 w-9 items-center justify-center rounded-sm text-muted-foreground transition-colors",
+            "hover:bg-hover hover:text-foreground",
             action.tone === "accept" &&
-              "text-emerald-600 hover:bg-emerald-500/15 active:bg-emerald-500/20 dark:text-emerald-300",
-            action.key === "keep" &&
-              (suggestionDismissed
-                ? "bg-primary/15 text-primary"
-                : "text-primary hover:bg-primary/20")
+              "text-success hover:bg-success/10 hover:text-success",
+            action.key === "keep" && suggestionDismissed && "bg-primary/10 text-primary"
           )}
           title={action.label}
           aria-label={action.label}

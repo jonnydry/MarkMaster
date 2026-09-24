@@ -114,9 +114,21 @@ export function SimpleAreaChart({
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.32} />
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.22} />
           <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
         </linearGradient>
+        {/* Soft under-glow for the data line — the chart's one light source. */}
+        <filter
+          id={`${gradientId}-glow`}
+          filterUnits="userSpaceOnUse"
+          x={-12}
+          y={-12}
+          width={innerWidth + 24}
+          height={innerHeight + 24}
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur stdDeviation={3} />
+        </filter>
       </defs>
 
       <g transform={`translate(${MARGIN.left},${MARGIN.top})`}>
@@ -183,14 +195,26 @@ export function SimpleAreaChart({
           <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
         )}
 
-        {/* Line */}
+        {/* Line (glow copy underneath, then the crisp stroke) */}
         {linePath && (
-          <path
-            d={linePath}
-            fill="none"
-            stroke="var(--primary)"
-            strokeWidth={2.25}
-          />
+          <>
+            <path
+              d={linePath}
+              fill="none"
+              stroke="var(--primary)"
+              strokeWidth={4}
+              strokeOpacity={0.35}
+              filter={`url(#${gradientId}-glow)`}
+            />
+            <path
+              d={linePath}
+              fill="none"
+              stroke="var(--primary)"
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </>
         )}
 
         {/* Highlight dot */}
