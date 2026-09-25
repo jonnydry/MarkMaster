@@ -45,7 +45,9 @@ soft wash *inside* the element with background layers — no box-shadow, no pseu
 so it can't be clipped, bleed into neighbours, collide with focus rings, or shift layout.
 `--glow` is lightness-clamped per mode so every accent theme reads. Use it only for
 selected / active / focused state and live progress. Never on backgrounds, hover, cards,
-chips, or search. No decorative gradients, watermarks, beams, or shimmer effects.
+chips, or search. No decorative gradients, beams, or shimmer effects. Orbit
+(`/orbit` and `/orbit/map`) may keep one pair of translucent Orbit marks behind
+the page; no other watermarks.
 
 ## Typography
 Geist (UI + reading) and Geist Mono (data) by default; alternate presets live in

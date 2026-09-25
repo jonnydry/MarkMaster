@@ -351,6 +351,8 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     deepLockedReason,
     sweepUnlocked,
     sweepLockedReason,
+    /** Jev (TypeSafe) is configured: Sweep and whole-queue auto-tag work. */
+    hybridScanAvailable,
     canApplyStrongMatches,
     canRescanCurrentSelection,
     staleScanPlan,

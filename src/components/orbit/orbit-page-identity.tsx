@@ -23,7 +23,7 @@ export function OrbitPageIdentityBase({
         {title}
       </p>
       {subtitle ? (
-        <p className="hidden truncate text-xs tabular-nums text-muted-foreground sm:block">
+        <p className="hidden truncate text-xs text-muted-foreground sm:block">
           {subtitle}
         </p>
       ) : null}
@@ -37,7 +37,7 @@ type OrbitPageIdentityProps = {
   className?: string;
 };
 
-/** Orbit triage queue identity. */
+/** Orbit triage queue identity — the hybrid tagging instrument. */
 export function OrbitPageIdentity({
   queueTotal,
   className,
@@ -46,17 +46,43 @@ export function OrbitPageIdentity({
     queueTotal === undefined
       ? null
       : queueTotal > 0
-        ? `${queueTotal.toLocaleString()} waiting`
+        ? `${queueTotal.toLocaleString()} in queue`
         : "Queue clear";
+  const subtitle = queueLabel
+    ? `Hybrid tagging · ${queueLabel}`
+    : "Hybrid tagging";
 
   return (
     <OrbitPageIdentityBase
       title="Orbit"
-      subtitle={queueLabel ?? undefined}
+      subtitle={subtitle}
       ariaLabel={
-        queueLabel ? `Orbit triage queue, ${queueLabel}` : "Orbit triage queue"
+        queueLabel
+          ? `Orbit hybrid tagging, ${queueLabel}`
+          : "Orbit hybrid tagging"
       }
       className={className}
     />
+  );
+}
+
+type OrbitMapIdentityProps = {
+  className?: string;
+};
+
+/** Compact identity for map console chrome over the Pixi stage. */
+export function OrbitMapIdentity({ className }: OrbitMapIdentityProps) {
+  return (
+    <div
+      className={cn("min-w-0 shrink-0", className)}
+      aria-label="Orbit living graph"
+    >
+      <p className="heading-font truncate text-sm leading-4 font-bold tracking-tight text-foreground">
+        Orbit
+      </p>
+      <p className="truncate text-2xs text-muted-foreground">
+        Living graph
+      </p>
+    </div>
   );
 }

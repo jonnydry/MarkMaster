@@ -13,7 +13,6 @@ import type { DbUser } from "@/lib/auth";
 import type { OrbitXaiStatusPayload } from "@/types";
 
 export const SETTINGS_SECTIONS = [
-  { id: "connection", label: "Connection" },
   { id: "sync", label: "Sync" },
   { id: "orbit-grok", label: "Orbit scanning" },
   { id: "appearance", label: "Appearance" },

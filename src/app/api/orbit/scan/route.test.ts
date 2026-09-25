@@ -540,4 +540,97 @@ describe("/api/orbit/scan", () => {
     expect(response.status).toBe(400);
     expect(scanOrbitBookmarksWithXaiMock).not.toHaveBeenCalled();
   });
+
+  async function readLines(response: Response) {
+    const text = await response.text();
+    return text
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+
+  function streamRequest() {
+    return new NextRequest("http://localhost/api/orbit/scan", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "scan",
+        bookmarkIds: ["bookmark-1"],
+        stream: true,
+      }),
+    });
+  }
+
+  it("streams progress lines, then the result, when asked to", async () => {
+    await mockScanData();
+    scanOrbitBookmarksWithXaiMock.mockImplementationOnce(
+      async (args: { onProgress?: (event: unknown) => void }) => {
+        args.onProgress?.({ type: "phase", phase: "match" });
+        args.onProgress?.({
+          type: "row",
+          bookmarkId: "bookmark-1",
+          state: "matched",
+          label: "AI",
+        });
+        return {
+          model: "test-model",
+          scannedAt: "2026-05-11T00:00:00.000Z",
+          privacy: { storeDisabled: true, zeroDataRetention: null },
+          plan: {
+            overview: { summary: "", taggingStrategy: "", collectionStrategy: "" },
+            suggestions: [],
+          },
+          batch: { mode: "auto", profile: "quick", requestedCount: 1 },
+        };
+      }
+    );
+    const { POST } = await import("./route");
+
+    const response = await POST(streamRequest());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+    expect(response.headers.get("cache-control")).toContain("no-transform");
+    const lines = await readLines(response);
+    expect(lines.map((line) => line.type)).toEqual([
+      "phase",
+      "phase",
+      "row",
+      "result",
+    ]);
+    expect(lines[0]).toEqual({ type: "phase", phase: "prepare" });
+    expect(lines[3].payload).toMatchObject({
+      model: "test-model",
+      scannedBookmarks: [expect.objectContaining({ id: "bookmark-1" })],
+    });
+  });
+
+  it("ends the stream with a typed error line when the scan fails", async () => {
+    await mockScanData();
+    const { OrbitScanError } = await import("@/lib/orbit-grok");
+    scanOrbitBookmarksWithXaiMock.mockRejectedValueOnce(
+      new OrbitScanError("TypeSafe rate limit reached.", 429, "typesafe_unavailable")
+    );
+    const { POST } = await import("./route");
+
+    const lines = await readLines(await POST(streamRequest()));
+
+    expect(lines.at(-1)).toEqual({
+      type: "error",
+      status: 429,
+      error: { error: "TypeSafe rate limit reached.", code: "typesafe_unavailable" },
+    });
+  });
+
+  it("keeps request errors as plain JSON before any stream starts", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    const { POST } = await import("./route");
+
+    const response = await POST(streamRequest());
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+  });
 });

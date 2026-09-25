@@ -20,7 +20,8 @@ export function isLightweightApiRequest(pathname: string, method: string): boole
   }
 
   if (pathname === "/api/orbit/library-classify") {
-    // GET applies api:read in-handler; POST uses the orbit:library bucket.
+    // GET (progress polling) applies orbit:progress in-handler; POST uses the
+    // orbit:library bucket. DELETE (stop) falls through to the proxy's api:write.
     return method === "GET" || method === "HEAD" || method === "POST";
   }
 

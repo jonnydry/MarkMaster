@@ -5,9 +5,11 @@ import { act, waitFor } from "@testing-library/react";
 
 import { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { renderOrbitHook } from "@/test/hooks/orbit-test-harness";
+import type { OrbitScanProgressEvent } from "@/types";
 
 const mocks = vi.hoisted(() => ({
   sendJson: vi.fn(),
+  requestOrbitScanStream: vi.fn(),
   invalidateOrbitApplyQueries: vi.fn(),
   trackFlywheelEvent: vi.fn(),
 }));
@@ -15,6 +17,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/fetch-json", () => ({
   sendJson: mocks.sendJson,
   FetchJsonError: class FetchJsonError extends Error {},
+}));
+
+vi.mock("@/lib/orbit-scan-stream", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/orbit-scan-stream")>()),
+  requestOrbitScanStream: mocks.requestOrbitScanStream,
 }));
 
 vi.mock("@/lib/query-invalidation", () => ({
@@ -31,7 +38,7 @@ describe("useOrbitScan", () => {
   });
 
   it("dismiss hides decisions until toggled back", async () => {
-    mocks.sendJson.mockResolvedValueOnce({
+    mocks.requestOrbitScanStream.mockResolvedValueOnce({
       scanRunId: "run-1",
       model: "grok",
       scannedAt: "2026-06-08T00:00:00.000Z",
@@ -102,7 +109,7 @@ describe("useOrbitScan", () => {
   });
 
   it("clearPlan resets scan state", async () => {
-    mocks.sendJson.mockResolvedValueOnce({
+    mocks.requestOrbitScanStream.mockResolvedValueOnce({
       scanRunId: "run-1",
       model: "grok",
       scannedAt: "2026-06-08T00:00:00.000Z",
@@ -176,7 +183,7 @@ describe("useOrbitScan", () => {
       expect(payload).toBeNull();
     });
 
-    expect(mocks.sendJson).not.toHaveBeenCalled();
+    expect(mocks.requestOrbitScanStream).not.toHaveBeenCalled();
   });
 });
 
@@ -187,7 +194,7 @@ describe("useOrbitScan scanning flag", () => {
 
   it("sets scanning while scanNow is in flight", async () => {
     let resolveScan!: (value: unknown) => void;
-    mocks.sendJson.mockImplementation(
+    mocks.requestOrbitScanStream.mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveScan = resolve;
@@ -247,6 +254,94 @@ describe("useOrbitScan scanning flag", () => {
       });
     });
 
+    expect(result.current.scanning).toBe(false);
+  });
+});
+
+describe("useOrbitScan progress", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("tracks rows while the scan streams, then clears when the plan lands", async () => {
+    let finish!: (value: unknown) => void;
+    let report!: (event: OrbitScanProgressEvent) => void;
+    mocks.requestOrbitScanStream.mockImplementation(
+      ({ onProgress }: { onProgress: (event: OrbitScanProgressEvent) => void }) => {
+        report = onProgress;
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      }
+    );
+
+    const { result } = renderOrbitHook(() => useOrbitScan());
+
+    act(() => {
+      void result.current.scanNow(["b1", "b2"]);
+    });
+    await waitFor(() => {
+      expect(result.current.progress?.total).toBe(2);
+    });
+
+    act(() => {
+      report({ type: "phase", phase: "match" });
+      report({ type: "row", bookmarkId: "b1", state: "matched", label: "AI" });
+      report({ type: "row", bookmarkId: "b2", state: "leftover", label: null });
+      report({ type: "phase", phase: "name", bookmarkIds: ["b2"] });
+    });
+
+    expect(result.current.progress).toMatchObject({
+      phase: "name",
+      resolved: 1,
+      naming: 1,
+    });
+    expect(result.current.progress?.rows.get("b1")).toEqual({
+      state: "matched",
+      label: "AI",
+    });
+    expect(result.current.progress?.rows.get("b2")?.state).toBe("naming");
+
+    await act(async () => {
+      finish({
+        scanRunId: "run-1",
+        model: "jev",
+        scannedAt: "2026-06-08T00:00:00.000Z",
+        privacy: { storeDisabled: true, zeroDataRetention: null },
+        batch: {
+          mode: "auto",
+          profile: "quick",
+          requestedCount: 2,
+          candidatePoolCount: 2,
+          sharedSignalCount: 0,
+          sourceUnknownCount: 0,
+          sourceUnknownRate: 0,
+          selectedSourceUnknownCount: 0,
+          selectedSourceUnknownRate: 0,
+          usefulSignalCount: 1,
+          selectionReason: "test",
+        },
+        plan: {
+          overview: { summary: "", taggingStrategy: "", collectionStrategy: "" },
+          suggestions: [],
+        },
+        summary: {
+          bookmarkCount: 0,
+          bookmarksWithTags: 0,
+          bookmarksWithCollections: 0,
+          tagAssignments: 0,
+          uniqueTags: 0,
+          collectionBuckets: 0,
+          reusedExistingTags: 0,
+          reusedExistingCollections: 0,
+          newCollectionBuckets: 0,
+        },
+        tagRollups: [],
+        collectionRollups: [],
+      });
+    });
+
+    expect(result.current.progress).toBeNull();
     expect(result.current.scanning).toBe(false);
   });
 });

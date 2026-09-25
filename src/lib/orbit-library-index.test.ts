@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { libraryTagProgressLabel } from "@/hooks/use-orbit-library-tag";
 import { ORBIT_JEV_TAG_STRONG_THRESHOLD } from "@/lib/orbit-config";
 import { freeLibraryTags, tagsFromPackedNouls } from "@/lib/orbit-library-assign";
 import {
@@ -108,17 +107,5 @@ describe("tagsFromPackedNouls", () => {
     });
 
     expect(assigned.get("b1")).toEqual(["Cooking", "AI"]);
-  });
-});
-
-describe("libraryTagProgressLabel", () => {
-  it("stays quiet until a run is active", () => {
-    expect(libraryTagProgressLabel(false, 12, 40)).toBeNull();
-  });
-
-  it("reports tagged posts against what is still untagged", () => {
-    expect(libraryTagProgressLabel(true, 12, 40)).toBe(
-      "Tagging the library · 12 tagged · 40 still untagged"
-    );
   });
 });

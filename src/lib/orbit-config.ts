@@ -109,14 +109,38 @@ export const ORBIT_LIBRARY_SAMPLE_SIZE = 36;
 /** Posts scored together in one Jev call against the closed tag list. */
 export const ORBIT_LIBRARY_PACK_SIZE = 6;
 
-/** Packed Jev calls in flight during a library page. */
-export const ORBIT_LIBRARY_PACK_CONCURRENCY = 3;
+/**
+ * Packed Jev calls in flight during a library page (override with
+ * ORBIT_LIBRARY_PACK_CONCURRENCY). Rate-limited packs retry with backoff
+ * before they count as failed, so a higher value degrades gracefully.
+ */
+export const ORBIT_LIBRARY_PACK_CONCURRENCY = parseBoundedIntEnv(
+  process.env.ORBIT_LIBRARY_PACK_CONCURRENCY,
+  6,
+  1,
+  16
+);
 
 /** Untagged bookmarks processed per library-classify worker page. */
 export const ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE = 48;
 
-/** Max worker pages after one user-triggered library classify. */
-export const ORBIT_LIBRARY_CLASSIFY_MAX_PAGES = 400;
+/**
+ * A worker invocation starts another page only while it is under this budget,
+ * leaving headroom for one slow page under the route's 240 s maxDuration.
+ */
+export const ORBIT_LIBRARY_INVOCATION_BUDGET_MS = 150_000;
 
-/** Pages to finish inside one worker invocation before kicking the next. */
-export const ORBIT_LIBRARY_CLASSIFY_PAGES_PER_INVOCATION = 4;
+/**
+ * A running pass with no progress write for this long has lost its worker
+ * (deploy, crash, dev restart). Starting again resumes it from its cursor.
+ */
+export const ORBIT_LIBRARY_RUN_STALE_MS = 3 * 60_000;
+
+/** Finished runs stay visible this long so a polling client sees the end state. */
+export const ORBIT_LIBRARY_RUN_VISIBLE_AFTER_MS = 2 * 60_000;
+
+/**
+ * A failed run resumes from its cursor for this long. After that the queue has
+ * likely moved on, so starting again begins a fresh pass from the newest save.
+ */
+export const ORBIT_LIBRARY_RUN_RESUME_WINDOW_MS = 24 * 60 * 60_000;

@@ -44,11 +44,12 @@ export function OrbitTriageHint({ className }: { className?: string }) {
     >
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <p className="min-w-0 flex-1">
-        <span className={strong}>Scan</span>, then{" "}
+        <span className={strong}>Scan</span> reuses your tags first, then proposes
+        names for leftovers.{" "}
         <span className={strong}>Accept</span> ·{" "}
         <span className={strong}>Skip</span> ·{" "}
-        <span className={strong}>Edit</span> each row inline — or open the{" "}
-        <span className={strong}>Review pass</span> for the whole batch.{" "}
+        <span className={strong}>Edit</span> each row — or open{" "}
+        <span className={strong}>Review</span> for the whole batch.{" "}
         <span className="hidden sm:inline">Press ? for shortcuts.</span>
       </p>
       <button

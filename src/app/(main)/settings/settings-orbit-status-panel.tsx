@@ -119,8 +119,10 @@ export function OrbitGrokStatusPanel({
           headingFont={false}
           tabularNums={false}
           valueClassName="break-words text-foreground"
-          label="Privacy"
-          value={privacyValue}
+          label="Jev model"
+          value={`${status.typesafe.model}${
+            status.typesafe.modelSource === "environment" ? " · env" : ""
+          }`}
         />
         <StatRow
           size="sm"
@@ -147,19 +149,19 @@ export function OrbitGrokStatusPanel({
           headingFont={false}
           tabularNums={false}
           valueClassName="break-words text-foreground"
-          label="Endpoint"
-          value={`${status.baseUrl}${status.baseUrlSource === "environment" ? " · env" : ""}`}
+          label="Privacy"
+          value={privacyValue}
         />
-        <StatRow
-          size="sm"
-          headingFont={false}
-          tabularNums={false}
-          valueClassName="break-words text-foreground"
-          label="Jev model"
-          value={`${status.typesafe.model}${
-            status.typesafe.modelSource === "environment" ? " · env" : ""
-          }`}
-        />
+        {status.baseUrlSource === "environment" ? (
+          <StatRow
+            size="sm"
+            headingFont={false}
+            tabularNums={false}
+            valueClassName="break-words text-foreground"
+            label="Endpoint"
+            value={status.baseUrl}
+          />
+        ) : null}
       </dl>
 
       <div className="flex flex-wrap gap-2 pt-1">

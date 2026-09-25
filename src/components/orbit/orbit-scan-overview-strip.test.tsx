@@ -49,6 +49,49 @@ const payload = {
 } satisfies OrbitScanResponsePayload;
 
 describe("OrbitScanOverviewStrip", () => {
+  it("keeps the scan summary as readable prose instead of a squeezed flex column", () => {
+    render(
+      <OrbitScanOverviewStrip
+        payload={{
+          ...payload,
+          summary: {
+            ...payload.summary,
+            bookmarksWithCollections: 41,
+          },
+          tagRollups: [
+            {
+              name: "AI",
+              color: "#1d9bf0",
+              count: 10,
+              reuseExisting: true,
+            },
+            {
+              name: "Video",
+              color: "#a855f7",
+              count: 4,
+              reuseExisting: false,
+            },
+          ],
+        }}
+        suggestionCount={27}
+        scanning={false}
+        applyingBatch={false}
+        canApplyStrongMatches
+        onReview={vi.fn()}
+        onApplyStrongMatches={vi.fn()}
+      />
+    );
+
+    const summary = screen.getByText("27 suggestions");
+    expect(summary.closest("p")).toHaveClass("text-sm", "leading-snug", "text-pretty");
+    expect(summary.closest("p")).not.toHaveClass("flex-1");
+    expect(
+      screen.getByRole("region", { name: "Scan results" }).firstElementChild
+    ).toHaveClass("flex-col");
+    expect(screen.getByText("Grok pass")).toBeInTheDocument();
+    expect(screen.getByText(/1 reuse your tags · 1 new tag · 41 to collections/)).toBeInTheDocument();
+  });
+
   it("keeps completed-scan decisions with the overview", async () => {
     const user = userEvent.setup();
     const onReview = vi.fn();
@@ -122,9 +165,12 @@ describe("OrbitScanOverviewStrip", () => {
       />
     );
 
+    // Closed strip leads with the pass kind so hybrid identity is visible.
+    expect(screen.getAllByText("Orbit pass").length).toBeGreaterThanOrEqual(1);
+
     await user.click(screen.getByRole("button", { name: /details/i }));
     // Engine telemetry lives behind the Details disclosure.
-    expect(screen.getByText(/Orbit pass/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Orbit pass/).length).toBeGreaterThanOrEqual(1);
     const outcomeLine = screen.getByText(
       /Couldn't match: 8 · Fixed on retry: 5 · Sent to Grok for new names: 3/
     );

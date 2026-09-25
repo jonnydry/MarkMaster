@@ -15,6 +15,7 @@ export type RateLimitAction =
   | "sync"
   | "orbit"
   | "orbit:library"
+  | "orbit:progress"
   | "orbit:graph"
   | "orbit:snapshot"
   | "media"
@@ -31,6 +32,7 @@ export const DEBUG_RATE_LIMIT_ACTIONS = [
   "sync",
   "orbit",
   "orbit:library",
+  "orbit:progress",
   "orbit:graph",
   "orbit:snapshot",
   "media",
@@ -66,6 +68,11 @@ const POLICIES: Record<RateLimitAction, RateLimitPolicy> = {
     requests: 24,
     window: "1 d",
     description: "Orbit library classify kicks - Jev backlog pages",
+  },
+  "orbit:progress": {
+    requests: 300,
+    window: "5 m",
+    description: "Orbit auto-tag progress polling - one indexed row read",
   },
   "orbit:graph": {
     requests: 120,

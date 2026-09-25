@@ -51,7 +51,7 @@ describe("getOrbitXaiRuntimeStatus", () => {
     expect(status).toMatchObject({
       state: "misconfigured",
       apiKeyConfigured: false,
-      model: "grok-4.6",
+      model: "grok-4.7",
       modelSource: "default",
       baseUrl: "https://api.x.ai/v1",
       baseUrlSource: "default",
@@ -1074,7 +1074,7 @@ describe("Orbit static instructions", () => {
     expect(payload.bookmarkIds).toEqual([]);
   });
 
-  it("embeds librarian rules as a Grok 4.6 system spec, not a duplicated JSON dump", () => {
+  it("embeds librarian rules as a Grok 4.7 system spec, not a duplicated JSON dump", () => {
     const systemPrompt = buildOrbitSystemPrompt();
     expect(systemPrompt).toContain("Orbit librarian");
     expect(systemPrompt).toContain("## Signal priority");
@@ -1281,15 +1281,15 @@ describe("extractXaiResponsesOutputText", () => {
 });
 
 describe("buildOrbitXaiResponsesRequestBody", () => {
-  it("targets Grok 4.6 Responses settings without temperature", () => {
+  it("targets Grok 4.7 Responses settings without temperature", () => {
     const body = buildOrbitXaiResponsesRequestBody({
-      model: "grok-4.6",
+      model: "grok-4.7",
       systemPrompt: "system",
       userContent: "{}",
     });
 
     expect(body).toMatchObject({
-      model: "grok-4.6",
+      model: "grok-4.7",
       store: false,
       prompt_cache_key: "markmaster-orbit-scan",
       reasoning: { effort: "low" },
@@ -1309,7 +1309,7 @@ describe("buildOrbitXaiResponsesRequestBody", () => {
     expect(resolveOrbitXaiReasoningEffort(13)).toBe("medium");
     expect(
       buildOrbitXaiResponsesRequestBody({
-        model: "grok-4.6",
+        model: "grok-4.7",
         systemPrompt: "system",
         userContent: "{}",
         reasoningEffort: "medium",

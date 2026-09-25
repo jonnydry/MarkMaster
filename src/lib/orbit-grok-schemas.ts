@@ -11,7 +11,7 @@ import {
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
-export const DEFAULT_XAI_MODEL = "grok-4.6";
+export const DEFAULT_XAI_MODEL = "grok-4.7";
 export const ORBIT_XAI_PROMPT_CACHE_KEY = "markmaster-orbit-scan";
 export const ORBIT_XAI_REASONING_EFFORT = "low";
 
@@ -276,6 +276,8 @@ export const orbitScanRequestSchema = z.discriminatedUnion("mode", [
         `Scan up to ${ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN} bookmarks at a time`
       ),
     batch: orbitScanBatchMetadataSchema.optional(),
+    /** Answer with NDJSON progress lines, then the result, instead of one JSON body. */
+    stream: z.boolean().optional(),
   }),
   z.object({
     mode: z.literal("apply"),

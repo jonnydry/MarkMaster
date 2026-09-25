@@ -1,6 +1,11 @@
 import "server-only";
 
-import { RateLimitError, noul } from "@typesafe-ai/sdk";
+import {
+  AuthenticationError,
+  PermissionDeniedError,
+  RateLimitError,
+  noul,
+} from "@typesafe-ai/sdk";
 
 import {
   ORBIT_JEV_TAG_STRONG_THRESHOLD,
@@ -8,6 +13,7 @@ import {
   ORBIT_LIBRARY_PACK_SIZE,
   ORBIT_MAX_TAGS_PER_BOOKMARK,
 } from "@/lib/orbit-config";
+import { OrbitScanError } from "@/lib/orbit-grok-schemas";
 import { normalizeTagKey } from "@/lib/orbit-grok-normalize";
 import {
   libraryTopics,
@@ -138,36 +144,74 @@ async function assignPack(
   return tagsFromPackedNouls({ posts, tags, nouls });
 }
 
+/** Rate-limit retries per pack (server Retry-After, else jittered exponential backoff). */
+const PACK_RATE_LIMIT_RETRIES = 3;
+const PACK_RETRY_BASE_DELAY_MS = 500;
+const PACK_RETRY_MAX_DELAY_MS = 10_000;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Credential failures would fail every pack; stop the run instead of skipping the library. */
+function isFatalPackError(error: unknown) {
+  return (
+    error instanceof AuthenticationError ||
+    error instanceof PermissionDeniedError
+  );
+}
+
 async function assignPackWithRetry(
   posts: LibraryAssignBookmark[],
-  tags: string[]
+  tags: string[],
+  retryBaseDelayMs: number
 ): Promise<Map<string, string[]>> {
-  try {
-    return await assignPack(posts, tags);
-  } catch (error) {
-    if (!(error instanceof RateLimitError)) throw error;
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return assignPack(posts, tags);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await assignPack(posts, tags);
+    } catch (error) {
+      if (
+        !(error instanceof RateLimitError) ||
+        attempt >= PACK_RATE_LIMIT_RETRIES
+      ) {
+        throw error;
+      }
+      const backoff = retryBaseDelayMs * 2 ** attempt;
+      await sleep(
+        Math.min(
+          PACK_RETRY_MAX_DELAY_MS,
+          error.retryAfterMs ?? backoff + Math.random() * backoff
+        )
+      );
+    }
   }
 }
 
 async function mapPacks(
   packs: LibraryAssignBookmark[][],
-  tags: string[]
-): Promise<Map<string, string[]>> {
+  tags: string[],
+  retryBaseDelayMs: number
+): Promise<{ assigned: Map<string, string[]>; failed: number }> {
   const assigned = new Map<string, string[]>();
+  let failed = 0;
+  let fatal: unknown = null;
   let next = 0;
 
   async function worker() {
-    while (next < packs.length) {
+    while (next < packs.length && !fatal) {
       const index = next;
       next += 1;
       const pack = packs[index];
       if (!pack || pack.length === 0) continue;
       try {
-        const packAssigned = await assignPackWithRetry(pack, tags);
+        const packAssigned = await assignPackWithRetry(pack, tags, retryBaseDelayMs);
         for (const [id, names] of packAssigned) assigned.set(id, names);
       } catch (error) {
+        if (isFatalPackError(error)) {
+          fatal = error;
+          return;
+        }
+        failed += pack.length;
         logWarn(
           "OrbitLibrary",
           `Packed assignment failed for ${pack.length} posts; leaving them untagged.`,
@@ -183,7 +227,14 @@ async function mapPacks(
       () => worker()
     )
   );
-  return assigned;
+  if (fatal) {
+    throw new OrbitScanError(
+      "TypeSafe rejected the request. Confirm TYPESAFE_API_KEY.",
+      502,
+      "typesafe_auth"
+    );
+  }
+  return { assigned, failed };
 }
 
 function suggestion(
@@ -207,10 +258,20 @@ function suggestion(
   };
 }
 
+export type LibraryAssignmentPlan = {
+  plan: OrbitScanPlan;
+  /** Posts that needed a Jev call. */
+  modelChecked: number;
+  /** Of those, posts whose pack still failed after retries. */
+  failed: number;
+};
+
 export async function planLibraryAssignments(args: {
   bookmarks: LibraryAssignBookmark[];
   vocabulary: LibraryVocabularyTag[];
-}): Promise<OrbitScanPlan> {
+  /** Test hook — base backoff for rate-limit retries. */
+  retryBaseDelayMs?: number;
+}): Promise<LibraryAssignmentPlan> {
   const tagNames = args.vocabulary.map((tag) => tag.name);
   const suggestions: OrbitBookmarkSuggestion[] = [];
   const needsModel: LibraryAssignBookmark[] = [];
@@ -237,10 +298,14 @@ export async function planLibraryAssignments(args: {
   for (let index = 0; index < needsModel.length; index += ORBIT_LIBRARY_PACK_SIZE) {
     packs.push(needsModel.slice(index, index + ORBIT_LIBRARY_PACK_SIZE));
   }
-  const assigned =
+  const { assigned, failed } =
     tagNames.length > 0 && packs.length > 0
-      ? await mapPacks(packs, tagNames)
-      : new Map<string, string[]>();
+      ? await mapPacks(
+          packs,
+          tagNames,
+          args.retryBaseDelayMs ?? PACK_RETRY_BASE_DELAY_MS
+        )
+      : { assigned: new Map<string, string[]>(), failed: 0 };
 
   for (const bookmark of needsModel) {
     const free = freeLibraryTags(bookmark, args.vocabulary);
@@ -260,11 +325,15 @@ export async function planLibraryAssignments(args: {
   }
 
   return {
-    overview: {
-      summary: `Tagged ${suggestions.length} of ${args.bookmarks.length} posts from the library tag list.`,
-      taggingStrategy: "Assigned posts to the library tag list. Posts that fit nothing stayed untagged.",
-      collectionStrategy: "Collections were left unchanged.",
+    plan: {
+      overview: {
+        summary: `Tagged ${suggestions.length} of ${args.bookmarks.length} posts from the library tag list.`,
+        taggingStrategy: "Assigned posts to the library tag list. Posts that fit nothing stayed untagged.",
+        collectionStrategy: "Collections were left unchanged.",
+      },
+      suggestions,
     },
-    suggestions,
+    modelChecked: tagNames.length > 0 ? needsModel.length : 0,
+    failed,
   };
 }

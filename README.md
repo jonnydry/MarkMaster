@@ -132,7 +132,7 @@ npm run env:check
 | `CSP_MODE` | No | Production defaults to `enforce`; set `report-only` only for a temporary diagnostics/rollback window |
 | `APP_URL` / `NEXT_PUBLIC_APP_URL` | No | Override the origin used in share links (defaults to `NEXTAUTH_URL`) |
 | `TRUSTED_PROXY_HOPS` | Self-hosted | Trusted reverse-proxy hop count for client-IP resolution (`src/lib/client-ip.ts`); Vercel needs no configuration |
-| `XAI_API_BASE_URL` / `XAI_ORBIT_MODEL` | No | Override the xAI endpoint or Grok model for Orbit scans |
+| `XAI_API_BASE_URL` / `XAI_ORBIT_MODEL` | No | Override the xAI endpoint or Grok model for Orbit scans (default `grok-4.7`) |
 | `ORBIT_SCAN_ENRICHMENT` | No | Toggle the Orbit scan enrichment phase |
 | `SKIP_DB_MIGRATION_CHECK` | No (dev) | Skip the migration-status check `npm run dev` performs |
 

@@ -116,6 +116,7 @@ describe("checkRateLimit with Upstash configured", () => {
       sync: "ratelimit:sync",
       orbit: "ratelimit:orbit",
       "orbit:library": "ratelimit:orbit-library",
+      "orbit:progress": "ratelimit:orbit-progress",
       "orbit:graph": "ratelimit:orbit-graph",
       "orbit:snapshot": "ratelimit:orbit-snapshot",
       media: "ratelimit:media",

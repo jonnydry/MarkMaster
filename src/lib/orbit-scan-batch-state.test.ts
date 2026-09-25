@@ -56,8 +56,10 @@ describe("deriveOrbitScanBatchState", () => {
     });
 
     expect(state.scanTargetIds).toEqual([]);
-    expect(state.scanHelperText).toBe("Orbit is clear.");
-    expect(state.scanButtonLabel).toBe("Orbit is clear");
+    expect(state.scanHelperText).toBe(
+      "Queue clear — new saves land here for hybrid tagging."
+    );
+    expect(state.scanButtonLabel).toBe("Queue clear");
   });
 
   it("describes selection scans when bookmarks are selected", () => {

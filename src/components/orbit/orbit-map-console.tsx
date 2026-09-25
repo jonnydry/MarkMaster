@@ -5,6 +5,7 @@ import { forwardRef, type ReactNode } from "react";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
+import { OrbitMapIdentity } from "@/components/orbit/orbit-page-identity";
 import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
 import { OrbitMapGraphSearch } from "@/components/orbit/orbit-map-graph-search";
 import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
@@ -91,10 +92,8 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
             <span className="flex size-6 shrink-0 items-center justify-center text-primary">
               <OrbitLogoMark className="size-4" />
             </span>
-            <span className="heading-font hidden text-sm font-bold tracking-tight text-foreground sm:inline">
-              Orbit
-            </span>
-            <span className="h-5 w-px shrink-0 bg-hairline-soft" />
+            <OrbitMapIdentity className="hidden min-w-0 sm:block" />
+            <span className="hidden h-5 w-px shrink-0 bg-hairline-soft sm:block" />
             <OrbitModeSwitch active="map" size="md" />
             <OrbitMapScopeMenu
               graphScope={graphScope}

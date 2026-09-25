@@ -109,13 +109,8 @@ export function useOrbitScanRunners(options: UseOrbitScanRunnersOptions) {
     async (request: OrbitScanRequest) => {
       if (request.targetIds.length === 0) return null;
 
+      // Progress shows in the Orbit activity banner and on the rows in flight.
       setLastScanRequest(request);
-
-      toast.info(
-        request.scanningSelection
-          ? "Scanning your selection — this should be quicker."
-          : "Scanning your queue — large batches can take a minute."
-      );
       try {
         const result = await scan.scanNow(request.targetIds, request.batch);
         if (result) {

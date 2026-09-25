@@ -1,10 +1,17 @@
 "use client";
 
 import { memo } from "react";
-import { Check, FolderInput, MoreHorizontal, Tag as TagIcon } from "lucide-react";
+import {
+  Check,
+  FolderInput,
+  Loader2,
+  MoreHorizontal,
+  Tag as TagIcon,
+} from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
+import type { OrbitScanRowState } from "@/lib/orbit-scan-stream";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
@@ -23,6 +30,10 @@ interface OrbitListRowProps {
   selected?: boolean;
   selectionMode?: boolean;
   bulkSelected?: boolean;
+  /** Where this row is in a running scan; undefined when it isn't in one. */
+  matchState?: OrbitScanRowState;
+  /** Preview of the first matched tag while the rest of the batch finishes. */
+  matchLabel?: string | null;
   decision?: OrbitBookmarkDecision | null;
   dismissedBookmarkIds?: Set<string>;
   appliedBookmarkIds?: Set<string>;
@@ -36,6 +47,8 @@ export const OrbitListRow = memo(function OrbitListRow({
   selected = false,
   selectionMode = false,
   bulkSelected = false,
+  matchState,
+  matchLabel = null,
   decision = null,
   dismissedBookmarkIds,
   appliedBookmarkIds,
@@ -80,7 +93,10 @@ export const OrbitListRow = memo(function OrbitListRow({
     decision,
   });
   const suggestion = getOrbitRowSuggestion(decision);
-  const showSuggestion = queueStatus === "hasSuggestion" && Boolean(suggestion);
+  const inScan = matchState !== undefined;
+  const scanWorking = matchState === "matching" || matchState === "naming";
+  const showSuggestion =
+    !inScan && queueStatus === "hasSuggestion" && Boolean(suggestion);
   const confidenceDotClass =
     suggestion?.confidence === "high"
       ? "bg-success"
@@ -146,12 +162,15 @@ export const OrbitListRow = memo(function OrbitListRow({
         </div>
       ) : null}
 
-      {queueStatus === "hasSuggestion" && !isHighlighted ? (
-        // Quiet rail for rows with a pending suggestion; absolutely placed
-        // so it never shifts the row's content.
+      {(inScan || queueStatus === "hasSuggestion") && !isHighlighted ? (
+        // Quiet rail for rows with a pending suggestion; it pulses while the
+        // row's scan is in flight. Absolutely placed so it never shifts content.
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-primary/40"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-primary/40",
+            scanWorking && "animate-pulse bg-primary motion-reduce:animate-none"
+          )}
         />
       ) : null}
 
@@ -218,6 +237,26 @@ export const OrbitListRow = memo(function OrbitListRow({
 
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {scanWorking ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2
+                  className="size-3 shrink-0 animate-spin text-primary motion-reduce:animate-none"
+                  aria-hidden
+                />
+                {matchState === "naming" ? "Grok is naming…" : "Matching tags…"}
+              </span>
+            ) : matchState ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Check className="size-3 shrink-0 text-success" aria-hidden />
+                <span className="min-w-0 max-w-[14rem] truncate">
+                  {matchState === "named"
+                    ? "Named"
+                    : matchLabel
+                      ? `Matched · ${matchLabel}`
+                      : "Matched"}
+                </span>
+              </span>
+            ) : null}
             {showSuggestion && suggestion ? (
               <span
                 className={cn(

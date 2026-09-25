@@ -44,8 +44,27 @@ import { getTypeSafeModel } from "@/lib/typesafe";
 import type {
   OrbitHybridScanMetrics,
   OrbitScanBatchMetadata,
+  OrbitScanProgressEvent,
   OrbitScanResponsePayload,
 } from "@/types";
+
+/** Receives live scan progress; streamed to the Orbit page when it asked for it. */
+export type OrbitScanProgressSink = (event: OrbitScanProgressEvent) => void;
+
+/** A Jev answer as a row event: matched (with a preview label) or left over. */
+export function orbitScanRowEvent(
+  assignment: OrbitJevAssignment
+): OrbitScanProgressEvent {
+  const leftover = assignment.needsNewLabel || assignment.abstain;
+  return {
+    type: "row",
+    bookmarkId: assignment.bookmarkId,
+    state: leftover ? "leftover" : "matched",
+    label: leftover
+      ? null
+      : (assignment.tags[0]?.name ?? assignment.collection?.name ?? null),
+  };
+}
 
 export function selectOrbitJevLeftovers(assignments: OrbitJevAssignment[]) {
   return assignments.filter(
@@ -154,6 +173,7 @@ export async function refineOrbitJevLeftovers(args: {
     bookmarks: OrbitBookmarkForScan[],
     notes: OrbitHybridLeftoverNote[]
   ) => Promise<OrbitLabelPool>;
+  onProgress?: OrbitScanProgressSink;
 }): Promise<{ assignments: OrbitJevAssignment[]; pool: OrbitLabelPool }> {
   const harvest = harvestOrbitAcceptedLabels(args.assignments);
   let pool = mergeOrbitLabelPool(args.pool, harvest, { asProposed: false });
@@ -181,6 +201,12 @@ export async function refineOrbitJevLeftovers(args: {
     }
   }
 
+  args.onProgress?.({
+    type: "phase",
+    phase: "refine",
+    bookmarkIds: [...leftoverIds],
+  });
+
   // The batch vocabulary is only the labels Jev accepted this batch — not the
   // whole pool. Preferring the whole pool would flood every leftover shortlist
   // with all existing tags instead of the ~12-question budget.
@@ -193,6 +219,9 @@ export async function refineOrbitJevLeftovers(args: {
     learningHints: args.learningHints,
     neighborHints: args.neighborHints,
     batchVocabulary: batchVocabularyFromPool(harvest),
+    onAssigned: args.onProgress
+      ? (assignment) => args.onProgress?.(orbitScanRowEvent(assignment))
+      : undefined,
   });
 
   return {
@@ -261,7 +290,9 @@ export async function assignAndRefineOrbitJev(args: {
     bookmarks: OrbitBookmarkForScan[],
     notes: OrbitHybridLeftoverNote[]
   ) => Promise<OrbitLabelPool>;
+  onProgress?: OrbitScanProgressSink;
 }): Promise<{ assignments: OrbitJevAssignment[]; firstPassLeftovers: number }> {
+  args.onProgress?.({ type: "phase", phase: "match" });
   const firstPass = await assignOrbitBookmarksWithJev({
     bookmarks: args.bookmarks,
     existingTags: args.existingTags,
@@ -271,6 +302,9 @@ export async function assignAndRefineOrbitJev(args: {
     learningHints: args.learningHints,
     neighborHints: args.neighborHints,
     batchVocabulary: args.firstPassBatchVocabulary,
+    onAssigned: args.onProgress
+      ? (assignment) => args.onProgress?.(orbitScanRowEvent(assignment))
+      : undefined,
   });
   const firstPassLeftovers = selectOrbitJevLeftovers(firstPass).length;
   const refined = await refineOrbitJevLeftovers({
@@ -283,6 +317,7 @@ export async function assignAndRefineOrbitJev(args: {
     learningHints: args.learningHints,
     neighborHints: args.neighborHints,
     proposeLeftoverVocab: args.proposeLeftoverVocab,
+    onProgress: args.onProgress,
   });
   return { assignments: refined.assignments, firstPassLeftovers };
 }
@@ -299,6 +334,7 @@ export async function runHybridOrbitScan(args: {
     bookmarks: OrbitBookmarkForScan[],
     notes: OrbitHybridLeftoverNote[]
   ) => Promise<OrbitScanPlanFromXai>;
+  onProgress?: OrbitScanProgressSink;
 }): Promise<OrbitScanResponsePayload> {
   const seed = buildSeedOrbitLabelPool(args);
   let grokUsed = false;
@@ -310,6 +346,7 @@ export async function runHybridOrbitScan(args: {
     authorPriorHints: args.authorPriorHints,
     learningHints: args.learningHints,
     neighborHints: args.neighborHints,
+    onProgress: args.onProgress,
   });
   let rawPlan = jevAssignmentsToRawPlan(assignments);
 
@@ -321,16 +358,25 @@ export async function runHybridOrbitScan(args: {
     const leftoverBookmarks = args.bookmarks.filter((bookmark) =>
       leftoverIds.has(bookmark.id)
     );
+    args.onProgress?.({
+      type: "phase",
+      phase: "name",
+      bookmarkIds: [...leftoverIds],
+    });
     // Chunks run in parallel; a failed chunk keeps its Jev abstentions and is
     // excluded from the escalated count so the metrics stay honest.
     const settled = await Promise.allSettled(
       chunkItems(leftoverBookmarks, ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN).map(
         async (chunk) => {
           const chunkIds = new Set(chunk.map((bookmark) => bookmark.id));
-          const notes = leftoverNotesFromAssignments(
-            leftovers.filter((assignment) => chunkIds.has(assignment.bookmarkId))
-          );
-          return { chunkIds, plan: await escalate(chunk, notes) };
+          try {
+            const notes = leftoverNotesFromAssignments(
+              leftovers.filter((assignment) => chunkIds.has(assignment.bookmarkId))
+            );
+            return { chunkIds, plan: await escalate(chunk, notes) };
+          } finally {
+            args.onProgress?.({ type: "named", bookmarkIds: [...chunkIds] });
+          }
         }
       )
     );

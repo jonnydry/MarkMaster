@@ -167,23 +167,31 @@ export function OrbitScanOverviewStrip({
       ? `${summary.bookmarksWithCollections.toLocaleString()} to collections`
       : null,
   ].filter(Boolean);
+  const passKind = payload.batch.hybrid ? "Orbit pass" : "Grok pass";
 
   return (
     <section
       aria-label="Scan results"
       className={cn("border-y border-hairline-soft", className)}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
-        <p className="min-w-0 flex-1 text-sm">
-          <span className="font-semibold text-foreground">{headline}</span>
-          {detailParts.length > 0 ? (
-            <span className="text-muted-foreground">
-              {" · "}
-              {detailParts.join(" · ")}
-            </span>
-          ) : null}
-        </p>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+      {/*
+        Two-line strip inside the feed column: stats stay intact on their own
+        row (never squeeze beside actions), then decision controls align below.
+      */}
+      <div className="flex flex-col gap-2 py-2.5">
+        <div className="min-w-0 space-y-0.5">
+          <p className={orbitLabelClass()}>{passKind}</p>
+          <p className="text-sm leading-snug text-pretty">
+            <span className="font-semibold text-foreground">{headline}</span>
+            {detailParts.length > 0 ? (
+              <span className="text-muted-foreground">
+                {" · "}
+                {detailParts.join(" · ")}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="ghost"
@@ -289,7 +297,7 @@ export function OrbitScanOverviewStrip({
 
           <div className="space-y-1 text-xs text-muted-foreground">
             <p>
-              {payload.batch.hybrid ? "Orbit pass" : "Grok pass"}
+              {passKind}
               {" · "}
               <span className={orbitDataClass()}>{payload.model}</span>
               {zeroDataRetention ? " · Zero data retention" : null}

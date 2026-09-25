@@ -641,6 +641,8 @@ export async function assignOrbitBookmarksWithJev(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batchVocabulary?: OrbitBatchVocabulary;
+  /** Called as each bookmark's answer lands (including abstains), for live progress. */
+  onAssigned?: (assignment: OrbitJevAssignment) => void;
   /** Test hook — base backoff for rate-limit retries. */
   retryBaseDelayMs?: number;
 }): Promise<OrbitJevAssignment[]> {
@@ -659,7 +661,9 @@ export async function assignOrbitBookmarksWithJev(args: {
   const retryBaseDelayMs =
     args.retryBaseDelayMs ?? JEV_ASSIGN_RETRY_BASE_DELAY_MS;
 
-  return mapInPool(args.bookmarks, ORBIT_JEV_ASSIGN_CONCURRENCY, async (bookmark) => {
+  const assignWithRetry = async (
+    bookmark: OrbitBookmarkForScan
+  ): Promise<OrbitJevAssignment> => {
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await assignOneOrbitBookmarkWithJev({
@@ -693,6 +697,12 @@ export async function assignOrbitBookmarksWithJev(args: {
         return abstainAssignmentForFailure(bookmark.id);
       }
     }
+  };
+
+  return mapInPool(args.bookmarks, ORBIT_JEV_ASSIGN_CONCURRENCY, async (bookmark) => {
+    const assignment = await assignWithRetry(bookmark);
+    args.onAssigned?.(assignment);
+    return assignment;
   });
 }
 

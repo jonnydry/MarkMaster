@@ -154,7 +154,7 @@ export function SettingsTagsSection({
         <TagListSkeleton />
       ) : tags.length === 0 ? (
         <div className="rounded-sm border border-dashed border-hairline-soft px-4 py-10 text-center">
-          <Tag className="mx-auto mb-2 size-7 text-muted-foreground/40" />
+          <Tag className="mx-auto mb-2 size-7 text-muted-foreground" />
           <p className="text-sm font-medium">No tags yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Tags appear here as you organize bookmarks on the dashboard.
