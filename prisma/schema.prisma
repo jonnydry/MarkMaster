@@ -38,6 +38,7 @@ model User {
   flywheelEvents      FlywheelEvent[]
   orbitDecisionEvents OrbitDecisionEvent[]
   orbitScanSnapshot   OrbitScanSnapshot?
+  orbitLibraryRuns    OrbitLibraryRun[]
 }
 
 enum CollectionType {
@@ -229,6 +230,42 @@ model OrbitScanSnapshot {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OrbitLibraryRunStatus {
+  RUNNING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+/**
+ * One whole-queue auto-tag pass. The worker walks untagged bookmarks
+ * newest-first from the stored cursor and writes progress after every page,
+ * so Orbit can show real progress, survive reloads, stop, and resume.
+ */
+model OrbitLibraryRun {
+  id                 String                @id @default(cuid())
+  userId             String
+  status             OrbitLibraryRunStatus @default(RUNNING)
+  /** Untagged bookmarks when the run started. */
+  total              Int
+  processed          Int                   @default(0)
+  applied            Int                   @default(0)
+  /** Bookmarks whose Jev call failed after retries; the next run checks them again. */
+  failed             Int                   @default(0)
+  /** Closed tag list the run assigns from, fixed before the first page. */
+  vocabulary         Json?
+  cursorBookmarkedAt DateTime?
+  cursorId           String?
+  errorMessage       String?
+  startedAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  completedAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt(sort: Desc)])
 }
 
 model OrbitDecisionEvent {

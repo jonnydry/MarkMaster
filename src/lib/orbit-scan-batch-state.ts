@@ -158,30 +158,30 @@ export function deriveOrbitScanBatchState(
     ? "Loading the current Orbit queue."
     : scanningSelection
       ? hasSelectionOverflow
-        ? `Orbit will suggest tags and destinations for the first ${scanTargetCount} selected bookmarks. Review before you apply.`
-        : `Orbit will suggest tags and destinations for ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}. Review before you apply.`
+        ? `Scan matches your vocabulary on the first ${scanTargetCount} selected, then escalates leftovers. Review before you apply.`
+        : `Scan matches your vocabulary on ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}, then escalates leftovers. Review before you apply.`
       : queueBatchCount > 0
-        ? `${scanProfileLabel} scan selected ${queueBatchCount} ${queueOrderLabel} un-triaged bookmark${queueBatchCount === 1 ? "" : "s"} from ${defaultScanPlan.candidateCount.toLocaleString()} candidates. Review each suggestion before applying.`
+        ? `${scanProfileLabel} · ${queueBatchCount} ${queueOrderLabel} of ${defaultScanPlan.candidateCount.toLocaleString()} — match your tags, then escalate leftovers. Review before applying.`
         : hasSearchQuery
           ? "No bookmarks match the current Orbit filter."
-          : "Orbit is clear.";
+          : "Queue clear — new saves land here for hybrid tagging.";
 
   const scanButtonLabel = queueIsLoading
     ? "Loading queue…"
     : scanTargetCount === 0 && !scanning
       ? hasSearchQuery
         ? "No matches"
-        : "Orbit is clear"
+        : "Queue clear"
       : hasPlan
         ? scanning
           ? "Refreshing…"
           : scanningSelection
             ? "Refresh selection"
-            : "Refresh queue"
+            : "Refresh scan"
         : scanning
           ? scanningSelection
-            ? "Categorizing selection…"
-            : "Categorizing queue…"
+            ? "Matching selection…"
+            : "Matching queue…"
           : scanningSelection
             ? "Scan selection"
             : "Scan queue";

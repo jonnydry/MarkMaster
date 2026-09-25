@@ -180,6 +180,8 @@ export function Sidebar({
       aria-label={showToggle ? "Sidebar navigation" : undefined}
       className={cn(
         "sidebar-embedded flex h-full min-h-0 shrink-0 flex-col overflow-hidden py-3 transition-[width,padding,background-color] duration-300 ease-out motion-reduce:transition-none",
+        (pathname === "/orbit" || pathname.startsWith("/orbit/")) &&
+          "sidebar-embedded-watermark",
         expanded ? "w-64 px-3" : "w-[60px] items-center px-1.5",
         showToggle && "cursor-default"
       )}

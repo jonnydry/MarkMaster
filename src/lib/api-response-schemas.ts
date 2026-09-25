@@ -7,6 +7,7 @@ import type {
   BookmarkWithRelations,
   CollectionWithCount,
   OrbitGraphPayload,
+  OrbitLibraryStatusPayload,
   OrbitScanQualityPayload,
   OrbitXaiStatusPayload,
   SyncStatusResponse,
@@ -224,18 +225,27 @@ export const orbitXaiStatusPayloadSchema = v.object({
   ),
 }) as unknown as v.GenericSchema<unknown, OrbitXaiStatusPayload>;
 
-export const orbitLibraryClassifyResultSchema = v.object({
+const orbitLibraryRunViewSchema = v.object({
+  id: v.string(),
+  status: v.picklist(["running", "completed", "cancelled", "failed"]),
+  total: v.number(),
   processed: v.number(),
   applied: v.number(),
-  skippedReview: v.number(),
-  remaining: v.number(),
-  continued: v.boolean(),
-  queueCount: v.optional(v.number()),
+  failed: v.number(),
+  vocabulary: v.nullable(
+    v.array(v.object({ name: v.string(), color: v.string() }))
+  ),
+  errorMessage: v.nullable(v.string()),
+  startedAt: v.string(),
+  updatedAt: v.string(),
+  completedAt: v.nullable(v.string()),
+  stalled: v.boolean(),
 });
 
-export const orbitLibraryClassifyQueueSchema = v.object({
-  untaggedCount: v.number(),
-});
+export const orbitLibraryStatusSchema = v.object({
+  untaggedCount: v.nullable(v.number()),
+  run: v.nullable(orbitLibraryRunViewSchema),
+}) as unknown as v.GenericSchema<unknown, OrbitLibraryStatusPayload>;
 
 export const collectionDetailSchema = v.object({
   id: v.string(),

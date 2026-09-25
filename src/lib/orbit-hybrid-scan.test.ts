@@ -397,6 +397,64 @@ describe("runHybridOrbitScan", () => {
     expect(result.model).toContain("+");
   });
 
+  it("reports each stage and row as the scan moves", async () => {
+    const matched = (bookmarkId: string, tag: string): OrbitJevAssignment => ({
+      ...abstainAssignment(bookmarkId),
+      tags: [{ name: tag, color: "#1d9bf0", reason: "match" }],
+      abstain: false,
+      confidence: "high",
+    });
+    let pass = 0;
+    assignSpy.mockImplementation(
+      async (call: {
+        bookmarks: Array<{ id: string }>;
+        onAssigned?: (assignment: OrbitJevAssignment) => void;
+      }) => {
+        pass += 1;
+        return call.bookmarks.map((bookmark) => {
+          const assignment =
+            bookmark.id === "bm-1"
+              ? matched("bm-1", "AI")
+              : pass === 2 && bookmark.id === "bm-2"
+                ? matched("bm-2", "Cooking")
+                : abstainAssignment(bookmark.id);
+          call.onAssigned?.(assignment);
+          return assignment;
+        });
+      }
+    );
+    const events: unknown[] = [];
+
+    await runHybridOrbitScan({
+      bookmarks: ["bm-1", "bm-2", "bm-3"].map(scanBookmark),
+      existingTags: [],
+      existingCollections: [],
+      onProgress: (event) => events.push(event),
+      escalateLeftovers: async (chunk) => ({
+        overview: { summary: "", taggingStrategy: "", collectionStrategy: "" },
+        suggestions: chunk.map((bookmark) => ({
+          bookmarkId: bookmark.id,
+          confidence: "medium" as const,
+          reasoning: "Grok named it",
+          tags: [{ name: "Compilers", color: "#64748b", reason: "gap" }],
+          collection: null,
+        })),
+      }),
+    });
+
+    expect(events).toEqual([
+      { type: "phase", phase: "match" },
+      { type: "row", bookmarkId: "bm-1", state: "matched", label: "AI" },
+      { type: "row", bookmarkId: "bm-2", state: "leftover", label: null },
+      { type: "row", bookmarkId: "bm-3", state: "leftover", label: null },
+      { type: "phase", phase: "refine", bookmarkIds: ["bm-2", "bm-3"] },
+      { type: "row", bookmarkId: "bm-2", state: "matched", label: "Cooking" },
+      { type: "row", bookmarkId: "bm-3", state: "leftover", label: null },
+      { type: "phase", phase: "name", bookmarkIds: ["bm-3"] },
+      { type: "named", bookmarkIds: ["bm-3"] },
+    ]);
+  });
+
   it("reports a Jev-only model when Grok never contributed", async () => {
     assignSpy.mockImplementation(
       async (call: { bookmarks: Array<{ id: string }> }) =>

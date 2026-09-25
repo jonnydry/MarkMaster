@@ -1,7 +1,9 @@
 "use client";
 
-import { Check, ChevronDown, Lock } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, Lock, Tags } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { orbitLabelClass } from "@/lib/orbit-route-chrome";
 import {
@@ -38,6 +40,18 @@ const BATCH_OPTIONS: Array<{
     detail: `${ORBIT_SCAN_BATCH_PROFILES.sweep.size} bookmarks · reuses existing tags only — never invents new ones`},
 ];
 
+/** Whole-queue auto-tag, offered beside the batch sizes. */
+export interface OrbitLibraryTagOption {
+  /** Untagged bookmarks in Orbit. Null while unknown (loading, or a run owns the count). */
+  untaggedCount: number | null;
+  available: boolean;
+  unavailableReason: string;
+  /** A run exists: going, or paused waiting for Resume. It shows above the queue. */
+  state: "idle" | "running" | "paused";
+  starting: boolean;
+  onStart: () => void;
+}
+
 export interface OrbitBatchMenuProps {
   batchMode: OrbitScanBatchMode;
   resolvedBatchProfile: OrbitScanBatchProfileId;
@@ -47,12 +61,16 @@ export interface OrbitBatchMenuProps {
   sweepLockedReason: string;
   disabled?: boolean;
   onBatchModeChange: (mode: OrbitScanBatchMode) => void;
+  library?: OrbitLibraryTagOption;
 }
 
+const rowClass =
+  "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors";
+
 /**
- * Compact batch-size affordance. Demoted from the old always-on 4-segment
- * control to a caret popover that hangs off the scan CTA — advanced, not
- * equal-weight with the primary action.
+ * How much Orbit works on at once: a reviewable batch (the scan CTA's size),
+ * or the whole queue auto-tagged from existing tags. Hangs off the scan CTA
+ * as a caret popover — advanced, not equal-weight with the primary action.
  */
 export function OrbitBatchMenu({
   batchMode,
@@ -63,15 +81,33 @@ export function OrbitBatchMenu({
   sweepLockedReason,
   disabled = false,
   onBatchModeChange,
+  library,
 }: OrbitBatchMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const triggerLabel =
     batchMode === "auto"
       ? `Auto · ${ORBIT_SCAN_BATCH_PROFILES[resolvedBatchProfile].label}`
       : ORBIT_SCAN_BATCH_PROFILES[batchMode].label;
 
+  const untagged = library?.untaggedCount ?? null;
+  const untaggedLabel =
+    untagged == null ? null : untagged.toLocaleString();
+  const libraryLocked =
+    !library ||
+    !library.available ||
+    library.state !== "idle" ||
+    library.starting;
+
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setConfirming(false);
+      }}
+    >
       <PopoverTrigger
         disabled={disabled}
         aria-label={`Scan batch size: ${triggerLabel}`}
@@ -88,15 +124,12 @@ export function OrbitBatchMenu({
         </span>
         <ChevronDown className="size-3 opacity-60" aria-hidden />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 gap-1 p-1.5">
-        <div
-          className={cn(
-            orbitLabelClass(),
-            "px-2 pb-1 pt-1.5 text-2xs",
-            "text-muted-foreground"
-          )}
-        >
-          Scan batch size
+      <PopoverContent align="end" className="w-72 gap-1 p-1.5">
+        <div className="space-y-0.5 px-2 pb-1 pt-1.5">
+          <p className={orbitLabelClass()}>Review a batch</p>
+          <p className="text-xs leading-4 text-muted-foreground">
+            Scan suggests; nothing changes until you accept.
+          </p>
         </div>
         {BATCH_OPTIONS.map((option) => {
           const active = batchMode === option.mode;
@@ -114,7 +147,7 @@ export function OrbitBatchMenu({
               onClick={() => onBatchModeChange(option.mode)}
               title={locked ? lockedReason : option.detail}
               className={cn(
-                "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors",
+                rowClass,
                 active
                   ? highlightSegmentActiveClass
                   : cn("text-foreground", highlightIdleClass),
@@ -144,6 +177,88 @@ export function OrbitBatchMenu({
             </button>
           );
         })}
+
+        {library ? (
+          <div className="mt-1 border-t border-hairline-soft pt-1.5">
+            <p className={cn(orbitLabelClass(), "px-2 pb-1")}>Tag everything</p>
+            {confirming ? (
+              <div className="space-y-2 px-2 pb-1.5 pt-0.5">
+                <p className="text-xs leading-relaxed text-foreground">
+                  Auto-tag {untaggedLabel ?? "every"} untagged bookmark
+                  {untagged === 1 ? "" : "s"}? Confident matches from your tags
+                  are applied without review. You can stop it any time.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      setOpen(false);
+                      setConfirming(false);
+                      library.onStart();
+                    }}
+                  >
+                    <Tags className="size-3.5" aria-hidden />
+                    Start auto-tag
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={libraryLocked}
+                onClick={() => setConfirming(true)}
+                title={
+                  library.available ? undefined : library.unavailableReason
+                }
+                className={cn(
+                  rowClass,
+                  "text-foreground",
+                  highlightIdleClass,
+                  libraryLocked &&
+                    "cursor-not-allowed opacity-55 hover:bg-transparent"
+                )}
+              >
+                <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
+                  {library.available ? (
+                    <Tags className="size-3.5" aria-hidden />
+                  ) : (
+                    <Lock className="size-3 opacity-70" aria-hidden />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold">
+                    {library.state === "running"
+                      ? "Auto-tag is running"
+                      : library.state === "paused"
+                        ? "Auto-tag is paused"
+                        : untaggedLabel
+                        ? `Auto-tag all ${untaggedLabel}`
+                        : "Auto-tag the queue"}
+                  </span>
+                  <span className="block text-2xs leading-4 text-muted-foreground">
+                    {!library.available
+                      ? library.unavailableReason
+                      : library.state === "running"
+                        ? "Progress shows above the queue."
+                        : library.state === "paused"
+                          ? "Resume or dismiss it above the queue."
+                          : "Applies confident matches from your tags. No review."}
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

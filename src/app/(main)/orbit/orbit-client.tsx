@@ -28,6 +28,9 @@ const OrbitReviewOverlay = dynamic(
     ),
   { ssr: false }
 );
+import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
+import { OrbitActivityBanner } from "@/components/orbit/orbit-activity-banner";
+import { OrbitLibraryRunBanner } from "@/components/orbit/orbit-library-run-banner";
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
@@ -49,6 +52,10 @@ import { appContentGutterClassName } from "@/lib/app-chrome";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { useOrbitLibraryTag } from "@/hooks/use-orbit-library-tag";
 import { useOrbitPage } from "@/hooks/use-orbit-page";
+import {
+  orbitScanProgressDetail,
+  orbitScanProgressRatio,
+} from "@/lib/orbit-scan-stream";
 import { cn } from "@/lib/utils";
 
 const AddTagDialog = dynamic(
@@ -137,6 +144,7 @@ export default function OrbitPage() {
     deepLockedReason,
     sweepUnlocked,
     sweepLockedReason,
+    hybridScanAvailable,
     canApplyStrongMatches,
     canRescanCurrentSelection,
     staleScanPlan,
@@ -196,6 +204,8 @@ export default function OrbitPage() {
   } = interactions;
 
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const matchingCount = scan.progress?.total ?? scanTargetCount;
 
   const handleToggleSelect = useCallback(
     (id: string) => {
@@ -287,6 +297,7 @@ export default function OrbitPage() {
     <>
     <AppPageShell
       className="orbit-route-default"
+      backdrop={<OrbitPageWatermark />}
       sidebar={
         <Sidebar
           tags={tags}
@@ -350,10 +361,19 @@ export default function OrbitPage() {
               mapHref={orbitMapHref}
               onBatchModeChange={setScanBatchMode}
               onScan={handleScan}
-              libraryUntaggedCount={libraryTag.count}
-              libraryTagBusy={libraryTag.busy}
-              libraryTagStatus={libraryTag.status}
-              onTagLibrary={() => void libraryTag.start()}
+              libraryTag={{
+                untaggedCount: libraryTag.untaggedCount,
+                available: hybridScanAvailable,
+                unavailableReason: "Auto-tag needs TYPESAFE_API_KEY.",
+                state: libraryTag.paused
+                  ? "paused"
+                  : libraryTag.run
+                    ? "running"
+                    : "idle",
+                starting: libraryTag.starting,
+                onStart: () => void libraryTag.start(),
+              }}
+              libraryTagLive={libraryTag.live}
               search={search}
               onSearchChange={handleSearchChange}
               visibleStatusLabel={visibleStatusLabel}
@@ -381,6 +401,25 @@ export default function OrbitPage() {
 
           <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-4")}>
             <section className={cn(bookmarkFeedColumnClassName, "space-y-3")}>
+              {scan.scanning ? (
+                <OrbitActivityBanner
+                  title={`Matching ${matchingCount.toLocaleString()} bookmark${matchingCount === 1 ? "" : "s"}`}
+                  detail={
+                    scan.progress
+                      ? orbitScanProgressDetail(scan.progress)
+                      : "Your existing tags first, then new names for leftovers."
+                  }
+                  progress={orbitScanProgressRatio(scan.progress)}
+                  elapsed
+                />
+              ) : null}
+              {scan.applyingBatch ? (
+                <OrbitActivityBanner
+                  title="Applying matches"
+                  detail="Tags and collections land on each post as they save."
+                />
+              ) : null}
+              <OrbitLibraryRunBanner libraryTag={libraryTag} />
               <OrbitTriageHint />
 
               {scan.plan ? (
@@ -459,14 +498,18 @@ export default function OrbitPage() {
                       variant="outline"
                       className="h-8 gap-1.5"
                       onClick={handleScan}
-                      disabled={scan.scanning || scanTargetIds.length === 0}
+                      disabled={
+                        scan.scanning ||
+                        libraryTag.live ||
+                        scanTargetIds.length === 0
+                      }
                     >
                       {scan.scanning ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : (
                         <OrbitLogoMark className="size-3.5" />
                       )}
-                      Scan selection
+                      {scan.scanning ? "Matching selection…" : "Scan selection"}
                     </Button>
                     <Button
                       size="sm"
@@ -535,11 +578,11 @@ export default function OrbitPage() {
                       </div>
                     )
                   }
-                  title={search.trim() ? "No matches in Orbit" : "Orbit is clear"}
+                  title={search.trim() ? "No matches in Orbit" : "Queue clear"}
                   description={
                     search.trim()
                       ? "Try a different term or clear the query."
-                      : "Library organized. Highlights will surface the next standouts for Orbit review."
+                      : "Nothing left to triage. New saves land here for hybrid tagging — Scan reuses your vocabulary, then proposes names for leftovers."
                   }
                   action={
                     search.trim() ? (
@@ -595,6 +638,7 @@ export default function OrbitPage() {
                         isLoading={isLoading}
                         selectionMode={selectionMode}
                         selectedIds={selectedBookmarkIds}
+                        scanRows={scan.progress?.rows}
                         getDecision={scan.getDecision}
                         dismissedBookmarkIds={scan.dismissedBookmarkIds}
                         appliedBookmarkIds={appliedBookmarkIds}

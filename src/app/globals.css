@@ -566,6 +566,10 @@
     background: var(--sidebar);
     box-shadow: inset -1px 0 0 var(--sidebar-border);
   }
+  /* Orbit only: let the page marks read through the sidebar. No blur. */
+  .sidebar-embedded-watermark {
+    background: color-mix(in srgb, var(--sidebar) 78%, transparent);
+  }
 
   .app-viewport {
     min-height: 100vh;

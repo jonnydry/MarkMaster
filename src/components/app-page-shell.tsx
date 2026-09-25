@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 type AppPageShellProps = {
   /** Desktop sidebar slot. Omit for single-column pages (collection detail). */
   sidebar?: ReactNode;
+  /** Non-interactive layer painted behind the sidebar and main column. */
+  backdrop?: ReactNode;
   /** Content rendered above the scroll region (e.g. sync progress). */
   mainTop?: ReactNode;
   /** Main column content. Wrapped in the scroll region when layout is "scroll". */
@@ -28,6 +30,7 @@ type AppPageShellProps = {
 
 export function AppPageShell({
   sidebar,
+  backdrop,
   mainTop,
   children,
   layout = "scroll",
@@ -49,6 +52,7 @@ export function AppPageShell({
         className
       )}
     >
+      {backdrop}
       {sidebar ? (
         <div className={appPageSidebarClassName}>{sidebar}</div>
       ) : null}

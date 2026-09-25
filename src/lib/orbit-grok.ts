@@ -7,7 +7,10 @@ import {
   ORBIT_SCAN_BATCH_PROFILES,
   getOrbitScanMaxBookmarks,
 } from "@/lib/orbit-config";
-import { runHybridOrbitScan } from "@/lib/orbit-hybrid-scan";
+import {
+  runHybridOrbitScan,
+  type OrbitScanProgressSink,
+} from "@/lib/orbit-hybrid-scan";
 import { isTypeSafeConfigured } from "@/lib/typesafe";
 import type { OrbitLearningHint, OrbitNeighborHint } from "@/lib/orbit-signal-extraction";
 import {
@@ -160,6 +163,8 @@ export async function scanOrbitBookmarksWithXai(args: {
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batch?: OrbitScanBatchMetadata;
   hybridLeftoverNotes?: OrbitHybridLeftoverNote[];
+  /** Live progress for streamed scans. A cached result arrives without events. */
+  onProgress?: OrbitScanProgressSink;
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitScanError(
@@ -198,6 +203,7 @@ export async function scanOrbitBookmarksWithXai(args: {
         learningHints: args.learningHints,
         neighborHints: args.neighborHints,
         batch: args.batch,
+        onProgress: args.onProgress,
         escalateLeftovers: apiKey
           ? async (bookmarks, notes) => {
               const escalated = await fetchOrbitScanFromXai(
@@ -230,9 +236,15 @@ export async function scanOrbitBookmarksWithXai(args: {
     );
   }
 
-  return getCachedJson(cacheKey, SCAN_CACHE_TTL_SECONDS, () =>
-    fetchOrbitScanFromXai(args, apiKey!)
-  );
+  return getCachedJson(cacheKey, SCAN_CACHE_TTL_SECONDS, () => {
+    // Grok-only: one call names the whole batch.
+    args.onProgress?.({
+      type: "phase",
+      phase: "name",
+      bookmarkIds: args.bookmarks.map((bookmark) => bookmark.id),
+    });
+    return fetchOrbitScanFromXai(args, apiKey!);
+  });
 }
 
 export function resolveOrbitXaiReasoningEffort(

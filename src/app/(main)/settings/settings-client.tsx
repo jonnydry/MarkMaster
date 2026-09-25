@@ -9,8 +9,6 @@ import {
   Braces,
   Check,
   LogOut,
-  BrainCircuit,
-  KeyRound,
   ShieldCheck,
   Table2,
   type LucideIcon,
@@ -78,13 +76,12 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
   {
     title: "Sections",
     shortcuts: [
-      { id: "connection", keys: ["1"], label: "Connection" },
-      { id: "sync", keys: ["2"], label: "Sync" },
-      { id: "orbit-grok", keys: ["3"], label: "Orbit scanning" },
-      { id: "appearance", keys: ["4"], label: "Appearance" },
-      { id: "export", keys: ["5"], label: "Export" },
-      { id: "tags", keys: ["6"], label: "Tags" },
-      { id: "account", keys: ["7"], label: "Account" },
+      { id: "sync", keys: ["1"], label: "Sync" },
+      { id: "orbit-grok", keys: ["2"], label: "Orbit scanning" },
+      { id: "appearance", keys: ["3"], label: "Appearance" },
+      { id: "export", keys: ["4"], label: "Export" },
+      { id: "tags", keys: ["5"], label: "Tags" },
+      { id: "account", keys: ["6"], label: "Account" },
     ],
   },
   {
@@ -172,7 +169,6 @@ export default function SettingsPage() {
   useSurfaceKeyboardShortcuts({
     shortcutGroups: SETTINGS_SHORTCUT_GROUPS,
     actions: {
-      connection: () => scrollToSettingsSection("connection"),
       sync: () => scrollToSettingsSection("sync"),
       "orbit-grok": () => scrollToSettingsSection("orbit-grok"),
       appearance: () => scrollToSettingsSection("appearance"),
@@ -279,55 +275,39 @@ export default function SettingsPage() {
                   <SettingsMobileNav onNavigate={scrollToSettingsSection} />
 
                   <SettingsSection
-                    id="connection"
-                    title="Connection"
-                    description="Read-only X access. Sync imports bookmarks — nothing is posted for you."
-                  >
-                    <ul className="space-y-1.5 text-xs text-muted-foreground">
-                      <li className="flex items-start gap-2">
-                        <KeyRound className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                        Tokens are encrypted before storage.
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <BrainCircuit className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                        Scan matches your existing tags first. Grok only fills gaps you approve.
-                      </li>
-                    </ul>
-                  </SettingsSection>
-
-                  <SettingsSection
                     id="sync"
                     title="Sync"
-                    description="Pull new bookmarks from X. A regular sync is quick; scanning X folders takes longer."
+                    description="Read-only import from X. Tokens stay encrypted. A rate limit pauses the run; the next sync resumes it."
                   >
-                    <div className="surface-inset px-4">
-                      <SettingsRow
-                        label="Scan X bookmark folders"
-                        description="Mirrors your X folders into synced collections. Adds extra API calls and may make sync take a bit longer."
-                        divider={false}
-                      >
-                        <Switch
-                          checked={syncXFolders}
-                          disabled={isUpdatingSyncSettings}
-                          aria-label="Scan X bookmark folders when syncing"
-                          onCheckedChange={(checked) => setSyncXFolders(checked)}
-                        />
-                      </SettingsRow>
-                      <div className="border-t border-hairline-soft py-3">
+                    <SettingsRow
+                      label="Scan X bookmark folders"
+                      description="Mirrors X folders into synced collections. This adds API calls and takes longer."
+                      divider={false}
+                    >
+                      <Switch
+                        checked={syncXFolders}
+                        disabled={isUpdatingSyncSettings}
+                        aria-label="Scan X bookmark folders when syncing"
+                        onCheckedChange={(checked) => setSyncXFolders(checked)}
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Sync now"
+                      description="Fetches the newest bookmarks and updates existing saves."
+                    >
+                      <div className="w-full sm:max-w-xs">
                         <SyncButton
                           lastSyncAt={lastSyncAt}
                           onSyncComplete={handleSyncComplete}
-                          detail="full"
-                          folderScanHint="above"
                         />
                       </div>
-                    </div>
+                    </SettingsRow>
                   </SettingsSection>
 
                   <SettingsSection
                     id="orbit-grok"
                     title="Orbit scanning"
-                    description="Orbit suggests tags from the ones you already use and only proposes new names when nothing fits. Nothing changes until you approve it."
+                    description="Suggestions reuse your tags. New names wait until you approve them."
                     badge={<OrbitReadyBadge status={orbitStatusQuery.data} />}
                   >
                     <OrbitGrokStatusPanel
@@ -342,7 +322,7 @@ export default function SettingsPage() {
                     id="appearance"
                     title="Appearance"
                   >
-                    <div className="surface-inset px-4">
+                    <div>
                       <SettingsRow label="Color mode" divider={false}>
                         <SettingsSegment
                           ariaLabel="Color mode"
@@ -363,8 +343,7 @@ export default function SettingsPage() {
                             Typography
                           </p>
                           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                            Choose a cohesive type system for body text,
-                            headings, labels, and data.
+                            Type for reading, labels, and data.
                           </p>
                         </div>
                         <TypographyPresetPicker
@@ -394,14 +373,13 @@ export default function SettingsPage() {
                     </div>
                   </SettingsSection>
 
-                  <SettingsSection
-                    id="account"
-                    title="Account"
-                    tone="danger"
-                  >
+                  <SettingsTagsSection {...tagsState} tagSearchRef={tagSearchRef} />
+
+                  <SettingsSection id="account" title="Account">
                     <SettingsRow
                       label="Sign out"
-                      description="Clears this browser session. Your synced data stays until you revoke access on X."
+                      description="Clears this browser session. Synced data stays until you revoke access on X."
+                      divider={false}
                     >
                       <Button
                         variant="destructive"
@@ -415,8 +393,7 @@ export default function SettingsPage() {
                     </SettingsRow>
                     <SettingsRow
                       label="Sign out everywhere"
-                      description="Invalidates sessions on all devices within a few minutes. Use this if a device was lost or a session may be compromised."
-                      divider={false}
+                      description="Ends sessions on every device within a few minutes."
                     >
                       <Button
                         variant="destructive"
@@ -430,8 +407,6 @@ export default function SettingsPage() {
                       </Button>
                     </SettingsRow>
                   </SettingsSection>
-
-                  <SettingsTagsSection {...tagsState} tagSearchRef={tagSearchRef} />
                 </div>
               </div>
               </SettingsScrollspyProvider>
@@ -540,10 +515,10 @@ function ExportLink({
       href={href}
       className={cn(
         "inline-flex flex-1 items-center gap-2 rounded-sm border border-hairline-soft px-3 py-2.5 text-sm font-medium transition-colors",
-        "hover:border-primary/25 hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        "hover:bg-hover focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
       )}
     >
-      <Icon className="size-4 text-primary" aria-hidden />
+      <Icon className="size-4 text-muted-foreground" aria-hidden />
       Download {title}
     </a>
   );

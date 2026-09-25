@@ -12,6 +12,12 @@ import {
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import { ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
+import {
+  applyOrbitScanProgressEvent,
+  requestOrbitScanStream,
+  startOrbitScanProgress,
+  type OrbitScanProgress,
+} from "@/lib/orbit-scan-stream";
 import { invalidateOrbitApplyQueries } from "@/lib/query-invalidation";
 import type {
   BookmarkWithRelations,
@@ -50,6 +56,8 @@ export interface OrbitScanState {
   scannedBookmarkIds: Set<string>;
   dismissedBookmarkIds: Set<string>;
   scanning: boolean;
+  /** Live per-row progress while a scan runs; null otherwise. */
+  progress: OrbitScanProgress | null;
   applyingBookmarkId: string | null;
   applyingBatch: boolean;
   error: OrbitScanFailure | null;
@@ -312,6 +320,7 @@ export function useOrbitScan(): OrbitScanHandle {
   );
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState<OrbitScanProgress | null>(null);
   const [applyingBookmarkId, setApplyingBookmarkId] = useState<string | null>(
     null
   );
@@ -358,25 +367,19 @@ export function useOrbitScan(): OrbitScanHandle {
       const requestId = ++scanRequestIdRef.current;
 
       setScanning(true);
+      setProgress(startOrbitScanProgress(unique));
       setError(null);
       const startedAt = Date.now();
 
       try {
-        const result = await sendJson<
-          OrbitScanResponsePayload,
-          {
-            mode: "scan";
-            bookmarkIds: string[];
-            batch?: JsonValue;
-          }
-        >("/api/orbit/scan", {
-          method: "POST",
-          body: {
-            mode: "scan",
-            bookmarkIds: unique,
-            ...(batch
-              ? {               batch: structuredClone(batch) as unknown as JsonValue }
-              : {}),
+        const result = await requestOrbitScanStream({
+          bookmarkIds: unique,
+          batch,
+          onProgress: (event) => {
+            if (requestId !== scanRequestIdRef.current) return;
+            setProgress((current) =>
+              current ? applyOrbitScanProgressEvent(current, event) : current
+            );
           },
         });
         if (requestId !== scanRequestIdRef.current) return null;
@@ -413,6 +416,7 @@ export function useOrbitScan(): OrbitScanHandle {
         if (requestId === scanRequestIdRef.current) {
           scanInFlightRef.current = false;
           setScanning(false);
+          setProgress(null);
         }
       }
     },
@@ -727,6 +731,7 @@ export function useOrbitScan(): OrbitScanHandle {
     scannedBookmarkIds,
     dismissedBookmarkIds: dismissed,
     scanning,
+    progress,
     applyingBookmarkId,
     applyingBatch,
     error,

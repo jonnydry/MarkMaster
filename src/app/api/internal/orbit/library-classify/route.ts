@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { ORBIT_LIBRARY_CLASSIFY_MAX_PAGES } from "@/lib/orbit-config";
-import { classifyOrbitLibraryRun } from "@/lib/orbit-library-classify";
-import { OrbitScanError } from "@/lib/orbit-grok";
+import { driveOrbitLibraryRun } from "@/lib/orbit-library-classify";
 import { isSyncWorkerAuthorized } from "@/lib/sync-queue";
 
 export const maxDuration = 240;
 
 const workerBodySchema = z.object({
-  userId: z.string().trim().min(1),
-  pagesLeft: z.number().int().min(0).max(ORBIT_LIBRARY_CLASSIFY_MAX_PAGES).optional(),
-  cursor: z
-    .object({
-      bookmarkedAt: z.string().trim().min(1),
-      id: z.string().trim().min(1),
-    })
-    .optional(),
+  runId: z.string().trim().min(1),
 });
 
+/** Runs the next budgeted slice of an auto-tag run, then hands off again. */
 export async function POST(req: NextRequest) {
   if (!isSyncWorkerAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,32 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  try {
-    const result = await classifyOrbitLibraryRun({
-      userId: parsed.data.userId,
-      cursor: parsed.data.cursor,
-      pagesLeft: parsed.data.pagesLeft,
-      continueInBackground: true,
-    });
-
-    return NextResponse.json({
-      processed: result.processed,
-      applied: result.applied,
-      skippedReview: result.skippedReview,
-      remaining: result.remaining,
-      continued: result.continued,
-    });
-  } catch (error) {
-    if (error instanceof OrbitScanError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Library classify worker failed." },
-      { status: 500 }
-    );
-  }
+  // Failures are written to the run itself; the caller only needs a hand-off.
+  await driveOrbitLibraryRun(parsed.data.runId);
+  return NextResponse.json({ ok: true });
 }

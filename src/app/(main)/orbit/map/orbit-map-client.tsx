@@ -17,6 +17,7 @@ import {
   orbitMapInspectorOverlayZoomClass,
 } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
+import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import {
@@ -181,6 +182,7 @@ export default function OrbitMapPage() {
     <AppPageShell
       className="orbit-route-default"
       layout="column"
+      backdrop={<OrbitPageWatermark />}
       mainTop={
         syncProgressVisible ? (
           <ScrollingProgressBar className="relative z-50" />
@@ -226,7 +228,7 @@ export default function OrbitMapPage() {
                 title="Nothing to chart yet"
                 description={
                   graphScope === "orbit"
-                    ? "Your Orbit queue is clear. Sync new bookmarks or switch to the full library map."
+                    ? "Your Orbit queue is clear. Tag and organize new saves in the queue, or switch scope to chart the full library."
                     : "Sync bookmarks from X, then return here to explore how tags and collections connect."
                 }
                 action={

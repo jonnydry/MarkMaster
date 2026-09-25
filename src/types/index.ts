@@ -372,6 +372,40 @@ export interface OrbitScanResponsePayload {
   scannedBookmarks?: BookmarkWithRelations[];
 }
 
+/**
+ * Scan stages, in order: read posts and hints, match existing tags (Jev),
+ * re-check leftovers against this batch's tags, name what's left (Grok).
+ */
+export type OrbitScanPhase = "prepare" | "match" | "refine" | "name";
+
+/** Progress a streamed scan reports before its result. */
+export type OrbitScanProgressEvent =
+  | {
+      type: "phase";
+      phase: OrbitScanPhase;
+      /** The bookmarks this phase works on; omitted when it is the whole batch. */
+      bookmarkIds?: string[];
+    }
+  | {
+      /** One bookmark's answer from a Jev pass. */
+      type: "row";
+      bookmarkId: string;
+      state: "matched" | "leftover";
+      /** First tag or collection matched, as a preview. */
+      label: string | null;
+    }
+  | {
+      /** A Grok naming chunk finished (or failed and kept its Jev answer). */
+      type: "named";
+      bookmarkIds: string[];
+    };
+
+/** One NDJSON line of a streamed `/api/orbit/scan` response. */
+export type OrbitScanStreamLine =
+  | OrbitScanProgressEvent
+  | { type: "result"; payload: OrbitScanResponsePayload }
+  | { type: "error"; status: number; error: OrbitScanErrorPayload };
+
 export interface OrbitScanQualityPayload {
   recommendedProfile: OrbitScanBatchProfileId;
   profileReason: string;
@@ -430,19 +464,38 @@ export interface OrbitApplyResult {
   skippedNewCollectionSingletons: number;
 }
 
-export interface OrbitLibraryClassifyResult {
+export type OrbitLibraryRunStatus =
+  | "running"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+/** Whole-queue auto-tag pass as the Orbit page sees it. */
+export interface OrbitLibraryRunView {
+  id: string;
+  status: OrbitLibraryRunStatus;
+  /** Untagged bookmarks when the run started. */
+  total: number;
+  /** Bookmarks checked so far (tagged, no match, or failed). */
   processed: number;
+  /** Bookmarks that received at least one tag. */
   applied: number;
-  skippedReview: number;
-  remaining: number;
-  continued: boolean;
-  queueCount?: number;
-  pagesLeft?: number;
-  cursor?: {
-    bookmarkedAt: string;
-    id: string;
-  };
-  appliedResult?: OrbitApplyResult | null;
+  /** Bookmarks whose Jev call failed after retries. */
+  failed: number;
+  /** Tag list in use; null until the worker has resolved it. */
+  vocabulary: Array<{ name: string; color: string }> | null;
+  errorMessage: string | null;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  /** Running, but the worker stopped writing progress. Starting again resumes it. */
+  stalled: boolean;
+}
+
+export interface OrbitLibraryStatusPayload {
+  /** Null while a run is active (the run carries the counts). */
+  untaggedCount: number | null;
+  run: OrbitLibraryRunView | null;
 }
 
 export type OrbitGraphCollectionVariant = "user_collection" | "x_folder";

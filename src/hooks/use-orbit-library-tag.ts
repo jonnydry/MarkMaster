@@ -1,132 +1,224 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { orbitLibraryClassifyQueueSchema, orbitLibraryClassifyResultSchema } from "@/lib/api-response-schemas";
+import { orbitLibraryStatusSchema } from "@/lib/api-response-schemas";
 import { fetchJson, sendJson } from "@/lib/fetch-json";
 import { invalidateOrbitApplyQueries } from "@/lib/query-invalidation";
 import { toast } from "@/lib/toast";
+import type { OrbitLibraryRunView, OrbitLibraryStatusPayload } from "@/types";
 
-const QUEUE_KEY = ["orbit", "library-classify-queue"] as const;
-const REFRESH_MS = 15_000;
-/** Stop watching after this many unchanged polls. The worker keeps going if it is still mid-page. */
-const QUIET_POLLS = 12;
+const STATUS_KEY = ["orbit", "library-classify"] as const;
+const ENDPOINT = "/api/orbit/library-classify";
+/** Progress poll while a run is live. */
+const POLL_MS = 2_500;
+/** Refresh the queue at most this often while tags land, so tagged rows leave. */
+const QUEUE_REFRESH_MS = 8_000;
+/** Bookmarks checked before the rate is steady enough for an ETA. */
+const ETA_MIN_PROCESSED = 48;
 
-export function libraryTagProgressLabel(
-  active: boolean,
-  tagged: number | null,
-  left: number | null
-) {
-  if (!active) return null;
-  if (left == null) return "Tagging the library";
-  if (tagged != null && tagged > 0) {
-    return `Tagging the library · ${tagged.toLocaleString()} tagged · ${left.toLocaleString()} still untagged`;
-  }
-  return `Tagging the library · ${left.toLocaleString()} still untagged`;
+function count(value: number, one: string, many: string) {
+  return `${value.toLocaleString()} ${value === 1 ? one : many}`;
 }
 
+function isLive(run: OrbitLibraryRunView | null | undefined) {
+  return run?.status === "running" && !run.stalled;
+}
+
+/** Share of the run's starting queue that has been checked, 0–1. */
+export function libraryRunProgress(run: OrbitLibraryRunView | null) {
+  if (!run || run.total <= 0) return null;
+  if (run.status === "completed") return 1;
+  return Math.min(1, run.processed / run.total);
+}
+
+/** Time left at the pace so far, from server timestamps. Null until the pace is known. */
+export function libraryRunRemainingMs(run: OrbitLibraryRunView | null) {
+  if (!isLive(run) || !run || run.processed < ETA_MIN_PROCESSED) return null;
+  const elapsed = Date.parse(run.updatedAt) - Date.parse(run.startedAt);
+  if (!(elapsed > 0)) return null;
+  const left = Math.max(0, run.total - run.processed);
+  return (left * elapsed) / run.processed;
+}
+
+export function formatLibraryRunEta(ms: number) {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "under a minute left";
+  if (minutes < 60) return `about ${minutes} min left`;
+  const hours = Math.round(minutes / 6) / 10;
+  return `about ${hours.toLocaleString()} hr left`;
+}
+
+/** One line of run status for the Orbit banner. */
+export function libraryRunDetail(run: OrbitLibraryRunView) {
+  const of = `${run.processed.toLocaleString()} of ${run.total.toLocaleString()}`;
+  if (run.status === "failed") {
+    return `${run.errorMessage ?? "Auto-tag stopped."} Stopped at ${of}; Resume picks up where it left off.`;
+  }
+  if (run.stalled) {
+    return `Stopped responding at ${of}. Resume picks up where it left off.`;
+  }
+  if (!run.vocabulary) return "Getting the tag list ready…";
+  if (run.processed === 0) {
+    return `Starting on ${count(run.total, "bookmark", "bookmarks")}…`;
+  }
+  const remaining = libraryRunRemainingMs(run);
+  return [
+    `${of} checked`,
+    `${run.applied.toLocaleString()} tagged`,
+    remaining == null ? null : formatLibraryRunEta(remaining),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Closing message once a watched run ends. */
+export function libraryRunOutcome(run: OrbitLibraryRunView): {
+  tone: "success" | "info" | "error";
+  message: string;
+} {
+  if (run.status === "failed") {
+    return {
+      tone: "error",
+      message: run.errorMessage ?? "Auto-tag stopped unexpectedly.",
+    };
+  }
+  if (run.status === "cancelled") {
+    return {
+      tone: "info",
+      message:
+        run.applied > 0
+          ? `Auto-tag stopped. ${count(run.applied, "bookmark", "bookmarks")} tagged so far.`
+          : "Auto-tag stopped.",
+    };
+  }
+  if (run.applied === 0) {
+    return {
+      tone: "info",
+      message:
+        "Auto-tag finished with no confident matches. Scan can propose new tags.",
+    };
+  }
+  const noMatch = Math.max(0, run.processed - run.applied - run.failed);
+  return {
+    tone: "success",
+    message: [
+      `Tagged ${count(run.applied, "bookmark", "bookmarks")}.`,
+      noMatch > 0 ? `${noMatch.toLocaleString()} had no confident match and stay in Orbit.` : null,
+      run.failed > 0
+        ? `${run.failed.toLocaleString()} couldn't be checked; run auto-tag again to retry them.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  };
+}
+
+/**
+ * Whole-queue auto-tag. The server owns the run, so progress is real, it
+ * survives reloads, and a second click never starts a duplicate pass.
+ */
 export function useOrbitLibraryTag() {
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [watching, setWatching] = useState(false);
-  const [startedFrom, setStartedFrom] = useState<number | null>(null);
-  const seen = useRef<number | null>(null);
-  const unchanged = useRef(0);
+  const [pending, setPending] = useState<"start" | "stop" | null>(null);
+  // Runs this tab saw running: only those get a closing toast.
+  const watched = useRef(new Set<string>());
+  const lastRefresh = useRef({ runId: "", applied: 0, at: 0 });
 
-  const queueQuery = useQuery({
-    queryKey: QUEUE_KEY,
-    queryFn: () =>
-      fetchJson(
-        "/api/orbit/library-classify",
-        undefined,
-        orbitLibraryClassifyQueueSchema
-      ),
+  const statusQuery = useQuery({
+    queryKey: STATUS_KEY,
+    queryFn: () => fetchJson(ENDPOINT, undefined, orbitLibraryStatusSchema),
     staleTime: 15_000,
-    refetchInterval: watching ? REFRESH_MS : false,
+    refetchInterval: (query) => (isLive(query.state.data?.run) ? POLL_MS : false),
   });
 
-  const count =
-    typeof queueQuery.data?.untaggedCount === "number"
-      ? queueQuery.data.untaggedCount
-      : null;
+  const run = statusQuery.data?.run ?? null;
 
   useEffect(() => {
-    if (!watching || count == null) return;
+    if (!run) return;
 
-    if (seen.current == null) {
-      seen.current = count;
-      return;
-    }
-
-    if (count < seen.current) {
-      seen.current = count;
-      unchanged.current = 0;
-      void invalidateOrbitApplyQueries(queryClient);
-      return;
-    }
-
-    unchanged.current += 1;
-    if (count !== 0 && unchanged.current < QUIET_POLLS) return;
-
-    const remaining = count;
-    const timer = window.setTimeout(() => {
-      setWatching(false);
-      setBusy(false);
-      toast.success(
-        remaining === 0
-          ? "The library is tagged."
-          : `${remaining.toLocaleString()} bookmarks still have no tag.`
-      );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [count, queryClient, queueQuery.dataUpdatedAt, watching]);
-
-  const start = async () => {
-    if (busy || watching) return;
-    setStartedFrom(count);
-    setBusy(true);
-    try {
-      const result = await sendJson("/api/orbit/library-classify", {
-        method: "POST",
-        body: {},
-        schema: orbitLibraryClassifyResultSchema,
-      });
-      await invalidateOrbitApplyQueries(queryClient, { includeGraph: true });
-      await queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
-      if (result.continued && result.remaining > 0) {
-        seen.current = null;
-        unchanged.current = 0;
-        setWatching(true);
-        toast.success("Tagging the library. Tags show up as they land.");
-        return;
+    if (run.status === "running") {
+      watched.current.add(run.id);
+      const last = lastRefresh.current;
+      if (last.runId !== run.id) {
+        lastRefresh.current = { runId: run.id, applied: run.applied, at: Date.now() };
+      } else if (run.applied > last.applied && Date.now() - last.at >= QUEUE_REFRESH_MS) {
+        lastRefresh.current = { runId: run.id, applied: run.applied, at: Date.now() };
+        void invalidateOrbitApplyQueries(queryClient);
       }
-      setBusy(false);
-      const stillUntagged = result.skippedReview + result.remaining;
-      toast.success(
-        stillUntagged === 0
-          ? `Tagged ${result.applied.toLocaleString()} bookmarks.`
-          : `Tagged ${result.applied.toLocaleString()} · ${stillUntagged.toLocaleString()} still untagged.`
-      );
-    } catch (error) {
-      setBusy(false);
-      setWatching(false);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Tagging the library could not start."
-      );
+      return;
     }
-  };
 
-  const active = busy || watching;
-  const tagged =
-    startedFrom != null && count != null ? Math.max(0, startedFrom - count) : null;
+    if (!watched.current.delete(run.id)) return;
+    void invalidateOrbitApplyQueries(queryClient, { includeGraph: true });
+    // A failure stays in the banner with Resume, so it needs no toast.
+    if (run.status === "failed") return;
+    const outcome = libraryRunOutcome(run);
+    toast[outcome.tone](outcome.message);
+  }, [queryClient, run]);
+
+  const start = useCallback(async () => {
+    if (pending) return;
+    setPending("start");
+    try {
+      const result = await sendJson(ENDPOINT, {
+        method: "POST",
+        schema: orbitLibraryStatusSchema,
+      });
+      queryClient.setQueryData<OrbitLibraryStatusPayload>(STATUS_KEY, result);
+      if (!result.run) {
+        toast.message("Nothing to tag. Every bookmark in Orbit already has a tag.");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Auto-tag could not start."
+      );
+    } finally {
+      setPending(null);
+    }
+  }, [pending, queryClient]);
+
+  const stop = useCallback(async () => {
+    if (pending) return;
+    setPending("stop");
+    try {
+      const result = await sendJson(ENDPOINT, {
+        method: "DELETE",
+        schema: orbitLibraryStatusSchema,
+      });
+      queryClient.setQueryData<OrbitLibraryStatusPayload>(STATUS_KEY, result);
+      void queryClient.invalidateQueries({ queryKey: STATUS_KEY });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Auto-tag could not stop."
+      );
+    } finally {
+      setPending(null);
+    }
+  }, [pending, queryClient]);
+
+  // Running (live or stalled) or failed-but-resumable: the banner owns it.
+  const activeRun =
+    run?.status === "running" || run?.status === "failed" ? run : null;
+  const failed = activeRun?.status === "failed";
 
   return {
-    count,
-    busy: active,
-    status: libraryTagProgressLabel(active, tagged, active ? count : null),
+    untaggedCount: statusQuery.data?.untaggedCount ?? null,
+    /** The pass the banner shows: running, stalled, or failed and resumable. */
+    run: activeRun,
+    live: isLive(activeRun),
+    stalled: Boolean(activeRun?.stalled),
+    failed,
+    /** Waiting on the user to Resume or dismiss. */
+    paused: Boolean(activeRun?.stalled) || failed,
+    progress: libraryRunProgress(activeRun),
+    detail: activeRun ? libraryRunDetail(activeRun) : null,
+    starting: pending === "start",
+    stopping: pending === "stop",
     start,
+    stop,
   };
 }
+
+export type OrbitLibraryTagHandle = ReturnType<typeof useOrbitLibraryTag>;

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useScrollElement } from "@/hooks/use-scroll-element";
 import { useListScrollMargin } from "@/hooks/use-list-scroll-margin";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
+import type { OrbitScanRowProgress } from "@/lib/orbit-scan-stream";
 import type { BookmarkWithRelations, OrbitBookmarkDecision } from "@/types";
 
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
@@ -23,6 +24,8 @@ interface OrbitListProps {
   isLoading?: boolean;
   selectionMode?: boolean;
   selectedIds?: Set<string>;
+  /** Per-row progress of the running scan. */
+  scanRows?: ReadonlyMap<string, OrbitScanRowProgress>;
   onToggleSelect?: (id: string) => void;
   getDecision?: (bookmarkId: string) => OrbitBookmarkDecision | null;
   dismissedBookmarkIds?: Set<string>;
@@ -63,6 +66,7 @@ function OrbitListStatic({
   className,
   selectionMode,
   selectedIds,
+  scanRows,
   onToggleSelect,
   getDecision,
   dismissedBookmarkIds,
@@ -77,6 +81,8 @@ function OrbitListStatic({
           selected={selectedId === bookmark.id}
           selectionMode={selectionMode}
           bulkSelected={selectedIds?.has(bookmark.id) ?? false}
+          matchState={scanRows?.get(bookmark.id)?.state}
+          matchLabel={scanRows?.get(bookmark.id)?.label}
           decision={getDecision?.(bookmark.id) ?? null}
           dismissedBookmarkIds={dismissedBookmarkIds}
           appliedBookmarkIds={appliedBookmarkIds}
@@ -99,6 +105,7 @@ export function OrbitList({
   isLoading,
   selectionMode = false,
   selectedIds,
+  scanRows,
   onToggleSelect,
   getDecision,
   dismissedBookmarkIds,
@@ -148,6 +155,7 @@ export function OrbitList({
         className={className}
         selectionMode={selectionMode}
         selectedIds={selectedIds}
+        scanRows={scanRows}
         onToggleSelect={onToggleSelect}
         getDecision={getDecision}
         dismissedBookmarkIds={dismissedBookmarkIds}
@@ -179,6 +187,8 @@ export function OrbitList({
                 selected={selectedId === bookmark.id}
                 selectionMode={selectionMode}
                 bulkSelected={selectedIds?.has(bookmark.id) ?? false}
+                matchState={scanRows?.get(bookmark.id)?.state}
+                matchLabel={scanRows?.get(bookmark.id)?.label}
                 decision={getDecision?.(bookmark.id) ?? null}
                 dismissedBookmarkIds={dismissedBookmarkIds}
                 appliedBookmarkIds={appliedBookmarkIds}
