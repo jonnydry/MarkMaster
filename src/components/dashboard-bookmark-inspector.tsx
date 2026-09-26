@@ -17,6 +17,7 @@ import {
 
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { cardPreviewMedia } from "@/lib/bookmark-preview";
 import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import {
   BookmarkOverlayCollectionsSection,
@@ -94,6 +95,11 @@ export function DashboardBookmarkInspector({
     : -1;
   const hasPrevious = activeIndex > 0;
   const hasNext = activeIndex >= 0 && activeIndex < bookmarks.length - 1;
+  const previewMedia = bookmark?.media?.length
+    ? bookmark.media
+    : bookmark
+      ? cardPreviewMedia(bookmark)
+      : null;
 
   const handleCopyLink = async () => {
     if (!bookmark) return;
@@ -173,11 +179,11 @@ export function DashboardBookmarkInspector({
       </div>
 
       <div className="px-4 pb-5 pt-4">
-        {bookmark.media?.length ? (
+        {previewMedia?.length ? (
           <BookmarkPostPreview
             tweetText={bookmark.tweetText}
             authorUsername={bookmark.authorUsername}
-            media={bookmark.media}
+            media={previewMedia}
             urls={bookmark.urls}
             tweetLink={{
               authorUsername: bookmark.authorUsername,

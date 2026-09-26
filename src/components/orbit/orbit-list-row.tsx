@@ -9,6 +9,7 @@ import {
   Tag as TagIcon,
 } from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { cardPreviewMedia } from "@/lib/bookmark-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import type { OrbitScanRowState } from "@/lib/orbit-scan-stream";
@@ -116,6 +117,7 @@ export const OrbitListRow = memo(function OrbitListRow({
   const checkboxLabel = `${author}: ${excerpt.slice(0, 80)}`;
   const mediaItems = bookmark.media;
   const hasMedia = Boolean(mediaItems?.length);
+  const previewMedia = hasMedia ? mediaItems : cardPreviewMedia(bookmark);
   const tweetLink = {
     authorUsername: bookmark.authorUsername,
     tweetId: bookmark.tweetId};
@@ -219,7 +221,7 @@ export const OrbitListRow = memo(function OrbitListRow({
           <BookmarkPostPreview
             tweetText={excerpt}
             authorUsername={bookmark.authorUsername}
-            media={hasMedia ? mediaItems : null}
+            media={previewMedia}
             tweetLink={tweetLink}
             bookmarkKey={bookmark.id}
             variant="compact"

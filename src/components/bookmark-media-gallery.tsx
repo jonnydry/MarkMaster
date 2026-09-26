@@ -152,6 +152,18 @@ function GalleryImage({
   onError: () => void;
   onClick?: () => void;
 }) {
+  if (src.startsWith("/")) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        onError={onError}
+        onClick={onClick}
+      />
+    );
+  }
+
   if (expanded) {
     return (
       <img

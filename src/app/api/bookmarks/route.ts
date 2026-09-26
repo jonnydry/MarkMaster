@@ -18,6 +18,7 @@ import {
 } from "@/lib/bookmark-list-filters";
 import { tokenizeBookmarkSearch } from "@/lib/bookmark-search";
 import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
+import { withBookmarkCardUrls } from "@/lib/bookmark-card-urls";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
 import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
@@ -181,7 +182,7 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({
-      bookmarks,
+      bookmarks: await withBookmarkCardUrls(bookmarks),
       page,
       ...(total !== null
         ? { total, totalPages: Math.ceil(total / limit) || 1 }
@@ -256,7 +257,7 @@ export async function GET(req: NextRequest) {
   );
 
   return NextResponse.json({
-    bookmarks,
+    bookmarks: await withBookmarkCardUrls(bookmarks),
     page,
     ...(total !== null
       ? { total, totalPages: Math.ceil(total / limit) || 1 }

@@ -17,7 +17,9 @@ import {
   BookmarkCardSelectionToggle,
   BookmarkTagChip,
 } from "@/components/bookmark-card-chrome";
+import { BookmarkThumbnail } from "@/components/bookmark-thumbnail";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
+import { bookmarkThumbnailPlan } from "@/lib/bookmark-preview";
 import { openBookmarkOnX } from "@/lib/bookmark-url";
 import { formatCompactCount } from "@/lib/format-metrics";
 import { GRID_POST_TEXT_MEDIA, GRID_POST_TEXT_ONLY } from "@/lib/typography";
@@ -81,7 +83,10 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
   const metrics = bookmark.publicMetrics;
   const firstMedia = mediaItems?.[0];
   const firstMediaUrl = firstMedia?.url || firstMedia?.preview_image_url;
-  const hasVisual = Boolean(firstMediaUrl && !imageError.has(firstMediaUrl));
+  const cardThumbnail = firstMediaUrl ? null : bookmarkThumbnailPlan(bookmark);
+  const hasVisual = Boolean(
+    (firstMediaUrl && !imageError.has(firstMediaUrl)) || cardThumbnail
+  );
   const mediaCount = mediaItems?.length ?? 0;
   const hasTag = bookmark.tags.length > 0;
   const hasCollection = Boolean(
@@ -179,6 +184,21 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
               {mediaCount > 1 ? <span>+{mediaCount - 1}</span> : null}
             </div>
           ) : null}
+        </div>
+      ) : cardThumbnail ? (
+        <div className="relative isolate aspect-[4/3] overflow-hidden bg-muted">
+          <BookmarkThumbnail
+            bookmark={bookmark}
+            alt={`Preview from @${bookmark.authorUsername}`}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            priority={priorityMedia}
+            className="transition-transform duration-500 ease-out group-hover:scale-[1.025]"
+          />
+          <div className="pointer-events-none absolute left-2 top-2">
+            <span className="rounded-sm bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+              Link
+            </span>
+          </div>
         </div>
       ) : null}
       <div className={cn("flex flex-col", hasVisual ? "p-3" : "p-3.5")}>
