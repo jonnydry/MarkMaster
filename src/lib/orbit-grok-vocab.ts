@@ -28,7 +28,7 @@ import {
 import type { OrbitLearningHint, OrbitNeighborHint } from "@/lib/orbit-signal-extraction";
 import type { OrbitLabelPool } from "@/lib/orbit-jev-assign";
 
-export const ORBIT_VOCAB_JSON_SCHEMA = {
+const ORBIT_VOCAB_JSON_SCHEMA = {
   type: "object",
   properties: {
     tags: {
@@ -157,6 +157,9 @@ export async function proposeOrbitVocabWithXai(args: {
                 text: bookmark.tweetText,
                 note: bookmark.note,
                 urls: bookmark.urls,
+                article: bookmark.signals.articleContext,
+                links: bookmark.signals.linkContext,
+                imageAltTexts: bookmark.signals.visualContext.altTexts,
                 matches: bookmark.signals.existingVocabularyMatches,
               })),
               leftoverGaps: args.gapHints ?? [],

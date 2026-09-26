@@ -66,7 +66,7 @@ export function getOrbitAuthorBio(xMetadata: unknown): string | null {
 }
 
 /** Quoted tweet text from stored quotedTweet payload. */
-export function getOrbitQuotedText(quotedTweet: unknown): string | null {
+function getOrbitQuotedText(quotedTweet: unknown): string | null {
   if (!isObject(quotedTweet)) return null;
   return getString(quotedTweet.text);
 }

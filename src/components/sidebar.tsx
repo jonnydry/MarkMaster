@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -13,6 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import type { TagWithCount, CollectionWithCount } from "@/types";
+import { useRoutePreview } from "@/components/route-preview";
 import { useSidebar } from "@/components/sidebar-provider";
 import { SidebarSection } from "@/components/sidebar-section";
 import { SyncButton } from "@/components/sync-button";
@@ -21,7 +22,10 @@ import { cn } from "@/lib/utils";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { TagDot } from "@/components/tag-dot";
 import { useTypography } from "@/hooks/use-typography";
-import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
+import {
+  prefetchAppRoute,
+  prefetchAppRouteDocument,
+} from "@/lib/prefetch-app-route";
 import { useTagsQuery, useCollectionsQuery } from "@/hooks/use-library-data";
 
 const TAG_PREVIEW_LIMIT = 12;
@@ -108,12 +112,40 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useTypography();
   const pathname = usePathname();
+  const { shownPath, showRoute } = useRoutePreview();
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const prefetchGraph = useCallback(() => {
-    prefetchOrbitGraph(queryClient);
-  }, [queryClient]);
+  const warmRoute = useCallback(
+    (href: string) => {
+      prefetchAppRouteDocument(router, href);
+      prefetchAppRoute(queryClient, href);
+    },
+    [queryClient, router]
+  );
+  useEffect(() => {
+    let cancelled = false;
+    let timer = 0;
+    let index = 0;
+    const hrefs = NAV_ITEMS.map((item) => item.href);
+    const step = () => {
+      if (cancelled) return;
+      const href = hrefs[index];
+      index += 1;
+      if (!href) return;
+      prefetchAppRouteDocument(router, href);
+      timer = window.setTimeout(step, 80);
+    };
+    timer = window.setTimeout(step, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [router]);
   const { expanded: ctxExpanded, toggle: ctxToggle } = useSidebar();
   const [localExpanded, setLocalExpanded] = useState(false);
+  useEffect(() => {
+    if (pathname === "/orbit/map") setLocalExpanded(false);
+  }, [pathname]);
   const expanded = forceExpanded
     ? true
     : preferCollapsed
@@ -207,14 +239,16 @@ export function Sidebar({
       <nav className="flex flex-col gap-0.5">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive =
-            pathname === href || (href === "/dashboard" && pathname === "/");
+            shownPath === href || (href === "/dashboard" && shownPath === "/");
           return (
             <Link
               key={href}
               href={href}
               title={label}
-              onMouseEnter={href === "/orbit/map" ? prefetchGraph : undefined}
-              onFocus={href === "/orbit/map" ? prefetchGraph : undefined}
+              prefetch={true}
+              onClick={() => showRoute(href)}
+              onMouseEnter={() => warmRoute(href)}
+              onFocus={() => warmRoute(href)}
               className={cn(
                 "flex items-center rounded-sm border border-transparent transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
                 isActive
@@ -340,6 +374,13 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
+                          prefetch={true}
+                          onMouseEnter={() =>
+                            warmRoute(`/collections/${collection.id}`)
+                          }
+                          onFocus={() =>
+                            warmRoute(`/collections/${collection.id}`)
+                          }
                           className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold"
@@ -392,6 +433,13 @@ export function Sidebar({
                         <Link
                           key={collection.id}
                           href={`/collections/${collection.id}`}
+                          prefetch={true}
+                          onMouseEnter={() =>
+                            warmRoute(`/collections/${collection.id}`)
+                          }
+                          onFocus={() =>
+                            warmRoute(`/collections/${collection.id}`)
+                          }
                           className={`flex w-full items-center justify-between rounded-sm border border-transparent px-2.5 py-1 text-sm transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 ${
                             isCollectionActive
                               ? "menu-selection-active font-semibold"

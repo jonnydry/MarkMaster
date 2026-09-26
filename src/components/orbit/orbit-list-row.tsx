@@ -303,7 +303,12 @@ export const OrbitListRow = memo(function OrbitListRow({
           <div
             className={cn(
               "pointer-events-auto flex shrink-0 items-center gap-1 transition-opacity",
-              selected || selectionMode
+              // Triage Accept/Skip stay visible — hiding them behind hover
+              // slows scanning a suggestion list. Idle row chrome can fade.
+              selected ||
+                selectionMode ||
+                showSuggestion ||
+                queueStatus === "dismissed"
                 ? "opacity-100"
                 : "opacity-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
             )}

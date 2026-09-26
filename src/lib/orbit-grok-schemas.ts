@@ -165,19 +165,19 @@ export const orbitCollectionSuggestionSchema = z.object({
 });
 
 /** xAI response contract — matches `ORBIT_SCAN_PLAN_JSON_SCHEMA` (no `reuseExisting`). */
-export const orbitTagSuggestionFromXaiSchema = z.object({
+const orbitTagSuggestionFromXaiSchema = z.object({
   name: z.string(),
   color: z.string(),
   reason: z.string(),
 });
 
-export const orbitCollectionSuggestionFromXaiSchema = z.object({
+const orbitCollectionSuggestionFromXaiSchema = z.object({
   name: z.string(),
   description: z.string(),
   reason: z.string(),
 });
 
-export const orbitBookmarkSuggestionFromXaiSchema = z.object({
+const orbitBookmarkSuggestionFromXaiSchema = z.object({
   bookmarkId: z.string(),
   confidence: orbitConfidenceSchema,
   reasoning: z.string(),

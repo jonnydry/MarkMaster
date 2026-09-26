@@ -1,4 +1,7 @@
+"use client";
+
 import type { ComponentProps, ReactNode, RefObject } from "react";
+import { usePageActive } from "@/components/page-activity";
 import {
   appPageCenterClassName,
   appPageMainClassName,
@@ -13,6 +16,11 @@ import { cn } from "@/lib/utils";
 type AppPageShellProps = {
   /** Desktop sidebar slot. Omit for single-column pages (collection detail). */
   sidebar?: ReactNode;
+  /**
+   * Fill the app frame's main column. The frame already owns the viewport
+   * and the persistent sidebar.
+   */
+  embedded?: boolean;
   /** Non-interactive layer painted behind the sidebar and main column. */
   backdrop?: ReactNode;
   /** Content rendered above the scroll region (e.g. sync progress). */
@@ -34,12 +42,45 @@ export function AppPageShell({
   mainTop,
   children,
   layout = "scroll",
+  embedded = false,
   className,
   mainClassName,
   scrollClassName,
   scrollRef,
   mainProps,
 }: AppPageShellProps) {
+  const pageActive = usePageActive();
+  const contentId = pageActive ? "app-main-content" : undefined;
+  if (embedded) {
+    if (layout === "column") {
+      return (
+        <div
+          className={cn(appPageMainColumnClassName, className)}
+          {...mainProps}
+          id={contentId}
+          tabIndex={contentId ? -1 : undefined}
+        >
+          {mainTop}
+          {children}
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn(appPageMainClassName, "h-auto", className)} {...mainProps}>
+        {mainTop}
+        <div
+          ref={scrollRef}
+          id={contentId}
+          tabIndex={contentId ? -1 : undefined}
+          className={cn(appPageScrollClassName, scrollClassName)}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
   const mainColumnClassName =
     layout === "column" ? appPageMainColumnClassName : appPageMainClassName;
   const isSingleColumnScroll = !sidebar && layout === "scroll";
@@ -61,7 +102,8 @@ export function AppPageShell({
           {mainTop}
           <div
             ref={scrollRef}
-            id="app-main-content"
+            id={contentId}
+            tabIndex={contentId ? -1 : undefined}
             className={cn(appPageScrollClassName, scrollClassName)}
           >
             {children}
@@ -71,13 +113,15 @@ export function AppPageShell({
         <div
           className={cn(mainColumnClassName, mainClassName)}
           {...mainProps}
-          id={layout === "column" ? "app-main-content" : undefined}
+          id={layout === "column" ? contentId : undefined}
+          tabIndex={layout === "column" && contentId ? -1 : undefined}
         >
           {mainTop}
           {layout === "scroll" ? (
             <div
               ref={scrollRef}
-              id="app-main-content"
+              id={contentId}
+              tabIndex={contentId ? -1 : undefined}
               className={cn(appPageScrollClassName, scrollClassName)}
             >
               {children}

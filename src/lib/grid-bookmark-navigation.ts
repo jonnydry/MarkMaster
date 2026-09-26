@@ -1,4 +1,4 @@
-export type GridBookmarkPosition = {
+type GridBookmarkPosition = {
   id: string;
   top: number;
   left: number;
@@ -71,7 +71,7 @@ export function offsetInVisualOrder(
   return orderedIds[nextIndex] ?? null;
 }
 
-export function getGridBookmarkIdsInVisualOrder(): string[] {
+function getGridBookmarkIdsInVisualOrder(): string[] {
   if (typeof document === "undefined") return [];
 
   const cards = Array.from(

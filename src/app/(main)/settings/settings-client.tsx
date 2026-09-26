@@ -22,7 +22,6 @@ import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
@@ -167,6 +166,7 @@ export default function SettingsPage() {
   }, []);
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/settings",
     shortcutGroups: SETTINGS_SHORTCUT_GROUPS,
     actions: {
       sync: () => scrollToSettingsSection("sync"),
@@ -193,19 +193,7 @@ export default function SettingsPage() {
 
   return (
     <>
-    <AppPageShell
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={() => setCreateOpen(true)}
-          lastSyncAt={lastSyncAt}
-          onSyncComplete={handleSyncComplete}
-        />
-      }
-    >
+    <AppPageShell embedded>
           <PageHeader
             sticky
             title="Settings"

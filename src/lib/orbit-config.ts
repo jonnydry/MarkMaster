@@ -47,6 +47,9 @@ export const ORBIT_SCAN_ENRICHMENT = process.env.ORBIT_SCAN_ENRICHMENT !== "fals
 /** Jev may score this many tags per bookmark (priors + matches + proposed). */
 export const ORBIT_JEV_MAX_TAG_SHORTLIST = 12;
 
+/** Jev may choose among this many collections per bookmark. */
+export const ORBIT_JEV_MAX_COLLECTION_SHORTLIST = 8;
+
 /** Keep this many lexical overlaps even when Grok proposed a large increment. */
 export const ORBIT_JEV_SHORTLIST_LEXICAL_RESERVE = 3;
 
@@ -97,8 +100,17 @@ export const ORBIT_JEV_ASSIGN_CONCURRENCY = parseBoundedIntEnv(
   32
 );
 
-/** Tags learned from one untagged library. The assignment list stays this short. */
+/** Tags learned from one untagged library when the user has none yet. */
 export const ORBIT_LIBRARY_VOCAB_MAX = 24;
+
+/**
+ * Existing tags loaded for a library pass. The most-used names come first;
+ * a pack shortlist still decides which of them Jev is asked about.
+ */
+export const ORBIT_LIBRARY_EXISTING_TAG_CAP = 80;
+
+/** Tags one packed Jev call may judge. Lexical matches are kept ahead of this cap. */
+export const ORBIT_LIBRARY_PACK_TAG_CAP = 32;
 
 /** Bookmarks read to build a stratified sample. The model only sees the sample. */
 export const ORBIT_LIBRARY_SAMPLE_POOL = 240;

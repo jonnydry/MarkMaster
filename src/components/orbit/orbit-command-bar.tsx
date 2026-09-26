@@ -401,6 +401,17 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               />
             ) : null}
           </FeedCompactToolbarShell>
+          {showTriageProgress ? (
+            <p
+              className={cn(
+                "px-4 pt-1 text-xs text-muted-foreground sm:px-5",
+                orbitDataClass(),
+                "normal-case"
+              )}
+            >
+              {triagedCount} / {passTotal} triaged
+            </p>
+          ) : null}
           <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
           {scanErrorBlock}
         </>

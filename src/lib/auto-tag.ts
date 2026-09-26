@@ -48,7 +48,7 @@ const TAG_RULES: TagRule[] = [
   },
 ];
 
-export function suggestTags(
+function suggestTags(
   tweetText: string,
   media: unknown[] | null,
   urls: unknown[] | null

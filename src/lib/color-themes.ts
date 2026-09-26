@@ -1,4 +1,4 @@
-export const COLOR_THEME_IDS = [
+const COLOR_THEME_IDS = [
   "horizon",
   "aurora",
   "ember",
@@ -10,7 +10,7 @@ export const COLOR_THEME_IDS = [
 
 export type ColorThemeId = (typeof COLOR_THEME_IDS)[number];
 
-export type ColorThemeOption = {
+type ColorThemeOption = {
   id: ColorThemeId;
   name: string;
   description: string;

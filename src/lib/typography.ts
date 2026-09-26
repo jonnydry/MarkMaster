@@ -6,21 +6,20 @@
 
 import type { TypographyPresetId } from "./typography-presets";
 
-export const MONO_LABEL = "text-mono-label tracking-[0.14em]";
-export const MONO_DATA = "text-mono-data tabular-nums";
-export const MONO_DISPLAY = "text-mono-display";
-export const MONO_SECTION_LABEL =
+const MONO_LABEL = "text-mono-label tracking-[0.14em]";
+const MONO_DATA = "text-mono-data tabular-nums";
+const MONO_DISPLAY = "text-mono-display";
+const MONO_SECTION_LABEL =
   "text-mono-label text-primary/60 tracking-[0.14em] mb-1.5";
 
+/** Sentence-case field/control label — referenced by AGENTS.md design contract. */
 export const SANS_LABEL = "text-xs font-medium text-muted-foreground";
-export const SANS_DATA = "tabular-nums text-foreground";
-export const SANS_SECTION_LABEL =
+const SANS_DATA = "tabular-nums text-foreground";
+const SANS_SECTION_LABEL =
   "text-[13px] font-semibold text-muted-foreground mb-1.5";
 
-export type FontMode = TypographyPresetId;
-
 export function resolveMonoNative(opts: {
-  fontMode?: FontMode;
+  fontMode?: TypographyPresetId;
 }): boolean {
   return opts.fontMode === "mono";
 }
@@ -35,6 +34,10 @@ export type TypographyClasses = {
   chromeLabel: string;
   sectionLabel: string;
 };
+
+const MONO_BODY_STRONG =
+  "font-[family-name:var(--font-ibm-plex-mono)] text-[13px] font-medium tracking-normal normal-case";
+const SANS_BODY_STRONG = "text-[15px] font-medium";
 
 export function getTypographyClasses(monoNative: boolean): TypographyClasses {
   return {
@@ -55,11 +58,6 @@ export const orbitalTypography = {
   data: MONO_DATA,
   sectionLabel: MONO_SECTION_LABEL,
 } as const;
-
-/** Semibold nav / list titles when monoNative (IBM Plex, normal case). */
-export const MONO_BODY_STRONG =
-  "font-[family-name:var(--font-ibm-plex-mono)] text-[13px] font-medium tracking-normal normal-case";
-export const SANS_BODY_STRONG = "text-[15px] font-medium";
 
 /** Post-text presets for bookmark cards — one source of truth across view modes. */
 export const FEED_POST_TEXT = "text-[15px] leading-6 text-foreground whitespace-pre-wrap";

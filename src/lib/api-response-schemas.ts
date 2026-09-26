@@ -18,7 +18,7 @@ import type {
 const collectionTypeSchema = v.picklist(["x_folder", "user_collection"]);
 
 /** Minimal bookmark row shape — loose object keeps nullable/detail fields without brittle nesting. */
-export const bookmarkWithRelationsSchema = v.looseObject({
+const bookmarkWithRelationsSchema = v.looseObject({
   id: v.string(),
   tweetId: v.string(),
   authorUsername: v.string(),
@@ -55,7 +55,7 @@ export const bookmarkListResponseSchema = v.looseObject({
 
 export const performanceHighlightsResponseSchema = bookmarkListResponseSchema;
 
-export const tagWithCountSchema = v.object({
+const tagWithCountSchema = v.object({
   id: v.string(),
   name: v.string(),
   color: v.string(),
@@ -66,7 +66,7 @@ export const tagsResponseSchema = v.array(
   tagWithCountSchema
 ) as unknown as v.GenericSchema<unknown, TagWithCount[]>;
 
-export const collectionWithCountSchema = v.object({
+const collectionWithCountSchema = v.object({
   id: v.string(),
   name: v.string(),
   description: v.nullable(v.string()),

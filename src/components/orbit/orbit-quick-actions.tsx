@@ -89,12 +89,6 @@ export function OrbitActionPill({
   /** When true, a Grok suggestion is queued — surface inbox-zero Accept/Edit. */
   hasSuggestion?: boolean;
 }) {
-  const skipLabel = suggestionDismissed
-    ? "Restore suggestion"
-    : hasSuggestion
-      ? "Skip suggestion"
-      : "Keep in Orbit";
-
   const actions: Array<{
     key: string;
     label: string;
@@ -102,7 +96,8 @@ export function OrbitActionPill({
     tone?: "accept";
   }> = [];
 
-  // Inbox-zero affordances appear only while an un-actioned suggestion exists.
+  // Triage controls only when there is a suggestion to act on (or restore).
+  // Idle rows used to show a dead "Keep in Orbit" that marked them skipped.
   if (hasSuggestion && !suggestionDismissed) {
     actions.push({
       key: "accept",
@@ -115,17 +110,18 @@ export function OrbitActionPill({
       label: "Edit in review",
       icon: <SlidersHorizontal className="size-3.5" />,
     });
+    actions.push({
+      key: "keep",
+      label: "Skip suggestion",
+      icon: <CircleSlash2 className="size-3.5" />,
+    });
+  } else if (suggestionDismissed) {
+    actions.push({
+      key: "keep",
+      label: "Restore suggestion",
+      icon: <RotateCcw className="size-3.5" />,
+    });
   }
-
-  actions.push({
-    key: "keep",
-    label: skipLabel,
-    icon: suggestionDismissed ? (
-      <RotateCcw className="size-3.5" />
-    ) : (
-      <CircleSlash2 className="size-3.5" />
-    ),
-  });
 
   if (!hasSuggestion || suggestionDismissed) {
     actions.push({
@@ -134,6 +130,8 @@ export function OrbitActionPill({
       icon: <Tag className="size-3.5" />,
     });
   }
+
+  if (actions.length === 0) return null;
 
   return (
     <OrbitalActionPill>

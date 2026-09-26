@@ -20,7 +20,7 @@
 
 import { sendJson, type JsonValue } from "./fetch-json";
 
-export type FlywheelEventType =
+type FlywheelEventType =
   | "cta.review_in_orbit"
   | "cta.digest_review_together"
   | "feedback.good"

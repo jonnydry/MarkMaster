@@ -23,7 +23,7 @@ function hasOwnData(value: Record<string, unknown>) {
   return Object.keys(value).length > 0;
 }
 
-export function buildBookmarkXMetadata(
+function buildBookmarkXMetadata(
   data: BookmarkData
 ): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   const tweet: Record<string, unknown> = {};
@@ -109,7 +109,7 @@ export function buildBookmarkUpdateData(data: BookmarkData) {
   };
 }
 
-export type BookmarkSyncEntry = {
+type BookmarkSyncEntry = {
   tweetId: string;
   data: BookmarkData;
 };

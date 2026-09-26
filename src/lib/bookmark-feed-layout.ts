@@ -41,9 +41,6 @@ export const bookmarkFeedColumnClassName = "mx-auto w-full max-w-[600px]";
  */
 export const bookmarkCollectionRowWithReorderClassName = "mx-auto w-full max-w-[672px]";
 
-/** Collection detail when items are read-only (synced folder): single feed column. */
-export const bookmarkCollectionRowSyncedClassName = bookmarkFeedColumnClassName;
-
 /** Inner cell so the bookmark card never exceeds feed width beside controls. */
 export const bookmarkCollectionCardCellClassName =
   "min-w-0 flex-1 max-w-[600px]";

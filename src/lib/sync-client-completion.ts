@@ -1,6 +1,6 @@
 import type { SyncRunSummary } from "@/types";
 
-export const TERMINAL_SYNC_STATUSES = new Set([
+const TERMINAL_SYNC_STATUSES = new Set([
   "COMPLETED",
   "RATE_LIMITED",
   "FAILED",

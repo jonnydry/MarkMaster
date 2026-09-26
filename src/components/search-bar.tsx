@@ -46,6 +46,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
 
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
+        if (inputRef.current?.closest("[hidden]")) return;
         if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
           const target = e.target as HTMLElement;
           const tag = target.tagName;

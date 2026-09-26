@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { buildBookmarkListQueryString, BOOKMARK_LIST_PAGE_LIMIT } from "@/lib/bookmark-list-params";
 import type { SortField, SortDirection, MediaFilter } from "@/types";
 
-const PAGE_LIMIT = "20";
+const PAGE_LIMIT = BOOKMARK_LIST_PAGE_LIMIT;
 const DEBOUNCE_MS = 300;
 
 /**
@@ -119,8 +120,8 @@ export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
   }, [resetPage]);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams({
-      page: page.toString(),
+    return buildBookmarkListQueryString({
+      page,
       limit: PAGE_LIMIT,
       search: debouncedSearch,
       sortField,
@@ -128,21 +129,16 @@ export function useBookmarkFilters(initial: BookmarkFilterInitialState = {}) {
       mediaFilter,
       authorFilter,
       tagFilter: selectedTags.join(","),
-      ...(dateFrom && { dateFrom }),
-      ...(dateTo && { dateTo }),
-      ...((dateFrom || dateTo) && {
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      }),
-      ...(collectionId && { collectionId }),
-      ...(bookmarkId && { bookmarkId }),
+      dateFrom,
+      dateTo,
+      timeZone:
+        dateFrom || dateTo
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+          : undefined,
+      collectionId,
+      bookmarkId,
+      cursor: page > 1 ? pageCursors[page] : undefined,
     });
-
-    const cursor = page > 1 ? pageCursors[page] : undefined;
-    if (cursor) {
-      params.set("cursor", cursor);
-    }
-
-    return params.toString();
   }, [
     page,
     pageCursors,

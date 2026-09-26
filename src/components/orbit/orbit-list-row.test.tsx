@@ -64,4 +64,42 @@ describe("OrbitListRow", () => {
     render(<OrbitListRow bookmark={bookmark} matchState="naming" />);
     expect(screen.getByText("Grok is naming…")).toBeInTheDocument();
   });
+
+  it("offers Add tag on idle rows without a dead Keep control", () => {
+    render(<OrbitListRow bookmark={bookmark} />);
+    expect(screen.getByRole("button", { name: "Add tag" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Keep in Orbit" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Skip suggestion" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps Accept and Skip visible when a suggestion is pending", () => {
+    render(<OrbitListRow bookmark={bookmark} decision={decision} />);
+    expect(
+      screen.getByRole("button", { name: "Accept suggestion" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Skip suggestion" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit in review" })
+    ).toBeInTheDocument();
+  });
+
+  it("lets a skipped suggestion be restored", () => {
+    render(
+      <OrbitListRow
+        bookmark={bookmark}
+        decision={decision}
+        dismissedBookmarkIds={new Set(["bm-1"])}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: "Restore suggestion" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Skipped")).toBeInTheDocument();
+  });
 });

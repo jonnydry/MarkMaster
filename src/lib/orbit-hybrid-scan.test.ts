@@ -129,6 +129,22 @@ describe("selectOrbitJevLeftovers", () => {
 
     expect(leftovers.map((item) => item.bookmarkId)).toEqual(["b", "c"]);
   });
+
+  it("does not re-queue a bookmark that already has tags even if needsNewLabel is set", () => {
+    const leftovers = selectOrbitJevLeftovers([
+      {
+        bookmarkId: "placed",
+        confidence: "high",
+        reasoning: "matched",
+        tags: [{ name: "AI", color: "#1d9bf0", reason: "match" }],
+        collection: null,
+        needsNewLabel: true,
+        abstain: false,
+      },
+    ]);
+
+    expect(leftovers).toEqual([]);
+  });
 });
 
 describe("mergeLeftoverSuggestion", () => {
@@ -346,6 +362,66 @@ describe("refineOrbitJevLeftovers", () => {
     );
     expect(result.assignments[1]?.abstain).toBe(false);
   });
+
+  it("grows both shortlists by the Grok name increment and prefers those names", async () => {
+    assignSpy.mockResolvedValueOnce([abstainAssignment("bm-2")]);
+
+    await refineOrbitJevLeftovers({
+      bookmarks: [scanBookmark("bm-1"), scanBookmark("bm-2")],
+      assignments: [
+        {
+          bookmarkId: "bm-1",
+          confidence: "high",
+          reasoning: "ok",
+          tags: [{ name: "AI", color: "#1d9bf0", reason: "match" }],
+          collection: {
+            name: "Research",
+            description: "Papers",
+            reason: "home",
+          },
+          needsNewLabel: false,
+          abstain: false,
+        },
+        abstainAssignment("bm-2"),
+      ],
+      pool: {
+        tags: [{ name: "AI", existing: true }],
+        collections: [{ name: "Research", existing: true }],
+      },
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 4 }],
+      existingCollections: [
+        { name: "Research", description: "Papers", bookmarkCount: 2 },
+      ],
+      proposeLeftoverVocab: async () => ({
+        tags: [
+          { name: "LLM Evals", existing: false, reason: "papers" },
+          { name: "Scaling Laws", existing: false, reason: "laws" },
+        ],
+        collections: [
+          {
+            name: "Eval Desk",
+            existing: false,
+            description: "Evaluation notes.",
+            reason: "shared leftover theme",
+          },
+        ],
+      }),
+    });
+
+    const call = assignSpy.mock.calls[0]?.[0];
+    expect(call.maxTagShortlist).toBe(14);
+    expect(call.maxCollectionShortlist).toBe(9);
+    expect(call.batchVocabulary).toEqual({
+      tags: ["AI", "LLM Evals", "Scaling Laws"],
+      collections: ["Research", "Eval Desk"],
+    });
+    expect(call.pool.tags.map((tag: { name: string }) => tag.name)).toContain(
+      "LLM Evals"
+    );
+    expect(
+      call.pool.collections.map((collection: { name: string }) => collection.name)
+    ).toContain("Eval Desk");
+  });
 });
 
 describe("runHybridOrbitScan", () => {
@@ -518,6 +594,42 @@ describe("runHybridOrbitScan", () => {
     expect(escalate.mock.calls[0]?.[0]).toEqual([
       expect.objectContaining({ id: "bm-1" }),
     ]);
+  });
+
+  it("lets Jev place names Grok proposes before a full Grok assignment", async () => {
+    let pass = 0;
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }>; pool: { tags: Array<{ name: string }> } }) => {
+        pass += 1;
+        if (pass === 1) {
+          return call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id));
+        }
+        expect(call.pool.tags.map((tag) => tag.name)).toContain("LLM Evals");
+        return call.bookmarks.map((bookmark) => ({
+          ...abstainAssignment(bookmark.id),
+          tags: [{ name: "LLM Evals", color: "#64748b", reason: "placed" }],
+          abstain: false,
+          confidence: "high" as const,
+        }));
+      }
+    );
+    const escalate = vi.fn();
+
+    const result = await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 4 }],
+      existingCollections: [],
+      proposeLeftoverVocab: async () => ({
+        tags: [{ name: "LLM Evals", existing: false, reason: "leftover papers" }],
+        collections: [],
+      }),
+      escalateLeftovers: escalate,
+    });
+
+    expect(pass).toBe(2);
+    expect(escalate).not.toHaveBeenCalled();
+    expect(result.plan.suggestions[0]?.tags.map((tag) => tag.name)).toContain("LLM Evals");
+    expect(result.batch.hybrid?.escalatedToGrok).toBe(0);
   });
 });
 

@@ -165,6 +165,7 @@ export function useAnalyticsPage() {
   );
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/analytics",
     shortcutGroups: ANALYTICS_SHORTCUT_GROUPS,
     actions: {
       "tab-overview": () => handleTabChange("overview"),

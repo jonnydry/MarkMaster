@@ -12,13 +12,13 @@ import {
 } from "lucide-react";
 
 import { AppPageShell } from "@/components/app-page-shell";
+import { visiblePathname } from "@/components/route-preview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 const OrbitReviewOverlay = dynamic(
@@ -28,7 +28,6 @@ const OrbitReviewOverlay = dynamic(
     ),
   { ssr: false }
 );
-import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
 import { OrbitActivityBanner } from "@/components/orbit/orbit-activity-banner";
 import { OrbitLibraryRunBanner } from "@/components/orbit/orbit-library-run-banner";
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
@@ -280,6 +279,7 @@ export default function OrbitPage() {
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (visiblePathname() !== "/orbit") return;
       if (event.key === "Escape") {
         setMenuForId(null);
         setMenuPosition(null);
@@ -295,23 +295,7 @@ export default function OrbitPage() {
 
   return (
     <>
-    <AppPageShell
-      className="orbit-route-default"
-      backdrop={<OrbitPageWatermark />}
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-          totalBookmarks={libraryStats?.libraryBookmarkCount}
-          onSyncComplete={handleSyncComplete}
-        />
-      }
-      scrollRef={scrollRef}
-    >
+    <AppPageShell embedded scrollRef={scrollRef}>
           <PageHeader
             sticky
             feedChrome

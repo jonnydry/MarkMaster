@@ -1,7 +1,11 @@
 import { AuthenticationError, RateLimitError } from "@typesafe-ai/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { planLibraryAssignments } from "@/lib/orbit-library-assign";
+import {
+  libraryPostJudgmentText,
+  planLibraryAssignments,
+  shortlistLibraryPackTags,
+} from "@/lib/orbit-library-assign";
 
 const systemOneMock = vi.hoisted(() => vi.fn());
 
@@ -40,6 +44,91 @@ const rateLimited = () =>
 
 beforeEach(() => {
   systemOneMock.mockReset();
+});
+
+describe("libraryPostJudgmentText", () => {
+  it("includes the long-post note, article, link, and image alt text", () => {
+    const text = libraryPostJudgmentText({
+      id: "bm-1",
+      tweetText: "Today we’re announcing OrcaSAQ-2",
+      media: [{ type: "photo", alt_text: "Gradient card for the model" }],
+      urls: [{ expanded_url: "https://example.com/ignored" }],
+      xMetadata: {
+        tweet: {
+          note_tweet: {
+            text: "A 27B model you can deploy.\nhttps://t.co/FqslE1kYnw",
+            entities: {
+              urls: [{ expanded_url: "https://huggingface.co/orcarouter/OrcaSAQ-2-27B" }],
+            },
+          },
+          article: { title: "OrcaSAQ-2" },
+        },
+        author: { description: "Quantization research." },
+      },
+    });
+
+    expect(text).toContain("A 27B model you can deploy.");
+    expect(text).toContain("Today we’re announcing");
+    expect(text).toContain("OrcaSAQ-2");
+    expect(text).toContain("huggingface.co/orcarouter/OrcaSAQ-2-27B");
+    expect(text).toContain("Gradient card for the model");
+    expect(text).not.toContain("Quantization research.");
+  });
+});
+
+describe("shortlistLibraryPackTags", () => {
+  it("keeps a rare tag whose name is in the post ahead of unused popular tags", () => {
+    const vocabulary = [
+      ...Array.from({ length: 40 }, (_, index) => ({
+        name: `Popular ${index}`,
+        color: "#111111",
+      })),
+      { name: "Quantization", color: "#222222" },
+    ];
+    const shortlist = shortlistLibraryPackTags(
+      [
+        {
+          id: "bm-1",
+          tweetText: "Notes on quantization for long-horizon agents.",
+          media: null,
+        },
+      ],
+      vocabulary,
+      8
+    );
+
+    expect(shortlist[0]).toBe("Quantization");
+    expect(shortlist).toHaveLength(8);
+  });
+
+  it("does not treat a tag as present when it is only a fragment of another word", () => {
+    const shortlist = shortlistLibraryPackTags(
+      [{ id: "bm-1", tweetText: "This is available at the start.", media: null }],
+      [
+        { name: "Cooking", color: "#333333" },
+        { name: "AI", color: "#111111" },
+        { name: "Art", color: "#222222" },
+      ],
+      3
+    );
+
+    expect(shortlist).toEqual(["Cooking", "AI", "Art"]);
+  });
+
+  it("dedupes vocabulary names before packing questions", () => {
+    const shortlist = shortlistLibraryPackTags(
+      [{ id: "bm-1", tweetText: "Notes on quantization.", media: null }],
+      [
+        { name: "Quantization", color: "#111111" },
+        { name: "quantization", color: "#222222" },
+        { name: "Cooking", color: "#333333" },
+      ],
+      8
+    );
+
+    expect(shortlist.filter((name) => /quantization/i.test(name))).toHaveLength(1);
+    expect(shortlist[0]).toBe("Quantization");
+  });
 });
 
 describe("planLibraryAssignments", () => {

@@ -7,8 +7,8 @@ import {
   type BookmarkListCursor,
 } from "@/lib/bookmark-keyset";
 
-export const EXPORT_LIMIT = 10_000;
-export const EXPORT_BATCH_SIZE = 500;
+const EXPORT_LIMIT = 10_000;
+const EXPORT_BATCH_SIZE = 500;
 
 export const CSV_EXPORT_HEADER =
   "Tweet ID,Author,Username,Text,Likes,Retweets,Replies,Tags,Note,Tweet Date,Bookmarked Date,URL\n";
@@ -60,7 +60,7 @@ export function formatBookmarkJsonRecord(b: ExportBookmark) {
   };
 }
 
-export async function fetchBookmarkExportBatch(
+async function fetchBookmarkExportBatch(
   userId: string,
   cursor: string | undefined,
   remaining: number

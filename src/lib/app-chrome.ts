@@ -49,6 +49,3 @@ export function appToolbarControlHeightClassName(compact: boolean): string {
 
 /** Horizontal page gutter — headers, toolbars, scroll content */
 export const appContentGutterClassName = "px-4 sm:px-5";
-
-/** Full inset for scrollable content wells */
-export const appContentInsetClassName = "p-4 sm:p-5";

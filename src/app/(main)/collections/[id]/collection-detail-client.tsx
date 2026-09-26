@@ -154,7 +154,7 @@ export default function CollectionDetailClient({
 
   return (
     <>
-    <AppPageShell scrollRef={scrollRef}>
+    <AppPageShell embedded scrollRef={scrollRef}>
         <PageHeader
           sticky
           titleClassName="text-2xl sm:text-3xl"

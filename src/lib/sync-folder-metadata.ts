@@ -6,7 +6,7 @@ export const X_FOLDER_COLLECTION_SOURCE = "x-bookmark-folder";
 /** Re-use cached folder ids/names for this long before calling X again. */
 export const FOLDER_METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 
-export type SyncFolderRef = {
+type SyncFolderRef = {
   id: string;
   name: string;
 };

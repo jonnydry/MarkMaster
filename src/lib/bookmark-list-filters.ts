@@ -72,7 +72,7 @@ export function getNextDateStart(value: string) {
   return getZonedDayStart(next.toISOString().slice(0, 10), timeZone);
 }
 
-export function buildMediaFilterCondition(
+function buildMediaFilterCondition(
   mediaFilter: "all" | "images" | "video" | "links" | "text-only"
 ) {
   switch (mediaFilter) {

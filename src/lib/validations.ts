@@ -4,8 +4,8 @@ export const MAX_BOOKMARK_TARGETS = 100;
 export const MAX_REORDER_ITEMS = 500;
 export const MAX_BOOKMARK_QUERY_PAGE = 500;
 export const MAX_BOOKMARK_QUERY_LENGTH = 240;
-export const MAX_BOOKMARK_FILTER_LENGTH = 120;
-export const MAX_TAG_FILTER_IDS = 100;
+const MAX_BOOKMARK_FILTER_LENGTH = 120;
+const MAX_TAG_FILTER_IDS = 100;
 export const MAX_TAG_NAME_LENGTH = 50;
 
 const booleanQueryFlagSchema = z
@@ -197,7 +197,7 @@ export const reorderCollectionItemsSchema = z.object({
   }
 });
 
-export const moveCollectionItemSchema = z.object({
+const moveCollectionItemSchema = z.object({
   bookmarkId: idSchema,
   direction: z.enum(["up", "down"]),
 });
@@ -305,12 +305,12 @@ export const exportQuerySchema = z.object({
 });
 
 // Orbit Graph query parameters
-export const MAX_ORBIT_GRAPH_NODE_CAP = 4000;
+const MAX_ORBIT_GRAPH_NODE_CAP = 4000;
 export const DEFAULT_ORBIT_GRAPH_NODE_CAP = 1000;
 
-export const orbitGraphScopeSchema = z.enum(["library", "orbit"]).default("library");
+const orbitGraphScopeSchema = z.enum(["library", "orbit"]).default("library");
 
-export const MAX_ORBIT_GRAPH_EXPAND_ANCHORS = 10;
+const MAX_ORBIT_GRAPH_EXPAND_ANCHORS = 10;
 
 export const orbitGraphQuerySchema = z.object({
   nodeCap: z.coerce
@@ -335,7 +335,7 @@ export const orbitGraphQuerySchema = z.object({
     .optional(),
 });
 
-export const COLLECTION_DETAIL_PAGE_LIMIT = 20;
+const COLLECTION_DETAIL_PAGE_LIMIT = 20;
 
 export const collectionDetailQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(MAX_BOOKMARK_QUERY_PAGE).default(1),

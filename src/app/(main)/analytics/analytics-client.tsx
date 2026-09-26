@@ -6,7 +6,6 @@ import { BarChart3 } from "lucide-react";
 import { AppPageShell } from "@/components/app-page-shell";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { SyncButton } from "@/components/sync-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
@@ -63,22 +62,7 @@ export default function AnalyticsPage() {
 
   return (
     <>
-    <AppPageShell
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={lastSyncAt}
-          totalBookmarks={
-            libraryStats?.libraryBookmarkCount ?? analytics?.totalBookmarks
-          }
-          onSyncComplete={handleSyncComplete}
-        />
-      }
-    >
+    <AppPageShell embedded>
           <PageHeader
             sticky
             title="Analytics"

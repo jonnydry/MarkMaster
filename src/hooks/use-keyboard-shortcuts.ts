@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { resolveBookmarkNavigationId } from "@/lib/grid-bookmark-navigation";
+import { visiblePathname } from "@/components/route-preview";
 
 export interface KeyboardShortcut {
   id: string;
@@ -19,6 +20,8 @@ interface UseSurfaceKeyboardShortcutsOptions {
   shortcutGroups: readonly KeyboardShortcutGroup[];
   actions: Partial<Record<string, (event: KeyboardEvent) => void>>;
   disabled?: boolean;
+  /** When set, shortcuts no-op unless this path is the address bar path. */
+  surfacePath?: string;
 }
 
 interface UseKeyboardShortcutsOptions {
@@ -32,6 +35,7 @@ interface UseKeyboardShortcutsOptions {
   onCollection: () => void;
   onNote: () => void;
   onShowShortcuts?: () => void;
+  surfacePath?: string;
 }
 
 export const DASHBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
@@ -109,18 +113,6 @@ export function scrollDataElementIntoView(attribute: string, value: string) {
   });
 }
 
-export function focusElement(selector: string) {
-  const target = document.querySelector<HTMLElement>(selector);
-  if (!target) return false;
-  target.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
-    inline: "nearest",
-  });
-  target.focus();
-  return true;
-}
-
 function normalizeShortcutKey(key: string) {
   return key.length === 1 ? key.toLowerCase() : key.toLowerCase();
 }
@@ -163,15 +155,22 @@ export function useSurfaceKeyboardShortcuts({
   shortcutGroups,
   actions,
   disabled = false,
+  surfacePath,
 }: UseSurfaceKeyboardShortcutsOptions) {
-  const refs = useRef({ shortcutGroups, actions, disabled });
+  const refs = useRef({ shortcutGroups, actions, disabled, surfacePath });
 
   useEffect(() => {
-    refs.current = { shortcutGroups, actions, disabled };
+    refs.current = { shortcutGroups, actions, disabled, surfacePath };
   });
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (
+        refs.current.surfacePath &&
+        visiblePathname() !== refs.current.surfacePath
+      ) {
+        return;
+      }
       if (isEditable(event)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
@@ -214,6 +213,7 @@ export function useKeyboardShortcuts({
   onCollection,
   onNote,
   onShowShortcuts,
+  surfacePath,
 }: UseKeyboardShortcutsOptions) {
   const refs = useRef({
     activeBookmarkId,
@@ -315,5 +315,6 @@ export function useKeyboardShortcuts({
         if (refs.current.activeBookmarkId) refs.current.onNote();
       },
     },
+    surfacePath,
   });
 }

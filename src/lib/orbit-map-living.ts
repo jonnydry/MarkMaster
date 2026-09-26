@@ -58,12 +58,6 @@ export function getOrbitMapLivingEnabled(lookup: LivingLookup = {}): boolean {
   }
 }
 
-export function prefersOrbitMapReducedMotion(
-  matchMedia?: LivingLookup["matchMedia"]
-): boolean {
-  return Boolean(readMatchMedia(matchMedia)?.matches);
-}
-
 export function setOrbitMapLivingEnabled(
   enabled: boolean,
   storage?: Pick<Storage, "setItem"> | null

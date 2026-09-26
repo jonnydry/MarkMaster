@@ -372,6 +372,7 @@ export function useOrbitMapPage() {
   );
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/orbit/map",
     shortcutGroups: ORBIT_MAP_SHORTCUT_GROUPS,
     actions: {
       search: () => searchInputRef.current?.focus(),

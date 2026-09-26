@@ -400,7 +400,6 @@ export function extractOrbitBookmarkSignals(args: {
     quotedText,
     articleContext?.title,
     articleContext?.previewText,
-    authorContext?.bio,
     ...linkContext.flatMap((link) => [link.domain, link.title, link.description]),
     ...xTopics.flatMap((topic) => [topic.domain, topic.entity, topic.description]),
     ...altTexts,

@@ -1,7 +1,7 @@
 import { shuffleWithSeed } from "@/lib/discovery-shown";
 import type { BookmarkWithRelations } from "@/types";
 
-export type WeeklyGemsCuration = {
+type WeeklyGemsCuration = {
   primaryGems: BookmarkWithRelations[];
   resurfacedGems: BookmarkWithRelations[];
   otherStrong: BookmarkWithRelations[];
@@ -76,7 +76,7 @@ export function buildWeeklyGemsCuration(
   };
 }
 
-export function buildDigestItemLabels(
+function buildDigestItemLabels(
   resurfacedGems: BookmarkWithRelations[]
 ): Record<string, string> {
   const labels: Record<string, string> = {};
@@ -92,13 +92,6 @@ export function computeDigestEngagement(bookmarks: BookmarkWithRelations[]): num
     if (!m) return sum;
     return sum + (m.like_count || 0) + (m.reply_count || 0) + (m.bookmark_count || 0);
   }, 0);
-}
-
-export function filterDigestDisplayGems(
-  displayGems: BookmarkWithRelations[],
-  quickPickIds: Set<string>
-): BookmarkWithRelations[] {
-  return displayGems.filter((g) => !quickPickIds.has(g.id));
 }
 
 /**

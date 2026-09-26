@@ -13,32 +13,32 @@ import {
 import type { TypographyPresetId } from "@/lib/typography-presets";
 
 /** Orbit (default) preset — Geist for UI and reading, Geist Mono for data. */
-export const geistSans = Geist({
+const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-export const geistMono = Geist_Mono({
+const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
 /** Mono + editorial presets — declared globally, not preloaded. */
-export const ibmPlexSans = IBM_Plex_Sans({
+const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-ibm-plex-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
-export const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
-export const ibmPlexMono = IBM_Plex_Mono({
+const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -46,13 +46,13 @@ export const ibmPlexMono = IBM_Plex_Mono({
 });
 
 /** Classic preset — lazy-loaded when selected. */
-export const inter = Inter({
+const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   preload: false,
 });
 
-export const dmSans = DM_Sans({
+const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
@@ -60,13 +60,13 @@ export const dmSans = DM_Sans({
 });
 
 /** Editorial preset — lazy-loaded when selected. */
-export const sourceSerif = Source_Serif_4({
+const sourceSerif = Source_Serif_4({
   variable: "--font-source-serif",
   subsets: ["latin"],
   preload: false,
 });
 
-export const newsreader = Newsreader({
+const newsreader = Newsreader({
   variable: "--font-newsreader",
   subsets: ["latin"],
   preload: false,

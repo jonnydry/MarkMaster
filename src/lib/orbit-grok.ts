@@ -25,6 +25,7 @@ import {
   buildOrbitSystemPrompt,
   buildOrbitUserPrompt,
 } from "@/lib/orbit-grok-prompt";
+import { proposeOrbitVocabWithXai } from "@/lib/orbit-grok-vocab";
 import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
 import {
   buildOrbitCollectionRollups,
@@ -204,6 +205,19 @@ export async function scanOrbitBookmarksWithXai(args: {
         neighborHints: args.neighborHints,
         batch: args.batch,
         onProgress: args.onProgress,
+        proposeLeftoverVocab: apiKey
+          ? (bookmarks, notes) =>
+              proposeOrbitVocabWithXai({
+                bookmarks,
+                existingTags: args.existingTags,
+                existingCollections: args.existingCollections,
+                authorPriorHints: args.authorPriorHints,
+                learningHints: args.learningHints,
+                neighborHints: args.neighborHints,
+                gapHints: notes,
+                apiKey,
+              })
+          : undefined,
         escalateLeftovers: apiKey
           ? async (bookmarks, notes) => {
               const escalated = await fetchOrbitScanFromXai(

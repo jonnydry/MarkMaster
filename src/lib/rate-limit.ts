@@ -11,7 +11,7 @@ import { getRedis } from "@/lib/redis";
  * so it is heavily restricted. Orbit scans are more generous.
  */
 
-export type RateLimitAction =
+type RateLimitAction =
   | "sync"
   | "orbit"
   | "orbit:library"
@@ -184,7 +184,7 @@ function getGlobalOrbitLimiter() {
  */
 
 
-export interface RateLimitResult {
+interface RateLimitResult {
   success: boolean;
   limit: number;
   remaining: number;

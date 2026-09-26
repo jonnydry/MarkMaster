@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 
+import { visiblePathname } from "@/components/route-preview";
 import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
 import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
@@ -73,6 +74,36 @@ export function useDashboardPage() {
     collectionId: collectionFromUrl ?? "",
     bookmarkId: bookmarkFromUrl ?? "",
   });
+  const pathname = usePathname();
+  const urlIntent = [
+    tagFromUrl ?? "",
+    tagsFromUrl ?? "",
+    authorFromUrl ?? "",
+    collectionFromUrl ?? "",
+    bookmarkFromUrl ?? "",
+  ].join("\0");
+  const appliedUrlIntent = useRef(urlIntent);
+  useEffect(() => {
+    if (pathname !== "/dashboard") return;
+    if (!tagFromUrl && !tagsFromUrl && !authorFromUrl && !collectionFromUrl && !bookmarkFromUrl) {
+      return;
+    }
+    if (appliedUrlIntent.current === urlIntent) return;
+    appliedUrlIntent.current = urlIntent;
+    filters.setSelectedTags((tagsFromUrl ?? tagFromUrl ?? "").split(",").filter(Boolean));
+    filters.setAuthorFilter(authorFromUrl?.replace(/^@/, "") ?? "");
+    filters.setCollectionId(collectionFromUrl ?? "");
+    filters.setBookmarkId(bookmarkFromUrl ?? "");
+  }, [
+    authorFromUrl,
+    bookmarkFromUrl,
+    collectionFromUrl,
+    filters,
+    pathname,
+    tagFromUrl,
+    tagsFromUrl,
+    urlIntent,
+  ]);
   const { resetPage } = filters;
   const actions = useBookmarkActions();
   const { createCollectionQuick, createCollection } = useCreateCollection();
@@ -398,10 +429,12 @@ export function useDashboardPage() {
     },
     onNote: () => setNoteDialogOpen(true),
     onShowShortcuts: () => setKeyboardShortcutsOpen(true),
+    surfacePath: "/dashboard",
   });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (visiblePathname() !== "/dashboard") return;
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setCommandPaletteOpen(true);

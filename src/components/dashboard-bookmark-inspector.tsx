@@ -248,13 +248,17 @@ export function DashboardBookmarkInspector({
           />
           <InspectorAction
             icon={Tags}
-            label={bookmark.tags.length > 0 ? "Tags" : "Add tag"}
+            label={bookmark.tags.length > 0 ? "Edit tags" : "Add tag"}
             active={bookmark.tags.length > 0}
             onClick={() => onAddTag(bookmark.id)}
           />
           <InspectorAction
             icon={FolderInput}
-            label={bookmark.collectionItems.length > 0 ? "Collections" : "Add to collection"}
+            label={
+              bookmark.collectionItems.length > 0
+                ? "Edit collections"
+                : "Add to collection"
+            }
             active={bookmark.collectionItems.length > 0}
             onClick={() => onAddToCollection(bookmark.id)}
           />
@@ -290,17 +294,11 @@ export function DashboardBookmarkInspector({
           </div>
         ) : null}
 
-        <BookmarkOverlayTagsSection
-          tags={bookmark.tags}
-          actionLabel={bookmark.tags.length > 0 ? "Edit tags" : "Add tag"}
-          onAction={() => onAddTag(bookmark.id)}
-        />
+        {/* Tag/collection edit lives in the action strip above — sections
+            only list what's already applied so scanning stays one-path. */}
+        <BookmarkOverlayTagsSection tags={bookmark.tags} />
         <BookmarkOverlayCollectionsSection
           collections={bookmark.collectionItems}
-          actionLabel={
-            bookmark.collectionItems.length > 0 ? "Edit collections" : "Add to collection"
-          }
-          onAction={() => onAddToCollection(bookmark.id)}
         />
         <BookmarkOverlayNotesSection
           notes={bookmark.notes}

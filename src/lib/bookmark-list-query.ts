@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 /** Relations needed for feed/grid cards — shared by list API routes. */
-export const bookmarkListInclude = {
+const bookmarkListInclude = {
   tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
   notes: { select: { id: true, content: true } },
   collectionItems: {
@@ -39,7 +39,7 @@ export const bookmarkListSelect = {
  * Keeps url entities so t.co-only cards can show a stored title.
  * Drops quotedTweet, xMetadata, and small unused columns.
  */
-export const bookmarkCompactSelect = {
+const bookmarkCompactSelect = {
   id: true,
   tweetId: true,
   authorUsername: true,
@@ -58,7 +58,7 @@ export const bookmarkCompactSelect = {
 } as const satisfies Prisma.BookmarkSelect;
 
 /** Include quotedTweet when a single bookmark is requested by id. */
-export const bookmarkDetailSelect = {
+const bookmarkDetailSelect = {
   ...bookmarkListSelect,
   quotedTweet: true,
   xMetadata: true,

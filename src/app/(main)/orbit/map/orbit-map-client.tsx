@@ -10,15 +10,13 @@ import { buttonVariants } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RetryButton } from "@/components/ui/retry-button";
-import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
 import {
   orbitMapInspectorDockWidthClass,
   orbitMapInspectorOverlayMaxClass,
   orbitMapInspectorOverlayZoomClass,
 } from "@/lib/orbit-map-chrome";
 import { cn } from "@/lib/utils";
-import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
-import { Sidebar } from "@/components/sidebar-dynamic";
+import { useAppChrome } from "@/components/app-frame";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import {
   ORBIT_MAP_SHORTCUT_GROUPS,
@@ -79,6 +77,7 @@ const CreateCollectionDialog = dynamic(
 );
 
 export default function OrbitMapPage() {
+  const { setSyncing } = useAppChrome();
   const page = useOrbitMapPage();
   const {
     dbUser,
@@ -119,8 +118,6 @@ export default function OrbitMapPage() {
     goToTagOnDashboard,
     handleCreateCollectionOpen,
     handleSyncComplete,
-    handleSyncStateChange,
-    syncProgressVisible,
     handleCanvasSelectionChange,
     handleScopeChange,
     handleOpenBookmark,
@@ -179,31 +176,7 @@ export default function OrbitMapPage() {
 
   return (
     <>
-    <AppPageShell
-      className="orbit-route-default"
-      layout="column"
-      backdrop={<OrbitPageWatermark />}
-      mainTop={
-        syncProgressVisible ? (
-          <ScrollingProgressBar className="relative z-50" />
-        ) : null
-      }
-      mainProps={{ "aria-busy": syncProgressVisible }}
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={lastSyncAt}
-          totalBookmarks={libraryStats?.libraryBookmarkCount}
-          onSyncComplete={handleSyncComplete}
-          onSyncStateChange={handleSyncStateChange}
-          preferCollapsed
-        />
-      }
-    >
+    <AppPageShell embedded layout="column">
         <h1 className="sr-only">Orbit map</h1>
         <div className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
           {isLoading ? (
@@ -282,7 +255,7 @@ export default function OrbitMapPage() {
                 lastSyncAt={lastSyncAt}
                 totalBookmarks={libraryStats?.libraryBookmarkCount}
                 onSyncComplete={handleSyncComplete}
-                onSyncStateChange={handleSyncStateChange}
+                onSyncStateChange={setSyncing}
               />
             }
             user={dbUser ?? undefined}
