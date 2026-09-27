@@ -137,6 +137,81 @@ type BookmarkSyncEntry = {
   data: BookmarkData;
 };
 
+type RememberedCardImage = { url: string; width?: number; height?: number };
+
+function urlEntityKey(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.expanded_url === "string" && record.expanded_url) {
+    return record.expanded_url;
+  }
+  if (typeof record.url === "string" && record.url) return record.url;
+  return null;
+}
+
+function rememberedCardImages(value: unknown): RememberedCardImage[] {
+  if (!Array.isArray(value)) return [];
+  const images: RememberedCardImage[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.url !== "string" || !record.url.startsWith("https://")) continue;
+    const image: RememberedCardImage = { url: record.url };
+    if (typeof record.width === "number") image.width = record.width;
+    if (typeof record.height === "number") image.height = record.height;
+    images.push(image);
+  }
+  return images;
+}
+
+/**
+ * A re-sync replaces `urls` with the X payload, which drops card images we
+ * fetched and stored on the matching link. Put those images back on the same
+ * expanded URL. Images stay off a link that is no longer in the payload.
+ */
+function mergeRememberedCardImages(
+  next: Prisma.InputJsonValue | typeof Prisma.JsonNull,
+  previous: unknown
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (!Array.isArray(next) || !Array.isArray(previous)) return next;
+
+  const rememberedByKey = new Map<string, RememberedCardImage[]>();
+  for (const entity of previous) {
+    const key = urlEntityKey(entity);
+    const images = rememberedCardImages(
+      entity && typeof entity === "object" && !Array.isArray(entity)
+        ? (entity as { images?: unknown }).images
+        : undefined
+    );
+    if (!key || images.length === 0) continue;
+    const existing = rememberedByKey.get(key) ?? [];
+    rememberedByKey.set(key, [...existing, ...images]);
+  }
+  if (rememberedByKey.size === 0) return next;
+
+  let changed = false;
+  const merged = next.map((entity) => {
+    const key = urlEntityKey(entity);
+    const remembered = key ? rememberedByKey.get(key) : undefined;
+    if (!remembered || !entity || typeof entity !== "object" || Array.isArray(entity)) {
+      return entity;
+    }
+    const record = entity as Record<string, unknown>;
+    const current = Array.isArray(record.images) ? record.images : [];
+    const seen = new Set(rememberedCardImages(current).map((image) => image.url));
+    const missing = remembered.filter((image) => {
+      if (seen.has(image.url)) return false;
+      seen.add(image.url);
+      return true;
+    });
+    if (missing.length === 0) return entity;
+    changed = true;
+    return { ...record, images: [...current, ...missing] };
+  });
+
+  return changed ? merged : next;
+}
+
 export async function updateBookmarksInBatches(
   userId: string,
   entries: BookmarkSyncEntry[]
@@ -145,12 +220,24 @@ export async function updateBookmarksInBatches(
 
   for (let i = 0; i < entries.length; i += BOOKMARK_UPDATE_BATCH_SIZE) {
     const batch = entries.slice(i, i + BOOKMARK_UPDATE_BATCH_SIZE);
+    const existing = await prisma.bookmark.findMany({
+      where: { userId, tweetId: { in: batch.map((entry) => entry.tweetId) } },
+      select: { tweetId: true, urls: true },
+    });
+    const previousUrls = new Map(existing.map((row) => [row.tweetId, row.urls]));
+
     const results = await Promise.all(
       batch.map((entry) => {
         const bookmarkData = buildBookmarkUpdateData(entry.data);
         return prisma.bookmark.updateMany({
           where: { userId, tweetId: entry.tweetId },
-          data: bookmarkData,
+          data: {
+            ...bookmarkData,
+            urls: mergeRememberedCardImages(
+              bookmarkData.urls,
+              previousUrls.get(entry.tweetId)
+            ),
+          },
         });
       })
     );

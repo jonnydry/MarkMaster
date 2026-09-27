@@ -61,6 +61,7 @@ function makeBookmarkData(id: string): BookmarkData {
 describe("sync-utils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.prisma.bookmark.findMany.mockResolvedValue([]);
   });
 
   describe("buildBookmarkCreateData", () => {
@@ -310,6 +311,151 @@ describe("sync-utils", () => {
   });
 
   describe("updateBookmarksInBatches", () => {
+    it("keeps a remembered card image when a re-sync rewrites urls", async () => {
+      const page = "https://huggingface.co/example/model";
+      const image = "https://cdn.example/preview.png";
+      mocks.prisma.bookmark.findMany.mockResolvedValue([
+        {
+          tweetId: "t-card",
+          urls: [
+            {
+              url: "https://t.co/abc",
+              expanded_url: page,
+              display_url: "huggingface.co/example/…",
+              images: [{ url: image }],
+            },
+          ],
+        },
+      ]);
+      mocks.prisma.bookmark.updateMany.mockResolvedValue({ count: 1 });
+
+      const data = makeBookmarkData("t-card");
+      data.tweet.text = "Updated text";
+      data.tweet.entities = {
+        urls: [
+          {
+            url: "https://t.co/abc",
+            expanded_url: page,
+            display_url: "huggingface.co/example/…",
+          },
+        ],
+      };
+
+      await updateBookmarksInBatches("user-1", [{ tweetId: "t-card", data }]);
+
+      expect(mocks.prisma.bookmark.findMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", tweetId: { in: ["t-card"] } },
+        select: { tweetId: true, urls: true },
+      });
+      expect(mocks.prisma.bookmark.updateMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", tweetId: "t-card" },
+        data: expect.objectContaining({
+          tweetText: "Updated text",
+          urls: [
+            expect.objectContaining({
+              expanded_url: page,
+              images: [{ url: image }],
+            }),
+          ],
+        }),
+      });
+    });
+
+    it("appends a remembered image without dropping images from the new payload", async () => {
+      const page = "https://huggingface.co/example/model";
+      mocks.prisma.bookmark.findMany.mockResolvedValue([
+        {
+          tweetId: "t-card",
+          urls: [
+            {
+              expanded_url: page,
+              images: [
+                { url: "https://pbs.twimg.com/news_img/card.jpg", width: 1200, height: 630 },
+                { url: "https://cdn.example/preview.png" },
+              ],
+            },
+          ],
+        },
+      ]);
+      mocks.prisma.bookmark.updateMany.mockResolvedValue({ count: 1 });
+
+      const data = makeBookmarkData("t-card");
+      data.tweet.entities = {
+        urls: [
+          {
+            url: "https://t.co/abc",
+            expanded_url: page,
+            display_url: "huggingface.co/example/…",
+            images: [
+              { url: "https://pbs.twimg.com/news_img/card.jpg", width: 1200, height: 630 },
+            ],
+          },
+        ],
+      };
+
+      await updateBookmarksInBatches("user-1", [{ tweetId: "t-card", data }]);
+
+      const payload = mocks.prisma.bookmark.updateMany.mock.calls[0]?.[0];
+      expect(payload.data.urls[0].images).toEqual([
+        { url: "https://pbs.twimg.com/news_img/card.jpg", width: 1200, height: 630 },
+        { url: "https://cdn.example/preview.png" },
+      ]);
+    });
+
+    it("does not keep a card image when the link is gone or the url changed", async () => {
+      mocks.prisma.bookmark.findMany.mockResolvedValue([
+        {
+          tweetId: "t-gone",
+          urls: [
+            {
+              expanded_url: "https://huggingface.co/example/model",
+              images: [{ url: "https://cdn.example/preview.png" }],
+            },
+          ],
+        },
+        {
+          tweetId: "t-moved",
+          urls: [
+            {
+              expanded_url: "https://huggingface.co/example/model",
+              images: [{ url: "https://cdn.example/preview.png" }],
+            },
+          ],
+        },
+      ]);
+      mocks.prisma.bookmark.updateMany.mockResolvedValue({ count: 1 });
+
+      const gone = makeBookmarkData("t-gone");
+      gone.tweet.entities = undefined;
+      const moved = makeBookmarkData("t-moved");
+      moved.tweet.entities = {
+        urls: [
+          {
+            url: "https://t.co/other",
+            expanded_url: "https://example.com/other",
+            display_url: "example.com/other",
+          },
+        ],
+      };
+
+      await updateBookmarksInBatches("user-1", [
+        { tweetId: "t-gone", data: gone },
+        { tweetId: "t-moved", data: moved },
+      ]);
+
+      const writes = mocks.prisma.bookmark.updateMany.mock.calls.map((call) => call[0]);
+      expect(writes.find((write) => write.where.tweetId === "t-gone")?.data.urls).toBe(
+        Prisma.JsonNull
+      );
+      expect(writes.find((write) => write.where.tweetId === "t-moved")?.data.urls).toEqual([
+        {
+          url: "https://t.co/other",
+          expanded_url: "https://example.com/other",
+          display_url: "example.com/other",
+        },
+      ]);
+    });
+
     it("processes updates in batches of BOOKMARK_UPDATE_BATCH_SIZE", async () => {
       mocks.prisma.bookmark.updateMany.mockResolvedValue({ count: 1 });
 
