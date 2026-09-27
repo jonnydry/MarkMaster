@@ -529,6 +529,12 @@ export type OrbitGraphNode =
       authorDisplayName: string;
       affiliated: boolean;
       recent: boolean;
+      /**
+       * Days since the bookmark was saved, to one decimal. Orders a home's
+       * rings (newest nearest the hub) and drives Motion. Payloads cached
+       * before this field existed omit it.
+       */
+      ageDays?: number;
     }
   | {
       kind: "overflow";

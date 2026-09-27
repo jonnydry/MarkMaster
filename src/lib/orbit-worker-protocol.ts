@@ -152,6 +152,8 @@ export const WorkerMessageType = {
   SET_LIVING_MAP: "SET_LIVING_MAP",
   /** Play the radar sweep effect (optionally glinting specific nodes). */
   PLAY_SCAN_SWEEP: "PLAY_SCAN_SWEEP",
+  /** Replay: show only bookmarks saved at least `cutoffDays` ago (null = off). */
+  SET_REPLAY: "SET_REPLAY",
 
   // Lifecycle
   DESTROY: "DESTROY",
@@ -296,6 +298,11 @@ export interface InitMessage {
    * and `prefers-reduced-motion`.
    */
   livingMap?: boolean;
+  /**
+   * Absolute URL of the page's Geist webfont (basic Latin subset). The worker
+   * can't see document fonts, so it loads this itself for label glyphs.
+   */
+  labelFontUrl?: string;
 }
 
 export interface SetGraphMessage {
@@ -513,6 +520,17 @@ export interface SetLivingMapMessage {
 }
 
 /**
+ * Replay the library's growth: bookmarks saved more recently than
+ * `cutoffDays` ago are hidden (fading in as the cutoff passes them), and
+ * homes appear once they hold anything. `null` ends the replay.
+ */
+export interface SetReplayMessage {
+  type: typeof WorkerMessageType.SET_REPLAY;
+  protocolVersion: number;
+  cutoffDays: number | null;
+}
+
+/**
  * Plays a radar sweep across the sky: a beam rotates once around the core
  * and the given nodes glint as it passes them (all bookmarks when omitted).
  * Used by scan/triage flows to visualize the AI pass over the library.
@@ -552,6 +570,7 @@ export type WorkerMessage =
   | SetThemeMessage
   | SetVisibilityMessage
   | SetLivingMapMessage
+  | SetReplayMessage
   | PlayScanSweepMessage;
 
 // Grouped unions for handler typing
@@ -818,7 +837,8 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
         optionalStringFieldError(msg, "colorTheme") ??
         (msg.livingMap === undefined || typeof msg.livingMap === "boolean"
           ? null
-          : "INIT.livingMap must be a boolean when provided")
+          : "INIT.livingMap must be a boolean when provided") ??
+        optionalStringFieldError(msg, "labelFontUrl")
       );
 
     case WorkerMessageType.RESIZE:
@@ -919,6 +939,14 @@ export function getWorkerMessageValidationError(msg: unknown): string | null {
       return typeof msg.enabled === "boolean"
         ? null
         : "SET_LIVING_MAP.enabled must be a boolean";
+
+    case WorkerMessageType.SET_REPLAY:
+      return msg.cutoffDays === null ||
+        (typeof msg.cutoffDays === "number" &&
+          Number.isFinite(msg.cutoffDays) &&
+          msg.cutoffDays >= 0)
+        ? null
+        : "SET_REPLAY.cutoffDays must be a non-negative number or null";
 
     case WorkerMessageType.PLAY_SCAN_SWEEP:
       return msg.nodeIds === undefined ||

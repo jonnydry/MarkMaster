@@ -14,99 +14,40 @@ function parseHexColor(value: string | undefined, fallback: number) {
   return Number.parseInt(normalized, 16);
 }
 
-/** Push channel values away from luminance for a more electric read. */
-export function saturateOrbitMapColor(color: number, amount: number): number {
-  const r = (color >> 16) & 0xff;
-  const g = (color >> 8) & 0xff;
-  const b = color & 0xff;
-  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-  const saturate = (channel: number) =>
-    Math.min(255, Math.max(0, Math.round(lum + (channel - lum) * amount)));
-  return (saturate(r) << 16) | (saturate(g) << 8) | saturate(b);
-}
-
-function enhanceOrbitMapFill(color: number, isLightCanvas: boolean): number {
-  const saturated = saturateOrbitMapColor(color, isLightCanvas ? 1.28 : 1.42);
-  return isLightCanvas
-    ? mixOrbitMapColors(saturated, 0xffffff, 0.06)
-    : saturated;
-}
-
-function getOrbitMapNeonStroke(fill: number, isLightCanvas: boolean): number {
-  const ringMix = isLightCanvas ? 0xffffff : 0x22d3ee;
-  return mixOrbitMapColors(
-    saturateOrbitMapColor(fill, isLightCanvas ? 1.18 : 1.3),
-    ringMix,
-    isLightCanvas ? 0.48 : 0.38
-  );
-}
-
-function styleOrbitMapHub(
-  fill: number,
-  stroke: number,
-  strokeWidth: number,
-  isLightCanvas: boolean
-): OrbitMapNodeVisualStyle {
-  const color = enhanceOrbitMapFill(fill, isLightCanvas);
-  return {
-    color,
-    strokeColor: getOrbitMapNeonStroke(stroke, isLightCanvas),
-    strokeWidth,
-    isHub: true,
-  };
-}
-
+/**
+ * Flat glyph colours on the neutral canvas. The accent (`palette.glow`) is
+ * reserved for the queue and loose bookmarks; tags keep the user's colour;
+ * collections are neutral ink. Filed dots start neutral and take a calm tint
+ * of their home tag in the worker (applyBookmarkAccentColors).
+ */
 export function getOrbitMapNodeVisualStyle(
   node: OrbitGraphNode,
   palette?: OrbitMapPalette
 ): OrbitMapNodeVisualStyle {
   const isLightCanvas = (palette?.background ?? 0) > 0x808080;
+  const glow = palette?.glow ?? (isLightCanvas ? 0x2563eb : 0x5b8def);
+  const neutral = palette?.neutral ?? (isLightCanvas ? 0x56606b : 0x8d9299);
+  const ink = palette?.ink ?? (isLightCanvas ? 0x0f1419 : 0xececec);
   switch (node.kind) {
     case "core":
-      return styleOrbitMapHub(0xfde047, 0xfef9c3, 2.3, isLightCanvas);
+      return { color: glow, strokeColor: glow, strokeWidth: 2.4, isHub: true };
     case "tag": {
-      const color = parseHexColor(node.color, 0x06d6a0);
-      return styleOrbitMapHub(color, color, 2.2, isLightCanvas);
+      const color = parseHexColor(node.color, neutral);
+      return { color, strokeColor: color, strokeWidth: 0, isHub: true };
     }
     case "collection":
-      return node.variant === "x_folder"
-        ? styleOrbitMapHub(0xa855f7, 0xf0abfc, 2.2, isLightCanvas)
-        : styleOrbitMapHub(0xec4899, 0xfda4af, 2.2, isLightCanvas);
-    case "bookmark": {
-      const accent = palette?.accent ?? 0x2f6fed;
-      const color = node.affiliated
-        ? isLightCanvas
-          ? saturateOrbitMapColor(0x475569, 1.12)
-          : 0x737373
-        : enhanceOrbitMapFill(accent, isLightCanvas);
-      const strokeColor = node.affiliated
-        ? isLightCanvas
-          ? saturateOrbitMapColor(0x64748b, 1.1)
-          : 0xa3a3a3
-        : getOrbitMapNeonStroke(color, isLightCanvas);
-      // Fresh bookmarks pick up a cyan-hot edge instead of washing toward white.
-      if (node.recent) {
-        return {
-          color: mixOrbitMapColors(color, 0x67e8f9, 0.14),
-          strokeColor: mixOrbitMapColors(strokeColor, 0x67e8f9, 0.28),
-          strokeWidth: (node.affiliated ? 0.9 : 1.2) + 0.25,
-          isHub: false,
-        };
-      }
       return {
-        color,
-        strokeColor,
-        strokeWidth: node.affiliated ? 0.9 : 1.25,
-        isHub: false,
+        color: ink,
+        strokeColor: ink,
+        strokeWidth: node.variant === "x_folder" ? 2 : 0,
+        isHub: true,
       };
-    }
+    case "bookmark":
+      return node.affiliated
+        ? { color: neutral, strokeColor: neutral, strokeWidth: 0, isHub: false }
+        : { color: glow, strokeColor: glow, strokeWidth: 1.5, isHub: false };
     case "overflow":
-      return {
-        color: enhanceOrbitMapFill(0xfb923c, isLightCanvas),
-        strokeColor: getOrbitMapNeonStroke(0xfb923c, isLightCanvas),
-        strokeWidth: 1.5,
-        isHub: false,
-      };
+      return { color: neutral, strokeColor: neutral, strokeWidth: 0, isHub: false };
   }
 }
 
@@ -149,11 +90,11 @@ export function shouldShowOrbitMapLabel(
   const isHub = kind === "core" || kind === "tag" || kind === "collection";
 
   if (options.isSelectedNeighbor) {
-    // Hubs connected to the selection are always worth naming; bookmark
-    // neighbors only label once moderately zoomed in, or selecting a large
-    // hub floods the canvas with handles.
+    // Hubs connected to the selection are always worth naming. Bookmark
+    // neighbors follow the normal zoom rule: the hairlines already show which
+    // ones are related, and a large hub would flood the canvas with handles.
     if (isHub) return true;
-    if (kind === "bookmark") return zoom >= ORBIT_MAP_BOOKMARK_LABEL_ZOOM / 2;
+    if (kind === "bookmark") return zoom >= ORBIT_MAP_BOOKMARK_LABEL_ZOOM;
     return true;
   }
 
@@ -184,7 +125,7 @@ export function getOrbitMapLabelText(node: OrbitGraphNode) {
     return `+${node.remaining}`;
   }
   if (node.kind === "core") {
-    return "Orbit";
+    return "Orbit queue";
   }
   return "Node";
 }

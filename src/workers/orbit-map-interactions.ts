@@ -52,6 +52,11 @@ export interface OrbitMapInteractionDeps<TNode extends OrbitMapInteractionNode> 
   returnNodeTo(nodeId: string, x: number, y: number): void;
   /** Arrival feedback pulse on a hub after a successful drop. */
   pulseNode(nodeId: string): void;
+  /**
+   * Whether a dragged bookmark may drop onto a hub. Hubs it already belongs
+   * to (and read-only hubs) are excluded so a drop is always a real change.
+   */
+  canDropOnto?(bookmarkId: string, hub: TNode): boolean;
 }
 
 function hitTest<TNode extends OrbitMapInteractionNode>(
@@ -82,10 +87,14 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
   let panStart: { x: number; y: number } | null = null;
   let panMoved = false;
   let dragCandidate: { id: string; startX: number; startY: number } | null = null;
+  // Non-draggable node (hub, core, overflow) under the press: a press that
+  // doesn't travel selects it, one that does pans the map.
+  let pressedNodeId: string | null = null;
   let draggingNodeId: string | null = null;
   let dragOrigin: { x: number; y: number } | null = null;
   let dropTargetId: string | null = null;
   let hubDropTargets: TNode[] = [];
+  let activeDropTargets: TNode[] = [];
   let currentHover: { id: string; kind: string } | null = null;
   let currentCursor: CursorChangedMessage['cursor'] = 'default';
 
@@ -107,6 +116,9 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     draggingNodeId = nodeId;
     dragOrigin = { x: datum.x ?? 0, y: datum.y ?? 0 };
     dropTargetId = null;
+    activeDropTargets = deps.canDropOnto
+      ? hubDropTargets.filter((hub) => deps.canDropOnto!(nodeId, hub))
+      : hubDropTargets;
     datum.x = worldX;
     datum.y = worldY;
     deps.refreshNodeStyles();
@@ -122,7 +134,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     // Drag-to-assign: bookmarks can be dropped onto tag/collection hubs.
     if (datum.node.kind === 'bookmark') {
       const target = findClosestOrbitMapNode(
-        hubDropTargets,
+        activeDropTargets,
         { x: worldX, y: worldY },
         getOrbitMapHitPadding(deps.getCamera().zoom, 14)
       );
@@ -165,6 +177,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
     draggingNodeId = null;
     dragOrigin = null;
     dropTargetId = null;
+    activeDropTargets = [];
     deps.refreshNodeStyles();
   }
 
@@ -180,6 +193,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       panStart = null;
       panMoved = false;
       dragCandidate = null;
+      pressedNodeId = null;
       if (currentHover) {
         currentHover = null;
         deps.refreshNodeStyles();
@@ -278,27 +292,34 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
         getOrbitMapHitPadding(camera.zoom)
       );
 
-      if (closest) {
-        // Selection happens on pointer-up so a drag doesn't also select.
+      // Selection happens on pointer-up so a drag doesn't also select.
+      // Only bookmarks drag (drag-to-assign); pressing anything else pans,
+      // since a dragged hub would just glide back to its layout slot.
+      if (closest && closest.node.kind === 'bookmark') {
         dragCandidate = { id: closest.id, startX: x, startY: y };
+        pressedNodeId = null;
         isPanning = false;
         panDragLast = null;
         panStart = null;
         setCursor('pointer');
       } else {
         dragCandidate = null;
+        pressedNodeId = closest?.id ?? null;
         isPanning = true;
         panDragLast = { x, y };
         panStart = { x, y };
-        setCursor('grabbing');
+        setCursor(closest ? 'pointer' : 'grabbing');
       }
       return;
     }
 
     if (type === WorkerMessageType.POINTER_UP) {
       const wasDragging = Boolean(draggingNodeId);
-      const clickedNodeId = !wasDragging && dragCandidate ? dragCandidate.id : null;
-      const wasEmptyClick = !wasDragging && !dragCandidate && isPanning && !panMoved;
+      const clickedNodeId = wasDragging
+        ? null
+        : dragCandidate?.id ?? (panMoved ? null : pressedNodeId);
+      const wasEmptyClick =
+        !wasDragging && !dragCandidate && !pressedNodeId && isPanning && !panMoved;
       const didPan = isPanning && panMoved;
 
       if (wasDragging) {
@@ -311,6 +332,7 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       panStart = null;
       panMoved = false;
       dragCandidate = null;
+      pressedNodeId = null;
 
       if (clickedNodeId) {
         const datum = deps.getNodeById().get(clickedNodeId);
@@ -344,7 +366,9 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       draggingNodeId = null;
       dragOrigin = null;
       dropTargetId = null;
+      activeDropTargets = [];
       dragCandidate = null;
+      pressedNodeId = null;
     },
     /** Full reset for worker teardown. */
     reset() {
@@ -354,10 +378,12 @@ export function createOrbitMapInteractions<TNode extends OrbitMapInteractionNode
       panStart = null;
       panMoved = false;
       dragCandidate = null;
+      pressedNodeId = null;
       draggingNodeId = null;
       dragOrigin = null;
       dropTargetId = null;
       hubDropTargets = [];
+      activeDropTargets = [];
       currentHover = null;
       currentCursor = 'default';
     },

@@ -88,7 +88,8 @@ describe("computeOrbitMapClusterLayout", () => {
     const { positions, clusters } = computeOrbitMapClusterLayout(nodes, edges);
 
     const cluster = clusters.get("tag-a")!;
-    expect(cluster.memberCount).toBe(20);
+    // 20 of its own plus the 3 shared bookmarks whose first tag is tag-a.
+    expect(cluster.memberCount).toBe(23);
 
     const anchorPosition = positions.get("tag-a")!;
     for (let i = 0; i < 20; i++) {
@@ -110,31 +111,56 @@ describe("computeOrbitMapClusterLayout", () => {
     expect(centerDistance).toBeGreaterThanOrEqual((a.radius + b.radius) * 0.9);
   });
 
-  it("places multi-anchor bookmarks between their anchors", () => {
+  it("puts bookmarks with several homes in their first tag's disc", () => {
     const { nodes, edges } = buildFixture();
-    const { positions } = computeOrbitMapClusterLayout(nodes, edges);
-
-    const a = positions.get("tag-a")!;
-    const b = positions.get("tag-b")!;
-    const centroid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const { orbits, clusters } = computeOrbitMapClusterLayout(nodes, edges);
+    const a = clusters.get("tag-a")!;
 
     for (let i = 0; i < 3; i++) {
-      const position = positions.get(`shared-${i}`)!;
-      // Centroid + bounded jitter + a few relax passes.
-      expect(dist(position, centroid)).toBeLessThan(120);
+      const orbit = orbits.get(`shared-${i}`)!;
+      expect(orbit.anchorId).toBe("tag-a");
+      expect(orbit.radius).toBeLessThanOrEqual(a.radius);
     }
   });
 
-  it("places loose bookmarks in a band outside the constellation", () => {
-    const { nodes, edges } = buildFixture();
-    const { positions, constellationRadius } = computeOrbitMapClusterLayout(
-      nodes,
-      edges
-    );
+  it("prefers a tag over a collection as a bookmark's home", () => {
+    const nodes: OrbitMapLayoutNodeInput[] = [
+      core(),
+      { id: "col", kind: "collection", radius: 9 },
+      tag("tag-a"),
+      bookmark("both"),
+    ];
+    const edges: OrbitGraphEdge[] = [
+      { kind: "bookmark-collection", bookmarkId: "both", collectionId: "col" },
+      tagEdge("both", "tag-a"),
+    ];
+    const { orbits } = computeOrbitMapClusterLayout(nodes, edges);
+    expect(orbits.get("both")!.anchorId).toBe("tag-a");
+  });
 
+  it("puts loose bookmarks on rings around the core", () => {
+    const { nodes, edges } = buildFixture();
+    const { orbits, clusters } = computeOrbitMapClusterLayout(nodes, edges);
+    const queue = clusters.get("orbit-index")!;
+
+    expect(queue.memberCount).toBe(6);
     for (let i = 0; i < 6; i++) {
-      const position = positions.get(`loose-${i}`)!;
-      expect(dist(position)).toBeGreaterThan(constellationRadius);
+      const orbit = orbits.get(`loose-${i}`)!;
+      expect(orbit.anchorId).toBe("orbit-index");
+      expect(orbit.centerX).toBe(0);
+      expect(orbit.radius).toBeLessThanOrEqual(queue.radius);
+    }
+  });
+
+  it("keeps the queue disc clear of the other discs", () => {
+    const { nodes, edges } = buildFixture();
+    const { clusters } = computeOrbitMapClusterLayout(nodes, edges);
+    const queue = clusters.get("orbit-index")!;
+    for (const id of ["tag-a", "tag-b"]) {
+      const cluster = clusters.get(id)!;
+      expect(dist(cluster, queue)).toBeGreaterThanOrEqual(
+        (cluster.radius + queue.radius) * 0.9
+      );
     }
   });
 
@@ -146,13 +172,24 @@ describe("computeOrbitMapClusterLayout", () => {
     ];
     const { positions, clusters } = computeOrbitMapClusterLayout(nodes, []);
 
-    expect(clusters.size).toBe(0);
+    expect([...clusters.keys()]).toEqual(["orbit-index"]);
     expect(positions.get("orbit-index")).toEqual({ x: 0, y: 0 });
-    expect(dist(positions.get("loose-1")!)).toBeGreaterThan(100);
+    expect(dist(positions.get("loose-1")!)).toBeGreaterThan(13);
     expect(positions.get("loose-1")).not.toEqual(positions.get("loose-2"));
   });
 
-  it("keeps very large loose bands from creating near-overlapping bookmarks", () => {
+  it("puts an overflow marker on its disc's rim", () => {
+    const { nodes, edges } = buildFixture();
+    nodes.push({ id: "tag-a-more", kind: "overflow", radius: 7 });
+    edges.push({ kind: "overflow", overflowId: "tag-a-more", anchorId: "tag-a" });
+    const { positions, clusters, orbits } = computeOrbitMapClusterLayout(nodes, edges);
+    const a = clusters.get("tag-a")!;
+
+    expect(dist(positions.get("tag-a-more")!, a)).toBeGreaterThan(a.radius);
+    expect(orbits.has("tag-a-more")).toBe(false);
+  });
+
+  it("keeps very large loose discs from creating near-overlapping bookmarks", () => {
     const looseCount = 2000;
     const nodes: OrbitMapLayoutNodeInput[] = [core()];
     for (let i = 0; i < looseCount; i++) {
@@ -195,28 +232,28 @@ describe("orbit geometry", () => {
     }
   });
 
-  it("gives loose bookmarks a belt orbit through their relaxed position", () => {
+  it("gives loose bookmarks an orbit through their position", () => {
     const { nodes, edges } = buildFixture();
     const { positions, orbits } = computeOrbitMapClusterLayout(nodes, edges);
 
     for (let i = 0; i < 6; i++) {
       const orbit = orbits.get(`loose-${i}`)!;
-      expect(orbit).toBeDefined();
-      expect(orbit.ringIndex).toBe(-1);
-      expect(orbit.anchorId).toBeNull();
-      expect(orbit.centerX).toBe(0);
+      expect(orbit.ringIndex).toBeGreaterThanOrEqual(0);
       const position = positions.get(`loose-${i}`)!;
       expect(Math.cos(orbit.theta) * orbit.radius).toBeCloseTo(position.x, 6);
       expect(Math.sin(orbit.theta) * orbit.radius).toBeCloseTo(position.y, 6);
     }
   });
 
-  it("gives multi-anchor bookmarks no orbit", () => {
+  it("orders rings by age, newest innermost", () => {
     const { nodes, edges } = buildFixture();
-    const { orbits } = computeOrbitMapClusterLayout(nodes, edges);
-    for (let i = 0; i < 3; i++) {
-      expect(orbits.has(`shared-${i}`)).toBe(false);
-    }
+    const withAge = nodes.map((node) =>
+      node.id.startsWith("a-") ? { ...node, age: Number(node.id.slice(2)) * 10 } : node
+    );
+    const { orbits } = computeOrbitMapClusterLayout(withAge, edges);
+    // a-0 is newest, a-19 oldest; shared-* (no age) sort after aged members.
+    expect(orbits.get("a-0")!.ringIndex).toBe(0);
+    expect(orbits.get("a-19")!.radius).toBeGreaterThan(orbits.get("a-0")!.radius);
   });
 
   it("places recent bookmarks on the innermost shells", () => {

@@ -43,6 +43,19 @@ export function createOrbitMapGlowTexture(): Texture {
 }
 
 /**
+ * Resting glow for a whole disc: an even, faint wash that fades out just past
+ * the outer ring, rather than a bright point at the hub.
+ */
+export function createOrbitMapDiscGlowTexture(): Texture {
+  return createOrbitMapRadialGradientTexture(128, [
+    [0, "rgba(255,255,255,0.7)"],
+    [0.55, "rgba(255,255,255,0.42)"],
+    [0.82, "rgba(255,255,255,0.14)"],
+    [1, "rgba(255,255,255,0)"],
+  ]);
+}
+
+/**
  * Much softer, wider falloff than the glow texture — tinted per cluster and
  * stretched to several cluster radii, it reads as a faint nebula field.
  */

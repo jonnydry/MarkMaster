@@ -80,8 +80,9 @@ Borders, not shadows. Floating surfaces (menus, dialogs, tooltips) use
 `surface-overlay`'s stage shadow.
 
 ## Orbit map chrome
-The map canvas is dark in dark mode and tinted in light mode (`src/lib/orbit-map-palette.ts`).
-Chrome floating over it uses `.map-glass` (`src/styles/orbit.css`): theme-aware, near-opaque
+The map canvas uses the app's own neutral surfaces — `--background` dark, `--surface-2` light,
+never accent-tinted (`src/lib/orbit-map-palette.ts`).
+Chrome floating over it uses `.map-glass` (`src/styles/orbit.css`): theme-aware, opaque
 popover, no blur. `.map-glass-accent` (thin accent top edge) is reserved for the map console.
 The Pixi hub/cluster glows are the app's signature — keep them in the scene, not in CSS.
 

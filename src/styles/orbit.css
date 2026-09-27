@@ -36,10 +36,11 @@
   }
 
   /* Floating chrome over the Orbit map canvas — theme-aware popover shell.
-     Near-opaque and flat: no backdrop blur (the canvas is the only glow). */
+     Opaque and flat: canvas labels must not show through, and no backdrop
+     blur (the canvas is the only glow). */
   .map-glass {
     border: 1px solid var(--hairline-soft);
-    background: color-mix(in srgb, var(--popover) 94%, transparent);
+    background: var(--popover);
   }
   /* The one Orbit-specific highlight: a thin accent top edge on the console. */
   .map-glass-accent {

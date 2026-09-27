@@ -259,6 +259,75 @@ describe("OrbitMapCanvasHost graph + pointer gating", () => {
     expect(postedTypes(worker)).not.toContain(WorkerMessageType.POINTER_MOVE);
   });
 
+  it("turns a second finger into a pinch instead of a jumping pan", async () => {
+    const setPointerCapture = HTMLCanvasElement.prototype.setPointerCapture;
+    const releasePointerCapture = HTMLCanvasElement.prototype.releasePointerCapture;
+    HTMLCanvasElement.prototype.setPointerCapture = vi.fn();
+    HTMLCanvasElement.prototype.releasePointerCapture = vi.fn();
+
+    try {
+      const { container } = render(<OrbitMapCanvasHost />);
+
+      await act(async () => {
+        vi.runOnlyPendingTimers();
+      });
+
+      const worker = WorkerMock.instances[0];
+      const canvas = container.querySelector("canvas")!;
+      worker.postMessage.mockClear();
+
+      const pointer = (type: string, pointerId: number, clientX: number) =>
+        new PointerEvent(type, {
+          bubbles: true,
+          button: 0,
+          buttons: 1,
+          pointerId,
+          clientX,
+          clientY: 100,
+        });
+
+      await act(async () => {
+        canvas.dispatchEvent(pointer("pointerdown", 1, 100));
+        canvas.dispatchEvent(pointer("pointerdown", 2, 200));
+        // Spread doubles (100px → 200px) and the midpoint moves 50px right.
+        canvas.dispatchEvent(pointer("pointermove", 2, 300));
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(postedTypes(worker)).toEqual([
+        WorkerMessageType.POINTER_DOWN,
+        WorkerMessageType.POINTER_LEAVE,
+        WorkerMessageType.PAN,
+        WorkerMessageType.ZOOM,
+      ]);
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: WorkerMessageType.PAN, dx: 50, dy: 0 })
+      );
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: WorkerMessageType.ZOOM,
+          factor: 2,
+          focalX: 200,
+          focalY: 100,
+        })
+      );
+
+      worker.postMessage.mockClear();
+
+      await act(async () => {
+        canvas.dispatchEvent(pointer("pointerup", 1, 100));
+        canvas.dispatchEvent(pointer("pointerup", 2, 300));
+        vi.runOnlyPendingTimers();
+      });
+
+      // Lifting the fingers must not read as a click on the node beneath.
+      expect(postedTypes(worker)).not.toContain(WorkerMessageType.POINTER_UP);
+    } finally {
+      HTMLCanvasElement.prototype.setPointerCapture = setPointerCapture;
+      HTMLCanvasElement.prototype.releasePointerCapture = releasePointerCapture;
+    }
+  });
+
   it("posts SET_LIVING_MAP through the canvas handle", async () => {
     const ref = React.createRef<React.ComponentRef<typeof OrbitMapCanvasHost>>();
     render(<OrbitMapCanvasHost ref={ref} />);

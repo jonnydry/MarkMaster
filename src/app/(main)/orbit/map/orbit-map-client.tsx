@@ -1,7 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useRef } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type SyntheticEvent,
+} from "react";
 import { AppPageShell } from "@/components/app-page-shell";
 import Link from "next/link";
 import { MousePointer2 } from "lucide-react";
@@ -15,6 +22,14 @@ import {
   orbitMapInspectorOverlayMaxClass,
   orbitMapInspectorOverlayZoomClass,
 } from "@/lib/orbit-map-chrome";
+import {
+  getOrbitMapHintDismissed,
+  setOrbitMapHintDismissed,
+} from "@/lib/orbit-map-hint";
+import {
+  getOrbitMapReplayDays,
+  getOrbitMapReplayMonths,
+} from "@/lib/orbit-map-replay";
 import { cn } from "@/lib/utils";
 import { useAppChrome } from "@/components/app-frame";
 import { MobileSidebar } from "@/components/mobile-sidebar";
@@ -30,6 +45,7 @@ import {
 import { OrbitMapRail } from "@/components/orbit/orbit-map-rail";
 import { OrbitMapStatsStrip } from "@/components/orbit/orbit-map-stats-strip";
 import { OrbitMapChartingPlaceholder } from "@/components/orbit/orbit-map-charting-placeholder";
+import { OrbitMapReplayBar } from "@/components/orbit/orbit-map-replay-bar";
 
 const loadOrbitMapCanvas = () =>
   import("@/components/orbit/orbit-map-canvas-host").then((m) => m.default);
@@ -41,6 +57,8 @@ const OrbitMapCanvas = dynamic(loadOrbitMapCanvas, {
   ssr: false,
   loading: () => <OrbitMapChartingPlaceholder />,
 });
+
+const subscribeNoop = () => () => {};
 
 const AddTagDialog = dynamic(
   () => import("@/components/add-tag-dialog").then((m) => m.AddTagDialog),
@@ -96,7 +114,6 @@ export default function OrbitMapPage() {
     isFetching,
     graphIsEmpty,
     stats,
-    truncatedCount,
     search,
     setSearch,
     searchDeferred,
@@ -109,6 +126,7 @@ export default function OrbitMapPage() {
     canvasRef,
     copyingCollectionId,
     selectedBookmarkId,
+    armedBookmark,
     focusedBookmark,
     focusedBookmarkLoading,
     actions,
@@ -137,6 +155,7 @@ export default function OrbitMapPage() {
     handleClearSelection,
     handleSearchResultSelect,
     handleSelectConnectedNode,
+    handleSelectHub,
     graphIndexes,
     connectionIndex,
     livingEnabled,
@@ -148,6 +167,7 @@ export default function OrbitMapPage() {
     data: graph!,
     selection,
     selectedBookmarkId,
+    armedBookmark,
     focusedBookmark,
     focusedBookmarkLoading,
     onAssign: handleAssign,
@@ -157,6 +177,7 @@ export default function OrbitMapPage() {
     onOpenBookmark: handleOpenBookmark,
     onClearSelection: handleClearSelection,
     onSelectNode: handleSelectConnectedNode,
+    onSelectHub: handleSelectHub,
     nodeById: graphIndexes?.nodesById,
     connectionIndex,
     copyingCollectionId,
@@ -166,6 +187,30 @@ export default function OrbitMapPage() {
   // the right (desktop) or as a bottom sheet (mobile), the zoom cluster shifts
   // clear of it.
   const inspectorOpen = Boolean(graph && selection);
+  // The how-to hint shows until the first click, pan, or zoom on the canvas,
+  // then stays gone. Server snapshot is "dismissed" so returning users never
+  // see it flash in.
+  const hintDismissedStored = useSyncExternalStore(
+    subscribeNoop,
+    getOrbitMapHintDismissed,
+    () => true
+  );
+  const [hintDismissedNow, setHintDismissedNow] = useState(false);
+  const showHint = !hintDismissedStored && !hintDismissedNow;
+  const handleStageInteract = useCallback((event: SyntheticEvent) => {
+    if (!(event.target instanceof HTMLCanvasElement)) return;
+    setHintDismissedNow(true);
+    setOrbitMapHintDismissed();
+  }, []);
+
+  // Replay: the library filling in month by month (Motion menu).
+  const replayDays = useMemo(() => getOrbitMapReplayDays(graph), [graph]);
+  const [replayOpen, setReplayOpen] = useState(false);
+  const handleReplayCutoff = useCallback(
+    (cutoffDays: number | null) => canvasRef.current?.setReplay(cutoffDays),
+    [canvasRef]
+  );
+
   const hoverHandlerRef = useRef<OrbitMapHoverHandler | null>(null);
   const handleHoverChange = useCallback<OrbitMapHoverHandler>(
     (next, position) => {
@@ -178,7 +223,11 @@ export default function OrbitMapPage() {
     <>
     <AppPageShell embedded layout="column">
         <h1 className="sr-only">Orbit map</h1>
-        <div className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background">
+        <div
+          className="orbit-map-stage relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+          onPointerDownCapture={showHint ? handleStageInteract : undefined}
+          onWheelCapture={showHint ? handleStageInteract : undefined}
+        >
           {isLoading ? (
             <OrbitMapChartingPlaceholder />
           ) : isError ? (
@@ -232,7 +281,6 @@ export default function OrbitMapPage() {
               onFilterChange={handleFilterChange}
               hideLooseFilter={graphScope === "orbit"}
               className="h-full w-full"
-              filterControlsClassName="left-3 top-[4.25rem] sm:left-4 sm:top-[4.5rem]"
               zoomControlsClassName={cn(
                 "z-20",
                 inspectorOpen
@@ -262,6 +310,9 @@ export default function OrbitMapPage() {
             graphScope={graphScope}
             isLoading={isLoading}
             onScopeChange={handleScopeChange}
+            activeFilter={graphFilter}
+            onFilterChange={handleFilterChange}
+            hideLooseFilter={graphScope === "orbit"}
             isFetching={isFetching}
             hasGraph={Boolean(graph)}
             search={search}
@@ -272,25 +323,40 @@ export default function OrbitMapPage() {
             keyboardShortcutsOpen={keyboardShortcutsOpen}
             onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
             shortcutGroups={ORBIT_MAP_SHORTCUT_GROUPS}
-            toolsShifted={inspectorOpen}
             livingEnabled={livingEnabled}
             onLivingEnabledChange={handleLivingEnabledChange}
+            replayMonths={replayDays ? getOrbitMapReplayMonths(replayDays) : null}
+            onReplay={() => setReplayOpen(true)}
           />
+
+          {replayOpen && replayDays && graph ? (
+            <OrbitMapReplayBar
+              maxDays={replayDays}
+              onCutoffChange={handleReplayCutoff}
+              onClose={() => setReplayOpen(false)}
+            />
+          ) : null}
 
           <OrbitMapHoverOwner graph={graph} handlerRef={hoverHandlerRef} />
 
-          {stats && !inspectorOpen ? (
-            <OrbitMapStatsStrip stats={stats} truncatedCount={truncatedCount} />
+          {stats ? (
+            <OrbitMapStatsStrip
+              stats={stats}
+              // The phone inspector is a bottom sheet over this corner.
+              className={inspectorOpen ? "hidden lg:flex" : undefined}
+            />
           ) : null}
 
-          {graph && !selection ? (
-            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 items-center gap-2 overflow-hidden rounded-sm px-3 py-2 text-xs font-medium text-muted-foreground sm:flex">
-              <MousePointer2 className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-              <span className="whitespace-nowrap">Click to inspect</span>
-              <span className="text-muted-foreground/50" aria-hidden="true">·</span>
-              <span className="whitespace-nowrap">Scroll to zoom</span>
-              <span className="hidden text-muted-foreground/50 md:inline" aria-hidden="true">·</span>
-              <span className="hidden whitespace-nowrap md:inline">Drag to pan</span>
+          {/* Wide screens only: narrower stages would collide with the
+              stats strip, and touch users don't scroll to zoom. */}
+          {graph && !selection && showHint && !replayOpen ? (
+            <div className="map-glass pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-sm px-3 py-2 text-xs font-medium whitespace-nowrap text-muted-foreground xl:flex">
+              <MousePointer2 className="size-3.5 shrink-0" aria-hidden="true" />
+              <span>Click to inspect</span>
+              <span aria-hidden="true">·</span>
+              <span>Scroll to zoom</span>
+              <span aria-hidden="true">·</span>
+              <span>Drag to pan</span>
             </div>
           ) : null}
 

@@ -44,7 +44,6 @@ interface OrbitMapCanvasHostProps {
     anchorKind: 'tag' | 'collection'
   ) => void;
   className?: string;
-  filterControlsClassName?: string;
   zoomControlsClassName?: string;
   /** Hide the Loose filter when the fetched graph is already the queue. */
   hideLooseFilter?: boolean;
@@ -59,6 +58,8 @@ export interface OrbitMapCanvasHandle {
   playScanSweep: (nodeIds?: string[]) => void;
   /** Toggle living-map orbital motion after the worker is ready. */
   setLivingMap: (enabled: boolean) => void;
+  /** Replay: show bookmarks saved at least `cutoffDays` ago; null ends it. */
+  setReplay: (cutoffDays: number | null) => void;
 }
 
 // Re-export shared types so pages can import them from this component (for backward compatibility)
@@ -115,6 +116,36 @@ function OrbitMapMinimapBound({
   return <OrbitMapMinimap {...props} camera={camera} />;
 }
 
+/**
+ * URL of the page's Geist webfont (the basic-Latin subset), read from the
+ * @font-face rules next/font injects. The worker can't see document fonts, so
+ * it loads this itself to draw labels in the app's typeface.
+ */
+function resolveOrbitMapLabelFontUrl(): string | undefined {
+  try {
+    for (const sheet of Array.from(document.styleSheets)) {
+      let rules: CSSRuleList;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue; // cross-origin sheet
+      }
+      for (const rule of Array.from(rules)) {
+        if (!(rule instanceof CSSFontFaceRule)) continue;
+        const family = rule.style.getPropertyValue("font-family").replace(/["']/g, "").trim();
+        if (family !== "Geist") continue;
+        const range = rule.style.getPropertyValue("unicode-range");
+        if (range && !range.includes("U+0000-00FF") && !range.includes("U+0-FF")) continue;
+        const match = rule.style.getPropertyValue("src").match(/url\(["']?([^"')]+)["']?\)/);
+        if (match) return new URL(match[1], sheet.href ?? window.location.href).href;
+      }
+    }
+  } catch {
+    // Fall back to the worker's system UI font.
+  }
+  return undefined;
+}
+
 function isCanvasTransferReuseError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -157,7 +188,6 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
     const [fallbackRequested, setUseFallback] = useState(false);
     const useFallback = fallbackRequested || !workerSupported;
     const [workerGeneration, setWorkerGeneration] = useState(0);
-    const [internalFilter, setInternalFilter] = useState<GraphFilter>(filter ?? 'all');
     // Camera stays off React state so CAMERA_CHANGED (~15 Hz while panning)
     // only redraws the minimap. Keyboard pan/jump read the store snapshot.
     const [cameraStore] = useState(createOrbitMapCameraStore);
@@ -176,7 +206,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       });
     }, []);
     const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(null);
-    const requestedFilter = filter ?? internalFilter;
+    const requestedFilter = filter ?? 'all';
     const activeFilter =
       props.hideLooseFilter && requestedFilter === "loose" ? "all" : requestedFilter;
 
@@ -230,6 +260,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
             backgroundHex,
             colorTheme: colorThemeRef.current,
             livingMap: getOrbitMapLivingEnabled(),
+            labelFontUrl: resolveOrbitMapLabelFontUrl(),
           };
 
           worker.postMessage(initMessage, [offscreen]);
@@ -560,7 +591,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       return { x: clientX - rect.left, y: clientY - rect.top };
     };
 
-    // Pointer, wheel, and touch → worker (hit-test + pan + zoom)
+    // Pointer, wheel, and pinch → worker (hit-test + pan + zoom)
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas || useFallback || !workerRef.current) return;
@@ -576,10 +607,29 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         | null = null;
       let wheelFrame: number | null = null;
 
+      // Every pressed pointer. A second finger turns the gesture into a pinch
+      // instead of feeding both fingers into one pan (which jumped between
+      // them); it stays a pinch until every finger has lifted.
+      const activePointers = new Map<number, { x: number; y: number }>();
+      let multiTouch = false;
+      let pinch: { dist: number; midX: number; midY: number } | null = null;
+      let pendingPinch:
+        | { factor: number; dx: number; dy: number; focalX: number; focalY: number }
+        | null = null;
+      let pinchFrame: number | null = null;
+
       const flushPointerMove = () => {
         pointerMoveFrame = null;
         if (!pendingPointerMove) return;
         send(pendingPointerMove);
+        pendingPointerMove = null;
+      };
+
+      const cancelPendingPointerMove = () => {
+        if (pointerMoveFrame !== null) {
+          window.cancelAnimationFrame(pointerMoveFrame);
+          pointerMoveFrame = null;
+        }
         pendingPointerMove = null;
       };
 
@@ -597,8 +647,64 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         pendingWheel = null;
       };
 
+      // Pan by the midpoint's travel, then zoom about the new midpoint, so
+      // the content under the fingers stays under the fingers.
+      const flushPinch = () => {
+        pinchFrame = null;
+        if (!pendingPinch) return;
+        const { factor, dx, dy, focalX, focalY } = pendingPinch;
+        pendingPinch = null;
+        if (dx !== 0 || dy !== 0) {
+          send({ type: WorkerMessageType.PAN, protocolVersion: 1, dx, dy });
+        }
+        if (factor !== 1) {
+          send({
+            type: WorkerMessageType.ZOOM,
+            protocolVersion: 1,
+            factor,
+            focalX,
+            focalY,
+          });
+        }
+      };
+
+      const measurePinch = () => {
+        const [a, b] = activePointers.values();
+        if (!a || !b) return null;
+        return {
+          dist: Math.hypot(a.x - b.x, a.y - b.y),
+          midX: (a.x + b.x) / 2,
+          midY: (a.y + b.y) / 2,
+        };
+      };
+
+      const updatePinch = () => {
+        const next = measurePinch();
+        if (!next) return;
+        const previous = pinch;
+        pinch = next;
+        if (!previous || previous.dist < 1 || next.dist < 1) return;
+        pendingPinch = {
+          factor: (pendingPinch?.factor ?? 1) * (next.dist / previous.dist),
+          dx: (pendingPinch?.dx ?? 0) + next.midX - previous.midX,
+          dy: (pendingPinch?.dy ?? 0) + next.midY - previous.midY,
+          focalX: next.midX,
+          focalY: next.midY,
+        };
+        if (pinchFrame === null) {
+          pinchFrame = window.requestAnimationFrame(flushPinch);
+        }
+      };
+
       const queuePointerMove = (e: PointerEvent) => {
         const { x, y } = canvasPoint(e.clientX, e.clientY);
+        if (activePointers.has(e.pointerId)) {
+          activePointers.set(e.pointerId, { x, y });
+        }
+        if (multiTouch) {
+          if (activePointers.size >= 2) updatePinch();
+          return;
+        }
         pendingPointerMove = {
           type: WorkerMessageType.POINTER_MOVE,
           protocolVersion: 1,
@@ -630,6 +736,22 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       let windowGestureListenersAttached = false;
 
       const handlePointerUp = (e: PointerEvent) => {
+        if (!activePointers.delete(e.pointerId)) return;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          /* capture may already be released */
+        }
+        if (multiTouch) {
+          // Lifting a finger ends the pinch without reading as a click on
+          // whatever sits under it; any fingers left re-baseline on move.
+          pinch = null;
+          if (activePointers.size === 0) {
+            multiTouch = false;
+            detachWindowGestureListeners();
+          }
+          return;
+        }
         const { x, y } = canvasPoint(e.clientX, e.clientY);
         send({
           type: WorkerMessageType.POINTER_UP,
@@ -638,16 +760,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           y,
           button: e.button,
         });
-        try {
-          canvas.releasePointerCapture(e.pointerId);
-        } catch {
-          /* capture may already be released */
-        }
-        if (!windowGestureListenersAttached) return;
-        window.removeEventListener('pointermove', handleWindowPointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        window.removeEventListener('pointercancel', handlePointerUp);
-        windowGestureListenersAttached = false;
+        if (activePointers.size === 0) detachWindowGestureListeners();
       };
 
       const attachWindowGestureListeners = () => {
@@ -669,32 +782,38 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       const handlePointerDown = (e: PointerEvent) => {
         if (e.button !== 0) return;
         e.preventDefault();
-        if (pointerMoveFrame !== null) {
-          window.cancelAnimationFrame(pointerMoveFrame);
-          pointerMoveFrame = null;
-          pendingPointerMove = null;
-        }
-        const { x, y } = canvasPoint(e.clientX, e.clientY);
+        const point = canvasPoint(e.clientX, e.clientY);
         canvas.setPointerCapture(e.pointerId);
+        activePointers.set(e.pointerId, point);
+        attachWindowGestureListeners();
+
+        if (activePointers.size > 1) {
+          if (!multiTouch) {
+            // Cancel the one-finger pan/drag already under way: the worker
+            // treats LEAVE as "cancel gesture" and glides a dragged node back.
+            multiTouch = true;
+            cancelPendingPointerMove();
+            send({ type: WorkerMessageType.POINTER_LEAVE, protocolVersion: 1 });
+          }
+          pinch = measurePinch();
+          return;
+        }
+
+        cancelPendingPointerMove();
         send({
           type: WorkerMessageType.POINTER_DOWN,
           protocolVersion: 1,
-          x,
-          y,
+          x: point.x,
+          y: point.y,
           button: e.button,
         });
-        attachWindowGestureListeners();
       };
 
       const handlePointerLeave = () => {
         // Capture does not suppress pointerleave. During an active drag the
         // worker treats LEAVE as "cancel gesture" — skip it until pointerup.
         if (windowGestureListenersAttached) return;
-        if (pointerMoveFrame !== null) {
-          window.cancelAnimationFrame(pointerMoveFrame);
-          pointerMoveFrame = null;
-          pendingPointerMove = null;
-        }
+        cancelPendingPointerMove();
         send({
           type: WorkerMessageType.POINTER_LEAVE,
           protocolVersion: 1,
@@ -725,40 +844,10 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         });
       };
 
-      // Single-finger gestures are handled by the pointer events above (the
-      // browser fires pointer events for touches); only pinch-zoom needs the
-      // raw touch stream. Panning here too would double-apply the gesture.
-      let lastTouchDist = 0;
-
-      const handleTouchStart = (e: TouchEvent) => {
-        if (e.touches.length === 2) {
-          const dx = e.touches[0].clientX - e.touches[1].clientX;
-          const dy = e.touches[0].clientY - e.touches[1].clientY;
-          lastTouchDist = Math.hypot(dx, dy);
-        }
-      };
-
-      const handleTouchMove = (e: TouchEvent) => {
+      // Pinch runs on pointer events; this only keeps touch browsers that
+      // under-honor `touch-action: none` from scrolling or page-zooming.
+      const preventTouchDefault = (e: TouchEvent) => {
         e.preventDefault();
-        if (e.touches.length === 2) {
-          const dx = e.touches[0].clientX - e.touches[1].clientX;
-          const dy = e.touches[0].clientY - e.touches[1].clientY;
-          const dist = Math.hypot(dx, dy);
-          const rect = canvas.getBoundingClientRect();
-          const cx =
-            (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-          const cy =
-            (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
-          const factor = dist > lastTouchDist ? 1.06 : 0.94;
-          lastTouchDist = dist;
-          send({
-            type: WorkerMessageType.ZOOM,
-            protocolVersion: 1,
-            factor,
-            focalX: cx,
-            focalY: cy,
-          });
-        }
       };
 
       canvas.addEventListener('pointerdown', handlePointerDown);
@@ -766,8 +855,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       canvas.addEventListener('pointerleave', handlePointerLeave);
       canvas.addEventListener('wheel', handleWheel, { passive: false });
       canvas.addEventListener('dblclick', handleDoubleClick);
-      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchmove', preventTouchDefault, { passive: false });
 
       return () => {
         if (pointerMoveFrame !== null) {
@@ -776,26 +864,18 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         if (wheelFrame !== null) {
           window.cancelAnimationFrame(wheelFrame);
         }
+        if (pinchFrame !== null) {
+          window.cancelAnimationFrame(pinchFrame);
+        }
         detachWindowGestureListeners();
         canvas.removeEventListener('pointerdown', handlePointerDown);
         canvas.removeEventListener('pointermove', handleCanvasPointerMove);
         canvas.removeEventListener('pointerleave', handlePointerLeave);
         canvas.removeEventListener('wheel', handleWheel);
         canvas.removeEventListener('dblclick', handleDoubleClick);
-        canvas.removeEventListener('touchstart', handleTouchStart);
-        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchmove', preventTouchDefault);
       };
     }, [useFallback, workerGeneration]);
-
-    const handleFilterChange = (next: GraphFilter) => {
-      if (filter === undefined) setInternalFilter(next);
-      props.onFilterChange?.(next);
-      postToWorker({
-        type: WorkerMessageType.SET_FILTER,
-        protocolVersion: 1,
-        filter: next,
-      });
-    };
 
     const handleZoomIn = () => {
       const canvas = canvasRef.current;
@@ -910,7 +990,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       return input as OrbitMapSelection;
     };
 
-    // Expose imperative handle (will forward to worker in later phases)
+    // Imperative handle: camera, assign, sweep, and living-map commands.
     useImperativeHandle(ref, () => ({
       focusOn: (input: string | { kind: string; id: string } | OrbitMapSelection) => {
         if (workerRef.current) {
@@ -946,6 +1026,13 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           enabled,
         });
       },
+      setReplay: (cutoffDays: number | null) => {
+        workerRef.current?.postMessage({
+          type: WorkerMessageType.SET_REPLAY,
+          protocolVersion: 1,
+          cutoffDays,
+        });
+      },
       animateAssign: async (bookmarkId: string, anchorId: string) => {
         if (!workerRef.current) {
           return Promise.resolve();
@@ -960,7 +1047,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           const handleMessage = (event: MessageEvent) => {
             const msg = event.data;
             if (
-              msg.type === 'ANIMATE_ASSIGN_COMPLETE' &&
+              msg.type === MainMessageType.ANIMATE_ASSIGN_COMPLETE &&
               msg.bookmarkId === bookmarkId
             ) {
               cleanup();
@@ -997,7 +1084,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
         ref={stageFocusRef}
         className={`${props.className ?? ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-inset`}
         role="application"
-        aria-label="Orbit graph map — use arrow keys to pan, plus and minus to zoom, 0 to reset, Escape to clear selection"
+        aria-label="Orbit graph map — use arrow keys to pan, plus and minus to zoom, 0 to fit the whole map, Escape to clear selection"
         tabIndex={0}
         onKeyDown={handleCanvasKeyDown}
         style={{ position: 'relative', width: '100%', height: '100%', touchAction: 'none' }}
@@ -1013,13 +1100,9 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           }}
         />
         <OrbitMapCanvasControls
-          activeFilter={activeFilter}
-          onFilterChange={handleFilterChange}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
-          onResetView={handleResetView}
-          hideLooseFilter={props.hideLooseFilter}
-          filterControlsClassName={props.filterControlsClassName}
+          onFitView={handleResetView}
           zoomControlsClassName={props.zoomControlsClassName}
         />
         {graph && layoutVersion > 0 ? (
