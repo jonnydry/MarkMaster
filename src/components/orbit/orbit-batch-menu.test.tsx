@@ -13,13 +13,6 @@ function renderMenu(library: Partial<OrbitLibraryTagOption> = {}) {
   const onStart = vi.fn();
   render(
     <OrbitBatchMenu
-      batchMode="auto"
-      resolvedBatchProfile="balanced"
-      deepUnlocked
-      deepLockedReason=""
-      sweepUnlocked
-      sweepLockedReason=""
-      onBatchModeChange={vi.fn()}
       library={{
         untaggedCount: 3412,
         available: true,
@@ -35,19 +28,20 @@ function renderMenu(library: Partial<OrbitLibraryTagOption> = {}) {
 }
 
 async function openMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /scan batch size/i }));
+  await user.click(screen.getByRole("button", { name: "Scan mode" }));
 }
 
 describe("OrbitBatchMenu", () => {
-  it("offers review batches and whole-queue auto-tag side by side", async () => {
+  it("labels the control Mode and offers the two real tagging behaviors", async () => {
     const { user } = renderMenu();
+    expect(screen.getByRole("button", { name: "Scan mode" })).toHaveTextContent("Mode");
     await openMenu(user);
 
-    expect(screen.getByText("Review a batch")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sweep/ })).toBeInTheDocument();
-    expect(screen.getByText("Tag everything")).toBeInTheDocument();
+    expect(screen.getByText("Review batch")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sweep/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Quick")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Auto-tag all 3,412/ })
+      screen.getByRole("button", { name: /Auto-tag 3,412/ })
     ).toBeEnabled();
   });
 
@@ -55,7 +49,7 @@ describe("OrbitBatchMenu", () => {
     const { user, onStart } = renderMenu();
     await openMenu(user);
 
-    await user.click(screen.getByRole("button", { name: /Auto-tag all 3,412/ }));
+    await user.click(screen.getByRole("button", { name: /Auto-tag 3,412/ }));
     expect(onStart).not.toHaveBeenCalled();
     expect(
       screen.getByText(/Auto-tag 3,412 untagged bookmarks\?/)
@@ -64,7 +58,7 @@ describe("OrbitBatchMenu", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onStart).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: /Auto-tag all 3,412/ }));
+    await user.click(screen.getByRole("button", { name: /Auto-tag 3,412/ }));
     await user.click(screen.getByRole("button", { name: /Start auto-tag/ }));
     expect(onStart).toHaveBeenCalledOnce();
   });

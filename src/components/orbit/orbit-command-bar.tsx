@@ -9,19 +9,12 @@ import {
   MoreHorizontal,
   PanelTopClose,
   PanelTopOpen,
-  RefreshCw,
 } from "lucide-react";
 
-import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { OrbitPageIdentity } from "@/components/orbit/orbit-page-identity";
 import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
-import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/search-bar";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
-import {
-  OrbitBatchMenu,
-  type OrbitLibraryTagOption,
-} from "@/components/orbit/orbit-batch-menu";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { ToolbarIconButton, ToolbarSegmentControl } from "@/components/toolbar/toolbar-primitives";
 import {
@@ -34,15 +27,10 @@ import {
 } from "@/components/feed-toolbar-layout";
 import {
   appContentGutterClassName,
-  appToolbarControlHeightClassName,
   appToolbarSurfaceClassName,
   appToolbarSurfaceGroupClassName,
 } from "@/lib/app-chrome";
 import { orbitDataClass } from "@/lib/orbit-route-chrome";
-import {
-  type OrbitScanBatchMode,
-  type OrbitScanBatchProfileId,
-} from "@/lib/orbit-config";
 import {
   ORBIT_RECENT_PAGE_SIZE,
   type OrbitSortDirection,
@@ -87,27 +75,12 @@ export interface OrbitCommandBarProps {
   triagedCount: number;
   passTotal: number;
 
-  // Action / scan
-  scanButtonLabel: string;
+  // Scan status stays in the header; the launch control lives in the feed.
   scanHelperText: string;
-  queueIsLoading: boolean;
   scanning: boolean;
-  scanTargetCount: number;
-  hasScanPlan: boolean;
-  batchMode: OrbitScanBatchMode;
-  resolvedBatchProfile: OrbitScanBatchProfileId;
-  deepUnlocked: boolean;
-  deepLockedReason: string;
-  sweepUnlocked: boolean;
-  sweepLockedReason: string;
   mapHref: string;
-  onBatchModeChange: (mode: OrbitScanBatchMode) => void;
-  onScan: () => void;
-  /** Whole-queue auto-tag, offered in the batch menu. */
-  libraryTag?: OrbitLibraryTagOption;
-  /** Auto-tag is working the queue; scans wait so they don't race it. */
+  /** Auto-tag is working the queue; the header shows its progress. */
   libraryTagLive: boolean;
-  scanError?: ReactNode;
 
   // Utility
   search: string;
@@ -137,24 +110,10 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       onToggleSelectionMode,
       triagedCount,
       passTotal,
-      scanButtonLabel,
       scanHelperText,
-      queueIsLoading,
       scanning,
-      scanTargetCount,
-      hasScanPlan,
-      batchMode,
-      resolvedBatchProfile,
-      deepUnlocked,
-      deepLockedReason,
-      sweepUnlocked,
-      sweepLockedReason,
       mapHref,
-      onBatchModeChange,
-      onScan,
-      libraryTag,
       libraryTagLive,
-      scanError,
       search,
       onSearchChange,
       visibleStatusLabel,
@@ -165,8 +124,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
     },
     searchRef
   ) {
-    const scanBusy = queueIsLoading || scanning;
-    const scanDisabled = scanBusy || libraryTagLive || scanTargetCount === 0;
     const { compact, toggleCompact } = usePageHeaderCompact();
     const recentCount = Math.min(total, ORBIT_RECENT_PAGE_SIZE);
 
@@ -234,49 +191,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
 
     const toolbarActions = canSelect ? (
       <>
-        <div className="flex items-center gap-1.5">
-          {hasScanPlan ? (
-            <ToolbarIconButton
-              label={scanButtonLabel}
-              icon={RefreshCw}
-              disabled={scanDisabled}
-              onClick={onScan}
-              size={compact ? "compact" : "default"}
-              className={appToolbarSurfaceClassName}
-            />
-          ) : (
-            <Button
-              size="sm"
-              className={cn(
-                "gap-1.5 px-2.5 text-xs",
-                appToolbarControlHeightClassName(compact)
-              )}
-              disabled={scanDisabled}
-              onClick={onScan}
-            >
-              {scanBusy ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <OrbitLogoMark className="size-3.5" />
-              )}
-              <span className={cn(scanBusy ? "inline" : "hidden sm:inline")}>
-                {scanButtonLabel}
-              </span>
-              <span className={cn("sm:hidden", scanBusy && "hidden")}>Scan</span>
-            </Button>
-          )}
-          <OrbitBatchMenu
-            batchMode={batchMode}
-            resolvedBatchProfile={resolvedBatchProfile}
-            deepUnlocked={deepUnlocked}
-            deepLockedReason={deepLockedReason}
-            sweepUnlocked={sweepUnlocked}
-            sweepLockedReason={sweepLockedReason}
-            disabled={scanBusy}
-            onBatchModeChange={onBatchModeChange}
-            library={libraryTag}
-          />
-        </div>
         <OrbitModeSwitch
           active="queue"
           size={compact ? "sm" : "md"}
@@ -338,18 +252,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
       <ScrollingProgressBar className="absolute inset-x-0 top-0" />
     ) : null;
 
-    const scanErrorBlock = scanError ? (
-      <div
-        className={cn(
-          "mt-2 rounded-sm border border-hairline-soft p-3",
-          compact && "mx-4 sm:mx-5",
-          appToolbarSurfaceClassName
-        )}
-      >
-        {scanError}
-      </div>
-    ) : null;
-
     const statusRow =
       canSelect && !compact ? (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-0.5 text-xs text-muted-foreground">
@@ -382,11 +284,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
               <FeedToolbarRow
                 leading={
                   <>
-                {mobileSidebar ? (
-                  <div className="shrink-0 md:hidden">
-                    {withCompactToolbarSidebar(mobileSidebar, compact)}
-                  </div>
-                ) : null}
+                    {mobileSidebar ? (
+                      <div className="shrink-0 md:hidden">
+                        {withCompactToolbarSidebar(mobileSidebar, compact)}
+                      </div>
+                    ) : null}
                     <OrbitPageIdentity
                       queueTotal={total}
                       className="[&_p:first-child]:text-sm [&_p:first-child]:leading-5 [&_p:last-child]:hidden"
@@ -413,7 +315,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
             </p>
           ) : null}
           <CompactFloatingSearchBubble>{searchField}</CompactFloatingSearchBubble>
-          {scanErrorBlock}
         </>
       );
     }
@@ -430,11 +331,11 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
         <FeedToolbarSearchRow
           leading={
             <>
-                {mobileSidebar ? (
-                  <div className="shrink-0 md:hidden">
-                    {withCompactToolbarSidebar(mobileSidebar, compact)}
-                  </div>
-                ) : null}
+              {mobileSidebar ? (
+                <div className="shrink-0 md:hidden">
+                  {withCompactToolbarSidebar(mobileSidebar, compact)}
+                </div>
+              ) : null}
               <OrbitPageIdentity queueTotal={total} />
             </>
           }
@@ -449,7 +350,6 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           />
         ) : null}
         {statusRow}
-        {scanErrorBlock}
       </div>
     );
   }
