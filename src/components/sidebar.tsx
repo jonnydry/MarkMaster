@@ -143,9 +143,11 @@ export function Sidebar({
   }, [router]);
   const { expanded: ctxExpanded, toggle: ctxToggle } = useSidebar();
   const [localExpanded, setLocalExpanded] = useState(false);
-  useEffect(() => {
+  const [expandedPath, setExpandedPath] = useState(pathname);
+  if (pathname !== expandedPath) {
+    setExpandedPath(pathname);
     if (pathname === "/orbit/map") setLocalExpanded(false);
-  }, [pathname]);
+  }
   const expanded = forceExpanded
     ? true
     : preferCollapsed

@@ -44,6 +44,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
       "server-only": path.resolve(__dirname, "src/test/server-only.ts"),
       "next/font/google": path.resolve(__dirname, "src/test/next-font-google.mock.ts"),
+      "next/font/local": path.resolve(__dirname, "src/test/next-font-local.mock.ts"),
     },
   },
 });

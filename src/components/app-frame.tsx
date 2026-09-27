@@ -121,14 +121,15 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [previewRoute, setPreviewRoute] = useState<string | null>(null);
+  // Drop the optimistic route once the URL catches up, during render, so a
+  // later navigation does not replay a stale preview.
+  if (previewRoute !== null && previewRoute === pathname) {
+    setPreviewRoute(null);
+  }
   const shownPath = previewRoute ?? pathname;
   noteVisiblePath(shownPath);
   useEffect(() => {
     if (!previewRoute) return;
-    if (previewRoute === pathname) {
-      setPreviewRoute(null);
-      return;
-    }
     const timer = window.setTimeout(() => setPreviewRoute(null), 2000);
     return () => window.clearTimeout(timer);
   }, [pathname, previewRoute]);
