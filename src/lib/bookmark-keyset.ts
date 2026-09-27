@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 
-export const BOOKMARK_SORT_FIELDS = [
+const BOOKMARK_SORT_FIELDS = [
   "bookmarkedAt",
   "tweetCreatedAt",
   "authorUsername",

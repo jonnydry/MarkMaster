@@ -13,6 +13,7 @@ import {
 import {
   ORBIT_JEV_ASSIGN_CONCURRENCY,
   ORBIT_JEV_COLLECTION_CONFIDENCE_THRESHOLD,
+  ORBIT_JEV_MAX_COLLECTION_SHORTLIST,
   ORBIT_JEV_MAX_TAG_SHORTLIST,
   ORBIT_MAX_TAGS_PER_BOOKMARK,
   ORBIT_JEV_NEEDS_NEW_LABEL_THRESHOLD,
@@ -107,13 +108,23 @@ export type OrbitJevAssignment = {
   abstain: boolean;
 };
 
+/**
+ * Word-set overlap only. Substring matches ("AI" in "available", "Art" in
+ * "start") must not promote a tag onto the shortlist.
+ */
 function lexicalOverlap(name: string, haystack: string) {
   const key = normalizeKey(name);
   if (!key) return 0;
-  if (haystack.includes(key)) return 4;
-  return key
-    .split(/\s+/)
-    .filter((word) => word.length > 2 && haystack.includes(word)).length;
+  const words = new Set(
+    haystack
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean)
+  );
+  const tokens = key.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return 0;
+  if (tokens.every((token) => words.has(token))) return 4;
+  return tokens.filter((token) => token.length > 2 && words.has(token)).length;
 }
 
 function usableTagName(name: string) {
@@ -158,14 +169,77 @@ function bucketShortlistEntries(args: {
       key,
       overlap: lexicalOverlap(name, args.haystack),
     };
-    if (!raw.existing) proposed.push(entry);
-    else if (args.preferredKeys.has(key)) matched.push(entry);
+    if (args.preferredKeys.has(key)) matched.push(entry);
+    else if (!raw.existing) proposed.push(entry);
     else if (entry.overlap > 0) lexicalRest.push(entry);
     else otherRest.push(entry);
   }
 
+  // Names Grok just proposed are preferred and new. Rank them ahead of
+  // existing tags so a full shortlist of old names cannot drop them.
+  matched.sort((left, right) => Number(left.item.existing) - Number(right.item.existing));
   lexicalRest.sort((left, right) => right.overlap - left.overlap);
   return { matched, proposed, lexicalRest, otherRest };
+}
+
+/**
+ * Text used to decide which tag names are worth asking about.
+ * Author bio is omitted: it describes the person, not this post, and would
+ * pull the same tags onto every bookmark from that account.
+ */
+function jevSignalHaystack(payload: ReturnType<typeof buildBookmarkPayload>) {
+  const { signals } = payload;
+  return [
+    signals.primaryText,
+    payload.tweetText,
+    payload.note,
+    signals.articleContext?.title,
+    signals.articleContext?.previewText,
+    ...signals.linkContext.flatMap((link) => [link.title, link.description, link.domain]),
+    ...signals.visualContext.altTexts,
+    ...signals.xTopics.flatMap((topic) => [topic.entity, topic.description]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+/**
+ * The judgment state for one bookmark. Same textual signals Grok receives:
+ * article, link cards, image alt text, and author bio. Jev only reads text.
+ */
+function jevJudgmentState(payload: ReturnType<typeof buildBookmarkPayload>) {
+  const { signals } = payload;
+  return {
+    bookmark: {
+      id: payload.id,
+      author: payload.author,
+      text: payload.tweetText,
+      note: payload.note,
+      urls: payload.urls,
+      quotedTweet: payload.quotedTweet,
+      sourceFolders: payload.sourceFolders,
+    },
+    signals: {
+      primaryText: signals.primaryText,
+      article: signals.articleContext,
+      links: signals.linkContext,
+      imageAltTexts: signals.visualContext.altTexts,
+      authorBio: signals.authorContext?.bio ?? null,
+      thread: {
+        isThread: signals.threadContext.isThread,
+        isReply: signals.threadContext.isReply,
+      },
+      xTopics: signals.xTopics,
+      contentTypeHints: signals.contentTypeHints,
+      domainHints: signals.domainHints,
+      vocabularyMatches: signals.existingVocabularyMatches,
+      localLearning: signals.localLearning,
+      neighborHints: signals.neighborHints,
+      priorDecisions: payload.priorDecisions ?? null,
+      dataQuality: signals.dataQuality,
+    },
+  };
 }
 
 export function shortlistOrbitTagsForJev(args: {
@@ -182,14 +256,7 @@ export function shortlistOrbitTagsForJev(args: {
     ...(args.payload.priorDecisions?.frequentTags ?? []),
     ...(args.batchVocabulary?.tags ?? []),
   ];
-  const haystack = [
-    args.payload.signals.primaryText,
-    args.payload.tweetText,
-    args.payload.note,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  const haystack = jevSignalHaystack(args.payload);
 
   const { matched, proposed, lexicalRest, otherRest } = bucketShortlistEntries({
     pool: args.pool,
@@ -229,7 +296,7 @@ export function shortlistOrbitCollectionsForJev(args: {
   maxCount?: number;
   batchVocabulary?: OrbitBatchVocabulary;
 }): OrbitLabelPoolItem[] {
-  const maxCount = args.maxCount ?? 8;
+  const maxCount = args.maxCount ?? ORBIT_JEV_MAX_COLLECTION_SHORTLIST;
   const preferred = [
     ...args.payload.signals.existingVocabularyMatches.collections,
     ...(args.payload.signals.localLearning?.matchingCollections ?? []),
@@ -242,7 +309,7 @@ export function shortlistOrbitCollectionsForJev(args: {
     pool: args.pool,
     usable: usableCollectionName,
     preferredKeys: new Set(preferred.map((name) => normalizeKey(name))),
-    haystack: "",
+    haystack: jevSignalHaystack(args.payload),
   });
 
   // Same recall protection as tags: proposed collections are capped so Grok
@@ -373,7 +440,12 @@ export function buildJevAssignmentFromAnswers(args: {
       : null;
 
   const strongestTagNoul = Math.max(0, ...Object.values(args.tagNouls));
+  // Only flag a new-label gap when nothing was placed. Otherwise a high
+  // needs_new_label noul would re-queue an already-matched bookmark through
+  // refine and Grok escalation.
   const needsNewLabel =
+    includedTags.length === 0 &&
+    !pickedCollection &&
     args.needsNewLabel >= ORBIT_JEV_NEEDS_NEW_LABEL_THRESHOLD;
   const abstain =
     includedTags.length === 0 &&
@@ -509,6 +581,10 @@ export async function assignOneOrbitBookmarkWithJev(args: {
   learningHint?: OrbitLearningHint;
   neighborHint?: OrbitNeighborHint;
   batchVocabulary?: OrbitBatchVocabulary;
+  /** Overrides the tag shortlist size. The leftover pass raises it so new names fit. */
+  maxTagShortlist?: number;
+  /** Overrides the collection shortlist size for the leftover pass. */
+  maxCollectionShortlist?: number;
 }): Promise<OrbitJevAssignment> {
   const payload = buildBookmarkPayload({
     bookmark: args.bookmark,
@@ -522,11 +598,13 @@ export async function assignOneOrbitBookmarkWithJev(args: {
     pool: args.pool.tags,
     payload,
     batchVocabulary: args.batchVocabulary,
+    maxCount: args.maxTagShortlist,
   });
   const collectionShortlist = shortlistOrbitCollectionsForJev({
     pool: args.pool.collections,
     payload,
     batchVocabulary: args.batchVocabulary,
+    maxCount: args.maxCollectionShortlist,
   });
 
   const client = getTypeSafeClient();
@@ -536,26 +614,7 @@ export async function assignOneOrbitBookmarkWithJev(args: {
     response = await client.systemOne({
       model: getTypeSafeModel(),
       state: toJsonState({
-        bookmark: {
-          id: payload.id,
-          author: payload.author,
-          text: payload.tweetText,
-          note: payload.note,
-          urls: payload.urls,
-          quotedTweet: payload.quotedTweet,
-          sourceFolders: payload.sourceFolders,
-        },
-        signals: {
-          primaryText: payload.signals.primaryText,
-          xTopics: payload.signals.xTopics,
-          contentTypeHints: payload.signals.contentTypeHints,
-          domainHints: payload.signals.domainHints,
-          vocabularyMatches: payload.signals.existingVocabularyMatches,
-          localLearning: payload.signals.localLearning,
-          neighborHints: payload.signals.neighborHints,
-          priorDecisions: payload.priorDecisions ?? null,
-          dataQuality: payload.signals.dataQuality,
-        },
+        ...jevJudgmentState(payload),
         candidateTags: tagShortlist.map((tag) => ({
           name: tag.name,
           existing: tag.existing,
@@ -641,6 +700,10 @@ export async function assignOrbitBookmarksWithJev(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batchVocabulary?: OrbitBatchVocabulary;
+  /** Overrides the tag shortlist size. The leftover pass raises it so new names fit. */
+  maxTagShortlist?: number;
+  /** Overrides the collection shortlist size for the leftover pass. */
+  maxCollectionShortlist?: number;
   /** Called as each bookmark's answer lands (including abstains), for live progress. */
   onAssigned?: (assignment: OrbitJevAssignment) => void;
   /** Test hook — base backoff for rate-limit retries. */
@@ -677,6 +740,8 @@ export async function assignOrbitBookmarksWithJev(args: {
           learningHint: learningById.get(bookmark.id),
           neighborHint: neighborById.get(bookmark.id),
           batchVocabulary: args.batchVocabulary,
+          maxTagShortlist: args.maxTagShortlist,
+          maxCollectionShortlist: args.maxCollectionShortlist,
         });
       } catch (error) {
         const rateLimited = isRateLimitedAssignError(error);

@@ -2,7 +2,7 @@ import "server-only";
 
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 
-export const DEFAULT_TYPESAFE_MODEL = "jev-latest";
+const DEFAULT_TYPESAFE_MODEL = "jev-latest";
 
 export function isTypeSafeConfigured() {
   return Boolean(process.env.TYPESAFE_API_KEY?.trim());

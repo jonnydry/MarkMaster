@@ -151,17 +151,16 @@ export function deriveOrbitScanBatchState(
   const scanTargetCount = scanTargetIds.length;
   const queueBatchCount = defaultScanPlan.bookmarkIds.length;
   const hasSelectionOverflow = selectedBookmarkIds.size > scanBatchLimit;
-  const scanProfileLabel = ORBIT_SCAN_BATCH_PROFILES[scanBatchProfile].label;
   const queueOrderLabel = queueSortDirection === "asc" ? "oldest" : "newest";
 
   const scanHelperText = queueIsLoading
     ? "Loading the current Orbit queue."
     : scanningSelection
       ? hasSelectionOverflow
-        ? `Scan matches your vocabulary on the first ${scanTargetCount} selected, then escalates leftovers. Review before you apply.`
-        : `Scan matches your vocabulary on ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}, then escalates leftovers. Review before you apply.`
+        ? `Scan matches your tags on the first ${scanTargetCount} selected, then suggests names for leftovers. Review before you apply.`
+        : `Scan matches your tags on ${scanTargetCount} selected bookmark${scanTargetCount === 1 ? "" : "s"}, then suggests names for leftovers. Review before you apply.`
       : queueBatchCount > 0
-        ? `${scanProfileLabel} · ${queueBatchCount} ${queueOrderLabel} of ${defaultScanPlan.candidateCount.toLocaleString()} — match your tags, then escalate leftovers. Review before applying.`
+        ? `${queueBatchCount} ${queueOrderLabel} of ${defaultScanPlan.candidateCount.toLocaleString()} — match your tags, then suggest names for leftovers. Review before applying.`
         : hasSearchQuery
           ? "No bookmarks match the current Orbit filter."
           : "Queue clear — new saves land here for hybrid tagging.";

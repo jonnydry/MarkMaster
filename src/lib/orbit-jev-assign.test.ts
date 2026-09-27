@@ -80,6 +80,56 @@ describe("shortlistOrbitTagsForJev", () => {
     expect(shortlist.map((item) => item.name)).toEqual(["AI", "LLM Evals"]);
   });
 
+  it("asks about a new name even when existing preferred tags fill the shortlist", () => {
+    const existing = Array.from({ length: 12 }, (_, index) => ({
+      name: `Kept ${index}`,
+      existing: true as const,
+    }));
+    const payload = buildBookmarkPayload({
+      bookmark: bookmark(),
+      existingTags: existing.map((tag) => ({ ...tag, color: "#111111" })),
+      existingCollections: [],
+    });
+
+    const shortlist = shortlistOrbitTagsForJev({
+      pool: [...existing, { name: "LLM Evals", existing: false }],
+      payload,
+      maxCount: 12,
+      batchVocabulary: {
+        tags: ["LLM Evals", ...existing.map((tag) => tag.name)],
+        collections: [],
+      },
+    });
+
+    expect(shortlist.map((item) => item.name)).toContain("LLM Evals");
+  });
+
+  it("does not shortlist a tag that appears only in the author bio", () => {
+    const payload = buildBookmarkPayload({
+      bookmark: bookmark({
+        tweetText: "A photo from the coast.",
+        urls: [],
+        xMetadata: { author: { description: "I write about cooking every day." } },
+      }),
+      existingTags: [
+        { name: "Cooking", color: "#222222", bookmarkCount: 4 },
+        { name: "Coast", color: "#111111", bookmarkCount: 1 },
+      ],
+      existingCollections: [],
+    });
+
+    const shortlist = shortlistOrbitTagsForJev({
+      pool: [
+        { name: "Cooking", existing: true },
+        { name: "Coast", existing: true },
+      ],
+      payload,
+      maxCount: 1,
+    });
+
+    expect(shortlist.map((item) => item.name)).toEqual(["Coast"]);
+  });
+
   it("ranks unused existing tags by lexical overlap with the bookmark", () => {
     const payload = buildBookmarkPayload({
       bookmark: bookmark({
@@ -102,6 +152,38 @@ describe("shortlistOrbitTagsForJev", () => {
     });
 
     expect(shortlist[0]?.name).toBe("Rust");
+  });
+
+  it("does not treat short tags as lexical matches when they are only substrings", () => {
+    const payload = buildBookmarkPayload({
+      bookmark: bookmark({
+        tweetText: "This is available at the start of the guide.",
+        urls: [],
+      }),
+      existingTags: [
+        { name: "Cooking", color: "#333333", bookmarkCount: 40 },
+        { name: "AI", color: "#111111", bookmarkCount: 12 },
+        { name: "Art", color: "#222222", bookmarkCount: 8 },
+      ],
+      existingCollections: [],
+    });
+
+    const shortlist = shortlistOrbitTagsForJev({
+      pool: [
+        { name: "Cooking", existing: true },
+        { name: "AI", existing: true },
+        { name: "Art", existing: true },
+      ],
+      payload,
+      maxCount: 3,
+    });
+
+    // No real word hit — order stays pool order within the unused bucket.
+    expect(shortlist.map((item) => item.name)).toEqual([
+      "Cooking",
+      "AI",
+      "Art",
+    ]);
   });
 
   it("reserves lexical matches when Grok proposes many new names", () => {
@@ -221,6 +303,34 @@ describe("shortlistOrbitCollectionsForJev", () => {
     expect(shortlist.map((item) => item.name)).toContain("Travel");
     expect(shortlist.filter((item) => !item.existing).length).toBeLessThanOrEqual(4);
   });
+
+  it("asks about a new collection even when existing preferred names fill the shortlist", () => {
+    const existing = Array.from({ length: 8 }, (_, index) => ({
+      name: `Kept Home ${index}`,
+      existing: true as const,
+    }));
+    const payload = buildBookmarkPayload({
+      bookmark: bookmark(),
+      existingTags: [],
+      existingCollections: existing.map((collection) => ({
+        name: collection.name,
+        description: null,
+        bookmarkCount: 1,
+      })),
+    });
+
+    const shortlist = shortlistOrbitCollectionsForJev({
+      pool: [...existing, { name: "LLM Evals Desk", existing: false }],
+      payload,
+      maxCount: 8,
+      batchVocabulary: {
+        tags: [],
+        collections: ["LLM Evals Desk", ...existing.map((item) => item.name)],
+      },
+    });
+
+    expect(shortlist.map((item) => item.name)).toContain("LLM Evals Desk");
+  });
 });
 
 describe("buildJevAssignmentFromAnswers", () => {
@@ -268,6 +378,24 @@ describe("buildJevAssignmentFromAnswers", () => {
     expect(assignment.abstain).toBe(true);
     expect(assignment.confidence).toBe("low");
   });
+
+  it("does not flag needsNewLabel when tags already cleared the include threshold", () => {
+    const assignment = buildJevAssignmentFromAnswers({
+      bookmarkId: "bm-1",
+      tagShortlist: tags,
+      collectionShortlist: collections,
+      tagNouls: { tag_0: 0.88, tag_1: 0.12 },
+      collectionChoice: "none",
+      collectionConfidence: 0.1,
+      needsNewLabel: 0.95,
+      matchScore: 1.5,
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+    });
+
+    expect(assignment.tags.map((tag) => tag.name)).toEqual(["AI"]);
+    expect(assignment.needsNewLabel).toBe(false);
+    expect(assignment.abstain).toBe(false);
+  });
 });
 
 describe("assignOrbitBookmarksWithJev failure isolation", () => {
@@ -292,6 +420,37 @@ describe("assignOrbitBookmarksWithJev failure isolation", () => {
 
   beforeEach(() => {
     systemOneMock.mockReset();
+  });
+
+  it("gives Jev the article, link, image, and bio context Grok already uses", async () => {
+    systemOneMock.mockResolvedValue(successAnswers);
+    await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [
+        bookmark({
+          media: [{ type: "photo", alt_text: "A chart of model size versus accuracy" }],
+          xMetadata: {
+            tweet: {
+              article: { title: "Scaling laws for evals", preview_text: "How evals grow." },
+            },
+            author: { description: "Writes about model evaluation." },
+          },
+        }),
+      ],
+    });
+
+    const state = systemOneMock.mock.calls[0]?.[0]?.state as {
+      signals: {
+        article: { title?: string };
+        links: Array<{ title?: string }>;
+        imageAltTexts: string[];
+        authorBio: string | null;
+      };
+    };
+    expect(state.signals.article?.title).toBe("Scaling laws for evals");
+    expect(state.signals.links[0]?.title).toBe("Scaling laws");
+    expect(state.signals.imageAltTexts).toEqual(["A chart of model size versus accuracy"]);
+    expect(state.signals.authorBio).toBe("Writes about model evaluation.");
   });
 
   it("keeps completed assignments when one item fails with a non-rate-limit error", async () => {
@@ -342,20 +501,33 @@ describe("assignOrbitBookmarksWithJev failure isolation", () => {
     expect(assignments[0]?.tags.map((tag) => tag.name)).toEqual(["AI"]);
   });
 
-  it("abstains after exhausting rate-limit retries", async () => {
-    systemOneMock.mockRejectedValue(
-      new OrbitGrokError("slow down", 429, "typesafe_unavailable")
-    );
+  it("forwards an enlarged tag shortlist budget into the TypeSafe call", async () => {
+    systemOneMock.mockResolvedValue(successAnswers);
+    const poolTags = Array.from({ length: 20 }, (_, index) => ({
+      name: `Topic ${index}`,
+      existing: true as const,
+    }));
 
-    const assignments = await assignOrbitBookmarksWithJev({
+    await assignOrbitBookmarksWithJev({
       ...batchArgs,
       bookmarks: [bookmark({ id: "bm-1" })],
+      pool: { tags: poolTags, collections: [] },
+      existingTags: poolTags.map((tag) => ({
+        name: tag.name,
+        color: "#1d9bf0",
+        bookmarkCount: 1,
+      })),
+      batchVocabulary: {
+        tags: poolTags.map((tag) => tag.name),
+        collections: [],
+      },
+      maxTagShortlist: 18,
     });
 
-    // Initial attempt + 2 retries.
-    expect(systemOneMock).toHaveBeenCalledTimes(3);
-    expect(assignments[0]?.abstain).toBe(true);
-    expect(assignments[0]?.bookmarkId).toBe("bm-1");
+    const state = systemOneMock.mock.calls[0]?.[0]?.state as {
+      candidateTags: Array<{ name: string }>;
+    };
+    expect(state.candidateTags).toHaveLength(18);
   });
 });
 

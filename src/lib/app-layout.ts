@@ -30,12 +30,9 @@ export const appPageMainColumnClassName =
 export const appFixedViewportClassName =
   "app-fixed-viewport fixed inset-x-0 top-0 overflow-hidden";
 
-/** Minimum full-viewport height for scrollable public/marketing pages. */
-export const appMinViewportClassName = "app-min-viewport min-w-0";
-
 /** Public page shell — natural document scroll with horizontal containment. */
 export const appPublicPageClassName = cn(
-  appMinViewportClassName,
+  "app-min-viewport min-w-0",
   "flex flex-col overflow-x-hidden"
 );
 

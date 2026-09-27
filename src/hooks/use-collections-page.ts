@@ -297,6 +297,7 @@ export function useCollectionsPage() {
   }, []);
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/collections",
     shortcutGroups: COLLECTION_SHORTCUT_GROUPS,
     actions: {
       next: () => selectCollectionByOffset(1),

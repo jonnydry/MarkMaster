@@ -1,22 +1,21 @@
 "use client";
 
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
+import { Search, X } from "lucide-react";
 
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { OrbitMapIdentity } from "@/components/orbit/orbit-page-identity";
 import { OrbitModeSwitch } from "@/components/orbit/orbit-mode-switch";
+import { OrbitMapFilterControl } from "@/components/orbit/orbit-map-filter-control";
 import { OrbitMapGraphSearch } from "@/components/orbit/orbit-map-graph-search";
-import { OrbitMapLegendButton } from "@/components/orbit/orbit-map-legend-button";
-import { OrbitMapLivingToggle } from "@/components/orbit/orbit-map-living-toggle";
+import { OrbitMapMotionMenu } from "@/components/orbit/orbit-map-motion-menu";
 import { OrbitMapScopeMenu } from "@/components/orbit/orbit-map-scope-menu";
-import {
-  orbitMapFloatingShellClass,
-  orbitMapInspectorToolsShiftClass,
-} from "@/lib/orbit-map-chrome";
+import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
 import type { KeyboardShortcutGroup } from "@/hooks/use-keyboard-shortcuts";
 import type { DbUser } from "@/lib/auth";
+import type { GraphFilter } from "@/lib/orbit-worker-protocol";
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import type { OrbitGraphNode, OrbitGraphScope } from "@/types";
 import { cn } from "@/lib/utils";
@@ -27,6 +26,10 @@ export interface OrbitMapConsoleProps {
   graphScope: OrbitGraphScope;
   isLoading?: boolean;
   onScopeChange: (scope: OrbitGraphScope) => void;
+  activeFilter: GraphFilter;
+  onFilterChange: (filter: GraphFilter) => void;
+  /** Hide the Loose filter when the fetched graph is already the queue. */
+  hideLooseFilter?: boolean;
   isFetching: boolean;
   hasGraph: boolean;
   search: string;
@@ -37,23 +40,27 @@ export interface OrbitMapConsoleProps {
   keyboardShortcutsOpen: boolean;
   onKeyboardShortcutsOpenChange: (open: boolean) => void;
   shortcutGroups: KeyboardShortcutGroup[];
-  /** Shift the top-right tools left to clear the docked inspector. */
-  toolsShifted?: boolean;
   livingEnabled: boolean;
   onLivingEnabledChange: (enabled: boolean) => void;
+  /** Months Replay can cover; null disables it. */
+  replayMonths: number | null;
+  onReplay: () => void;
 }
 
 const controlOnGlassClass =
   "h-8 border-transparent bg-transparent hover:bg-hover";
 
+const iconButtonClass =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45";
+
 /**
- * The Orbit map's chrome, dissolved out of a top toolbar into two floating
- * `.map-glass` corner clusters over the space canvas:
- *  - top-left: identity + Queue⇄Map switch + graph scope
- *  - top-right: graph search + legend + shortcuts + user + mobile sidebar
+ * The Orbit map's chrome: two bars over the canvas.
+ *  - left: identity, Queue⇄Map, scope, and the All/Loose/Recent filter
+ *  - right: graph search, motion, shortcuts, user
  *
- * The All/Loose/Recent filter and zoom cluster continue to float from inside
- * the canvas host; this console owns everything that used to live in the header.
+ * Below lg the scope and filter drop to a second row under the left bar, and
+ * below sm search collapses to an icon that opens a full-width field, so the
+ * bars never run into each other on narrow screens.
  */
 export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps>(
   function OrbitMapConsole(
@@ -63,6 +70,9 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
       graphScope,
       isLoading = false,
       onScopeChange,
+      activeFilter,
+      onFilterChange,
+      hideLooseFilter = false,
       isFetching,
       hasGraph,
       search,
@@ -73,16 +83,45 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
       keyboardShortcutsOpen,
       onKeyboardShortcutsOpenChange,
       shortcutGroups,
-      toolsShifted = false,
       livingEnabled,
       onLivingEnabledChange,
+      replayMonths,
+      onReplay,
     },
     searchRef
   ) {
+    const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+    const phoneSearchRef = useRef<HTMLInputElement | null>(null);
+
+    useEffect(() => {
+      if (phoneSearchOpen) phoneSearchRef.current?.focus();
+    }, [phoneSearchOpen]);
+
+    const closePhoneSearch = () => {
+      onSearchChange("");
+      setPhoneSearchOpen(false);
+    };
+
+    const scopeMenu = (
+      <OrbitMapScopeMenu
+        graphScope={graphScope}
+        isLoading={isLoading}
+        onScopeChange={onScopeChange}
+        className={controlOnGlassClass}
+      />
+    );
+    const filterControl = (
+      <OrbitMapFilterControl
+        activeFilter={activeFilter}
+        onFilterChange={onFilterChange}
+        hideLooseFilter={hideLooseFilter}
+      />
+    );
+
     return (
       <>
-        {/* Top-left — identity, mode switch, scope. */}
-        <div className="pointer-events-none absolute left-3 top-3 z-30 flex max-w-[calc(100%-1.5rem)] sm:left-4 sm:top-4">
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-40 flex items-start justify-between gap-2 lg:inset-x-4 lg:top-4">
+          {/* Left bar — identity, mode switch, and (lg+) scope + filter. */}
           <div
             className={cn(
               orbitMapFloatingShellClass(),
@@ -92,68 +131,124 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
             <span className="flex size-6 shrink-0 items-center justify-center text-primary">
               <OrbitLogoMark className="size-4" />
             </span>
-            <OrbitMapIdentity className="hidden min-w-0 sm:block" />
-            <span className="hidden h-5 w-px shrink-0 bg-hairline-soft sm:block" />
+            <OrbitMapIdentity className="hidden min-w-0 xl:block" />
+            <span className="hidden h-5 w-px shrink-0 bg-hairline-soft xl:block" />
             <OrbitModeSwitch active="map" size="md" />
-            <OrbitMapScopeMenu
-              graphScope={graphScope}
-              isLoading={isLoading}
-              onScopeChange={onScopeChange}
-              className={controlOnGlassClass}
-            />
+            <div className="hidden items-center gap-2 lg:flex">
+              {scopeMenu}
+              <span className="h-5 w-px shrink-0 bg-hairline-soft" />
+              {filterControl}
+            </div>
+          </div>
+
+          {/* Right bar — search + tools. */}
+          <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+            <div
+              className={cn(
+                orbitMapFloatingShellClass(),
+                "hidden w-[12rem] items-center px-1.5 py-1 sm:flex lg:w-[16rem]"
+              )}
+            >
+              <OrbitMapGraphSearch
+                searchInputRef={searchRef}
+                embedded
+                isFetching={isFetching}
+                hasGraph={hasGraph}
+                search={search}
+                searchQuery={searchQuery}
+                searchResults={searchResults}
+                onSearchChange={onSearchChange}
+                onResultSelect={onResultSelect}
+                placeholder="Search tags, collections, posts…"
+              />
+            </div>
+            <div
+              className={cn(
+                orbitMapFloatingShellClass(),
+                "flex items-center gap-1 px-1.5 py-1"
+              )}
+            >
+              <button
+                type="button"
+                className={cn(iconButtonClass, "sm:hidden")}
+                aria-label="Search the map"
+                aria-expanded={phoneSearchOpen}
+                onClick={() => setPhoneSearchOpen(true)}
+                disabled={!hasGraph}
+              >
+                <Search className="size-4" aria-hidden />
+              </button>
+              <OrbitMapMotionMenu
+                enabled={livingEnabled}
+                onEnabledChange={onLivingEnabledChange}
+                replayMonths={replayMonths}
+                onReplay={onReplay}
+              />
+              <span className="hidden sm:inline-flex">
+                <KeyboardShortcutsHelpButton
+                  open={keyboardShortcutsOpen}
+                  onOpenChange={onKeyboardShortcutsOpenChange}
+                  groups={shortcutGroups}
+                  description="Orbit graph search, view, and assignment shortcuts."
+                  toolbarSize="compact"
+                />
+              </span>
+              {mobileSidebar ? (
+                <div className="shrink-0 md:hidden">{mobileSidebar}</div>
+              ) : null}
+              {user ? <UserNavDynamic user={user} avatarSize="default" /> : null}
+            </div>
           </div>
         </div>
 
-        {/* Top-right — search + tools. Stays above the docked inspector (z-40). */}
-        <div
-          className={cn(
-            "pointer-events-none absolute top-3 z-40 flex items-center gap-2 sm:top-4",
-            toolsShifted ? orbitMapInspectorToolsShiftClass : "right-3 sm:right-4"
-          )}
-        >
+        {/* Below lg: scope + filter on their own row under the left bar. */}
+        <div className="pointer-events-none absolute left-3 top-[4.25rem] z-30 flex lg:hidden">
           <div
             className={cn(
               orbitMapFloatingShellClass(),
-              "pointer-events-auto flex w-[9.5rem] items-center px-1.5 py-1 sm:w-[15rem]"
+              "pointer-events-auto flex items-center gap-1.5 px-1.5 py-1"
             )}
           >
-            <OrbitMapGraphSearch
-              searchInputRef={searchRef}
-              embedded
-              isFetching={isFetching}
-              hasGraph={hasGraph}
-              search={search}
-              searchQuery={searchQuery}
-              searchResults={searchResults}
-              onSearchChange={onSearchChange}
-              onResultSelect={onResultSelect}
-            />
-          </div>
-          <div
-            className={cn(
-              orbitMapFloatingShellClass(),
-              "pointer-events-auto flex items-center gap-1 px-1.5 py-1"
-            )}
-          >
-            <OrbitMapLivingToggle
-              enabled={livingEnabled}
-              onEnabledChange={onLivingEnabledChange}
-              className={controlOnGlassClass}
-            />
-            <OrbitMapLegendButton className={controlOnGlassClass} />
-            <KeyboardShortcutsHelpButton
-              open={keyboardShortcutsOpen}
-              onOpenChange={onKeyboardShortcutsOpenChange}
-              groups={shortcutGroups}
-              description="Orbit graph search, view, and assignment shortcuts."
-              toolbarSize="compact"
-            />
-            {mobileSidebar ? (
-              <div className="shrink-0 md:hidden">{mobileSidebar}</div>
-            ) : null}
-            {user ? <UserNavDynamic user={user} avatarSize="default" /> : null}
+            {filterControl}
+            {scopeMenu}
           </div>
         </div>
+
+        {/* Phones: search opens as a full-width field over the top bar. */}
+        {phoneSearchOpen ? (
+          <div className="pointer-events-none absolute inset-x-3 top-3 z-50 sm:hidden">
+            <div
+              className={cn(
+                orbitMapFloatingShellClass(),
+                "pointer-events-auto flex items-center gap-1 px-1.5 py-1"
+              )}
+            >
+              <OrbitMapGraphSearch
+                searchInputRef={phoneSearchRef}
+                embedded
+                isFetching={isFetching}
+                hasGraph={hasGraph}
+                search={search}
+                searchQuery={searchQuery}
+                searchResults={searchResults}
+                onSearchChange={onSearchChange}
+                onResultSelect={(selection) => {
+                  onResultSelect(selection);
+                  setPhoneSearchOpen(false);
+                }}
+                placeholder="Search the map…"
+              />
+              <button
+                type="button"
+                className={iconButtonClass}
+                aria-label="Close search"
+                onClick={closePhoneSearch}
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </>
     );
   }

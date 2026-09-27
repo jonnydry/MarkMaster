@@ -33,7 +33,7 @@ export type SyncRunSnapshot = Prisma.SyncRunGetPayload<{
   select: typeof syncRunSelect;
 }>;
 
-export type EnqueueSyncResult =
+type EnqueueSyncResult =
   | { conflict: SyncRunSnapshot }
   | { cooldown: { retryUntil: Date; latestRun: SyncRunSnapshot } }
   | { created: { id: string }; continuationToken?: string };
@@ -59,7 +59,7 @@ async function resolveContinuationToken(
   return resumeRun?.resumeToken ?? undefined;
 }
 
-export async function markStaleActiveSyncRuns(
+async function markStaleActiveSyncRuns(
   tx: Prisma.TransactionClient,
   userId: string
 ) {

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { AppFrame } from "@/components/app-frame";
 import { AuthenticatedShell } from "@/components/authenticated-shell";
 import { AuthSessionProvider, QueryProvider } from "@/components/providers";
 import { appFixedViewportClassName } from "@/lib/app-layout";
@@ -23,7 +24,9 @@ export default async function MainLayout({
       </a>
       <QueryProvider>
         <AuthSessionProvider session={session}>
-          <AuthenticatedShell>{children}</AuthenticatedShell>
+          <AuthenticatedShell>
+            <AppFrame>{children}</AppFrame>
+          </AuthenticatedShell>
         </AuthSessionProvider>
       </QueryProvider>
     </div>

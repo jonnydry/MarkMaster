@@ -159,6 +159,7 @@ export async function buildOrbitGraphPayload(
       authorDisplayName: bookmark.authorDisplayName,
       affiliated,
       recent,
+      ageDays: Math.max(0, Math.round((now - bookmarkedAtMs) / 8_640_000) / 10),
     });
 
     for (const { tagId } of bookmark.tags) {

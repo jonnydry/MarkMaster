@@ -2,23 +2,19 @@ import type { CollectionWithCount } from "@/types";
 
 export type CollectionFilter = "all" | "mine" | "public" | "x_folders";
 
-export type CollectionStats = {
+type CollectionStats = {
   emptyCount: number;
   publicCount: number;
   maxItems: number;
   largestCollection: CollectionWithCount | null;
 };
 
-export function getCollectionItemCount(collection: CollectionWithCount) {
+function getCollectionItemCount(collection: CollectionWithCount) {
   return collection._count?.items ?? 0;
 }
 
 export function bookmarkLabel(count: number) {
   return `${count.toLocaleString()} ${count === 1 ? "bookmark" : "bookmarks"}`;
-}
-
-export function collectionLabel(count: number) {
-  return `${count.toLocaleString()} ${count === 1 ? "collection" : "collections"}`;
 }
 
 export function splitCollections(collections: CollectionWithCount[]) {

@@ -15,7 +15,7 @@ import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import { formatCompactCount } from "@/lib/format-metrics";
 import type { BookmarkWithRelations } from "@/types";
 
-export function getHighlightLabel(bookmark: BookmarkWithRelations) {
+function getHighlightLabel(bookmark: BookmarkWithRelations) {
   const firstTag = bookmark.tags[0]?.tag.name;
   if (bookmark.notes.length > 0) return "Note attached";
   if (bookmark.collectionItems.length > 0) return "In collection";

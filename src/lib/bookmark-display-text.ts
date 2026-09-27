@@ -2,14 +2,14 @@ import { hasVideoLikeMedia, type BookmarkMediaJson } from "@/lib/bookmark-media"
 
 const TCO_URL = /https?:\/\/t\.co\/[A-Za-z0-9]+/gi;
 
-export type BookmarkUrlEntity = {
+type BookmarkUrlEntity = {
   url?: string;
   expanded_url?: string;
   display_url?: string;
   title?: string;
 };
 
-export type BookmarkDisplayTextSource = {
+type BookmarkDisplayTextSource = {
   tweetText: string;
   authorUsername?: string | null;
   media?: BookmarkMediaJson[] | null;

@@ -8,6 +8,17 @@ export interface OrbitMapPalette {
   linkFallback: number;
   linkHighlightMix: number;
   hubInnerStroke: number;
+  /** Valid drop-target ring; mirrors `--success` in globals.css. */
+  success: number;
+  /** Muted neutral for filed dots and collection glows (`--muted-foreground`). */
+  neutral: number;
+  /** Foreground ink for collection squares (`--foreground`). */
+  ink: number;
+  /**
+   * Accent for the state glow, loose rings and the queue. Lifted in dark mode
+   * like `--glow`, so every accent theme stays visible on the dark canvas.
+   */
+  glow: number;
   accent: number;
   accentSoft: number;
 }
@@ -51,30 +62,20 @@ function orbitHexToString(color: number): string {
 }
 
 const MAP_CANVAS_BASE_DARK = 0x0a0a0a;
-const MAP_CANVAS_BASE_LIGHT = 0xd8dce4;
+// Mirrors --surface-2: the light map sits on the app's own surface colour.
+const MAP_CANVAS_BASE_LIGHT = 0xf7f8f9;
 const DEFAULT_ACCENT_DARK = 0x2f6fed;
 const DEFAULT_ACCENT_SOFT_DARK = 0xbfdbfe;
 const DEFAULT_ACCENT_LIGHT = 0x2563eb;
 const DEFAULT_ACCENT_SOFT_LIGHT = 0x93c5fd;
-/** Barely-there theme wash on space-black. */
-const MAP_CANVAS_TINT_DARK = 0.04;
-const MAP_CANVAS_TINT_LIGHT = 0.06;
-
-/** Space-black / soft-gray canvas fill with a slight accent tint. */
-export function getOrbitMapBackgroundTint(
-  mode: OrbitMapColorMode,
-  accentHex: string
-): string {
-  const isLight = mode === "light";
-  const base = isLight ? MAP_CANVAS_BASE_LIGHT : MAP_CANVAS_BASE_DARK;
-  const fallbackAccent = isLight ? DEFAULT_ACCENT_LIGHT : DEFAULT_ACCENT_DARK;
-  const accent = parseHexColorToNumber(accentHex, fallbackAccent);
-  const mixed = mixOrbitHex(
-    base,
-    accent,
-    isLight ? MAP_CANVAS_TINT_LIGHT : MAP_CANVAS_TINT_DARK
-  );
-  return orbitHexToString(mixed);
+/**
+ * Canvas fill: the app's own surfaces (`--background` dark, `--surface-2`
+ * light). Neutral on purpose — the accent is never mixed into backgrounds,
+ * so every colour theme shares one calm canvas and the accent stays reserved
+ * for selection and the queue.
+ */
+export function getOrbitMapBackgroundTint(mode: OrbitMapColorMode): string {
+  return orbitHexToString(mode === "light" ? MAP_CANVAS_BASE_LIGHT : MAP_CANVAS_BASE_DARK);
 }
 
 export function getOrbitMapPalette(
@@ -95,6 +96,9 @@ export function getOrbitMapPalette(
         linkFallback: 0x475569,
         linkHighlightMix: 0x020617,
         hubInnerStroke: 0xffffff,
+        success: 0x15803d,
+        neutral: 0x56606b,
+        ink: 0x0f1419,
       }
     : {
         background,
@@ -104,6 +108,9 @@ export function getOrbitMapPalette(
         linkFallback: 0x334155,
         linkHighlightMix: 0xffffff,
         hubInnerStroke: 0xffffff,
+        success: 0x4ade80,
+        neutral: 0x8d9299,
+        ink: 0xececec,
       };
 
   const hasAccent =
@@ -121,23 +128,8 @@ export function getOrbitMapPalette(
       ? DEFAULT_ACCENT_SOFT_LIGHT
       : DEFAULT_ACCENT_SOFT_DARK;
 
-  return { ...base, accent, accentSoft };
+  const glow = isLight ? accent : mixOrbitHex(accent, 0xffffff, 0.22);
+
+  return { ...base, accent, accentSoft, glow };
 }
 
-export function getOrbitMapLabelFill(
-  palette: OrbitMapPalette,
-  state: "active" | "neighbor" | "default"
-): number {
-  switch (state) {
-    case "active":
-      return palette.labelActive;
-    case "neighbor":
-      return palette.labelNeighbor;
-    case "default":
-      return palette.labelDefault;
-    default: {
-      const _exhaustive: never = state;
-      return _exhaustive;
-    }
-  }
-}

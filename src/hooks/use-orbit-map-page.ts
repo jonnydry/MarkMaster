@@ -17,7 +17,7 @@ import { useOrbitGraphQuery } from "@/hooks/use-orbit-graph";
 import { useOrbitMapAssignments } from "@/hooks/use-orbit-map-assignments";
 import { useOrbitMapSearch } from "@/hooks/use-orbit-map-search";
 import { useOrbitMapUrl } from "@/hooks/use-orbit-map-url";
-import { useSyncStatus } from "@/hooks/use-sync-status";
+import { resolveOrbitMapArmedBookmark } from "@/lib/orbit-map-actions";
 import { buildOrbitMapConnectionIndex } from "@/lib/orbit-map-connections";
 import {
   buildOrbitMapFocus,
@@ -49,7 +49,7 @@ export const ORBIT_MAP_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { id: "pan", keys: ["←", "→", "↑", "↓"], label: "Pan the graph" },
       { id: "zoom-in", keys: ["+"], label: "Zoom in" },
       { id: "zoom-out", keys: ["-"], label: "Zoom out" },
-      { id: "reset-view", keys: ["0"], label: "Reset view" },
+      { id: "reset-view", keys: ["0"], label: "Fit the whole map" },
       { id: "clear-sel", keys: ["Esc"], label: "Clear selection" },
     ],
   },
@@ -108,8 +108,6 @@ export function useOrbitMapPage() {
     null
   );
   const canvasRef = useRef<OrbitMapCanvasHandle | null>(null);
-  const { data: syncStatus } = useSyncStatus();
-  const [syncRequestLoading, setSyncRequestLoading] = useState(false);
 
   const {
     data: graph,
@@ -144,6 +142,26 @@ export function useOrbitMapPage() {
     useBookmarkFocusQuery(selectedBookmarkId, "orbit-map-focus");
 
   const focusedBookmark = focusedBookmarkData?.bookmarks?.[0] ?? null;
+
+  // With a hub selected, Assign acts on the last bookmark clicked — name it
+  // (and whether it's already on the hub) instead of assigning blind.
+  const armedBookmark = useMemo(
+    () =>
+      resolveOrbitMapArmedBookmark({
+        hub: activeSelectionNode,
+        bookmarkId: selectedBookmarkId,
+        nodesById: graphIndexes?.nodesById,
+        connectionIndex,
+        fetchedBookmark: focusedBookmark,
+      }),
+    [
+      activeSelectionNode,
+      connectionIndex,
+      focusedBookmark,
+      graphIndexes,
+      selectedBookmarkId,
+    ]
+  );
 
   const { data: expandedBookmarkData } = useBookmarkFocusQuery(
     expandedBookmarkId,
@@ -239,8 +257,10 @@ export function useOrbitMapPage() {
     queryClient,
     canvasRef,
     graphIndexes,
+    connectionIndex,
     activeSelectionNode,
     selectedBookmarkId,
+    armedBookmark,
     refetch,
     onSelectionChange: handleSelectionChange,
   });
@@ -299,7 +319,6 @@ export function useOrbitMapPage() {
   );
 
   const stats = graph?.stats;
-  const truncatedCount = stats?.truncatedBookmarks ?? 0;
   const renderedBookmarkCount = graphIndexes?.bookmarkCount ?? 0;
   const graphIsEmpty =
     Boolean(graph && graphIndexes) &&
@@ -310,13 +329,6 @@ export function useOrbitMapPage() {
   const handleSyncComplete = useCallback(async () => {
     await completeLibrarySyncFromBootstrap({ refetch: () => void refetch() });
   }, [completeLibrarySyncFromBootstrap, refetch]);
-
-  const handleSyncStateChange = useCallback((syncing: boolean) => {
-    setSyncRequestLoading(syncing);
-  }, []);
-
-  const syncProgressVisible =
-    syncRequestLoading || Boolean(syncStatus?.currentRun);
 
   const handleScopeChange = useCallback(
     (next: OrbitGraphScope) => {
@@ -371,7 +383,18 @@ export function useOrbitMapPage() {
     [handleSelectionChange]
   );
 
+  // From a bookmark's relationship chips: fly to the hub. The bookmark stays
+  // armed (?bookmark=), so the hub inspector shows it as already assigned.
+  const handleSelectHub = useCallback(
+    (hub: { kind: "tag" | "collection"; id: string }) => {
+      handleSelectionChange(hub);
+      canvasRef.current?.focusOn(hub);
+    },
+    [handleSelectionChange]
+  );
+
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/orbit/map",
     shortcutGroups: ORBIT_MAP_SHORTCUT_GROUPS,
     actions: {
       search: () => searchInputRef.current?.focus(),
@@ -406,7 +429,6 @@ export function useOrbitMapPage() {
     isFetching,
     graphIsEmpty,
     stats,
-    truncatedCount,
     search,
     setSearch,
     searchDeferred,
@@ -419,6 +441,7 @@ export function useOrbitMapPage() {
     canvasRef,
     copyingCollectionId,
     selectedBookmarkId,
+    armedBookmark,
     focusedBookmark,
     focusedBookmarkLoading,
     actions,
@@ -428,8 +451,6 @@ export function useOrbitMapPage() {
     goToTagOnDashboard,
     handleCreateCollectionOpen,
     handleSyncComplete,
-    handleSyncStateChange,
-    syncProgressVisible,
     handleSelectionChange,
     handleCanvasSelectionChange,
     handleScopeChange,
@@ -450,6 +471,7 @@ export function useOrbitMapPage() {
     handleClearSelection,
     handleSearchResultSelect,
     handleSelectConnectedNode,
+    handleSelectHub,
     graphIndexes,
     connectionIndex,
     livingEnabled,

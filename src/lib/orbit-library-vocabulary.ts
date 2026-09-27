@@ -2,6 +2,7 @@ import "server-only";
 
 import { PRESET_COLORS } from "@/lib/constants";
 import {
+  ORBIT_LIBRARY_EXISTING_TAG_CAP,
   ORBIT_LIBRARY_SAMPLE_POOL,
   ORBIT_LIBRARY_SAMPLE_SIZE,
   ORBIT_LIBRARY_VOCAB_MAX,
@@ -184,10 +185,11 @@ async function withVideoTag(
     data: [{ userId, name: VIDEO_TAG_NAME, color }],
     skipDuplicates: true,
   });
-  return [
-    ...tags.slice(0, ORBIT_LIBRARY_VOCAB_MAX - 1),
-    { name: VIDEO_TAG_NAME, color },
-  ];
+  const kept =
+    tags.length > ORBIT_LIBRARY_VOCAB_MAX
+      ? tags
+      : tags.slice(0, ORBIT_LIBRARY_VOCAB_MAX - 1);
+  return [...kept, { name: VIDEO_TAG_NAME, color }];
 }
 
 /** Existing tags, or one new list learned from a sample of the untagged library. */
@@ -198,7 +200,7 @@ export async function ensureLibraryVocabulary(userId: string): Promise<
     where: { userId },
     select: { name: true, color: true },
     orderBy: { bookmarks: { _count: "desc" } },
-    take: ORBIT_LIBRARY_VOCAB_MAX,
+    take: ORBIT_LIBRARY_EXISTING_TAG_CAP,
   });
   if (existing.length > 0) return withVideoTag(userId, existing);
 

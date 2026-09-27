@@ -40,10 +40,15 @@ function hoverCopy(node: OrbitGraphNode) {
         meta: "Core",
       };
     case "overflow":
+      // Tag/collection overflow expands the cluster in place; core overflow
+      // has no expand API and opens the Orbit index instead.
       return {
-        title: `+${node.remaining} more`,
-        body: "Hidden by the map cap",
-        meta: "Overflow",
+        title: `+${node.remaining.toLocaleString()} more`,
+        body:
+          node.anchorKind === "core"
+            ? "Loose bookmarks past the map cap. Click to open the Orbit index."
+            : "Click to show more of this cluster on the map.",
+        meta: null,
       };
     default: {
       const exhaustive: never = node;
@@ -100,7 +105,7 @@ export function OrbitMapHoverCard({
         {copy.body}
       </p>
       {copy.meta ? (
-        <span className="mt-1.5 inline-flex items-center gap-1 text-2xs text-primary/80">
+        <span className="mt-1.5 inline-flex items-center gap-1 text-2xs text-muted-foreground">
           {copy.meta === "Recent" ? <Clock className="size-3" aria-hidden /> : null}
           {copy.meta}
         </span>

@@ -9,6 +9,7 @@ import {
   Tag as TagIcon,
 } from "lucide-react";
 import { BookmarkPostPreview } from "@/components/bookmark-post-preview";
+import { cardPreviewMedia } from "@/lib/bookmark-preview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
 import type { OrbitScanRowState } from "@/lib/orbit-scan-stream";
@@ -116,6 +117,7 @@ export const OrbitListRow = memo(function OrbitListRow({
   const checkboxLabel = `${author}: ${excerpt.slice(0, 80)}`;
   const mediaItems = bookmark.media;
   const hasMedia = Boolean(mediaItems?.length);
+  const previewMedia = hasMedia ? mediaItems : cardPreviewMedia(bookmark);
   const tweetLink = {
     authorUsername: bookmark.authorUsername,
     tweetId: bookmark.tweetId};
@@ -219,7 +221,7 @@ export const OrbitListRow = memo(function OrbitListRow({
           <BookmarkPostPreview
             tweetText={excerpt}
             authorUsername={bookmark.authorUsername}
-            media={hasMedia ? mediaItems : null}
+            media={previewMedia}
             tweetLink={tweetLink}
             bookmarkKey={bookmark.id}
             variant="compact"
@@ -303,7 +305,12 @@ export const OrbitListRow = memo(function OrbitListRow({
           <div
             className={cn(
               "pointer-events-auto flex shrink-0 items-center gap-1 transition-opacity",
-              selected || selectionMode
+              // Triage Accept/Skip stay visible — hiding them behind hover
+              // slows scanning a suggestion list. Idle row chrome can fade.
+              selected ||
+                selectionMode ||
+                showSuggestion ||
+                queueStatus === "dismissed"
                 ? "opacity-100"
                 : "opacity-100 max-lg:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
             )}

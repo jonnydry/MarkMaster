@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { encrypt, decrypt } from "./encryption";
+import { tweetMediaKeys } from "./tweet-media-keys";
 
 const BASE_URL = "https://api.x.com/2";
 
@@ -126,7 +127,8 @@ function buildTweetQueryParams(ids?: string[]) {
       "created_at,public_metrics,entities,referenced_tweets,attachments,author_id,context_annotations,lang,possibly_sensitive,conversation_id,community_id,note_tweet,article",
     "user.fields":
       "name,username,description,profile_image_url,verified,verified_type,public_metrics",
-    expansions: "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id",
+    expansions:
+      "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id,article.cover_media",
     "media.fields":
       "type,url,preview_image_url,width,height,variants,duration_ms,alt_text,public_metrics",
   });
@@ -225,9 +227,9 @@ function parseBookmarkPayload(
       username: "unknown",
     };
 
-    const media: XMedia[] = (tweet.attachments?.media_keys || [])
+    const media: XMedia[] = tweetMediaKeys(tweet)
       .map((key) => mediaMap.get(key))
-      .filter(Boolean) as XMedia[];
+      .filter((item): item is XMedia => Boolean(item));
 
     let quotedTweet: (XTweet & { author?: XUser }) | undefined;
     const quoteRef = tweet.referenced_tweets?.find((r) => r.type === "quoted");

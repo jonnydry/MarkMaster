@@ -1,74 +1,96 @@
-import {
-  DM_Sans,
-  Geist,
-  Geist_Mono,
-  IBM_Plex_Mono,
-  IBM_Plex_Sans,
-  Inter,
-  JetBrains_Mono,
-  Newsreader,
-  Source_Serif_4,
-} from "next/font/google";
+import localFont from "next/font/local";
 
 import type { TypographyPresetId } from "@/lib/typography-presets";
 
+/**
+ * Self-hosted latin files. next/font/google downloads a stylesheet at build
+ * time, and Turbopack rejects the build when Google returns extensionless
+ * `/l/font?kit=` URLs: the `&` in that query is parsed as extra font-file
+ * entries ("next/font/google queries have exactly one entry").
+ */
+
 /** Orbit (default) preset — Geist for UI and reading, Geist Mono for data. */
-export const geistSans = Geist({
+const geistSans = localFont({
+  src: "./fonts/geist-sans-latin.woff2",
+  weight: "100 900",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-export const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
+  weight: "100 900",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 /** Mono + editorial presets — declared globally, not preloaded. */
-export const ibmPlexSans = IBM_Plex_Sans({
+const ibmPlexSans = localFont({
+  src: "./fonts/ibm-plex-sans-latin.woff2",
+  weight: "400 700",
   variable: "--font-ibm-plex-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
-export const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin.woff2",
+  weight: "400 700",
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
-export const ibmPlexMono = IBM_Plex_Mono({
+const ibmPlexMono = localFont({
+  src: [
+    {
+      path: "./fonts/ibm-plex-mono-latin-400.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono-latin-500.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono-latin-600.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono-latin-700.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
 /** Classic preset — lazy-loaded when selected. */
-export const inter = Inter({
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
+  weight: "100 900",
   variable: "--font-inter",
-  subsets: ["latin"],
   preload: false,
 });
 
-export const dmSans = DM_Sans({
+const dmSans = localFont({
+  src: "./fonts/dm-sans-latin.woff2",
+  weight: "400 900",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
   preload: false,
 });
 
 /** Editorial preset — lazy-loaded when selected. */
-export const sourceSerif = Source_Serif_4({
+const sourceSerif = localFont({
+  src: "./fonts/source-serif-4-latin.woff2",
+  weight: "200 900",
   variable: "--font-source-serif",
-  subsets: ["latin"],
   preload: false,
 });
 
-export const newsreader = Newsreader({
+const newsreader = localFont({
+  src: "./fonts/newsreader-latin.woff2",
+  weight: "200 800",
   variable: "--font-newsreader",
-  subsets: ["latin"],
   preload: false,
 });
 

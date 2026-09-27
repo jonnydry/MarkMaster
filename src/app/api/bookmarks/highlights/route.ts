@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
+import { withBookmarkCardUrls } from "@/lib/bookmark-card-urls";
 
 const MAX_EXCLUDE_IDS = 100;
 
@@ -145,7 +146,7 @@ export async function GET(req: NextRequest) {
   const total = Number(totalRows[0]?.count ?? 0);
 
   return NextResponse.json({
-    bookmarks,
+    bookmarks: await withBookmarkCardUrls(bookmarks),
     total,
     totalPages: Math.ceil(total / limit) || 1,
     ...(personalBoostAuthors.length

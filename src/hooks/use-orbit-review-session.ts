@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { visiblePathname } from "@/components/route-preview";
 import { getHighlightFeedback } from "@/lib/highlight-feedback";
 import type { AuthorDecisionHistoryData } from "@/lib/orbit-author-history";
 import {
@@ -675,6 +676,7 @@ export function useOrbitReviewSession({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (visiblePathname() !== "/orbit") return;
       if (!open) return;
       const target = event.target as HTMLElement | null;
       if (target) {

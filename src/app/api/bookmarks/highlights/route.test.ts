@@ -5,6 +5,11 @@ vi.mock("@/lib/auth", () => ({
   getDbUser: vi.fn(async () => ({ id: "user-1" })),
 }));
 
+// Card-url lookup has its own tests; keep this suite on the ranking SQL.
+vi.mock("@/lib/bookmark-card-urls", () => ({
+  withBookmarkCardUrls: vi.fn(async (bookmarks: unknown[]) => bookmarks),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     bookmark: {

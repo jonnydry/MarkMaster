@@ -88,10 +88,3 @@ export function readPrimaryAccentHex(
 ): string | undefined {
   return readCssVariableHex("--primary", "color", root);
 }
-
-/** App shell background — used for the Orbit map canvas clear color. */
-export function readBackgroundHex(
-  root: HTMLElement = document.documentElement
-): string | undefined {
-  return readCssVariableHex("--background", "background-color", root);
-}

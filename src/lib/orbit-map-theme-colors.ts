@@ -17,6 +17,6 @@ export function resolveOrbitMapCanvasTheme(
 ): OrbitMapCanvasTheme {
   const accentHex =
     readPrimaryAccentHex() ?? getColorTheme(colorTheme).swatch;
-  const backgroundHex = getOrbitMapBackgroundTint(mode, accentHex);
+  const backgroundHex = getOrbitMapBackgroundTint(mode);
   return { accentHex, backgroundHex };
 }

@@ -187,6 +187,36 @@ describe("sync-utils", () => {
         ],
       });
     });
+
+    it("keeps a long-post link when the short post has no url entities", () => {
+      const data = makeBookmarkData("note-link");
+      data.tweet.entities = undefined;
+      data.tweet.note_tweet = {
+        text: "Long post",
+        entities: {
+          urls: [
+            {
+              start: 0,
+              end: 12,
+              url: "https://t.co/abc",
+              expanded_url: "https://huggingface.co/example/model",
+              display_url: "huggingface.co/example/…",
+            },
+          ],
+        },
+      };
+
+      const result = buildBookmarkCreateData("user-1", data);
+      expect(result.urls).toEqual([
+        {
+          start: 0,
+          end: 12,
+          url: "https://t.co/abc",
+          expanded_url: "https://huggingface.co/example/model",
+          display_url: "huggingface.co/example/…",
+        },
+      ]);
+    });
   });
 
   describe("buildBookmarkUpdateData", () => {

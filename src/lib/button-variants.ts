@@ -52,7 +52,7 @@ export const buttonVariants = cva(
   }
 );
 
-export type ButtonVariantProps = VariantProps<typeof buttonVariants>;
+type ButtonVariantProps = VariantProps<typeof buttonVariants>;
 
 export function buttonVariantClassName(
   variant?: ButtonVariantProps["variant"],

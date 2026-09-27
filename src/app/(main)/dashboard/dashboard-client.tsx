@@ -3,9 +3,9 @@
 import { Suspense, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
+import { useAppChrome } from "@/components/app-frame";
 import { AppPageCenter, AppPageShell } from "@/components/app-page-shell";
 import { DashboardToolbar } from "@/components/dashboard-toolbar";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
@@ -159,14 +159,21 @@ function DashboardContent() {
     focusPerformanceHighlight,
     handleSaveGemsAsCollection,
     handleSyncComplete,
-    handleSyncStateChange,
     handleCreateCollectionOpen,
     handleCommandPaletteFilter,
     primaryFilterLabel,
     primaryFilterCompactLabel,
-    syncProgressVisible,
     selectedTagEntries,
   } = useDashboardPage();
+
+  const { registerDashboardTags, setSyncing } = useAppChrome();
+  useEffect(() => {
+    registerDashboardTags({
+      selectedTags: filters.selectedTags,
+      onTagToggle: filters.toggleTag,
+    });
+  }, [filters.selectedTags, filters.toggleTag, registerDashboardTags]);
+  useEffect(() => () => registerDashboardTags(null), [registerDashboardTags]);
 
   const discoveryRequested = searchParams.get("discovery") === "1";
   useEffect(() => {
@@ -194,28 +201,7 @@ function DashboardContent() {
 
   return (
     <>
-    <AppPageShell
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={filters.selectedTags}
-          onTagToggle={filters.toggleTag}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-          totalBookmarks={libraryStats?.libraryBookmarkCount ?? total}
-          onSyncComplete={handleSyncComplete}
-          onSyncStateChange={handleSyncStateChange}
-        />
-      }
-      mainTop={
-        syncProgressVisible ? (
-          <ScrollingProgressBar className="relative z-50" />
-        ) : null
-      }
-      scrollRef={scrollRef}
-      mainProps={{ "aria-busy": syncProgressVisible }}
-    >
+    <AppPageShell embedded scrollRef={scrollRef}>
           <PageHeader
             sticky
             feedChrome
@@ -236,7 +222,7 @@ function DashboardContent() {
                       }
                       totalBookmarks={libraryStats?.libraryBookmarkCount ?? total}
                       onSyncComplete={handleSyncComplete}
-                      onSyncStateChange={handleSyncStateChange}
+                      onSyncStateChange={setSyncing}
                     />
                   }
                   search={filters.search}
@@ -381,7 +367,7 @@ function DashboardContent() {
                       <SyncButton
                         lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
                         onSyncComplete={handleSyncComplete}
-                        onSyncStateChange={handleSyncStateChange}
+                        onSyncStateChange={setSyncing}
                         detail="full"
                       />
                     </div>

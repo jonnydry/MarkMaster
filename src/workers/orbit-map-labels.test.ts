@@ -31,6 +31,22 @@ describe("declutterOrbitMapLabels", () => {
     expect(winners).toEqual(new Set(["a", "b", "c"]));
   });
 
+  it("drops a sized label that overlaps a higher-priority one, keeps clear ones", () => {
+    const candidates: OrbitMapLabelCandidate[] = [
+      // A wide hub label spanning several grid cells.
+      { id: "hub", x: 200, y: 200, priority: 4000, width: 160, height: 15 },
+      // Two cells to the right, but still under the hub label's box.
+      { id: "under-hub", x: 265, y: 205, priority: 100, width: 60, height: 13 },
+      // Just clears the hub label's right edge.
+      { id: "beside", x: 320, y: 200, priority: 100, width: 60, height: 13 },
+      // Directly below the hub label's baseline.
+      { id: "below", x: 200, y: 220, priority: 100, width: 60, height: 13 },
+    ];
+
+    const winners = declutterOrbitMapLabels(candidates, gridOptions);
+    expect(winners).toEqual(new Set(["hub", "beside", "below"]));
+  });
+
   it("drops candidates outside the screen (plus margin)", () => {
     const candidates: OrbitMapLabelCandidate[] = [
       { id: "visible", x: 400, y: 300, priority: 100 },

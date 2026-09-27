@@ -1,6 +1,6 @@
 import type { AnalyticsData } from "@/types";
 
-export interface MediaBreakdownCounts {
+interface MediaBreakdownCounts {
   totalBookmarks: number;
   mediaOnly: number;
   mediaAndLinks: number;
@@ -17,7 +17,7 @@ export function buildMediaBreakdown(counts: MediaBreakdownCounts) {
   ];
 }
 
-export type VelocityDelta = { pct: number | null; abs: number };
+type VelocityDelta = { pct: number | null; abs: number };
 
 export function computeTriagedPct(
   analytics: AnalyticsData | null | undefined

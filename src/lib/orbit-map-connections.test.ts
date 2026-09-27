@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrbitMapConnectionIndex,
   getConnectedOrbitMapNodes,
+  getSharedOrbitMapHubs,
 } from "@/lib/orbit-map-connections";
 import type { OrbitGraphNode, OrbitGraphPayload } from "@/types";
 
@@ -80,5 +81,46 @@ describe("orbit map connections", () => {
         (node) => node.id
       )
     ).toEqual(["tag-1", "collection-1"]);
+  });
+});
+
+describe("getSharedOrbitMapHubs", () => {
+  const hubNodes: OrbitGraphNode[] = [
+    { kind: "tag", id: "ai", name: "ai", color: "#8b5cf6", count: 3 },
+    { kind: "tag", id: "rust", name: "rust", color: "#ef4444", count: 1 },
+    { kind: "collection", id: "later", name: "Read later", variant: "user_collection", count: 2 },
+    ...["b1", "b2", "b3"].map(
+      (id): OrbitGraphNode => ({
+        kind: "bookmark",
+        id,
+        title: id,
+        authorUsername: id,
+        authorDisplayName: id,
+        affiliated: true,
+        recent: false,
+      })
+    ),
+  ];
+  const nodeById = new Map(hubNodes.map((node) => [node.id, node]));
+  const index = buildOrbitMapConnectionIndex([
+    { kind: "bookmark-tag", bookmarkId: "b1", tagId: "ai" },
+    { kind: "bookmark-tag", bookmarkId: "b2", tagId: "ai" },
+    { kind: "bookmark-tag", bookmarkId: "b3", tagId: "ai" },
+    { kind: "bookmark-tag", bookmarkId: "b1", tagId: "rust" },
+    { kind: "bookmark-collection", bookmarkId: "b1", collectionId: "later" },
+    { kind: "bookmark-collection", bookmarkId: "b2", collectionId: "later" },
+  ]);
+
+  it("counts shared bookmarks per other hub, most shared first", () => {
+    expect(
+      getSharedOrbitMapHubs("ai", nodeById, index).map(({ node, count }) => [node.id, count])
+    ).toEqual([
+      ["later", 2],
+      ["rust", 1],
+    ]);
+  });
+
+  it("returns nothing for a hub with no overlap", () => {
+    expect(getSharedOrbitMapHubs("rust", nodeById, buildOrbitMapConnectionIndex([]))).toEqual([]);
   });
 });

@@ -23,7 +23,30 @@ function hasOwnData(value: Record<string, unknown>) {
   return Object.keys(value).length > 0;
 }
 
-export function buildBookmarkXMetadata(
+/** Top-level entities miss links that only exist on a long post. */
+export function storedBookmarkUrls(
+  tweet: BookmarkData["tweet"]
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const primary = tweet.entities?.urls ?? [];
+  const note = tweet.note_tweet?.entities?.urls ?? [];
+  const merged = [...primary];
+  const seen = new Set(
+    primary
+      .map((item) => item.expanded_url || item.url)
+      .filter((value): value is string => Boolean(value))
+  );
+
+  for (const item of note) {
+    const key = item.expanded_url || item.url;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+
+  return merged.length > 0 ? merged : Prisma.JsonNull;
+}
+
+function buildBookmarkXMetadata(
   data: BookmarkData
 ): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   const tweet: Record<string, unknown> = {};
@@ -89,7 +112,7 @@ export function buildBookmarkUpdateData(data: BookmarkData) {
       data.media.length > 0
         ? mapStoredBookmarkMedia(data.media)
         : Prisma.JsonNull,
-    urls: data.tweet.entities?.urls ?? Prisma.JsonNull,
+    urls: storedBookmarkUrls(data.tweet),
     quotedTweet: data.quotedTweet
       ? {
           id: data.quotedTweet.id,
@@ -109,7 +132,7 @@ export function buildBookmarkUpdateData(data: BookmarkData) {
   };
 }
 
-export type BookmarkSyncEntry = {
+type BookmarkSyncEntry = {
   tweetId: string;
   data: BookmarkData;
 };
@@ -158,7 +181,7 @@ export function buildBookmarkCreateData(userId: string, data: BookmarkData) {
       data.media.length > 0
         ? mapStoredBookmarkMedia(data.media)
         : Prisma.JsonNull,
-    urls: data.tweet.entities?.urls ?? Prisma.JsonNull,
+    urls: storedBookmarkUrls(data.tweet),
     quotedTweet: data.quotedTweet
       ? {
           id: data.quotedTweet.id,

@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 
 import {
@@ -98,6 +98,7 @@ export function useCollectionDetailPage(
   viewMode: ViewMode = "feed"
 ) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageCursors, setPageCursors] = useState<Record<number, string>>({});
@@ -465,6 +466,7 @@ export function useCollectionDetailPage(
   }, [activeBookmarkId, router, sortedBookmarkIds]);
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: pathname,
     shortcutGroups: COLLECTION_DETAIL_SHORTCUT_GROUPS,
     actions: {
       next: () => selectBookmarkByOffset(1),

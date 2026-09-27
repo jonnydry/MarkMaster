@@ -244,7 +244,7 @@ export type OrbitLibraryPageResult = {
 };
 
 /** Tags one page of untagged bookmarks after the cursor from the closed tag list. */
-export async function tagUntaggedLibraryPage(args: {
+async function tagUntaggedLibraryPage(args: {
   userId: string;
   vocabulary: LibraryVocabularyTag[];
   cursor: OrbitLibraryClassifyCursor | null;
@@ -255,6 +255,7 @@ export async function tagUntaggedLibraryPage(args: {
       id: true,
       tweetText: true,
       media: true,
+      urls: true,
       xMetadata: true,
       bookmarkedAt: true,
     },

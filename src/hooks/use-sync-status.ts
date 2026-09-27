@@ -6,7 +6,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { syncStatusResponseSchema } from "@/lib/api-response-schemas";
 import type { SyncStatusResponse } from "@/types";
 
-export const syncStatusQueryKey = ["sync-status"] as const;
+const syncStatusQueryKey = ["sync-status"] as const;
 
 export function useSyncStatus() {
   return useQuery<SyncStatusResponse>({

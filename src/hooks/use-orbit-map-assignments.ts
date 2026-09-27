@@ -13,6 +13,8 @@ import type { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
 import { sendJson } from "@/lib/fetch-json";
 import { patchOrbitGraphAssignment } from "@/lib/orbit-graph-assign";
+import type { OrbitMapArmedBookmark } from "@/lib/orbit-map-actions";
+import { hasOrbitMapConnection } from "@/lib/orbit-map-connections";
 import {
   invalidateBookmarkCollectionSideEffects,
   invalidateBookmarkListQueries,
@@ -21,6 +23,7 @@ import {
   resolveOrbitMapSelectionNode,
   type buildOrbitMapGraphIndexes,
 } from "@/lib/orbit-map-graph-indexes";
+import type { OrbitGraphNode } from "@/types";
 
 type GraphIndexes = ReturnType<typeof buildOrbitMapGraphIndexes>;
 
@@ -30,8 +33,10 @@ interface UseOrbitMapAssignmentsOptions {
   queryClient: QueryClient;
   canvasRef: RefObject<OrbitMapCanvasHandle | null>;
   graphIndexes: GraphIndexes;
+  connectionIndex: Map<string, string[]> | null;
   activeSelectionNode: ReturnType<typeof resolveOrbitMapSelectionNode>;
   selectedBookmarkId: string | null;
+  armedBookmark: OrbitMapArmedBookmark | null;
   refetch: () => Promise<unknown>;
   onSelectionChange: (selection: OrbitMapSelection | null) => void;
 }
@@ -56,8 +61,10 @@ export function useOrbitMapAssignments({
   queryClient,
   canvasRef,
   graphIndexes,
+  connectionIndex,
   activeSelectionNode,
   selectedBookmarkId,
+  armedBookmark,
   refetch,
   onSelectionChange,
 }: UseOrbitMapAssignmentsOptions) {
@@ -65,58 +72,112 @@ export function useOrbitMapAssignments({
     null
   );
 
+  // One path for both drag-drop and the inspector's Assign: skip no-op
+  // assignments (their "Undo" would remove a link the bookmark already had),
+  // then tag/collect with a success toast that can undo it.
+  const assignToAnchor = useCallback(
+    async (
+      bookmarkId: string,
+      anchor: OrbitGraphNode,
+      options: { animate?: boolean; alreadyAssigned?: boolean } = {}
+    ) => {
+      if (anchor.kind !== "tag" && anchor.kind !== "collection") return;
+
+      if (
+        options.alreadyAssigned ||
+        hasOrbitMapConnection(connectionIndex, bookmarkId, anchor.id)
+      ) {
+        toast.info(
+          anchor.kind === "tag"
+            ? `Already tagged #${anchor.name}`
+            : `Already in ${anchor.name}`
+        );
+        return;
+      }
+
+      if (anchor.kind === "collection" && anchor.variant === "x_folder") {
+        toast.info(
+          "X folders are synced from X and can't be edited. Copy it as a collection first."
+        );
+        return;
+      }
+
+      try {
+        if (options.animate) {
+          await canvasRef.current?.animateAssign(bookmarkId, anchor.id);
+        }
+
+        if (anchor.kind === "tag") {
+          await actions.handleAddTag(bookmarkId, anchor.name, anchor.color);
+          applyAssignmentOrRefetch(queryClient, refetch, {
+            action: "add",
+            bookmarkId,
+            anchorKind: "tag",
+            anchorId: anchor.id,
+          });
+          toast.success(`Tagged #${anchor.name}`, {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void actions.handleRemoveTag(bookmarkId, anchor.id).then(() => {
+                  applyAssignmentOrRefetch(queryClient, refetch, {
+                    action: "remove",
+                    bookmarkId,
+                    anchorKind: "tag",
+                    anchorId: anchor.id,
+                  });
+                });
+              },
+            },
+          });
+          return;
+        }
+
+        await actions.handleAddToCollection(bookmarkId, anchor.id);
+        applyAssignmentOrRefetch(queryClient, refetch, {
+          action: "add",
+          bookmarkId,
+          anchorKind: "collection",
+          anchorId: anchor.id,
+        });
+        toast.success(`Added to ${anchor.name}`, {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              void sendJson(`/api/collections/${anchor.id}/items`, {
+                method: "DELETE",
+                body: { bookmarkIds: [bookmarkId] },
+              }).then(() => {
+                void invalidateBookmarkListQueries(queryClient);
+                void invalidateBookmarkCollectionSideEffects(
+                  queryClient,
+                  anchor.id
+                );
+                applyAssignmentOrRefetch(queryClient, refetch, {
+                  action: "remove",
+                  bookmarkId,
+                  anchorKind: "collection",
+                  anchorId: anchor.id,
+                });
+              });
+            },
+          },
+        });
+      } catch {
+        // Failure toasts come from the underlying mutations in useBookmarkActions.
+      }
+    },
+    [actions, canvasRef, connectionIndex, queryClient, refetch]
+  );
+
   const handleAssign = useCallback(async () => {
     if (!activeSelectionNode || !selectedBookmarkId) return;
-    if (
-      activeSelectionNode.kind !== "tag" &&
-      activeSelectionNode.kind !== "collection"
-    ) {
-      return;
-    }
-
-    if (activeSelectionNode.kind === "tag") {
-      await canvasRef.current?.animateAssign(
-        selectedBookmarkId,
-        activeSelectionNode.id
-      );
-      await actions.handleAddTag(
-        selectedBookmarkId,
-        activeSelectionNode.name,
-        activeSelectionNode.color
-      );
-      applyAssignmentOrRefetch(queryClient, refetch, {
-        action: "add",
-        bookmarkId: selectedBookmarkId,
-        anchorKind: "tag",
-        anchorId: activeSelectionNode.id,
-      });
-      return;
-    }
-
-    if (activeSelectionNode.variant === "x_folder") return;
-
-    await canvasRef.current?.animateAssign(
-      selectedBookmarkId,
-      activeSelectionNode.id
-    );
-    await actions.handleAddToCollection(
-      selectedBookmarkId,
-      activeSelectionNode.id
-    );
-    applyAssignmentOrRefetch(queryClient, refetch, {
-      action: "add",
-      bookmarkId: selectedBookmarkId,
-      anchorKind: "collection",
-      anchorId: activeSelectionNode.id,
+    await assignToAnchor(selectedBookmarkId, activeSelectionNode, {
+      animate: true,
+      alreadyAssigned:
+        armedBookmark?.id === selectedBookmarkId && armedBookmark.assigned,
     });
-  }, [
-    actions,
-    activeSelectionNode,
-    canvasRef,
-    queryClient,
-    refetch,
-    selectedBookmarkId,
-  ]);
+  }, [activeSelectionNode, armedBookmark, assignToAnchor, selectedBookmarkId]);
 
   const handleNodeDropped = useCallback(
     async (
@@ -129,77 +190,9 @@ export function useOrbitMapAssignments({
         graphIndexes
       );
       if (!anchor) return;
-
-      try {
-        if (anchor.kind === "tag") {
-          await actions.handleAddTag(bookmarkId, anchor.name, anchor.color);
-          applyAssignmentOrRefetch(queryClient, refetch, {
-            action: "add",
-            bookmarkId,
-            anchorKind: "tag",
-            anchorId,
-          });
-          toast.success(`Tagged #${anchor.name}`, {
-            action: {
-              label: "Undo",
-              onClick: () => {
-                void actions.handleRemoveTag(bookmarkId, anchorId).then(() => {
-                  applyAssignmentOrRefetch(queryClient, refetch, {
-                    action: "remove",
-                    bookmarkId,
-                    anchorKind: "tag",
-                    anchorId,
-                  });
-                });
-              },
-            },
-          });
-          return;
-        }
-
-        if (anchor.kind === "collection") {
-          if (anchor.variant === "x_folder") {
-            toast.info(
-              "X folders are synced from X and can't be edited. Copy it as a collection first."
-            );
-            return;
-          }
-          await actions.handleAddToCollection(bookmarkId, anchor.id);
-          applyAssignmentOrRefetch(queryClient, refetch, {
-            action: "add",
-            bookmarkId,
-            anchorKind: "collection",
-            anchorId: anchor.id,
-          });
-          toast.success(`Added to ${anchor.name}`, {
-            action: {
-              label: "Undo",
-              onClick: () => {
-                void sendJson(`/api/collections/${anchor.id}/items`, {
-                  method: "DELETE",
-                  body: { bookmarkIds: [bookmarkId] },
-                }).then(() => {
-                  void invalidateBookmarkListQueries(queryClient);
-                  void invalidateBookmarkCollectionSideEffects(
-                    queryClient,
-                    anchor.id
-                  );
-                  applyAssignmentOrRefetch(queryClient, refetch, {
-                    action: "remove",
-                    bookmarkId,
-                    anchorKind: "collection",
-                    anchorId: anchor.id,
-                  });
-                });
-              },
-            },
-          });
-        }
-      } catch {
-        // Failure toasts come from the underlying mutations in useBookmarkActions.
-      }
+      await assignToAnchor(bookmarkId, anchor);
     },
-    [actions, graphIndexes, queryClient, refetch]
+    [assignToAnchor, graphIndexes]
   );
 
   const openTagDialog = useCallback(() => {

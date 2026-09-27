@@ -3,13 +3,15 @@
  *
  * Phase 1 — anchor constellation: a short, synchronous d3-force run over only
  * core + tag/collection hubs, with links weighted by bookmark co-occurrence,
- * collision radii sized to each hub's full orbit cluster. Frozen afterwards.
+ * collision radii sized to each hub's full disc. Frozen afterwards.
  *
- * Phase 2 — analytic bookmark placement (no per-bookmark forces):
- * - single-anchor bookmarks sit on concentric rings around their hub
- * - multi-anchor bookmarks sit at the weighted centroid of their hubs
- *   (hash jitter + a few collision-relax passes)
- * - loose bookmarks form a sparse sunflower band outside the constellation
+ * Phase 2 — analytic bookmark placement (no per-bookmark forces). Every
+ * bookmark sits on a concentric ring around exactly one home, newest nearest
+ * the hub:
+ * - filed bookmarks orbit their first tag (else their first collection);
+ *   their other homes are linked on selection, not by position
+ * - loose bookmarks orbit the core (the Orbit queue)
+ * - "+N" overflow markers sit on their disc's rim
  *
  * Everything is a pure function of the graph payload, so the layout is stable
  * across reloads and cheap to recompute — no persistence required.
@@ -35,8 +37,11 @@ export interface OrbitMapLayoutNodeInput {
   /**
    * Recency signal for bookmarks. Recent members fill a cluster's inner
    * shells first, so orbital distance reads as age — like tree rings.
+   * Used only when `age` is missing.
    */
   recent?: boolean;
+  /** Days since the bookmark was saved; orders rings newest-first. */
+  age?: number;
 }
 
 export interface OrbitMapCluster {
@@ -62,9 +67,9 @@ export interface OrbitMapOrbitGeometry {
   radius: number;
   /** Angle (radians) of the node's layout position. */
   theta: number;
-  /** Ring index within its cluster, or -1 for the loose belt. */
+  /** Ring index within its cluster (0 = innermost, newest). */
   ringIndex: number;
-  /** Cluster anchor id for ring orbits; null for the loose belt. */
+  /** Home the node orbits (a hub or the core); null only without a core. */
   anchorId: string | null;
 }
 
@@ -72,13 +77,11 @@ export interface OrbitMapClusterLayoutResult {
   positions: Map<string, { x: number; y: number }>;
   clusters: Map<string, OrbitMapCluster>;
   /**
-   * Orbit geometry for every node that revolves around something: cluster
-   * ring members (single-anchor bookmarks + overflow) and loose-belt
-   * bookmarks. Multi-anchor bookmarks are tethered between hubs and have no
-   * orbit.
+   * Orbit geometry for every bookmark: each sits on a ring around its home
+   * (a hub, or the core for loose bookmarks). Overflow markers have none.
    */
   orbits: Map<string, OrbitMapOrbitGeometry>;
-  /** Radius of the anchor constellation; the loose band starts outside it. */
+  /** Radius enclosing every disc. */
   constellationRadius: number;
 }
 
@@ -92,16 +95,10 @@ const RING_GAP = 17;
 const RING_SLOT_SPACING = 15;
 /** Minimum clearance kept between neighboring clusters by the collide force. */
 export const ORBIT_MAP_CLUSTER_PADDING = 30;
-/** Gap between the constellation edge and the loose bookmark band. */
-export const ORBIT_MAP_LOOSE_BAND_GAP = 110;
+/** Gap between a disc's outer ring and its "+N" overflow marker. */
+const OVERFLOW_RIM_GAP = 10;
 
 const ANCHOR_SIM_TICKS = 300;
-const MULTI_JITTER_MIN = 14;
-const MULTI_JITTER_RANGE = 26;
-const MULTI_MIN_SEPARATION = 13;
-const MULTI_RELAX_ITERATIONS = 3;
-const LOOSE_MIN_SEPARATION = 11;
-const LOOSE_RELAX_ITERATIONS = 4;
 
 function hashId(id: string, salt = 0): number {
   let hash = (2166136261 ^ salt) >>> 0;
@@ -177,65 +174,51 @@ function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
-interface RelaxPoint {
-  x: number;
-  y: number;
-  /** Index into the movable array, or -1 for a static obstacle. */
-  movableIndex: number;
+/** Newest first; missing ages fall back to the `recent` flag. */
+function orderByAge(
+  ids: string[],
+  ageById: Map<string, number>,
+  recentIds: Set<string>
+): string[] {
+  const key = (id: string) =>
+    ageById.get(id) ?? (recentIds.has(id) ? 0 : Number.POSITIVE_INFINITY);
+  return [...ids].sort((a, b) => {
+    const diff = key(a) - key(b);
+    return Number.isNaN(diff) ? 0 : diff;
+  });
 }
 
-/**
- * A few grid-based separation passes pushing movable points apart from each
- * other and away from static obstacles. Mutates `movable` in place.
- */
-function relaxOverlaps(
-  movable: Array<{ x: number; y: number }>,
-  statics: Array<{ x: number; y: number }>,
-  minSeparation: number,
-  iterations: number
+/** Places `members` on `rings` around `center`, recording each orbit. */
+function placeOnRings(
+  anchorId: string | null,
+  center: { x: number; y: number },
+  rings: RingPlan[],
+  members: string[],
+  positions: Map<string, { x: number; y: number }>,
+  orbits: Map<string, OrbitMapOrbitGeometry>
 ) {
-  if (movable.length === 0) return;
-  const cellSize = minSeparation * 2;
-  const key = (x: number, y: number) =>
-    `${Math.floor(x / cellSize)}:${Math.floor(y / cellSize)}`;
-
-  for (let iter = 0; iter < iterations; iter++) {
-    const grid = new Map<string, RelaxPoint[]>();
-    const insert = (point: RelaxPoint) => {
-      const k = key(point.x, point.y);
-      const bucket = grid.get(k);
-      if (bucket) bucket.push(point);
-      else grid.set(k, [point]);
-    };
-    statics.forEach((p) => insert({ x: p.x, y: p.y, movableIndex: -1 }));
-    movable.forEach((p, index) =>
-      insert({ x: p.x, y: p.y, movableIndex: index })
-    );
-
-    for (let i = 0; i < movable.length; i++) {
-      const point = movable[i];
-      const cx = Math.floor(point.x / cellSize);
-      const cy = Math.floor(point.y / cellSize);
-      for (let gx = cx - 1; gx <= cx + 1; gx++) {
-        for (let gy = cy - 1; gy <= cy + 1; gy++) {
-          const bucket = grid.get(`${gx}:${gy}`);
-          if (!bucket) continue;
-          for (const other of bucket) {
-            if (other.movableIndex === i) continue;
-            const dx = point.x - other.x;
-            const dy = point.y - other.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist >= minSeparation) continue;
-            // Coincident points get a deterministic nudge direction.
-            const angle =
-              dist < 0.01 ? hash01(`${i}`, iter) * Math.PI * 2 : Math.atan2(dy, dx);
-            const push = (minSeparation - dist) *
-              (other.movableIndex === -1 ? 1 : 0.5);
-            point.x += Math.cos(angle) * push;
-            point.y += Math.sin(angle) * push;
-          }
-        }
-      }
+  const angleOffset = hash01(anchorId ?? "loose") * Math.PI * 2;
+  let memberIndex = 0;
+  for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+    const ring = rings[ringIndex];
+    const inRing = Math.min(ring.capacity, members.length - memberIndex);
+    for (let slot = 0; slot < inRing; slot++) {
+      const angle =
+        angleOffset + ringIndex * 0.35 + (slot / Math.max(inRing, 1)) * Math.PI * 2;
+      const id = members[memberIndex];
+      positions.set(id, {
+        x: center.x + Math.cos(angle) * ring.radius,
+        y: center.y + Math.sin(angle) * ring.radius,
+      });
+      orbits.set(id, {
+        centerX: center.x,
+        centerY: center.y,
+        radius: ring.radius,
+        theta: angle,
+        ringIndex,
+        anchorId,
+      });
+      memberIndex++;
     }
   }
 }
@@ -251,6 +234,7 @@ export function computeOrbitMapClusterLayout(
   const anchors = nodes.filter(
     (node) => node.kind === "tag" || node.kind === "collection"
   );
+  const anchorKind = new Map(anchors.map((anchor) => [anchor.id, anchor.kind]));
   const bookmarks = nodes.filter((node) => node.kind === "bookmark");
   const overflows = nodes.filter((node) => node.kind === "overflow");
   const core = nodes.find((node) => node.kind === "core");
@@ -259,7 +243,6 @@ export function computeOrbitMapClusterLayout(
   // --- Membership indexes -------------------------------------------------
   const bookmarkAnchors = new Map<string, string[]>();
   const overflowAnchor = new Map<string, string>();
-  const anchorOverflow = new Map<string, string>();
   for (const edge of edges) {
     if (edge.kind === "bookmark-tag" || edge.kind === "bookmark-collection") {
       const anchorId =
@@ -270,56 +253,59 @@ export function computeOrbitMapClusterLayout(
       else bookmarkAnchors.set(edge.bookmarkId, [anchorId]);
     } else if (edge.kind === "overflow") {
       overflowAnchor.set(edge.overflowId, edge.anchorId);
-      anchorOverflow.set(edge.anchorId, edge.overflowId);
     }
   }
 
-  const singleMembers = new Map<string, string[]>();
+  // Each bookmark orbits one home: its first tag, else its first collection.
+  // Bookmarks with several homes still pull those hubs together (below).
+  const homeMembers = new Map<string, string[]>();
   const multiBookmarks: Array<{ id: string; anchorIds: string[] }> = [];
   const looseIds: string[] = [];
   for (const bookmark of bookmarks) {
     const connected = bookmarkAnchors.get(bookmark.id) ?? [];
     if (connected.length === 0) {
       looseIds.push(bookmark.id);
-    } else if (connected.length === 1) {
-      const list = singleMembers.get(connected[0]);
-      if (list) list.push(bookmark.id);
-      else singleMembers.set(connected[0], [bookmark.id]);
-    } else {
+      continue;
+    }
+    const home =
+      connected.find((anchorId) => anchorKind.get(anchorId) === "tag") ??
+      connected[0];
+    const list = homeMembers.get(home);
+    if (list) list.push(bookmark.id);
+    else homeMembers.set(home, [bookmark.id]);
+    if (connected.length > 1) {
       multiBookmarks.push({ id: bookmark.id, anchorIds: connected });
     }
   }
-  // Overflow markers without a placeable anchor fall into the loose band.
-  for (const overflow of overflows) {
-    const anchorId = overflowAnchor.get(overflow.id);
-    if (!anchorId || !anchorIds.has(anchorId)) looseIds.push(overflow.id);
-  }
 
   // --- Cluster sizing -----------------------------------------------------
-  const recentById = new Map<string, boolean>();
+  const recentIds = new Set<string>();
+  const ageById = new Map<string, number>();
   for (const node of nodes) {
-    if (node.recent) recentById.set(node.id, true);
+    if (node.recent) recentIds.add(node.id);
+    if (typeof node.age === "number" && Number.isFinite(node.age)) {
+      ageById.set(node.id, node.age);
+    }
   }
 
   const ringPlans = new Map<string, RingPlan[]>();
   const clusterRadii = new Map<string, number>();
   const ringMembers = new Map<string, string[]>();
   for (const anchor of anchors) {
-    // Recent bookmarks first, so they fill the inner shells and orbital
-    // distance reads as age (stable sort keeps the rest deterministic).
-    // The overflow marker always goes last — the outermost slot.
-    const members = [...(singleMembers.get(anchor.id) ?? [])].sort(
-      (a, b) => (recentById.has(b) ? 1 : 0) - (recentById.has(a) ? 1 : 0)
-    );
-    const overflowId = anchorOverflow.get(anchor.id);
-    if (overflowId && overflows.some((o) => o.id === overflowId)) {
-      members.push(overflowId);
-    }
+    // Newest first, so they fill the inner shells and orbital distance
+    // reads as age, like tree rings.
+    const members = orderByAge(homeMembers.get(anchor.id) ?? [], ageById, recentIds);
     ringMembers.set(anchor.id, members);
     const rings = planRings(anchor.radius, members.length);
     ringPlans.set(anchor.id, rings);
     clusterRadii.set(anchor.id, clusterRadiusFromRings(anchor.radius, rings));
   }
+
+  // Loose bookmarks orbit the core, which becomes the Orbit queue's disc.
+  const coreRadius = core?.radius ?? 13;
+  const looseMembers = orderByAge(looseIds, ageById, recentIds);
+  const coreRings = planRings(coreRadius, looseMembers.length);
+  const coreClusterRadius = clusterRadiusFromRings(coreRadius, coreRings);
 
   // --- Phase 1: anchor constellation --------------------------------------
   // Seed on a golden-angle spiral, biggest clusters near the center, then let
@@ -334,7 +320,7 @@ export function computeOrbitMapClusterLayout(
 
   const simNodes: AnchorSimNode[] = orderedAnchors.map((anchor, index) => {
     const angle = index * GOLDEN_ANGLE;
-    const distance = 180 + 130 * Math.sqrt(index);
+    const distance = coreClusterRadius + 80 + 130 * Math.sqrt(index);
     return {
       id: anchor.id,
       clusterRadius: clusterRadii.get(anchor.id) ?? anchor.radius + 14,
@@ -346,7 +332,7 @@ export function computeOrbitMapClusterLayout(
   if (core) {
     simNodes.push({
       id: core.id,
-      clusterRadius: core.radius + 40,
+      clusterRadius: coreClusterRadius,
       x: 0,
       y: 0,
       fx: 0,
@@ -372,7 +358,10 @@ export function computeOrbitMapClusterLayout(
           source: core.id,
           target: anchor.id,
           distance:
-            200 + (clusterRadii.get(anchor.id) ?? 20) + ORBIT_MAP_CLUSTER_PADDING,
+            coreClusterRadius +
+            (clusterRadii.get(anchor.id) ?? 20) +
+            ORBIT_MAP_CLUSTER_PADDING +
+            60,
           strength: 0.04,
         });
       }
@@ -423,10 +412,9 @@ export function computeOrbitMapClusterLayout(
   }
   if (core) positions.set(core.id, { x: 0, y: 0 });
 
-  // --- Phase 2a: orbit ring placement -------------------------------------
+  // --- Phase 2a: rings around every home ---------------------------------
   for (const anchor of anchors) {
     const center = positions.get(anchor.id) ?? { x: 0, y: 0 };
-    const rings = ringPlans.get(anchor.id) ?? [];
     const members = ringMembers.get(anchor.id) ?? [];
     clusters.set(anchor.id, {
       anchorId: anchor.id,
@@ -435,130 +423,55 @@ export function computeOrbitMapClusterLayout(
       radius: clusterRadii.get(anchor.id) ?? anchor.radius + 14,
       memberCount: members.length,
     });
-
-    const angleOffset = hash01(anchor.id) * Math.PI * 2;
-    let memberIndex = 0;
-    for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
-      const ring = rings[ringIndex];
-      const inRing = Math.min(ring.capacity, members.length - memberIndex);
-      for (let slot = 0; slot < inRing; slot++) {
-        const angle =
-          angleOffset +
-          ringIndex * 0.35 +
-          (slot / Math.max(inRing, 1)) * Math.PI * 2;
-        positions.set(members[memberIndex], {
-          x: center.x + Math.cos(angle) * ring.radius,
-          y: center.y + Math.sin(angle) * ring.radius,
-        });
-        orbits.set(members[memberIndex], {
-          centerX: center.x,
-          centerY: center.y,
-          radius: ring.radius,
-          theta: angle,
-          ringIndex,
-          anchorId: anchor.id,
-        });
-        memberIndex++;
-      }
-    }
+    placeOnRings(
+      anchor.id,
+      center,
+      ringPlans.get(anchor.id) ?? [],
+      members,
+      positions,
+      orbits
+    );
   }
 
-  // --- Phase 2b: multi-anchor centroids + collision relax ------------------
-  const multiPositions: Array<{ x: number; y: number }> = multiBookmarks.map(
-    ({ id, anchorIds: list }) => {
-      let cx = 0;
-      let cy = 0;
-      for (const anchorId of list) {
-        const p = positions.get(anchorId) ?? { x: 0, y: 0 };
-        cx += p.x;
-        cy += p.y;
-      }
-      cx /= list.length;
-      cy /= list.length;
-      const jitterRadius = MULTI_JITTER_MIN + hash01(id, 7) * MULTI_JITTER_RANGE;
-      const jitterAngle = hash01(id, 13) * Math.PI * 2;
-      return {
-        x: cx + Math.cos(jitterAngle) * jitterRadius,
-        y: cy + Math.sin(jitterAngle) * jitterRadius,
-      };
-    }
-  );
-
-  const staticObstacles: Array<{ x: number; y: number }> = [];
-  for (const members of ringMembers.values()) {
-    for (const id of members) {
-      const p = positions.get(id);
-      if (p) staticObstacles.push(p);
-    }
+  // --- Phase 2b: the queue disc around the core ----------------------------
+  if (core) {
+    clusters.set(core.id, {
+      anchorId: core.id,
+      x: 0,
+      y: 0,
+      radius: coreClusterRadius,
+      memberCount: looseMembers.length,
+    });
   }
-  relaxOverlaps(
-    multiPositions,
-    staticObstacles,
-    MULTI_MIN_SEPARATION,
-    MULTI_RELAX_ITERATIONS
-  );
-  multiBookmarks.forEach(({ id }, index) => {
-    positions.set(id, multiPositions[index]);
-  });
+  placeOnRings(core?.id ?? null, { x: 0, y: 0 }, coreRings, looseMembers, positions, orbits);
+
+  // --- Phase 2c: "+N" markers on their disc's rim --------------------------
+  // Bottom-right of the rim; markers that share a disc fan out along it.
+  const rimSlots = new Map<string, number>();
+  for (const overflow of overflows) {
+    const anchorId = overflowAnchor.get(overflow.id);
+    const cluster =
+      (anchorId ? clusters.get(anchorId) : undefined) ??
+      (core ? clusters.get(core.id) : undefined);
+    const center = cluster ?? { x: 0, y: 0, radius: coreClusterRadius };
+    const key = cluster?.anchorId ?? "";
+    const slot = rimSlots.get(key) ?? 0;
+    rimSlots.set(key, slot + 1);
+    const angle = Math.PI / 4 + slot * 0.3;
+    const radius = center.radius + OVERFLOW_RIM_GAP;
+    positions.set(overflow.id, {
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    });
+  }
 
   // --- Constellation radius -----------------------------------------------
-  let constellationRadius = 260;
+  let constellationRadius = coreClusterRadius;
   for (const cluster of clusters.values()) {
     constellationRadius = Math.max(
       constellationRadius,
       Math.hypot(cluster.x, cluster.y) + cluster.radius
     );
-  }
-  for (const point of multiPositions) {
-    constellationRadius = Math.max(
-      constellationRadius,
-      Math.hypot(point.x, point.y) + 20
-    );
-  }
-
-  // --- Phase 2c: loose sunflower band --------------------------------------
-  if (looseIds.length > 0) {
-    const bandInner = constellationRadius + ORBIT_MAP_LOOSE_BAND_GAP;
-    const bandWidth = Math.min(420, Math.max(120, looseIds.length * 1.4));
-    const loosePositions = looseIds.map((id, index) => {
-      const t = (index + 0.5) / looseIds.length;
-      const radius = bandInner + bandWidth * Math.sqrt(t);
-      // Keep the low-discrepancy sunflower ordering, but add tiny deterministic
-      // per-node angle noise so Fibonacci-neighbor streaks don't line up exactly
-      // in very large loose bands.
-      const angle =
-        index * GOLDEN_ANGLE +
-        hash01(id, 3) * 0.06 +
-        (hash01(id, 29) - 0.5) * 0.018;
-      return {
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-      };
-    });
-    relaxOverlaps(
-      loosePositions,
-      [],
-      LOOSE_MIN_SEPARATION,
-      LOOSE_RELAX_ITERATIONS
-    );
-    looseIds.forEach((id, index) => {
-      const position = loosePositions[index];
-      positions.set(id, position);
-      // Belt orbit derived from the relaxed position so the circle passes
-      // exactly through it; the whole belt shares one ω, so it rotates
-      // rigidly and the relaxed spacing is preserved.
-      const radius = Math.hypot(position.x, position.y);
-      if (radius > 1) {
-        orbits.set(id, {
-          centerX: 0,
-          centerY: 0,
-          radius,
-          theta: Math.atan2(position.y, position.x),
-          ringIndex: -1,
-          anchorId: null,
-        });
-      }
-    });
   }
 
   // --- Safety net: every node gets a finite position -----------------------

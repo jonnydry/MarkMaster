@@ -4,7 +4,7 @@ import { invalidateCollectionsQuery } from "@/lib/query-invalidation";
 import type { QueryClient } from "@tanstack/react-query";
 import type { BookmarkWithRelations } from "@/types";
 
-export type SaveGemsResult = {
+type SaveGemsResult = {
   collectionId: string;
   /** false when gems were added to an existing collection with the same name. */
   created: boolean;

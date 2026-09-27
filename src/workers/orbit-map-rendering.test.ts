@@ -5,7 +5,6 @@ import {
   getOrbitMapNodeRadius,
   getOrbitMapNodeVisualStyle,
   mixOrbitMapColors,
-  saturateOrbitMapColor,
   shouldShowOrbitMapLabel,
   ORBIT_MAP_BOOKMARK_LABEL_ZOOM,
   ORBIT_MAP_TOP_HUB_LABEL_COUNT,
@@ -13,7 +12,7 @@ import {
 import type { OrbitGraphNode } from "@/types";
 
 describe("getOrbitMapNodeVisualStyle", () => {
-  it("uses distinct colors for loose and assigned bookmarks", () => {
+  it("draws loose bookmarks as accent rings and filed ones as neutral dots", () => {
     const looseBookmark: OrbitGraphNode = {
       kind: "bookmark",
       id: "loose-bookmark",
@@ -29,37 +28,17 @@ describe("getOrbitMapNodeVisualStyle", () => {
       affiliated: true,
     };
 
-    expect(getOrbitMapNodeVisualStyle(looseBookmark)).toMatchObject({
-      isHub: false,
-    });
-    expect(getOrbitMapNodeVisualStyle(looseBookmark).color).toBe(0x1671ff);
+    const loose = getOrbitMapNodeVisualStyle(looseBookmark);
+    expect(loose).toMatchObject({ color: 0x5b8def, isHub: false });
+    expect(loose.strokeWidth).toBeGreaterThan(0);
     expect(getOrbitMapNodeVisualStyle(assignedBookmark)).toMatchObject({
-      color: 0x737373,
+      color: 0x8d9299,
+      strokeWidth: 0,
       isHub: false,
     });
   });
 
-  it("brightens recent bookmarks with a cyan-hot edge", () => {
-    const stale: OrbitGraphNode = {
-      kind: "bookmark",
-      id: "stale",
-      title: "Stale",
-      authorUsername: "author",
-      authorDisplayName: "Author",
-      affiliated: true,
-      recent: false,
-    };
-    const fresh: OrbitGraphNode = { ...stale, id: "fresh", recent: true };
-
-    const staleStyle = getOrbitMapNodeVisualStyle(stale);
-    const freshStyle = getOrbitMapNodeVisualStyle(fresh);
-    expect(freshStyle.color).toBe(
-      mixOrbitMapColors(staleStyle.color, 0x67e8f9, 0.14)
-    );
-    expect(freshStyle.strokeWidth).toBeGreaterThan(staleStyle.strokeWidth);
-  });
-
-  it("boosts tag and collection hub colors for a neon read", () => {
+  it("keeps the user's tag colour and draws collections in neutral ink", () => {
     const tag: OrbitGraphNode = {
       kind: "tag",
       id: "tag",
@@ -74,16 +53,27 @@ describe("getOrbitMapNodeVisualStyle", () => {
       variant: "user_collection",
       count: 4,
     };
+    const xFolder: OrbitGraphNode = { ...collection, id: "x", variant: "x_folder" };
 
-    expect(getOrbitMapNodeVisualStyle(tag)).toMatchObject({
-      color: 0x006ffa,
-      isHub: true,
-    });
-    expect(getOrbitMapNodeVisualStyle(tag).strokeColor).not.toBe(0x1569cb);
+    expect(getOrbitMapNodeVisualStyle(tag)).toMatchObject({ color: 0x1569cb, isHub: true });
     expect(getOrbitMapNodeVisualStyle(collection)).toMatchObject({
+      color: 0xececec,
+      strokeWidth: 0,
       isHub: true,
     });
-    expect(getOrbitMapNodeVisualStyle(collection).color).toBe(16724131);
+    // X folders are outlined (read-only), so they carry a stroke.
+    expect(getOrbitMapNodeVisualStyle(xFolder).strokeWidth).toBeGreaterThan(0);
+  });
+
+  it("draws the core in the accent, as the queue", () => {
+    const core: OrbitGraphNode = {
+      kind: "core",
+      id: "orbit-index",
+      totalBookmarks: 10,
+      looseBookmarks: 4,
+    };
+    expect(getOrbitMapNodeVisualStyle(core)).toMatchObject({ color: 0x5b8def, isHub: true });
+    expect(getOrbitMapLabelText(core)).toBe("Orbit queue");
   });
 
   it("scales hubs by count while keeping bookmarks compact", () => {
@@ -139,12 +129,8 @@ describe("getOrbitMapNodeVisualStyle", () => {
       shouldShowOrbitMapLabel("bookmark", ORBIT_MAP_BOOKMARK_LABEL_ZOOM, 0.6)
     ).toBe(true);
     expect(shouldShowOrbitMapLabel("bookmark", 0.4, 0.6)).toBe(false);
-    // Selected-neighbor bookmarks need moderate zoom to avoid label storms
-    expect(
-      shouldShowOrbitMapLabel("bookmark", 0.4, 0.6, {
-        isSelectedNeighbor: true,
-      })
-    ).toBe(false);
+    // Selected-neighbor bookmarks follow the normal zoom rule (hairlines
+    // already show them), so selecting a big hub doesn't flood the canvas.
     expect(
       shouldShowOrbitMapLabel(
         "bookmark",
@@ -152,6 +138,11 @@ describe("getOrbitMapNodeVisualStyle", () => {
         0.6,
         { isSelectedNeighbor: true }
       )
+    ).toBe(false);
+    expect(
+      shouldShowOrbitMapLabel("bookmark", ORBIT_MAP_BOOKMARK_LABEL_ZOOM, 0.6, {
+        isSelectedNeighbor: true,
+      })
     ).toBe(true);
   });
 
@@ -176,7 +167,7 @@ describe("getOrbitMapNodeVisualStyle", () => {
     ).toBe(true);
   });
 
-  it("labels overflow nodes with their remaining count and the core as Orbit", () => {
+  it("labels overflow nodes with their remaining count and the core as the queue", () => {
     const overflow: OrbitGraphNode = {
       kind: "overflow",
       id: "tag-overflow-1",
@@ -192,7 +183,7 @@ describe("getOrbitMapNodeVisualStyle", () => {
     };
 
     expect(getOrbitMapLabelText(overflow)).toBe("+42");
-    expect(getOrbitMapLabelText(core)).toBe("Orbit");
+    expect(getOrbitMapLabelText(core)).toBe("Orbit queue");
   });
 });
 
@@ -206,11 +197,3 @@ describe("mixOrbitMapColors", () => {
   });
 });
 
-describe("saturateOrbitMapColor", () => {
-  it("increases chroma away from gray", () => {
-    const gray = 0x808080;
-    const blue = 0x2563eb;
-    expect(saturateOrbitMapColor(gray, 1.4)).toBe(0x808080);
-    expect(saturateOrbitMapColor(blue, 1.4)).not.toBe(blue);
-  });
-});

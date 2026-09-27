@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
-import { useTheme } from "@/components/providers";
+import { useColorTheme, useTheme } from "@/components/providers";
 import { orbitMapFloatingShellClass } from "@/lib/orbit-map-chrome";
+import { readPrimaryAccentHex } from "@/lib/read-primary-accent";
 import { cn } from "@/lib/utils";
 import type { CameraState } from "@/lib/orbit-worker-protocol";
 import type { OrbitGraphPayload } from "@/types";
@@ -12,22 +13,27 @@ const MINIMAP_WIDTH = 168;
 const MINIMAP_HEIGHT = 112;
 const MINIMAP_PADDING = 8;
 
-const CORE_COLOR = "#facc15";
-const TAG_FALLBACK_COLOR = "#34d399";
-const USER_COLLECTION_COLOR = "#f472b6";
-const X_FOLDER_COLOR = "#a78bfa";
+const TAG_FALLBACK_COLOR = "#8d9299";
+// Mirrors --muted-foreground; collections are neutral on the canvas too.
+const NEUTRAL_DARK = "#8d9299";
+const NEUTRAL_LIGHT = "#56606b";
+const ACCENT_FALLBACK = "#2563eb";
+/** Slack (px) before the graph counts as extending past the viewport. */
+const FIT_TOLERANCE = 12;
 
 /**
  * Hub-level rendering (matches the map's far LOD band): the minimap reads as
- * a topic overview — one colored dot per hub, sized by bookmark count —
- * instead of replicating every bookmark as noise.
+ * a topic overview — one dot per hub, sized by bookmark count, in the same
+ * colours the canvas uses — instead of replicating every bookmark as noise.
  */
 function getHubStyle(
-  node: OrbitGraphPayload["nodes"][number]
+  node: OrbitGraphPayload["nodes"][number],
+  neutral: string,
+  accent: string
 ): { color: string; radius: number } | null {
   switch (node.kind) {
     case "core":
-      return { color: CORE_COLOR, radius: 2.5 };
+      return { color: accent, radius: 2.5 };
     case "tag":
       return {
         color: node.color || TAG_FALLBACK_COLOR,
@@ -35,8 +41,7 @@ function getHubStyle(
       };
     case "collection":
       return {
-        color:
-          node.variant === "x_folder" ? X_FOLDER_COLOR : USER_COLLECTION_COLOR,
+        color: neutral,
         radius: 1.6 + Math.min(2.6, Math.sqrt(Math.max(0, node.count)) * 0.34),
       };
     case "bookmark":
@@ -78,8 +83,42 @@ export function OrbitMapMinimap({
   className,
 }: OrbitMapMinimapProps) {
   const { theme } = useTheme();
+  const { colorTheme } = useColorTheme();
+  // Reading --primary makes a DOM probe; do it once per theme, not per frame.
+  const accent = useMemo(
+    () => readPrimaryAccentHex() ?? ACCENT_FALLBACK,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [theme, colorTheme]
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<MinimapTransform | null>(null);
+
+  // Hidden while the whole graph is already on screen — it only helps once
+  // you've zoomed past the full view.
+  const fitsInView = useMemo(() => {
+    if (!camera || !viewport || camera.zoom <= 0) return true;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const node of graph.nodes) {
+      const position = positions[node.id];
+      if (!position) continue;
+      if (position.x < minX) minX = position.x;
+      if (position.y < minY) minY = position.y;
+      if (position.x > maxX) maxX = position.x;
+      if (position.y > maxY) maxY = position.y;
+    }
+    if (!Number.isFinite(minX)) return true;
+    return (
+      minX * camera.zoom + camera.x >= -FIT_TOLERANCE &&
+      minY * camera.zoom + camera.y >= -FIT_TOLERANCE &&
+      maxX * camera.zoom + camera.x <= viewport.width + FIT_TOLERANCE &&
+      maxY * camera.zoom + camera.y <= viewport.height + FIT_TOLERANCE
+    );
+    // layoutVersion bumps when positions refresh in place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, positions, layoutVersion, camera, viewport]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -120,10 +159,11 @@ export function OrbitMapMinimap({
       (MINIMAP_HEIGHT - (maxY - minY) * scale) / 2 - minY * scale;
     transformRef.current = { scale, offsetX, offsetY };
 
+    const neutral = theme === "dark" ? NEUTRAL_DARK : NEUTRAL_LIGHT;
     for (const node of graph.nodes) {
       const position = positions[node.id];
       if (!position) continue;
-      const style = getHubStyle(node);
+      const style = getHubStyle(node, neutral, accent);
       if (!style) continue;
       const x = position.x * scale + offsetX;
       const y = position.y * scale + offsetY;
@@ -149,11 +189,8 @@ export function OrbitMapMinimap({
       const worldWidth = viewport.width / camera.zoom;
       const worldHeight = viewport.height / camera.zoom;
 
-      ctx.strokeStyle =
-        theme === "dark"
-          ? "rgba(226,232,240,0.85)"
-          : "rgba(15,23,42,0.55)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.5;
       ctx.strokeRect(
         worldLeft * scale + offsetX,
         worldTop * scale + offsetY,
@@ -161,7 +198,7 @@ export function OrbitMapMinimap({
         worldHeight * scale
       );
     }
-  }, [graph, positions, layoutVersion, camera, viewport, theme]);
+  }, [graph, positions, layoutVersion, camera, viewport, theme, accent, fitsInView]);
 
   const jumpToEvent = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const transform = transformRef.current;
@@ -175,6 +212,8 @@ export function OrbitMapMinimap({
       (y - transform.offsetY) / transform.scale
     );
   };
+
+  if (fitsInView) return null;
 
   return (
     <canvas

@@ -8,7 +8,7 @@ type InvalidateOptions = {
   refetchType?: "active" | "all" | "none";
 };
 
-export function invalidateOrbitGraphQuery(
+function invalidateOrbitGraphQuery(
   queryClient: QueryClient,
   options?: InvalidateOptions
 ) {
@@ -137,12 +137,4 @@ export function invalidateCollectionMembershipQueries(
     queryClient.invalidateQueries({ queryKey: ["library-stats"] }),
     invalidateOrbitGraphQuery(queryClient),
   ]);
-}
-
-/** @deprecated Prefer invalidateCollectionMembershipQueries or invalidateCollectionMetadataQueries. */
-export function invalidateCollectionQueries(
-  queryClient: QueryClient,
-  collectionId: string
-) {
-  return invalidateCollectionMembershipQueries(queryClient, collectionId);
 }

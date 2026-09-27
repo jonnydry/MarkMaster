@@ -1,6 +1,6 @@
 import type { OrbitSortDirection, OrbitView } from "@/lib/orbit-navigation";
 
-export type OrbitQueueFilterInput = {
+type OrbitQueueFilterInput = {
   orbitView: OrbitView;
   page: number;
   pageSize: number;
@@ -50,8 +50,4 @@ export function buildOrbitScanCandidatesQueryString(
   }
 
   return params.toString();
-}
-
-export function resetOrbitPaginationActions() {
-  return { page: 1, pageCursors: {} as Record<number, string> };
 }

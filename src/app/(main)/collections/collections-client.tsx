@@ -8,7 +8,6 @@ import { bookmarkLabel } from "@/lib/collections-presentation";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { UserNavDynamic } from "@/components/user-nav-dynamic";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import {
@@ -82,20 +81,7 @@ export default function CollectionsPage() {
 
   return (
     <>
-    <AppPageShell
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={lastSyncAt}
-          totalBookmarks={libraryStats?.libraryBookmarkCount}
-          onSyncComplete={handleSyncComplete}
-        />
-      }
-    >
+    <AppPageShell embedded>
           <PageHeader
             sticky
             title="Collections"

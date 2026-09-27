@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
 
+import { visiblePathname } from "@/components/route-preview";
 import { applyPrimarySuggestion } from "@/lib/orbit-scan-apply";
 import { ORBIT_SHORTCUT_GROUPS } from "@/lib/orbit-client-constants";
 import type { OrbitReviewSession } from "@/lib/orbit-client-constants";
@@ -101,6 +102,7 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
     };
 
     const handleEsc = (e: KeyboardEvent) => {
+      if (visiblePathname() !== "/orbit") return;
       if (e.key === "Escape") {
         setMenuForId(null);
         setMenuPosition(null);
@@ -136,6 +138,7 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (visiblePathname() !== "/orbit") return;
       if (isEditableTarget(e.target)) return;
 
       if (e.key === "Escape") {
@@ -325,6 +328,7 @@ export function useOrbitPageInteractions(options: UseOrbitPageInteractionsOption
   })();
 
   useSurfaceKeyboardShortcuts({
+    surfacePath: "/orbit",
     shortcutGroups: ORBIT_SHORTCUT_GROUPS,
     actions: {
       next: () => selectOrbitBookmarkByOffset(1),

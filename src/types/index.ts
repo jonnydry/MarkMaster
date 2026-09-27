@@ -59,6 +59,11 @@ export interface BookmarkWithRelations {
     description?: string;
     images?: Array<{ url: string; width: number; height: number }>;
   }> | null;
+  /**
+   * Public page linked from the post when the row has no picture yet.
+   * The feed loads a same-origin thumbnail from it.
+   */
+  cardUrl?: string | null;
   /** Null from compact endpoints (scan-candidates) — only detail routes hydrate it. */
   quotedTweet: {
     id: string;
@@ -524,6 +529,12 @@ export type OrbitGraphNode =
       authorDisplayName: string;
       affiliated: boolean;
       recent: boolean;
+      /**
+       * Days since the bookmark was saved, to one decimal. Orders a home's
+       * rings (newest nearest the hub) and drives Motion. Payloads cached
+       * before this field existed omit it.
+       */
+      ageDays?: number;
     }
   | {
       kind: "overflow";

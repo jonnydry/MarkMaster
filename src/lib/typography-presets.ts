@@ -1,4 +1,4 @@
-export const TYPOGRAPHY_PRESET_IDS = [
+const TYPOGRAPHY_PRESET_IDS = [
   "orbit",
   "classic",
   "editorial",
@@ -7,7 +7,7 @@ export const TYPOGRAPHY_PRESET_IDS = [
 
 export type TypographyPresetId = (typeof TYPOGRAPHY_PRESET_IDS)[number];
 
-export type TypographyPreset = {
+type TypographyPreset = {
   id: TypographyPresetId;
   name: string;
   description: string;

@@ -11,7 +11,7 @@ import {
 import { useTypography } from "@/hooks/use-typography";
 import { formatPostDate } from "@/lib/format-metrics";
 import { formatBookmarkDisplayText } from "@/lib/bookmark-display-text";
-import { getMediaImageUrl } from "@/lib/bookmark-media";
+import { BookmarkThumbnail } from "@/components/bookmark-thumbnail";
 import { cn } from "@/lib/utils";
 import type { BookmarkWithRelations } from "@/types";
 
@@ -26,25 +26,19 @@ interface DashboardBookmarkWorkspaceProps {
 }
 
 function WorkspaceThumbnail({ bookmark }: { bookmark: BookmarkWithRelations }) {
-  const media = bookmark.media?.[0];
-  const imageUrl = media ? getMediaImageUrl(media) : null;
-
   return (
     <div className="relative h-[68px] w-24 shrink-0 overflow-hidden surface-inset-strong">
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={`Preview from @${bookmark.authorUsername}`}
-          fill
-          sizes="96px"
-          className="object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center text-muted-foreground">
-          <ImageIcon className="size-4" aria-hidden="true" />
-          <span className="sr-only">Text bookmark</span>
-        </div>
-      )}
+      <BookmarkThumbnail
+        bookmark={bookmark}
+        alt={`Preview from @${bookmark.authorUsername}`}
+        sizes="96px"
+        fallback={
+          <div className="flex size-full items-center justify-center text-muted-foreground">
+            <ImageIcon className="size-4" aria-hidden="true" />
+            <span className="sr-only">Text bookmark</span>
+          </div>
+        }
+      />
     </div>
   );
 }

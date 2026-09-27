@@ -303,21 +303,9 @@ export function OrbitBookmarkOverlay({
             <BookmarkOverlayTagsSection
               tags={bookmark.tags}
               title="Current tags"
-              actionLabel={bookmark.tags.length > 0 ? "Edit tags" : "Add tag"}
-              onAction={
-                onAddTag ? () => closeAndRun(() => onAddTag(bookmark.id)) : undefined
-              }
             />
             <BookmarkOverlayCollectionsSection
               collections={bookmark.collectionItems}
-              actionLabel={
-                bookmark.collectionItems.length > 0 ? "Edit collections" : "Add to collection"
-              }
-              onAction={
-                onAddToCollection
-                  ? () => closeAndRun(() => onAddToCollection(bookmark.id))
-                  : undefined
-              }
             />
           </BookmarkOverlaySidebar>
         </>

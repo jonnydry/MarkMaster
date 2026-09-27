@@ -4,7 +4,7 @@ import { AlertTriangle, Gauge, KeyRound } from "lucide-react";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
 import type { OrbitScanFailure } from "@/hooks/use-orbit-scan";
 
-export function formatRetryAfter(seconds: number | undefined) {
+function formatRetryAfter(seconds: number | undefined) {
   if (!seconds) return null;
   if (seconds < 60) return `${seconds}s`;
 

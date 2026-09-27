@@ -12,13 +12,13 @@ import {
 } from "lucide-react";
 
 import { AppPageShell } from "@/components/app-page-shell";
+import { visiblePathname } from "@/components/route-preview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { RetryButton } from "@/components/ui/retry-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { OrbitLogoMark } from "@/components/brands/orbit-logo-mark";
-import { Sidebar } from "@/components/sidebar-dynamic";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { PageHeader } from "@/components/page-header";
 const OrbitReviewOverlay = dynamic(
@@ -28,11 +28,11 @@ const OrbitReviewOverlay = dynamic(
     ),
   { ssr: false }
 );
-import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
 import { OrbitActivityBanner } from "@/components/orbit/orbit-activity-banner";
 import { OrbitLibraryRunBanner } from "@/components/orbit/orbit-library-run-banner";
 import { OrbitScanOverviewStrip } from "@/components/orbit/orbit-scan-overview-strip";
 import { OrbitCommandBar } from "@/components/orbit/orbit-command-bar";
+import { OrbitScanLaunch } from "@/components/orbit/orbit-scan-launch";
 import { OrbitTriageHint } from "@/components/orbit/orbit-triage-hint";
 import { OrbitScanFailureNotice } from "@/components/orbit/orbit-scan-failure-notice";
 import { OrbitList } from "@/components/orbit/orbit-list";
@@ -137,20 +137,13 @@ export default function OrbitPage() {
     scanTargetIds,
     scanTargetCount,
     selectedScanTargetIds,
-    resolvedScanBatchMode,
-    scanBatchProfile,
     scanBatchLimit,
-    deepUnlocked,
-    deepLockedReason,
-    sweepUnlocked,
-    sweepLockedReason,
     hybridScanAvailable,
     canApplyStrongMatches,
     canRescanCurrentSelection,
     staleScanPlan,
     hasSelectionOverflow,
     lastScanRequest,
-    setScanBatchMode,
     handleScan,
     handleRetryScan,
     handleRescanCurrentSelection,
@@ -280,6 +273,7 @@ export default function OrbitPage() {
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (visiblePathname() !== "/orbit") return;
       if (event.key === "Escape") {
         setMenuForId(null);
         setMenuPosition(null);
@@ -295,23 +289,7 @@ export default function OrbitPage() {
 
   return (
     <>
-    <AppPageShell
-      className="orbit-route-default"
-      backdrop={<OrbitPageWatermark />}
-      sidebar={
-        <Sidebar
-          tags={tags}
-          collections={collections}
-          selectedTags={[]}
-          onTagToggle={goToTagOnDashboard}
-          onCreateCollection={handleCreateCollectionOpen}
-          lastSyncAt={dbUser?.lastSyncAt ? new Date(dbUser.lastSyncAt) : null}
-          totalBookmarks={libraryStats?.libraryBookmarkCount}
-          onSyncComplete={handleSyncComplete}
-        />
-      }
-      scrollRef={scrollRef}
-    >
+    <AppPageShell embedded scrollRef={scrollRef}>
           <PageHeader
             sticky
             feedChrome
@@ -346,33 +324,9 @@ export default function OrbitPage() {
               onToggleSelectionMode={toggleSelectionMode}
               triagedCount={triagedCount}
               passTotal={passTotal}
-              scanButtonLabel={scanButtonLabel}
               scanHelperText={scanHelperText}
-              queueIsLoading={queueIsLoading}
               scanning={scan.scanning}
-              scanTargetCount={scanTargetIds.length}
-              hasScanPlan={activeScanPlanSuggestionCount > 0}
-              batchMode={resolvedScanBatchMode}
-              resolvedBatchProfile={scanBatchProfile}
-              deepUnlocked={deepUnlocked}
-              deepLockedReason={deepLockedReason}
-              sweepUnlocked={sweepUnlocked}
-              sweepLockedReason={sweepLockedReason}
               mapHref={orbitMapHref}
-              onBatchModeChange={setScanBatchMode}
-              onScan={handleScan}
-              libraryTag={{
-                untaggedCount: libraryTag.untaggedCount,
-                available: hybridScanAvailable,
-                unavailableReason: "Auto-tag needs TYPESAFE_API_KEY.",
-                state: libraryTag.paused
-                  ? "paused"
-                  : libraryTag.run
-                    ? "running"
-                    : "idle",
-                starting: libraryTag.starting,
-                onStart: () => void libraryTag.start(),
-              }}
               libraryTagLive={libraryTag.live}
               search={search}
               onSearchChange={handleSearchChange}
@@ -381,26 +335,50 @@ export default function OrbitPage() {
               keyboardShortcutsOpen={keyboardShortcutsOpen}
               onKeyboardShortcutsOpenChange={setKeyboardShortcutsOpen}
               shortcutGroups={ORBIT_SHORTCUT_GROUPS}
-              scanError={
-                scan.error ? (
-                  <OrbitScanFailureNotice
-                    error={scan.error}
-                    retryTargetCount={
-                      lastScanRequest?.targetIds.length ?? scanTargetCount
-                    }
-                    selectionTargetCount={selectedScanTargetIds.length}
-                    canRescanCurrentSelection={canRescanCurrentSelection}
-                    scanning={scan.scanning}
-                    onRetry={handleRetryScan}
-                    onRescanCurrentSelection={handleRescanCurrentSelection}
-                  />
-                ) : null
-              }
             />
           </PageHeader>
 
-          <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-4")}>
+          <div className={cn(appContentGutterClassName, "space-y-4 pb-6 pt-2")}>
             <section className={cn(bookmarkFeedColumnClassName, "space-y-3")}>
+              {total > 0 ? (
+                <OrbitScanLaunch
+                  label={scanButtonLabel}
+                  busy={queueIsLoading || scan.scanning}
+                  disabled={
+                    queueIsLoading ||
+                    scan.scanning ||
+                    libraryTag.live ||
+                    scanTargetIds.length === 0
+                  }
+                  hasPlan={activeScanPlanSuggestionCount > 0}
+                  onScan={handleScan}
+                  library={{
+                    untaggedCount: libraryTag.untaggedCount,
+                    available: hybridScanAvailable,
+                    unavailableReason: "Auto-tag needs TYPESAFE_API_KEY.",
+                    state: libraryTag.paused
+                      ? "paused"
+                      : libraryTag.run
+                        ? "running"
+                        : "idle",
+                    starting: libraryTag.starting,
+                    onStart: () => void libraryTag.start(),
+                  }}
+                />
+              ) : null}
+              {scan.error ? (
+                <OrbitScanFailureNotice
+                  error={scan.error}
+                  retryTargetCount={
+                    lastScanRequest?.targetIds.length ?? scanTargetCount
+                  }
+                  selectionTargetCount={selectedScanTargetIds.length}
+                  canRescanCurrentSelection={canRescanCurrentSelection}
+                  scanning={scan.scanning}
+                  onRetry={handleRetryScan}
+                  onRescanCurrentSelection={handleRescanCurrentSelection}
+                />
+              ) : null}
               {scan.scanning ? (
                 <OrbitActivityBanner
                   title={`Matching ${matchingCount.toLocaleString()} bookmark${matchingCount === 1 ? "" : "s"}`}

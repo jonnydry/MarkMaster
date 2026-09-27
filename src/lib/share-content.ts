@@ -1,4 +1,4 @@
-export interface ShareThreadTweet {
+interface ShareThreadTweet {
   text: string;
 }
 
