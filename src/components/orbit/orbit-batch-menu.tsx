@@ -33,8 +33,15 @@ const rowClass =
   "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors";
 
 /**
+ * Auto-tag can apply existing tags, add a Video tag, or name a starter set
+ * when the library has none. The menu must not claim otherwise.
+ */
+const AUTO_TAG_CAVEAT =
+  "Applies confident matches without review. Uses your tags, may add a Video tag, and names a starter set if you have none.";
+
+/**
  * The two tagging behaviors that actually differ: a reviewable scan, or
- * applying existing tags across the queue. Batch-size names stay internal.
+ * auto-tag across the queue. Batch-size names stay internal.
  */
 export function OrbitBatchMenu({
   disabled = false,
@@ -100,8 +107,8 @@ export function OrbitBatchMenu({
               <div className="space-y-2 px-2 pb-1.5 pt-0.5">
                 <p className="text-xs leading-relaxed text-foreground">
                   Auto-tag {untaggedLabel ?? "every"} untagged bookmark
-                  {untagged === 1 ? "" : "s"}? Confident matches from your tags
-                  are applied without review. You can stop it any time.
+                  {untagged === 1 ? "" : "s"}? {AUTO_TAG_CAVEAT} You can stop it
+                  any time.
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -164,7 +171,7 @@ export function OrbitBatchMenu({
                         ? "Progress shows above the queue."
                         : library.state === "paused"
                           ? "Resume or dismiss it above the queue."
-                          : "Applies confident matches from your existing tags. No new names, no review."}
+                          : AUTO_TAG_CAVEAT}
                   </span>
                 </span>
               </button>

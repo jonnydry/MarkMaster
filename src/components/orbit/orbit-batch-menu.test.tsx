@@ -49,11 +49,16 @@ describe("OrbitBatchMenu", () => {
     const { user, onStart } = renderMenu();
     await openMenu(user);
 
+    const caveat =
+      "Applies confident matches without review. Uses your tags, may add a Video tag, and names a starter set if you have none.";
+    expect(screen.getByText(caveat)).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: /Auto-tag 3,412/ }));
     expect(onStart).not.toHaveBeenCalled();
     expect(
       screen.getByText(/Auto-tag 3,412 untagged bookmarks\?/)
     ).toBeInTheDocument();
+    expect(screen.getByText(caveat, { exact: false })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onStart).not.toHaveBeenCalled();
