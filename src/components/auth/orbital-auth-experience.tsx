@@ -94,12 +94,12 @@ export function OrbitalAuthExperience({
               Read-only bookmark access. No posting, no feed clutter.
             </p>
           </div>
+
+          <footer className="auth-splash__footer text-[13px] text-muted-foreground">
+            © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
+          </footer>
         </div>
       </main>
-
-      <footer className="auth-splash__footer auth-splash__inset-x mx-auto w-full max-w-[1200px] text-center text-[13px] text-muted-foreground">
-        © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
-      </footer>
     </div>
   );
 }
