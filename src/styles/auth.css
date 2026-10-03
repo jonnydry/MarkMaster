@@ -10,17 +10,35 @@
     max-width: 100vw;
     min-width: 0;
     overflow: hidden;
+    /* Night-launch plate. Matches the app's dark background while the
+       rocket image loads, and keeps the splash readable in light mode. */
+    background-color: #0a0a0a;
+    color-scheme: dark;
   }
 
-  /* One soft accent horizon behind the hero. Single large radial at a
-     modest alpha so it stays smooth (no banding) in every accent theme. */
-  .auth-splash__horizon {
-    background: radial-gradient(
-      ellipse 90% 70% at 30% 110%,
-      color-mix(in srgb, var(--primary) 20%, transparent) 0%,
-      color-mix(in srgb, var(--primary) 10%, transparent) 38%,
-      transparent 72%
-    );
+  /* Restored launch plate. Anchor the rocket right of the copy column
+     so the mark stays the hero and the sign-in stays clear of the flame. */
+  .auth-splash__rocket {
+    object-position: 42% 28%;
+  }
+
+  /* Neutral read-back only — no accent wash on the photograph. */
+  .auth-splash__scrim {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(10, 10, 10, 0.2) 0%,
+        rgba(10, 10, 10, 0.02) 34%,
+        rgba(10, 10, 10, 0.46) 68%,
+        rgba(10, 10, 10, 0.84) 100%
+      ),
+      linear-gradient(
+        90deg,
+        rgba(10, 10, 10, 0.82) 0%,
+        rgba(10, 10, 10, 0.58) 32%,
+        rgba(10, 10, 10, 0.08) 56%,
+        rgba(10, 10, 10, 0.22) 100%
+      );
   }
 
   .auth-splash__inset-x {
@@ -40,13 +58,10 @@
       padding-left: max(3rem, env(safe-area-inset-left, 0px));
       padding-right: max(3rem, env(safe-area-inset-right, 0px));
     }
-  }
 
-  .auth-splash__header {
-    position: relative;
-    z-index: 2;
-    flex: 0 0 auto;
-    padding-top: max(clamp(1rem, 3dvh, 1.75rem), env(safe-area-inset-top, 0px));
+    .auth-splash__rocket {
+      object-position: 28% 78%;
+    }
   }
 
   .auth-splash__footer {
@@ -65,21 +80,13 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-end;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     padding-top: clamp(1.5rem, 5dvh, 3rem);
-    padding-bottom: clamp(1rem, 3dvh, 2rem);
-  }
-
-  .auth-splash__layout {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    align-items: center;
-    gap: clamp(2rem, 6dvh, 4rem);
+    padding-bottom: clamp(0.75rem, 2.5dvh, 1.5rem);
   }
 
   .auth-splash__hero {
@@ -92,20 +99,21 @@
   }
 
   .auth-splash__brand-row {
-    gap: 0.625rem;
+    gap: 0.75rem;
   }
 
   .auth-splash__brand-logo {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
   .auth-splash__wordmark {
-    font-size: 1.0625rem;
+    font-size: clamp(1.25rem, 2.4dvh, 1.5rem);
     letter-spacing: 0;
   }
 
   .auth-splash__headline {
+    margin-top: clamp(0.875rem, 2.4dvh, 1.35rem);
     max-width: 36rem;
     font-size: clamp(2.15rem, 7.5dvh, 3.85rem);
     letter-spacing: 0;
@@ -114,7 +122,7 @@
   }
 
   .auth-splash__lead {
-    margin-top: clamp(0.75rem, 2dvh, 1.25rem);
+    margin-top: clamp(0.75rem, 2dvh, 1.125rem);
     max-width: 28rem;
     font-size: clamp(0.9375rem, 2dvh, 1.125rem);
     line-height: 1.55;
@@ -141,33 +149,17 @@
     line-height: 1.4;
   }
 
-  /* Product glimpse — desktop only; the copy carries mobile on its own. */
-  .auth-splash__glimpse-wrap {
-    display: none;
-    min-width: 0;
-  }
-
-  .auth-splash__glimpse {
-    width: 100%;
-    max-width: 30rem;
-    margin-left: auto;
-  }
-
   @media (min-width: 1024px) {
-    .auth-splash__layout {
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    }
-
-    .auth-splash__glimpse-wrap {
-      display: block;
-    }
-
     .auth-splash__headline {
       font-size: clamp(2.5rem, 7dvh, 4rem);
     }
   }
 
   @media (max-width: 639px) {
+    .auth-splash__rocket {
+      object-position: center 22%;
+    }
+
     .auth-splash__headline {
       max-width: 20rem;
       font-size: clamp(2rem, 10vw, 2.75rem);
@@ -186,37 +178,34 @@
     }
 
     .auth-splash__main {
-      padding-bottom: clamp(0.75rem, 2.5dvh, 1.5rem);
+      padding-bottom: clamp(0.5rem, 2dvh, 1rem);
     }
   }
 
   @media (max-height: 640px) {
     .auth-splash__main {
       padding-top: clamp(1rem, 4dvh, 1.5rem);
-      padding-bottom: clamp(0.75rem, 2.5dvh, 1.25rem);
+      padding-bottom: clamp(0.5rem, 2dvh, 0.875rem);
     }
 
-    /* Not enough height for the glimpse — keep the copy and CTA in view. */
-    .auth-splash__glimpse-wrap {
-      display: none;
+    .auth-splash__brand-logo {
+      width: 2rem;
+      height: 2rem;
     }
 
-    .auth-splash__layout {
-      grid-template-columns: minmax(0, 1fr);
+    .auth-splash__wordmark {
+      font-size: 1.125rem;
     }
   }
 
   @media (max-height: 520px) {
-    .auth-splash__header {
-      padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
-    }
-
     .auth-splash__main {
       padding-top: clamp(0.75rem, 3dvh, 1.25rem);
-      padding-bottom: clamp(0.5rem, 2dvh, 1rem);
+      padding-bottom: clamp(0.375rem, 1.5dvh, 0.75rem);
     }
 
     .auth-splash__headline {
+      margin-top: clamp(0.5rem, 1.6dvh, 0.75rem);
       font-size: clamp(1.65rem, 6dvh, 2.25rem);
     }
 
