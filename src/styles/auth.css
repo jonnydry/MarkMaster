@@ -213,4 +213,87 @@
       margin-top: clamp(0.5rem, 1.8dvh, 0.75rem);
     }
   }
+
+  /* Liftoff. The photograph starts a little low and close, then eases into
+     the hero crop. The burn sits on the engine and rides with that move.
+     The scrim stays put, so the sign-in plate does not travel. */
+  .auth-splash__flight {
+    position: absolute;
+    inset: 0;
+    transform-origin: 50% 76%;
+    animation: auth-splash-liftoff 10.5s cubic-bezier(0.16, 0.84, 0.28, 1) both;
+  }
+
+  .auth-splash__burn {
+    position: absolute;
+    left: 50%;
+    top: 76%;
+    width: min(32rem, 52vw);
+    height: min(18rem, 34vh);
+    transform: translate(-50%, -46%);
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse at 50% 48%,
+      rgba(246, 251, 255, 0.92) 0%,
+      rgba(168, 208, 255, 0.5) 24%,
+      rgba(86, 146, 230, 0.18) 48%,
+      transparent 72%
+    );
+    mix-blend-mode: screen;
+    animation:
+      auth-splash-ignite 2.6s cubic-bezier(0.22, 0.61, 0.36, 1) both,
+      auth-splash-burn 3.4s ease-in-out 2.6s infinite;
+  }
+
+  @keyframes auth-splash-liftoff {
+    0%,
+    9% {
+      transform: translate3d(0, 6.5%, 0) scale(1.065);
+    }
+
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  @keyframes auth-splash-ignite {
+    0% {
+      opacity: 0.08;
+    }
+
+    42% {
+      opacity: 0.22;
+    }
+
+    68% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0.58;
+    }
+  }
+
+  @keyframes auth-splash-burn {
+    0%,
+    100% {
+      opacity: 0.48;
+    }
+
+    50% {
+      opacity: 0.78;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .auth-splash__flight {
+      animation: none;
+      transform: none;
+    }
+
+    .auth-splash__burn {
+      animation: none;
+      opacity: 0.5;
+    }
+  }
 }

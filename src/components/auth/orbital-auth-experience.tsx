@@ -35,14 +35,17 @@ export function OrbitalAuthExperience({
         aria-hidden="true"
         className="auth-splash__scene pointer-events-none absolute inset-0 -z-10"
       >
-        <Image
-          src={SPLASH_BACKGROUND_IMAGE_URL}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="auth-splash__rocket object-cover"
-        />
+        <div className="auth-splash__flight">
+          <Image
+            src={SPLASH_BACKGROUND_IMAGE_URL}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="auth-splash__rocket object-cover"
+          />
+          <div className="auth-splash__burn" />
+        </div>
         <div className="auth-splash__scrim absolute inset-0" />
       </div>
 
