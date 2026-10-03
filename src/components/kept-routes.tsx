@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { AppRouteError } from "@/components/app-route-error";
 import { PageActiveProvider } from "@/components/page-activity";
+import { RouteSearchParamsProvider } from "@/hooks/use-route-search-params";
 import { prefetchAppRoute } from "@/lib/prefetch-app-route";
 
 const DashboardClient = dynamic(
@@ -181,7 +182,7 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
   }, [pathname]);
 
   return (
-    <>
+    <RouteSearchParamsProvider>
       {KEPT_ROUTES.map((route) => (
         <KeptRoute
           key={route.href}
@@ -191,6 +192,6 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
           {route.slot}
         </KeptRoute>
       ))}
-    </>
+    </RouteSearchParamsProvider>
   );
 }

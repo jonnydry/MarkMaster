@@ -14,11 +14,13 @@ const ORBIT_GRAPH_BUILD_ID =
   process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "";
 
 /**
- * Identifies a graph by the user's cache generation (bumped by every library
- * write) rather than by one cached computation, so revalidating never needs
- * the payload: a match is a 304 even after the cached graph expired.
+ * Identifies a graph by the user and that user's cache generation (bumped by
+ * every library write) rather than by one cached computation, so revalidating
+ * never needs the payload: a match is a 304 even after the cached graph
+ * expired. The user id keeps one account's ETag from validating another's.
  */
 export function buildOrbitGraphETag(input: {
+  userId: string;
   cacheVersion: number;
   scope: string;
   nodeCap: number;
@@ -32,6 +34,7 @@ export function buildOrbitGraphETag(input: {
   const digest = createHash("sha256")
     .update(
       [
+        input.userId,
         input.cacheVersion,
         input.scope,
         input.nodeCap,

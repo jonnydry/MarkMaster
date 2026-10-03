@@ -25,6 +25,11 @@ export function orbitGraphQueryKey(
 
 const orbitGraphEtags = new Map<string, string>();
 
+/** Drop every cached graph ETag. Call on sign-out so the next user cannot send the previous user's validators. */
+export function clearOrbitGraphEtags() {
+  orbitGraphEtags.clear();
+}
+
 function orbitGraphRequestKey(
   scope: OrbitGraphScope,
   expandedAnchors: string[]

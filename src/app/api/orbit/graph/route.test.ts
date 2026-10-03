@@ -333,6 +333,52 @@ describe("/api/orbit/graph", () => {
     expect(payload.stats.renderedBookmarks).toBe(2);
   });
 
+  it("does not treat another user's etag as fresh", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+    const { buildOrbitGraphETag } = await import("@/lib/orbit-graph-etag");
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+    const now = Date.UTC(2026, 5, 11, 12, 5);
+    vi.spyOn(Date, "now").mockReturnValue(now);
+
+    try {
+      const first = await GET(new NextRequest("http://localhost/api/orbit/graph"));
+      const etag = first.headers.get("ETag");
+      const sameUser = buildOrbitGraphETag({
+        userId: "user-1",
+        cacheVersion: 1,
+        scope: "library",
+        nodeCap: 1000,
+        expandKey: "",
+        now,
+      });
+      const otherUser = buildOrbitGraphETag({
+        userId: "user-2",
+        cacheVersion: 1,
+        scope: "library",
+        nodeCap: 1000,
+        expandKey: "",
+        now,
+      });
+
+      expect(etag).toBe(sameUser);
+      expect(otherUser).not.toBe(etag);
+
+      const second = await GET(
+        new NextRequest("http://localhost/api/orbit/graph", {
+          headers: { "If-None-Match": otherUser },
+        })
+      );
+      expect(second.status).toBe(200);
+      expect(second.headers.get("ETag")).toBe(sameUser);
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+  });
+
   it("returns 304 when If-None-Match matches the current etag", async () => {
     const { GET } = await import("./route");
 
@@ -417,6 +463,7 @@ describe("/api/orbit/graph", () => {
       new NextRequest("http://localhost/api/orbit/graph", {
         headers: {
           "If-None-Match": buildOrbitGraphETag({
+            userId: "user-1",
             cacheVersion: 0,
             scope: "library",
             nodeCap: 1000,

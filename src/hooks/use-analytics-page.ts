@@ -3,8 +3,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
+import { useRouteSearchParams } from "@/hooks/use-route-search-params";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import {
   useCollectionsQuery,
@@ -59,7 +60,7 @@ function getClientTimeZone() {
 
 export function useAnalyticsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useRouteSearchParams("/analytics");
   const queryClient = useQueryClient();
   const { data: session, update: updateSession } = useSession();
   const { createCollection } = useCreateCollection();
