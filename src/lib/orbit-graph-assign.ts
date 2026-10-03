@@ -183,7 +183,9 @@ export function applyOrbitGraphAssignment(
  * Patches every cached orbit-graph query so the change shows at once, then
  * leaves them all stale: the server's graph replaces the patch at the next
  * natural refetch (remount, scope or expand change) rather than immediately.
- * Returns false when a payload couldn't be patched and needs a refetch now.
+ * Returns false unless a payload was actually patched. A query with no data
+ * yet is not a patch — an in-flight response can still land the previous
+ * graph — and neither is a payload this assignment cannot update.
  */
 export function patchOrbitGraphAssignment(
   queryClient: QueryClient,
@@ -194,17 +196,23 @@ export function patchOrbitGraphAssignment(
   });
   if (snapshots.length === 0) return false;
 
-  let applied = true;
+  let patched = false;
+  let incomplete = false;
   for (const [queryKey, current] of snapshots) {
-    if (!current) continue;
-    const next = applyOrbitGraphAssignment(current, assignment);
-    if (!next) {
-      applied = false;
+    if (!current) {
+      incomplete = true;
       continue;
     }
-    if (next !== current) queryClient.setQueryData(queryKey, next);
+    const next = applyOrbitGraphAssignment(current, assignment);
+    if (!next) {
+      incomplete = true;
+      continue;
+    }
+    if (next === current) continue;
+    queryClient.setQueryData(queryKey, next);
+    patched = true;
   }
   // setQueryData stamps a payload fresh; mark every variant stale afterwards.
   void invalidateOrbitGraphQuery(queryClient, { refetchType: "none" });
-  return applied;
+  return patched && !incomplete;
 }

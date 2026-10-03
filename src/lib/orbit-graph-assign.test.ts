@@ -233,4 +233,36 @@ describe("patchOrbitGraphAssignment", () => {
   it("asks for a refetch when no graph is cached", () => {
     expect(patchOrbitGraphAssignment(new QueryClient(), assignment)).toBe(false);
   });
+
+  it("does not count a graph query with missing data as patched", () => {
+    const queryClient = new QueryClient();
+    const key = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    queryClient.getQueryCache().build(queryClient, { queryKey: key });
+
+    expect(
+      queryClient.getQueriesData<OrbitGraphPayload>({
+        queryKey: ORBIT_GRAPH_QUERY_KEY,
+      })
+    ).toEqual([[key, undefined]]);
+
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(false);
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+  });
+
+  it("does not count missing data as patched when another graph was updated", () => {
+    const queryClient = new QueryClient();
+    const loaded = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    const inflight = [...ORBIT_GRAPH_QUERY_KEY, "orbit", ""];
+    queryClient.setQueryData(loaded, graph());
+    queryClient.getQueryCache().build(queryClient, { queryKey: inflight });
+
+    expect(queryClient.getQueryData(inflight)).toBeUndefined();
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(false);
+    expect(
+      queryClient
+        .getQueryData<OrbitGraphPayload>(loaded)
+        ?.edges.some((edge) => edge.kind === "bookmark-tag")
+    ).toBe(true);
+    expect(queryClient.getQueryData(inflight)).toBeUndefined();
+  });
 });
