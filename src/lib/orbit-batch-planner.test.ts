@@ -118,6 +118,57 @@ describe("planOrbitScanBatch", () => {
     expect(plan.usefulSignalCount).toBeGreaterThan(1);
   });
 
+  it("seeds with the most-connected bookmark and breaks ties by queue order", () => {
+    const candidates = [
+      bookmark("lone", { tweetText: "Gardening tomatoes" }),
+      bookmark("rust-1", { tweetText: "Rust compiler release" }),
+      bookmark("rust-2", { tweetText: "Rust compiler internals" }),
+      bookmark("rust-3", { tweetText: "Rust compiler errors" }),
+    ];
+
+    const plan = planOrbitScanBatch(candidates, 3);
+
+    // rust-1..3 tie on overlap and quality; queue order decides.
+    expect(plan.bookmarkIds).toEqual(["rust-1", "rust-2", "rust-3"]);
+    // Each later pick shares "rust" and "compiler" with the batch so far.
+    expect(plan.sharedSignalCount).toBe(4);
+  });
+
+  it("prefers higher source quality when overlap ties", () => {
+    const candidates = [
+      bookmark("seed", { tweetText: "Kubernetes operators guide" }),
+      bookmark("weak", {
+        authorUsername: "unknown",
+        tweetText: "kubernetes",
+      }),
+      bookmark("strong", { tweetText: "Kubernetes scaling notes" }),
+    ];
+
+    const plan = planOrbitScanBatch(candidates, 2);
+
+    expect(plan.bookmarkIds).toEqual(["seed", "strong"]);
+  });
+
+  it("plans a full 160-candidate pool without re-scoring inside sorts", () => {
+    const words = Array.from({ length: 400 }, (_, index) => `topic${index}`);
+    const candidates = Array.from({ length: 160 }, (_, index) =>
+      bookmark(`b${index}`, {
+        tweetText: Array.from(
+          { length: 40 },
+          (_, offset) => words[(index * 7 + offset * 13) % words.length]
+        ).join(" "),
+      })
+    );
+
+    const startedAt = performance.now();
+    const plan = planOrbitScanBatch(candidates, 72);
+
+    expect(plan.bookmarkIds).toHaveLength(72);
+    expect(new Set(plan.bookmarkIds).size).toBe(72);
+    // The quadratic version took over a second here; this one takes a few ms.
+    expect(performance.now() - startedAt).toBeLessThan(250);
+  });
+
   it("counts note_tweet primary text as a useful signal", () => {
     const quality = getOrbitBookmarkSourceQuality(
       bookmark("sparse", {

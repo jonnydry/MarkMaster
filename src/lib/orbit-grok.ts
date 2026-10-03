@@ -602,45 +602,44 @@ export async function applyOrbitScanPlan(args: {
       });
     }
 
-    for (const [tagKey, tagDefinition] of tagDefinitions) {
-      const existingTag = tagMap.get(tagKey);
-      if (existingTag) {
-        result.reusedTags += 1;
-        continue;
+    const newTagDefinitions = [...tagDefinitions].filter(
+      ([tagKey]) => !tagMap.has(tagKey)
+    );
+    result.reusedTags += tagDefinitions.size - newTagDefinitions.length;
+
+    if (newTagDefinitions.length > 0) {
+      // One INSERT for every new tag while the per-user lock is held (it was
+      // one round trip per tag). A name another writer (e.g. the tags API,
+      // which doesn't take this lock) created meanwhile is skipped by the
+      // insert and read back instead.
+      const createdTags = await tx.tag.createManyAndReturn({
+        data: newTagDefinitions.map(([, definition]) => ({
+          userId: args.userId,
+          name: definition.name,
+          color: definition.color,
+        })),
+        skipDuplicates: true,
+      });
+      result.createdTags += createdTags.length;
+
+      const tagsByName = new Map(createdTags.map((tag) => [tag.name, tag]));
+      const takenNames = newTagDefinitions
+        .map(([, definition]) => definition.name)
+        .filter((name) => !tagsByName.has(name));
+      if (takenNames.length > 0) {
+        const takenTags = await tx.tag.findMany({
+          where: { userId: args.userId, name: { in: takenNames } },
+        });
+        for (const tag of takenTags) tagsByName.set(tag.name, tag);
+        result.reusedTags += takenTags.length;
       }
 
-      try {
-        const createdTag = await tx.tag.create({
-          data: {
-            userId: args.userId,
-            name: tagDefinition.name,
-            color: tagDefinition.color,
-          },
-        });
-
-        tagMap.set(tagKey, createdTag);
-        result.createdTags += 1;
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
-          const recoveredTag = await tx.tag.findUnique({
-            where: {
-              userId_name: {
-                userId: args.userId,
-                name: tagDefinition.name,
-              },
-            },
-          });
-          if (recoveredTag) {
-            tagMap.set(tagKey, recoveredTag);
-            result.reusedTags += 1;
-            continue;
-          }
+      for (const [tagKey, definition] of newTagDefinitions) {
+        const tag = tagsByName.get(definition.name);
+        if (!tag) {
+          throw new Error(`Tag "${definition.name}" could not be created.`);
         }
-
-        throw error;
+        tagMap.set(tagKey, tag);
       }
     }
 

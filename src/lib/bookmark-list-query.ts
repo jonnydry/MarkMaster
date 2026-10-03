@@ -13,7 +13,7 @@ const bookmarkListInclude = {
  * Slim bookmark row for paginated library/collection lists.
  * Omits quotedTweet and xMetadata — large JSON blobs not needed in feed cards.
  */
-export const bookmarkListSelect = {
+const bookmarkListSelect = {
   id: true,
   userId: true,
   tweetId: true,
@@ -39,7 +39,7 @@ export const bookmarkListSelect = {
  * Keeps url entities so t.co-only cards can show a stored title.
  * Drops quotedTweet, xMetadata, and small unused columns.
  */
-const bookmarkCompactSelect = {
+export const bookmarkCompactSelect = {
   id: true,
   tweetId: true,
   authorUsername: true,

@@ -175,26 +175,58 @@ function getBookmarkTokens(bookmark: BookmarkWithRelations) {
   return tokens;
 }
 
-function overlapScore(a: Set<string>, b: Set<string>) {
-  let score = 0;
-  for (const token of a) {
-    if (!b.has(token)) continue;
-    if (token.startsWith("folder:")) score += 5;
-    else if (token.startsWith("topic:")) score += 4;
-    else if (token.startsWith("domain:")) score += 3;
-    else if (token.startsWith("author:")) score += 2;
-    else score += 1;
-  }
-  return score;
+function tokenWeight(token: string) {
+  if (token.startsWith("folder:")) return 5;
+  if (token.startsWith("topic:")) return 4;
+  if (token.startsWith("domain:")) return 3;
+  if (token.startsWith("author:")) return 2;
+  return 1;
 }
 
+/*
+ * Tokens and source quality depend only on the bookmark row, and query data
+ * is immutable (edits produce new objects), so both are memoized per row.
+ * The Orbit page re-plans the same 160 candidates on every selection change.
+ */
+const tokenCache = new WeakMap<BookmarkWithRelations, Set<string>>();
+const qualityCache = new WeakMap<BookmarkWithRelations, BookmarkSourceQuality>();
+
+function bookmarkTokens(bookmark: BookmarkWithRelations) {
+  let tokens = tokenCache.get(bookmark);
+  if (!tokens) {
+    tokens = getBookmarkTokens(bookmark);
+    tokenCache.set(bookmark, tokens);
+  }
+  return tokens;
+}
+
+function bookmarkQuality(bookmark: BookmarkWithRelations) {
+  let quality = qualityCache.get(bookmark);
+  if (!quality) {
+    quality = getOrbitBookmarkSourceQuality(bookmark);
+    qualityCache.set(bookmark, quality);
+  }
+  return quality;
+}
+
+/**
+ * Picks a coherent batch: seed with the bookmark sharing the most weighted
+ * tokens with the whole pool (plus its source quality), then repeatedly add
+ * the bookmark sharing the most weighted tokens with everything picked so far
+ * (ties: higher quality, then queue order).
+ *
+ * Linear-ish by construction: a bookmark's overlap with the whole pool is the
+ * sum of its token weights times each token's pool frequency, and each pick
+ * only raises the gain of bookmarks holding a token new to the batch. The
+ * old version re-scored inside sort comparators — ~1.5 s for 160 candidates.
+ */
 export function planOrbitScanBatch(
   bookmarks: BookmarkWithRelations[],
   limit: number
 ): OrbitBatchPlan {
   const candidateCount = bookmarks.length;
   const qualityById = new Map(
-    bookmarks.map((bookmark) => [bookmark.id, getOrbitBookmarkSourceQuality(bookmark)])
+    bookmarks.map((bookmark) => [bookmark.id, bookmarkQuality(bookmark)])
   );
   const sourceUnknownCount = bookmarks.filter(
     (bookmark) => qualityById.get(bookmark.id)?.sourceUnknown
@@ -239,53 +271,75 @@ export function planOrbitScanBatch(
     );
   }
 
-  const tokenById = new Map(
-    bookmarks.map((bookmark) => [bookmark.id, getBookmarkTokens(bookmark)])
+  const tokens = bookmarks.map(bookmarkTokens);
+  const quality = bookmarks.map(
+    (bookmark) => qualityById.get(bookmark.id)?.score ?? 0
   );
-  const originalIndex = new Map(bookmarks.map((bookmark, index) => [bookmark.id, index]));
 
-  const seed = [...bookmarks].sort((a, b) => {
-    const aTokens = tokenById.get(a.id) ?? new Set<string>();
-    const bTokens = tokenById.get(b.id) ?? new Set<string>();
-    const aScore = bookmarks.reduce(
-      (total, candidate) =>
-        total + overlapScore(aTokens, tokenById.get(candidate.id) ?? new Set()),
-      0
-    ) + (qualityById.get(a.id)?.score ?? 0);
-    const bScore = bookmarks.reduce(
-      (total, candidate) =>
-        total + overlapScore(bTokens, tokenById.get(candidate.id) ?? new Set()),
-      0
-    ) + (qualityById.get(b.id)?.score ?? 0);
-    return bScore - aScore || (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
-  })[0];
+  // Which candidates hold each token (the pool frequency is its length).
+  const holders = new Map<string, number[]>();
+  tokens.forEach((set, index) => {
+    for (const token of set) {
+      const list = holders.get(token);
+      if (list) list.push(index);
+      else holders.set(token, [index]);
+    }
+  });
 
-  if (!seed) return buildPlan([], 0, "No scan candidates available.");
+  let seed = -1;
+  let seedScore = -Infinity;
+  tokens.forEach((set, index) => {
+    let score = quality[index] ?? 0;
+    for (const token of set) {
+      score += tokenWeight(token) * (holders.get(token)?.length ?? 0);
+    }
+    // Strictly greater keeps the earliest bookmark on ties (queue order).
+    if (score > seedScore) {
+      seed = index;
+      seedScore = score;
+    }
+  });
 
-  const selected = [seed.id];
-  const selectedTokens = new Set(tokenById.get(seed.id) ?? []);
-  const remaining = bookmarks.filter((bookmark) => bookmark.id !== seed.id);
+  const seedBookmark = bookmarks[seed];
+  if (!seedBookmark) return buildPlan([], 0, "No scan candidates available.");
+
+  const picked = new Array<boolean>(bookmarks.length).fill(false);
+  // Weighted tokens each candidate shares with the batch picked so far.
+  const gain = new Array<number>(bookmarks.length).fill(0);
+  const batchTokens = new Set<string>();
+  const selected: string[] = [];
   let sharedSignalCount = 0;
 
-  while (selected.length < limit && remaining.length > 0) {
-    remaining.sort((a, b) => {
-      const aScore = overlapScore(selectedTokens, tokenById.get(a.id) ?? new Set());
-      const bScore = overlapScore(selectedTokens, tokenById.get(b.id) ?? new Set());
-      return (
-        bScore - aScore ||
-        (qualityById.get(b.id)?.score ?? 0) -
-          (qualityById.get(a.id)?.score ?? 0) ||
-        (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0)
-      );
-    });
+  const pick = (index: number) => {
+    picked[index] = true;
+    sharedSignalCount += gain[index] ?? 0;
+    selected.push(bookmarks[index]!.id);
+    for (const token of tokens[index] ?? []) {
+      if (batchTokens.has(token)) continue;
+      batchTokens.add(token);
+      const weight = tokenWeight(token);
+      for (const holder of holders.get(token) ?? []) {
+        gain[holder] = (gain[holder] ?? 0) + weight;
+      }
+    }
+  };
 
-    const next = remaining.shift();
-    if (!next) break;
-    const nextTokens = tokenById.get(next.id) ?? new Set<string>();
-    const score = overlapScore(selectedTokens, nextTokens);
-    sharedSignalCount += score;
-    selected.push(next.id);
-    for (const token of nextTokens) selectedTokens.add(token);
+  pick(seed);
+  while (selected.length < limit) {
+    let best = -1;
+    for (let index = 0; index < bookmarks.length; index += 1) {
+      if (picked[index]) continue;
+      if (
+        best === -1 ||
+        (gain[index] ?? 0) > (gain[best] ?? 0) ||
+        ((gain[index] ?? 0) === (gain[best] ?? 0) &&
+          (quality[index] ?? 0) > (quality[best] ?? 0))
+      ) {
+        best = index;
+      }
+    }
+    if (best === -1) break;
+    pick(best);
   }
 
   return buildPlan(

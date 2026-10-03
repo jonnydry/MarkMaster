@@ -133,14 +133,28 @@ export const ORBIT_LIBRARY_PACK_CONCURRENCY = parseBoundedIntEnv(
   16
 );
 
-/** Untagged bookmarks processed per library-classify worker page. */
-export const ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE = 48;
+/**
+ * Untagged bookmarks processed per library-classify worker page (12 packs).
+ * The next page's packs queue behind this one's, so slots don't idle at the
+ * boundary; the size only trades per-page overhead against memory, since each
+ * row carries xMetadata and up to two pages are in flight. Fixed rather than
+ * scaled with ORBIT_LIBRARY_PACK_CONCURRENCY to keep that bounded.
+ */
+export const ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE = 72;
 
 /**
  * A worker invocation starts another page only while it is under this budget,
  * leaving headroom for one slow page under the route's 240 s maxDuration.
  */
 export const ORBIT_LIBRARY_INVOCATION_BUDGET_MS = 150_000;
+
+/**
+ * Each page queues the following page's packs behind its own so no Jev slot
+ * idles at the page boundary. That can leave two pages in flight once a slice
+ * stops starting pages, so look-ahead pages only start under this lower
+ * budget, keeping the same headroom under the route's maxDuration.
+ */
+export const ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS = 110_000;
 
 /**
  * A running pass with no progress write for this long has lost its worker

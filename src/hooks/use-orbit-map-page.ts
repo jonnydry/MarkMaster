@@ -261,7 +261,6 @@ export function useOrbitMapPage() {
     activeSelectionNode,
     selectedBookmarkId,
     armedBookmark,
-    refetch,
     onSelectionChange: handleSelectionChange,
   });
 

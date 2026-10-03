@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
   ORBIT_LIBRARY_INVOCATION_BUDGET_MS,
+  ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS,
   ORBIT_LIBRARY_RUN_RESUME_WINDOW_MS,
   ORBIT_LIBRARY_RUN_STALE_MS,
   ORBIT_LIBRARY_RUN_VISIBLE_AFTER_MS,
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("@/lib/orbit-library-assign", () => ({
   planLibraryAssignments: mocks.planLibraryAssignments,
+  createPackLimiter: () => <T>(task: () => Promise<T>) => task(),
 }));
 vi.mock("@/lib/orbit-grok", async () => {
   const { OrbitScanError } = await import("@/lib/orbit-grok-schemas");
@@ -116,7 +118,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.isTypeSafeConfigured.mockReturnValue(true);
   mocks.prisma.orbitLibraryRun.updateMany.mockResolvedValue({ count: 1 });
-  mocks.ensureLibraryVocabulary.mockResolvedValue(vocabulary);
+  mocks.ensureLibraryVocabulary.mockResolvedValue({ tags: vocabulary, created: true });
 });
 
 describe("runOrbitLibraryInvocation", () => {
@@ -181,8 +183,104 @@ describe("runOrbitLibraryInvocation", () => {
     await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
       continued: false,
     });
-    expect(mocks.prisma.bookmark.findMany).toHaveBeenCalledOnce();
+    // The look-ahead page was queued but is never applied or recorded, and
+    // its packs that had not started are abandoned.
+    expect(mocks.applyOrbitScanPlan).toHaveBeenCalledOnce();
     expect(writes()).toHaveLength(1);
+    const lookaheadSignal = mocks.planLibraryAssignments.mock.calls[1]?.[0].signal;
+    expect(lookaheadSignal?.aborted).toBe(true);
+  });
+
+  it("queues the next page's packs before applying the current page", async () => {
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany
+      .mockResolvedValueOnce(page(ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE))
+      .mockResolvedValueOnce(page(5, ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE));
+    const order: string[] = [];
+    mocks.planLibraryAssignments.mockImplementation(async ({ bookmarks }) => {
+      order.push(`plan:${bookmarks.length}`);
+      return planTagging(1);
+    });
+    mocks.applyOrbitScanPlan.mockImplementation(async () => {
+      order.push("apply");
+    });
+
+    await runOrbitLibraryInvocation("run-1");
+
+    expect(order).toEqual([
+      `plan:${ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE}`,
+      "plan:5",
+      "apply",
+      "apply",
+    ]);
+    // Both pages share one Jev slot pool.
+    const [first, second] = mocks.planLibraryAssignments.mock.calls;
+    expect(first?.[0].limiter).toBe(second?.[0].limiter);
+  });
+
+  it("applies pages in order even when a later page plans first", async () => {
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany
+      .mockResolvedValueOnce(page(ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE))
+      .mockResolvedValueOnce(page(5, ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE));
+    let releaseFirst!: () => void;
+    mocks.planLibraryAssignments
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve(planTagging(2));
+          })
+      )
+      .mockResolvedValueOnce(planTagging(1));
+
+    const running = runOrbitLibraryInvocation("run-1");
+    await vi.waitFor(() =>
+      expect(mocks.planLibraryAssignments).toHaveBeenCalledTimes(2)
+    );
+    expect(mocks.applyOrbitScanPlan).not.toHaveBeenCalled();
+    releaseFirst();
+    await running;
+
+    const cursors = writes()
+      .filter((data) => "cursorId" in data)
+      .map((data) => data.cursorId);
+    expect(cursors).toEqual([
+      `bm-${ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE - 1}`,
+      `bm-${ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE + 4}`,
+    ]);
+  });
+
+  it("stops looking ahead past the look-ahead budget but keeps paging under the slice budget", async () => {
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany
+      .mockResolvedValueOnce(page(ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE))
+      .mockResolvedValueOnce(page(5, ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE));
+    const order: string[] = [];
+    mocks.planLibraryAssignments.mockImplementation(async ({ bookmarks }) => {
+      order.push(`plan:${bookmarks.length}`);
+      return planTagging(1);
+    });
+    mocks.applyOrbitScanPlan.mockImplementation(async () => {
+      order.push("apply");
+    });
+    const clock = vi.fn().mockReturnValue(0);
+    clock
+      .mockReturnValueOnce(0) // slice start
+      .mockReturnValueOnce(0) // first page
+      .mockReturnValueOnce(ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS); // look-ahead check
+
+    await expect(runOrbitLibraryInvocation("run-1", clock)).resolves.toEqual({
+      continued: false,
+    });
+
+    // The second page started only after the first was applied.
+    expect(order).toEqual([
+      `plan:${ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE}`,
+      "apply",
+      "plan:5",
+      "apply",
+    ]);
+    expect(writes().at(-1)).toMatchObject({ status: "COMPLETED" });
   });
 
   it("hands off to a fresh invocation once the time budget is spent", async () => {

@@ -1,6 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-import { ORBIT_GRAPH_QUERY_KEY } from "@/lib/query-invalidation";
+import {
+  invalidateOrbitGraphQuery,
+  ORBIT_GRAPH_QUERY_KEY,
+} from "@/lib/query-invalidation";
 import type { OrbitGraphEdge, OrbitGraphNode, OrbitGraphPayload } from "@/types";
 
 export type OrbitGraphAssignmentAction = "add" | "remove";
@@ -176,7 +179,12 @@ export function applyOrbitGraphAssignment(
   };
 }
 
-/** Patches every cached orbit-graph query. Returns false when a refetch is needed. */
+/**
+ * Patches every cached orbit-graph query so the change shows at once, then
+ * leaves them all stale: the server's graph replaces the patch at the next
+ * natural refetch (remount, scope or expand change) rather than immediately.
+ * Returns false when a payload couldn't be patched and needs a refetch now.
+ */
 export function patchOrbitGraphAssignment(
   queryClient: QueryClient,
   assignment: OrbitGraphAssignment
@@ -187,17 +195,16 @@ export function patchOrbitGraphAssignment(
   if (snapshots.length === 0) return false;
 
   let applied = true;
-  queryClient.setQueriesData<OrbitGraphPayload>(
-    { queryKey: ORBIT_GRAPH_QUERY_KEY },
-    (current) => {
-      if (!current) return current;
-      const next = applyOrbitGraphAssignment(current, assignment);
-      if (!next) {
-        applied = false;
-        return current;
-      }
-      return next;
+  for (const [queryKey, current] of snapshots) {
+    if (!current) continue;
+    const next = applyOrbitGraphAssignment(current, assignment);
+    if (!next) {
+      applied = false;
+      continue;
     }
-  );
+    if (next !== current) queryClient.setQueryData(queryKey, next);
+  }
+  // setQueryData stamps a payload fresh; mark every variant stale afterwards.
+  void invalidateOrbitGraphQuery(queryClient, { refetchType: "none" });
   return applied;
 }

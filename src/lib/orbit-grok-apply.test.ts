@@ -19,7 +19,7 @@ import {
 function createMockTransaction(options?: {
   tags?: unknown[];
   collections?: unknown[];
-  tagCreate?: ReturnType<typeof vi.fn>;
+  tagCreateManyAndReturn?: ReturnType<typeof vi.fn>;
   collectionCreate?: ReturnType<typeof vi.fn>;
   bookmarkTagCreateMany?: ReturnType<typeof vi.fn>;
   collectionItemGroupBy?: ReturnType<typeof vi.fn>;
@@ -29,8 +29,8 @@ function createMockTransaction(options?: {
     $executeRaw: vi.fn(),
     tag: {
       findMany: vi.fn().mockResolvedValue(options?.tags ?? []),
-      create: options?.tagCreate ?? vi.fn(),
-      findUnique: vi.fn(),
+      createManyAndReturn:
+        options?.tagCreateManyAndReturn ?? vi.fn().mockResolvedValue([]),
     },
     bookmarkTag: {
       createMany:
@@ -73,9 +73,9 @@ describe("applyOrbitScanPlan", () => {
 
     const mockTx = mockTransaction(
       createMockTransaction({
-        tagCreate: vi
+        tagCreateManyAndReturn: vi
           .fn()
-          .mockResolvedValue({ id: "t-new", name: "Alpha", color: "#22c55e" }),
+          .mockResolvedValue([{ id: "t-new", name: "Alpha", color: "#22c55e" }]),
         bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
       })
     );
@@ -112,7 +112,7 @@ describe("applyOrbitScanPlan", () => {
 
     expect(result.createdTags).toBe(1);
     expect(result.tagAssignments).toBe(1);
-    expect(mockTx.tag.create).toHaveBeenCalledTimes(1);
+    expect(mockTx.tag.createManyAndReturn).toHaveBeenCalledTimes(1);
     expect(mockTx.bookmarkTag.createMany).toHaveBeenCalled();
   });
 
@@ -232,7 +232,7 @@ describe("applyOrbitScanPlan", () => {
       createCollections: true,
     });
 
-    expect(mockTx.tag.create).not.toHaveBeenCalled();
+    expect(mockTx.tag.createManyAndReturn).not.toHaveBeenCalled();
     expect(result.createdTags).toBe(0);
     expect(result.reusedTags).toBe(1);
     expect(result.tagAssignments).toBe(1);
@@ -248,11 +248,13 @@ describe("applyOrbitScanPlan", () => {
 
     const mockTx = mockTransaction(
       createMockTransaction({
-        tagCreate: vi.fn().mockResolvedValue({
-          id: "t-http-caching",
-          name: "HTTP: Caching",
-          color: "#22c55e",
-        }),
+        tagCreateManyAndReturn: vi.fn().mockResolvedValue([
+          {
+            id: "t-http-caching",
+            name: "HTTP: Caching",
+            color: "#22c55e",
+          },
+        ]),
         bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
       })
     );
@@ -378,5 +380,93 @@ describe("applyOrbitScanPlan", () => {
     expect(createManyArgs?.data).toEqual([
       { collectionId: "c-existing", bookmarkId: "b1", sortOrder: 5 },
     ]);
+  });
+
+  it("creates every new tag in one statement", async () => {
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+      { id: "b1" } as never,
+      { id: "b2" } as never,
+    ]);
+
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        tagCreateManyAndReturn: vi.fn().mockResolvedValue([
+          { id: "t-a", name: "Alpha", color: "#22c55e" },
+          { id: "t-b", name: "Beta", color: "#3b82f6" },
+        ]),
+        bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 3 }),
+      })
+    );
+
+    const tag = (name: string) => ({
+      name,
+      color: "#22c55e",
+      reason: "topic",
+      reuseExisting: false,
+    });
+    const plan = orbitScanPlanSchema.parse({
+      overview: { summary: "s", taggingStrategy: "t", collectionStrategy: "c" },
+      suggestions: [
+        { bookmarkId: "b1", confidence: "high", reasoning: "r", tags: [tag("Alpha"), tag("Beta")], collection: null },
+        { bookmarkId: "b2", confidence: "high", reasoning: "r", tags: [tag("Alpha")], collection: null },
+      ],
+    });
+
+    const result = await applyOrbitScanPlan({ userId: "u1", plan, createCollections: true });
+
+    expect(mockTx.tag.createManyAndReturn).toHaveBeenCalledOnce();
+    expect(
+      vi.mocked(mockTx.tag.createManyAndReturn).mock.calls[0]?.[0]
+    ).toMatchObject({
+      data: [
+        { userId: "u1", name: "Alpha" },
+        { userId: "u1", name: "Beta" },
+      ],
+      skipDuplicates: true,
+    });
+    expect(result.createdTags).toBe(2);
+    expect(
+      vi.mocked(mockTx.bookmarkTag.createMany).mock.calls[0]?.[0]?.data
+    ).toEqual([
+      { bookmarkId: "b1", tagId: "t-a" },
+      { bookmarkId: "b1", tagId: "t-b" },
+      { bookmarkId: "b2", tagId: "t-a" },
+    ]);
+  });
+
+  it("reuses a tag another writer created after the lock-time read", async () => {
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([{ id: "b1" } as never]);
+
+    const mockTx = mockTransaction(
+      createMockTransaction({
+        // The insert skips the taken name, so it returns nothing.
+        tagCreateManyAndReturn: vi.fn().mockResolvedValue([]),
+        bookmarkTagCreateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      })
+    );
+    vi.mocked(mockTx.tag.findMany)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "t-raced", name: "Alpha", color: "#22c55e" }]);
+
+    const plan = orbitScanPlanSchema.parse({
+      overview: { summary: "s", taggingStrategy: "t", collectionStrategy: "c" },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "r",
+          tags: [{ name: "Alpha", color: "#22c55e", reason: "topic", reuseExisting: false }],
+          collection: null,
+        },
+      ],
+    });
+
+    const result = await applyOrbitScanPlan({ userId: "u1", plan, createCollections: true });
+
+    expect(result.createdTags).toBe(0);
+    expect(result.reusedTags).toBe(1);
+    expect(
+      vi.mocked(mockTx.bookmarkTag.createMany).mock.calls[0]?.[0]?.data
+    ).toEqual([{ bookmarkId: "b1", tagId: "t-raced" }]);
   });
 });

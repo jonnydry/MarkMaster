@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const redisMock = vi.hoisted(() => ({
   get: vi.fn(),
+  eval: vi.fn(),
   set: vi.fn(),
   incr: vi.fn(),
 }));
@@ -228,5 +229,118 @@ describe("getUserCacheVersion", () => {
     redisMock.get.mockRejectedValue(new Error("read failed"));
     const { getUserCacheVersion: withRedis } = await importCache();
     await expect(withRedis("user-1")).resolves.toBe(0);
+  });
+});
+
+describe("getUserCachedJson", () => {
+  beforeEach(() => {
+    enableUpstash();
+    redisMock.set.mockResolvedValue("OK");
+  });
+
+  it("reads the version and the entry in one roundtrip and returns a current hit", async () => {
+    // The script returns the entry only when its stamp matches. A hit is that
+    // already-filtered payload (the client auto-deserializes the Lua result).
+    redisMock.eval.mockResolvedValue({ v: 4, data: { cached: true } });
+    const { getUserCachedJson } = await importCache();
+    const compute = vi.fn(async () => ({ cached: false }));
+
+    await expect(
+      getUserCachedJson("user-1", "cache:thing:user-1", 60, compute)
+    ).resolves.toEqual({ value: { cached: true }, version: 4 });
+
+    expect(redisMock.eval).toHaveBeenCalledOnce();
+    const [, keys, args] = redisMock.eval.mock.calls[0]!;
+    expect(keys).toEqual(["cache:ver:user-1", "cache:thing:user-1"]);
+    expect(args).toEqual([]);
+    expect(redisMock.get).not.toHaveBeenCalled();
+    expect(compute).not.toHaveBeenCalled();
+    expect(redisMock.set).not.toHaveBeenCalled();
+  });
+
+  it("treats an entry from an older generation as a miss and restamps it", async () => {
+    // A stale entry is omitted by the script, so the client only sees the generation.
+    redisMock.eval.mockResolvedValue({ v: 5 });
+    const { getUserCachedJson } = await importCache();
+    const compute = vi.fn(async () => ({ fresh: 1 }));
+
+    await expect(
+      getUserCachedJson("user-1", "cache:thing:user-1", 120, compute)
+    ).resolves.toEqual({ value: { fresh: 1 }, version: 5 });
+
+    expect(compute).toHaveBeenCalledOnce();
+    expect(redisMock.set).toHaveBeenCalledWith(
+      "cache:thing:user-1",
+      { v: 5, data: { fresh: 1 } },
+      { ex: 120 }
+    );
+  });
+
+  it("starts at generation 0 before the user has ever invalidated", async () => {
+    redisMock.eval.mockResolvedValue({ v: 0, data: "cached" });
+    const { getUserCachedJson } = await importCache();
+
+    await expect(
+      getUserCachedJson("user-1", "k", 60, async () => "fresh")
+    ).resolves.toEqual({ value: "cached", version: 0 });
+  });
+
+  it("uses a lookup the caller already started instead of reading again", async () => {
+    redisMock.eval.mockResolvedValue({ v: 2, data: "early" });
+    const { getUserCachedJson, lookupUserCache } = await importCache();
+    const lookup = lookupUserCache<string>("user-1", "k");
+
+    await expect(
+      getUserCachedJson("user-1", "k", 60, async () => "fresh", lookup)
+    ).resolves.toEqual({ value: "early", version: 2 });
+    expect(redisMock.eval).toHaveBeenCalledOnce();
+  });
+
+  it("fails open to compute when the read throws", async () => {
+    redisMock.eval.mockRejectedValue(new Error("read failed"));
+    const { getUserCachedJson, lookupUserCache } = await importCache();
+
+    await expect(lookupUserCache("user-1", "k")).resolves.toEqual({
+      version: null,
+      value: null,
+    });
+    await expect(
+      getUserCachedJson("user-1", "k", 60, async () => "computed")
+    ).resolves.toEqual({ value: "computed", version: null });
+  });
+
+  it("computes on every call when Redis is not configured", async () => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    const { getUserCachedJson } = await importCache();
+    const compute = vi.fn(async () => "computed");
+
+    await getUserCachedJson("user-1", "k", 60, compute);
+    await getUserCachedJson("user-1", "k", 60, compute);
+
+    expect(compute).toHaveBeenCalledTimes(2);
+    expect(redisMock.eval).not.toHaveBeenCalled();
+  });
+});
+
+describe("readUserCacheVersion", () => {
+  it("reports a stored or initial generation as known", async () => {
+    enableUpstash();
+    redisMock.get.mockResolvedValueOnce(7).mockResolvedValueOnce(null);
+    const { readUserCacheVersion } = await importCache();
+
+    await expect(readUserCacheVersion("user-1")).resolves.toBe(7);
+    await expect(readUserCacheVersion("user-1")).resolves.toBe(0);
+  });
+
+  it("returns null rather than 0 when Redis cannot vouch for the version", async () => {
+    const { readUserCacheVersion } = await importCache();
+    await expect(readUserCacheVersion("user-1")).resolves.toBeNull();
+
+    vi.resetModules();
+    enableUpstash();
+    redisMock.get.mockRejectedValue(new Error("read failed"));
+    const { readUserCacheVersion: withRedis } = await importCache();
+    await expect(withRedis("user-1")).resolves.toBeNull();
   });
 });

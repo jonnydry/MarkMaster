@@ -2,6 +2,7 @@ import { AuthenticationError, RateLimitError } from "@typesafe-ai/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createPackLimiter,
   libraryPostJudgmentText,
   planLibraryAssignments,
   shortlistLibraryPackTags,
@@ -187,5 +188,126 @@ describe("planLibraryAssignments", () => {
         retryBaseDelayMs: 0,
       })
     ).rejects.toMatchObject({ code: "typesafe_auth" });
+  });
+});
+
+describe("createPackLimiter", () => {
+  it("caps calls in flight and starts queued ones in order", async () => {
+    const limit = createPackLimiter(2);
+    const started: number[] = [];
+    let inFlight = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+
+    const tasks = [0, 1, 2, 3].map((index) =>
+      limit(async () => {
+        started.push(index);
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        inFlight -= 1;
+        return index;
+      })
+    );
+
+    await vi.waitFor(() => expect(started).toEqual([0, 1]));
+    releases[1]!();
+    await vi.waitFor(() => expect(started).toEqual([0, 1, 2]));
+    releases[0]!();
+    await vi.waitFor(() => expect(started).toEqual([0, 1, 2, 3]));
+    releases[2]!();
+    releases[3]!();
+
+    await expect(Promise.all(tasks)).resolves.toEqual([0, 1, 2, 3]);
+    expect(peak).toBe(2);
+  });
+
+  it("frees the slot when a call fails", async () => {
+    const limit = createPackLimiter(1);
+    await expect(limit(async () => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
+    await expect(limit(async () => "next")).resolves.toBe("next");
+  });
+
+  it("shares slots across batches so a second page fills the first page's idle ones", async () => {
+    const limiter = createPackLimiter(2);
+    let inFlight = 0;
+    let peak = 0;
+    systemOneMock.mockImplementation(async (request) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return strongFirstTag(request);
+    });
+
+    await Promise.all([
+      planLibraryAssignments({ bookmarks: posts(18), vocabulary, limiter }),
+      planLibraryAssignments({ bookmarks: posts(18), vocabulary, limiter }),
+    ]);
+
+    expect(systemOneMock).toHaveBeenCalledTimes(6);
+    expect(peak).toBe(2);
+  });
+
+  it("never sends packs that were still queued when the batch was abandoned", async () => {
+    const limiter = createPackLimiter(1);
+    const abandon = new AbortController();
+    systemOneMock.mockImplementation(async (request) => {
+      abandon.abort();
+      return strongFirstTag(request);
+    });
+
+    await planLibraryAssignments({
+      bookmarks: posts(18),
+      vocabulary,
+      limiter,
+      signal: abandon.signal,
+    });
+
+    // The pack in flight finishes; the two queued behind it are dropped.
+    expect(systemOneMock).toHaveBeenCalledOnce();
+  });
+
+  it("cancels the Jev call in flight when the batch is abandoned", async () => {
+    const abandon = new AbortController();
+    systemOneMock.mockImplementation(
+      (_request, options?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener("abort", () =>
+            reject(new Error("aborted"))
+          );
+        })
+    );
+
+    const planning = planLibraryAssignments({
+      bookmarks: posts(6),
+      vocabulary,
+      signal: abandon.signal,
+    });
+    await vi.waitFor(() => expect(systemOneMock).toHaveBeenCalledOnce());
+    abandon.abort();
+    const result = await planning;
+
+    expect(systemOneMock.mock.calls[0]?.[1]?.signal).toBe(abandon.signal);
+    // An abandoned page's packs are not failures; nobody reads them.
+    expect(result.failed).toBe(0);
+    expect(result.plan.suggestions).toEqual([]);
+  });
+
+  it("cuts a rate-limit backoff short when the batch is abandoned", async () => {
+    const abandon = new AbortController();
+    systemOneMock.mockRejectedValue(rateLimited());
+
+    const planning = planLibraryAssignments({
+      bookmarks: posts(6),
+      vocabulary,
+      signal: abandon.signal,
+      retryBaseDelayMs: 60_000,
+    });
+    await vi.waitFor(() => expect(systemOneMock).toHaveBeenCalledOnce());
+    abandon.abort();
+
+    await expect(planning).resolves.toMatchObject({ failed: 0 });
+    expect(systemOneMock).toHaveBeenCalledOnce();
   });
 });

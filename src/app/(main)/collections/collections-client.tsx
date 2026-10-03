@@ -94,6 +94,7 @@ export default function CollectionsPage() {
                   selectedTags={[]}
                   onTagToggle={goToTagOnDashboard}
                   onCreateCollection={handleCreateCollectionOpen}
+                  lastSyncAt={lastSyncAt}
                   totalBookmarks={libraryStats?.libraryBookmarkCount}
                   onSyncComplete={handleSyncComplete}
                 />

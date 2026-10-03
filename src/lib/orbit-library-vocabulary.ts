@@ -167,21 +167,27 @@ function includesVideoTag(tags: Array<{ name: string }>) {
   return tags.some((tag) => normalizeTagKey(tag.name) === videoKey);
 }
 
+type LibraryVocabularyResult = {
+  tags: Array<{ name: string; color: string }>;
+  /** True only when this call inserted a tag. Callers invalidate caches then. */
+  created: boolean;
+};
+
 /** Video is a format tag, so it stays on the list when the untagged posts include video. */
 async function withVideoTag(
   userId: string,
   tags: Array<{ name: string; color: string }>
-) {
-  if (includesVideoTag(tags)) return tags;
+): Promise<LibraryVocabularyResult> {
+  if (includesVideoTag(tags)) return { tags, created: false };
   const probe = await prisma.bookmark.findMany({
     where: untaggedSampleWhere(userId),
     select: { media: true },
     take: 80,
   });
-  if (!librarySampleHasVideo(probe)) return tags;
+  if (!librarySampleHasVideo(probe)) return { tags, created: false };
 
   const color = normalizeColor(VIDEO_TAG_NAME, undefined, PRESET_COLORS);
-  await prisma.tag.createMany({
+  const inserted = await prisma.tag.createMany({
     data: [{ userId, name: VIDEO_TAG_NAME, color }],
     skipDuplicates: true,
   });
@@ -189,13 +195,16 @@ async function withVideoTag(
     tags.length > ORBIT_LIBRARY_VOCAB_MAX
       ? tags
       : tags.slice(0, ORBIT_LIBRARY_VOCAB_MAX - 1);
-  return [...kept, { name: VIDEO_TAG_NAME, color }];
+  return {
+    tags: [...kept, { name: VIDEO_TAG_NAME, color }],
+    created: inserted.count > 0,
+  };
 }
 
 /** Existing tags, or one new list learned from a sample of the untagged library. */
-export async function ensureLibraryVocabulary(userId: string): Promise<
-  Array<{ name: string; color: string }>
-> {
+export async function ensureLibraryVocabulary(
+  userId: string
+): Promise<LibraryVocabularyResult> {
   const existing = await prisma.tag.findMany({
     where: { userId },
     select: { name: true, color: true },
@@ -217,7 +226,7 @@ export async function ensureLibraryVocabulary(userId: string): Promise<
     orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
     take: ORBIT_LIBRARY_SAMPLE_POOL,
   });
-  if (pool.length === 0) return [];
+  if (pool.length === 0) return { tags: [], created: false };
 
   const sample = selectStratifiedLibrarySample(pool, ORBIT_LIBRARY_SAMPLE_SIZE);
   const names = await requestLibraryVocabulary(sample);
@@ -227,7 +236,10 @@ export async function ensureLibraryVocabulary(userId: string): Promise<
     color: normalizeColor(name, undefined, PRESET_COLORS),
   }));
 
-  await prisma.tag.createMany({ data, skipDuplicates: true });
+  const inserted = await prisma.tag.createMany({ data, skipDuplicates: true });
 
-  return data.map((tag) => ({ name: tag.name, color: tag.color }));
+  return {
+    tags: data.map((tag) => ({ name: tag.name, color: tag.color })),
+    created: inserted.count > 0,
+  };
 }

@@ -14,6 +14,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useOrbitLibraryBootstrap } from "@/hooks/use-orbit-library-bootstrap";
+import { useRouteSearchParams } from "@/hooks/use-route-search-params";
 import { EMPTY_BOOKMARKS } from "@/lib/orbit-client-constants";
 import { fetchJson } from "@/lib/fetch-json";
 import { bookmarkListResponseSchema } from "@/lib/api-response-schemas";
@@ -36,7 +37,6 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
   const { onUrlStateApplied } = options;
   const {
     router,
-    searchParams,
     queryClient,
     actions,
     createCollection,
@@ -49,13 +49,15 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
     goToTagOnDashboard,
   } = useOrbitLibraryBootstrap();
 
-  const highlightIdFromUrl = searchParams.get("highlightId");
-  const digestIdsFromUrl = searchParams.get("digestIds");
-  const sourceFromUrl = searchParams.get("source");
-  const orbitSearch = searchParams?.toString() ?? "";
+  // Only /orbit URLs carry Orbit state; other pages' queries used to reset
+  // the hidden page's view, search, and selection.
+  const orbitParams = useRouteSearchParams("/orbit");
+  const highlightIdFromUrl = orbitParams.get("highlightId");
+  const digestIdsFromUrl = orbitParams.get("digestIds");
+  const sourceFromUrl = orbitParams.get("source");
   const orbitUrlState = useMemo(
-    () => parseOrbitUrlState(orbitSearch),
-    [orbitSearch]
+    () => parseOrbitUrlState(orbitParams),
+    [orbitParams]
   );
 
   const [orbitView, setOrbitView] = useState<OrbitView>(orbitUrlState.view);
@@ -188,7 +190,8 @@ export function useOrbitQueue(options: UseOrbitQueueOptions = {}) {
 
   return {
     router,
-    searchParams,
+    /** Orbit's own query (see useRouteSearchParams), for readers and writers alike. */
+    searchParams: orbitParams,
     queryClient,
     actions,
     createCollection,

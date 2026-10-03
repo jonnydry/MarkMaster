@@ -9,7 +9,8 @@ import type { OrbitScanPlan } from "@/types";
 
 type UseOrbitFlywheelScanOptions = {
   router: ReturnType<typeof import("next/navigation").useRouter>;
-  searchParams: ReturnType<typeof import("next/navigation").useSearchParams>;
+  /** Orbit's route-scoped query: the review params are read from it too. */
+  searchParams: URLSearchParams;
   highlightIdFromUrl: string | null;
   digestIdsFromUrl: string | null;
   sourceFromUrl: string | null;

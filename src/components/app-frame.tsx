@@ -16,6 +16,7 @@ import { useSession } from "next-auth/react";
 
 import { isKeptRoute, KeptRoutes } from "@/components/kept-routes";
 import { noteVisiblePath, RoutePreviewProvider } from "@/components/route-preview";
+import { OrbitLibraryTagProvider } from "@/components/orbit-library-tag-provider";
 import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
 import { Sidebar } from "@/components/sidebar-dynamic";
 import { ScrollingProgressBar } from "@/components/ui/scrolling-progress-bar";
@@ -204,6 +205,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
   );
 
   return (
+    <OrbitLibraryTagProvider>
     <AppChromeContext.Provider value={chrome}>
     <RoutePreviewProvider value={routePreview}>
       <div
@@ -229,5 +231,6 @@ export function AppFrame({ children }: { children: ReactNode }) {
       />
     </RoutePreviewProvider>
     </AppChromeContext.Provider>
+    </OrbitLibraryTagProvider>
   );
 }

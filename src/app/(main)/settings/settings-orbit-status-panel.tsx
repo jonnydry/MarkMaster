@@ -5,8 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatRow } from "@/components/ui/stat-row";
-import { fetchJson } from "@/lib/fetch-json";
-import { orbitXaiStatusPayloadSchema } from "@/lib/api-response-schemas";
+import { orbitStatusQuery } from "@/lib/orbit-page-queries";
 import { cn } from "@/lib/utils";
 import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
 
@@ -16,23 +15,8 @@ export function parseOrbitIssue(value: string | null): OrbitScanFailureCode | nu
     : null;
 }
 
-export function buildOrbitStatusUrl(issue: OrbitScanFailureCode | null) {
-  if (!issue) return "/api/orbit/status";
-  const params = new URLSearchParams({ lastFailure: issue });
-  return `/api/orbit/status?${params.toString()}`;
-}
-
 export function useOrbitStatusQuery(orbitIssue: OrbitScanFailureCode | null) {
-  return useQuery({
-    queryKey: ["orbit", "xai-status", orbitIssue],
-    queryFn: () =>
-      fetchJson(
-        buildOrbitStatusUrl(orbitIssue),
-        undefined,
-        orbitXaiStatusPayloadSchema
-      ),
-    staleTime: 30_000,
-  });
+  return useQuery(orbitStatusQuery(orbitIssue));
 }
 
 export function OrbitGrokStatusPanel({

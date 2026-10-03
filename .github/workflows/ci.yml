@@ -35,8 +35,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Production dependencies only: dev tooling (lint config, shadcn CLI)
+      # never ships, and can carry advisories with no published fix.
       - name: Dependency audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
   test:
     runs-on: ubuntu-latest

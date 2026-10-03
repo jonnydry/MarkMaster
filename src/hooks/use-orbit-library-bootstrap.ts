@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 
@@ -21,7 +21,6 @@ type SyncCompleteOptions = {
 
 export function useOrbitLibraryBootstrap() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: session, update: updateSession } = useSession() as {
     data: { dbUser?: DbUser } | null;
@@ -52,7 +51,6 @@ export function useOrbitLibraryBootstrap() {
 
   return {
     router,
-    searchParams,
     queryClient,
     session,
     dbUser: session?.dbUser,

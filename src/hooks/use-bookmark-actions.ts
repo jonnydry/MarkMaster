@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "@/lib/toast";
 import { sendJson } from "@/lib/fetch-json";
 import {
@@ -12,6 +12,7 @@ import {
   invalidateBookmarkTagSideEffects,
   invalidateLibraryQueries,
 } from "@/lib/query-invalidation";
+import { patchOrbitGraphAssignment } from "@/lib/orbit-graph-assign";
 import type { BookmarkWithRelations } from "@/types";
 
 function asBookmarkIds(bookmarkIds: string | string[]) {
@@ -27,6 +28,31 @@ type BookmarkQueryData = {
 
 type TagResponse = { id: string; name: string; color: string };
 type NoteResponse = { id: string; content: string };
+
+
+function patchGraphAssignments(
+  queryClient: QueryClient,
+  bookmarkIds: string[],
+  anchorKind: "tag" | "collection",
+  anchorId: string,
+  action: "add" | "remove"
+) {
+  if (bookmarkIds.length === 0) return false;
+  let applied = true;
+  for (const bookmarkId of bookmarkIds) {
+    if (
+      !patchOrbitGraphAssignment(queryClient, {
+        action,
+        bookmarkId,
+        anchorKind,
+        anchorId,
+      })
+    ) {
+      applied = false;
+    }
+  }
+  return applied;
+}
 
 function patchBookmarkQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -111,8 +137,14 @@ export function useBookmarkActions() {
       });
       toast.error(err instanceof Error ? err.message : "Could not add tag");
     },
-    onSettled: () => {
-      void invalidateBookmarkTagSideEffects(queryClient);
+    onSettled: (tag, err, { bookmarkIds }) => {
+      const patched =
+        !err &&
+        tag != null &&
+        patchGraphAssignments(queryClient, bookmarkIds, "tag", tag.id, "add");
+      void invalidateBookmarkTagSideEffects(queryClient, {
+        graphRefetch: patched ? "none" : "active",
+      });
     },
   });
 
@@ -160,8 +192,19 @@ export function useBookmarkActions() {
       });
       toast.error(err instanceof Error ? err.message : "Could not remove tag");
     },
-    onSettled: () => {
-      void invalidateBookmarkTagSideEffects(queryClient);
+    onSettled: (_data, err, { bookmarkIds, tagId }) => {
+      const patched =
+        !err &&
+        patchGraphAssignments(
+          queryClient,
+          bookmarkIds,
+          "tag",
+          tagId,
+          "remove"
+        );
+      void invalidateBookmarkTagSideEffects(queryClient, {
+        graphRefetch: patched ? "none" : "active",
+      });
     },
   });
 
@@ -280,9 +323,20 @@ export function useBookmarkActions() {
         err instanceof Error ? err.message : "Could not add to collection"
       );
     },
-    onSettled: (_data, _err, vars) => {
+    onSettled: (_data, err, { bookmarkIds, collectionId }) => {
+      const patched =
+        !err &&
+        patchGraphAssignments(
+          queryClient,
+          bookmarkIds,
+          "collection",
+          collectionId,
+          "add"
+        );
       void invalidateBookmarkListQueries(queryClient);
-      void invalidateBookmarkCollectionSideEffects(queryClient, vars.collectionId);
+      void invalidateBookmarkCollectionSideEffects(queryClient, collectionId, {
+        graphRefetch: patched ? "none" : "active",
+      });
     },
   });
 
@@ -332,15 +386,25 @@ export function useBookmarkActions() {
       refreshAll,
       handleAddTag: (bookmarkIds: string | string[], name: string, color: string) =>
         addTagMutation
-          .mutateAsync({ bookmarkIds: asBookmarkIds(bookmarkIds), name, color })
+          .mutateAsync({
+            bookmarkIds: asBookmarkIds(bookmarkIds),
+            name,
+            color,
+          })
           .then(() => undefined),
       handleRemoveTag: (bookmarkIds: string | string[], tagId: string) =>
-        removeTagMutation.mutateAsync({ bookmarkIds: asBookmarkIds(bookmarkIds), tagId }),
+        removeTagMutation.mutateAsync({
+          bookmarkIds: asBookmarkIds(bookmarkIds),
+          tagId,
+        }),
       handleAddNote: (bookmarkId: string, content: string) =>
         addNoteMutation.mutateAsync({ bookmarkId, content }).then(() => undefined),
       handleDeleteNote: (noteId: string) =>
         deleteNoteMutation.mutateAsync({ noteId }),
-      handleAddToCollection: (bookmarkIds: string | string[], collectionId: string) =>
+      handleAddToCollection: (
+        bookmarkIds: string | string[],
+        collectionId: string
+      ) =>
         addToCollectionMutation.mutateAsync({
           bookmarkIds: asBookmarkIds(bookmarkIds),
           collectionId,
