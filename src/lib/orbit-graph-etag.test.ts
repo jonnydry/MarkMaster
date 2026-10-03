@@ -6,6 +6,7 @@ import {
 } from "@/lib/orbit-graph-etag";
 
 const base = {
+  userId: "user-1",
   cacheVersion: 3,
   scope: "library",
   nodeCap: 1000,
@@ -44,5 +45,11 @@ describe("buildOrbitGraphETag", () => {
     expect(buildOrbitGraphETag({ ...base, scope: "orbit" })).not.toBe(etag);
     expect(buildOrbitGraphETag({ ...base, nodeCap: 500 })).not.toBe(etag);
     expect(buildOrbitGraphETag({ ...base, expandKey: "" })).not.toBe(etag);
+  });
+
+  it("separates users who share a cache generation", () => {
+    expect(buildOrbitGraphETag({ ...base, userId: "user-2" })).not.toBe(
+      buildOrbitGraphETag(base)
+    );
   });
 });

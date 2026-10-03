@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/client-sign-out";
 import { Moon, Sun, LogOut, Download, User, Type, Palette } from "lucide-react";
 import {
   DropdownMenu,

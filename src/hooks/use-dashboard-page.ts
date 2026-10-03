@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 
 import { visiblePathname } from "@/components/route-preview";
+import { useRouteSearchParams } from "@/hooks/use-route-search-params";
 import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
 import { useCarriedListTotals } from "@/hooks/use-carried-list-totals";
 import { useBookmarkFilters } from "@/hooks/use-bookmark-filters";
@@ -56,7 +57,7 @@ const EMPTY_TAGS: TagWithCount[] = [];
 const EMPTY_COLLECTIONS: CollectionWithCount[] = [];
 
 export function useDashboardPage() {
-  const searchParams = useSearchParams();
+  const searchParams = useRouteSearchParams("/dashboard");
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session, update: updateSession } = useSession();

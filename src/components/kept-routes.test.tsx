@@ -61,6 +61,11 @@ vi.mock("@/components/app-route-error", () => ({ AppRouteError: () => null }));
 const prefetchAppRoute = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prefetch-app-route", () => ({ prefetchAppRoute }));
 
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { KeptRoutes } from "@/components/kept-routes";
 
 const ALL_ROUTES = ["/dashboard", "/orbit", "/collections", "/analytics", "/settings"];

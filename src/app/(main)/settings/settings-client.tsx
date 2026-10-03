@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSession, signOut } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Braces,
@@ -16,6 +16,7 @@ import {
 import { AppPageShell } from "@/components/app-page-shell";
 import { Button } from "@/components/ui/button";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { signOut } from "@/lib/client-sign-out";
 import { sendJson } from "@/lib/fetch-json";
 import { toast } from "@/lib/toast";
 import { ErrorState } from "@/components/ui/error-state";
@@ -31,6 +32,7 @@ import {
   highlightSurfaceActiveClass,
 } from "@/lib/highlight-chrome";
 import { ColorThemePicker } from "@/components/color-theme-picker";
+import { useRouteSearchParams } from "@/hooks/use-route-search-params";
 import { useCreateCollection } from "@/hooks/use-create-collection";
 import { useCollectionsQuery } from "@/hooks/use-library-data";
 import { useSettingsTags } from "@/hooks/use-settings-tags";
@@ -94,7 +96,7 @@ const SETTINGS_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useRouteSearchParams("/settings");
   const { data: session, update: updateSession } = useSession();
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();

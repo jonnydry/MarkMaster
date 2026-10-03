@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
 import { useAppChrome } from "@/components/app-frame";
 import { AppPageCenter, AppPageShell } from "@/components/app-page-shell";
 import { DashboardToolbar } from "@/components/dashboard-toolbar";
@@ -10,6 +9,7 @@ import { MobileSidebar } from "@/components/mobile-sidebar";
 import { FilterPanel } from "@/components/filter-panel";
 import { PageHeader } from "@/components/page-header";
 import { DASHBOARD_SHORTCUT_GROUPS } from "@/hooks/use-keyboard-shortcuts";
+import { useRouteSearchParams } from "@/hooks/use-route-search-params";
 import { useDashboardDiscovery } from "@/hooks/use-dashboard-discovery";
 import { useDashboardPage } from "@/hooks/use-dashboard-page";
 import { useDashboardRail } from "@/hooks/use-dashboard-rail";
@@ -86,7 +86,7 @@ const KeyboardShortcutsDialog = dynamic(
 
 function DashboardContent() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const searchParams = useSearchParams();
+  const searchParams = useRouteSearchParams("/dashboard");
   const {
     filters,
     actions,

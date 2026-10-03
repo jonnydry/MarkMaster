@@ -48,7 +48,13 @@ export async function GET(req: NextRequest) {
   const expandKey = [...expandAnchorIds].sort().join(",");
   const cacheKey = `cache:orbit:graph:${user.id}:${scope}:${nodeCap}:${expandKey}`;
   const etagFor = (cacheVersion: number) =>
-    buildOrbitGraphETag({ cacheVersion, scope, nodeCap, expandKey });
+    buildOrbitGraphETag({
+      userId: user.id,
+      cacheVersion,
+      scope,
+      nodeCap,
+      expandKey,
+    });
 
   // A revalidation is answered from the cache generation alone, so it reads
   // one small key instead of the cached graph. Either read overlaps the

@@ -11,14 +11,8 @@ import type {
 import type { useBookmarkActions } from "@/hooks/use-bookmark-actions";
 import type { useBookmarkDialogs } from "@/hooks/use-bookmark-dialogs";
 import { copyCollectionAsUserCollection } from "@/lib/collection-copy";
-import { sendJson } from "@/lib/fetch-json";
-import { patchOrbitGraphAssignment } from "@/lib/orbit-graph-assign";
 import type { OrbitMapArmedBookmark } from "@/lib/orbit-map-actions";
 import { hasOrbitMapConnection } from "@/lib/orbit-map-connections";
-import {
-  invalidateBookmarkCollectionSideEffects,
-  invalidateBookmarkListQueries,
-} from "@/lib/query-invalidation";
 import {
   resolveOrbitMapSelectionNode,
   type buildOrbitMapGraphIndexes,
@@ -113,23 +107,7 @@ export function useOrbitMapAssignments({
           action: {
             label: "Undo",
             onClick: () => {
-              void sendJson(`/api/collections/${anchor.id}/items`, {
-                method: "DELETE",
-                body: { bookmarkIds: [bookmarkId] },
-              }).then(() => {
-                const patched = patchOrbitGraphAssignment(queryClient, {
-                  action: "remove",
-                  bookmarkId,
-                  anchorKind: "collection",
-                  anchorId: anchor.id,
-                });
-                void invalidateBookmarkListQueries(queryClient);
-                void invalidateBookmarkCollectionSideEffects(
-                  queryClient,
-                  anchor.id,
-                  { graphRefetch: patched ? "none" : "active" }
-                );
-              });
+              void actions.handleRemoveFromCollection(bookmarkId, anchor.id);
             },
           },
         });
@@ -137,7 +115,7 @@ export function useOrbitMapAssignments({
         // Failure toasts come from the underlying mutations in useBookmarkActions.
       }
     },
-    [actions, canvasRef, connectionIndex, queryClient]
+    [actions, canvasRef, connectionIndex]
   );
 
   const handleAssign = useCallback(async () => {

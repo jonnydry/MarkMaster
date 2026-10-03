@@ -305,6 +305,41 @@ export function useBookmarkActions() {
     },
   });
 
+  const removeFromCollectionMutation = useMutation({
+    mutationFn: async ({
+      bookmarkIds,
+      collectionId,
+    }: {
+      bookmarkIds: string[];
+      collectionId: string;
+    }) => {
+      await sendJson(`/api/collections/${collectionId}/items`, {
+        method: "DELETE",
+        body: { bookmarkIds },
+      });
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof Error ? err.message : "Could not remove from collection"
+      );
+    },
+    onSettled: (_data, err, { bookmarkIds, collectionId }) => {
+      const patched =
+        !err &&
+        patchGraphAssignments(
+          queryClient,
+          bookmarkIds,
+          "collection",
+          collectionId,
+          "remove"
+        );
+      void invalidateBookmarkListQueries(queryClient);
+      void invalidateBookmarkCollectionSideEffects(queryClient, collectionId, {
+        graphRefetch: patched ? "none" : "active",
+      });
+    },
+  });
+
   const addToCollectionMutation = useMutation({
     mutationFn: async ({
       bookmarkIds,
@@ -409,6 +444,14 @@ export function useBookmarkActions() {
           bookmarkIds: asBookmarkIds(bookmarkIds),
           collectionId,
         }),
+      handleRemoveFromCollection: (
+        bookmarkIds: string | string[],
+        collectionId: string
+      ) =>
+        removeFromCollectionMutation.mutateAsync({
+          bookmarkIds: asBookmarkIds(bookmarkIds),
+          collectionId,
+        }),
       handleDeleteBookmark: (bookmarkIds: string | string[]) =>
         deleteBookmarkMutation.mutateAsync({ bookmarkIds: asBookmarkIds(bookmarkIds) }),
       isAddingTag: addTagMutation.isPending,
@@ -416,6 +459,7 @@ export function useBookmarkActions() {
       isAddingNote: addNoteMutation.isPending,
       isDeletingNote: deleteNoteMutation.isPending,
       isAddingToCollection: addToCollectionMutation.isPending,
+      isRemovingFromCollection: removeFromCollectionMutation.isPending,
       isDeletingBookmark: deleteBookmarkMutation.isPending,
     }),
     // Depend on the stable pieces (mutateAsync identity, isPending flags)
@@ -435,6 +479,8 @@ export function useBookmarkActions() {
       deleteNoteMutation.isPending,
       addToCollectionMutation.mutateAsync,
       addToCollectionMutation.isPending,
+      removeFromCollectionMutation.mutateAsync,
+      removeFromCollectionMutation.isPending,
       deleteBookmarkMutation.mutateAsync,
       deleteBookmarkMutation.isPending,
     ]
