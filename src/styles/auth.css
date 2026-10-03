@@ -16,28 +16,35 @@
     color-scheme: dark;
   }
 
-  /* Restored launch plate. Anchor the rocket right of the copy column
-     so the mark stays the hero and the sign-in stays clear of the flame. */
-  .auth-splash__rocket {
-    object-position: 42% 28%;
+  .auth-splash__scene {
+    overflow: hidden;
   }
 
-  /* Neutral read-back only — no accent wash on the photograph. */
+  /* Restored launch plate. Scale in so the rocket — not the empty sky —
+     fills the splash, and keep the sign-in clear of the body. */
+  .auth-splash__rocket {
+    object-position: 34% 68%;
+    transform: scale(1.42);
+    transform-origin: 68% 72%;
+  }
+
+  /* Neutral read-back behind the copy only. The rocket stays uncovered. */
   .auth-splash__scrim {
     background:
       linear-gradient(
         180deg,
-        rgba(10, 10, 10, 0.2) 0%,
-        rgba(10, 10, 10, 0.02) 34%,
-        rgba(10, 10, 10, 0.46) 68%,
-        rgba(10, 10, 10, 0.84) 100%
+        rgba(10, 10, 10, 0.18) 0%,
+        rgba(10, 10, 10, 0) 22%,
+        rgba(10, 10, 10, 0) 52%,
+        rgba(10, 10, 10, 0.28) 78%,
+        rgba(10, 10, 10, 0.7) 100%
       ),
       linear-gradient(
-        90deg,
-        rgba(10, 10, 10, 0.82) 0%,
-        rgba(10, 10, 10, 0.58) 32%,
-        rgba(10, 10, 10, 0.08) 56%,
-        rgba(10, 10, 10, 0.22) 100%
+        100deg,
+        rgba(10, 10, 10, 0.8) 0%,
+        rgba(10, 10, 10, 0.46) 18%,
+        rgba(10, 10, 10, 0.1) 34%,
+        rgba(10, 10, 10, 0) 46%
       );
   }
 
@@ -60,7 +67,9 @@
     }
 
     .auth-splash__rocket {
-      object-position: 28% 78%;
+      object-position: 30% 74%;
+      transform: scale(1.55);
+      transform-origin: 72% 76%;
     }
   }
 
@@ -157,7 +166,9 @@
 
   @media (max-width: 639px) {
     .auth-splash__rocket {
-      object-position: center 22%;
+      object-position: center 40%;
+      transform: translateY(-30%) scale(1.25);
+      transform-origin: center 28%;
     }
 
     .auth-splash__headline {
