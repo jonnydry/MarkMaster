@@ -1,6 +1,11 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import { applyOrbitGraphAssignment } from "./orbit-graph-assign";
+import {
+  applyOrbitGraphAssignment,
+  patchOrbitGraphAssignment,
+} from "./orbit-graph-assign";
+import { ORBIT_GRAPH_QUERY_KEY } from "./query-invalidation";
 import type { OrbitGraphPayload } from "@/types";
 
 function graph(overrides: Partial<OrbitGraphPayload> = {}): OrbitGraphPayload {
@@ -177,5 +182,87 @@ describe("applyOrbitGraphAssignment", () => {
     expect(
       next?.nodes.find((node) => node.kind === "core")
     ).toMatchObject({ looseBookmarks: 0 });
+  });
+});
+
+describe("patchOrbitGraphAssignment", () => {
+  const assignment = {
+    action: "add",
+    bookmarkId: "bookmark-1",
+    anchorKind: "tag",
+    anchorId: "tag-1",
+  } as const;
+
+  it("patches cached graphs that hold the bookmark and leaves them stale for the next refetch", () => {
+    const queryClient = new QueryClient();
+    const key = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    queryClient.setQueryData(key, graph());
+
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(true);
+
+    // Without this, the patch would pass for server truth until staleTime.
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(
+      queryClient
+        .getQueryData<OrbitGraphPayload>(key)
+        ?.edges.some((edge) => edge.kind === "bookmark-tag")
+    ).toBe(true);
+  });
+
+  it("reports a graph it cannot patch and leaves it unchanged", () => {
+    const queryClient = new QueryClient();
+    const patchable = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    const missing = [...ORBIT_GRAPH_QUERY_KEY, "orbit", ""];
+    queryClient.setQueryData(patchable, graph());
+    const truncated = graph({
+      nodes: graph().nodes.filter((node) => node.kind !== "bookmark"),
+    });
+    queryClient.setQueryData(missing, truncated);
+
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(false);
+
+    expect(queryClient.getQueryState(missing)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(missing)).toBe(truncated);
+    expect(
+      queryClient
+        .getQueryData<OrbitGraphPayload>(patchable)
+        ?.edges.some((edge) => edge.kind === "bookmark-tag")
+    ).toBe(true);
+  });
+
+  it("asks for a refetch when no graph is cached", () => {
+    expect(patchOrbitGraphAssignment(new QueryClient(), assignment)).toBe(false);
+  });
+
+  it("does not count a graph query with missing data as patched", () => {
+    const queryClient = new QueryClient();
+    const key = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    queryClient.getQueryCache().build(queryClient, { queryKey: key });
+
+    expect(
+      queryClient.getQueriesData<OrbitGraphPayload>({
+        queryKey: ORBIT_GRAPH_QUERY_KEY,
+      })
+    ).toEqual([[key, undefined]]);
+
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(false);
+    expect(queryClient.getQueryData(key)).toBeUndefined();
+  });
+
+  it("does not count missing data as patched when another graph was updated", () => {
+    const queryClient = new QueryClient();
+    const loaded = [...ORBIT_GRAPH_QUERY_KEY, "library", ""];
+    const inflight = [...ORBIT_GRAPH_QUERY_KEY, "orbit", ""];
+    queryClient.setQueryData(loaded, graph());
+    queryClient.getQueryCache().build(queryClient, { queryKey: inflight });
+
+    expect(queryClient.getQueryData(inflight)).toBeUndefined();
+    expect(patchOrbitGraphAssignment(queryClient, assignment)).toBe(false);
+    expect(
+      queryClient
+        .getQueryData<OrbitGraphPayload>(loaded)
+        ?.edges.some((edge) => edge.kind === "bookmark-tag")
+    ).toBe(true);
+    expect(queryClient.getQueryData(inflight)).toBeUndefined();
   });
 });

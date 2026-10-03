@@ -9,9 +9,14 @@ import {
 } from "@/lib/api-response-schemas";
 import { defaultBookmarkListQueryString } from "@/lib/bookmark-list-params";
 import { fetchJson } from "@/lib/fetch-json";
-import { ORBIT_RECENT_PAGE_SIZE } from "@/lib/orbit-navigation";
-import { buildOrbitQueueListQueryString } from "@/lib/orbit-queue-params";
 import { prefetchOrbitGraph } from "@/hooks/use-orbit-graph";
+import {
+  defaultOrbitQueueListQueryString,
+  defaultOrbitScanCandidatesQueryString,
+  orbitScanCandidatesQuery,
+  orbitScanQualityQuery,
+  orbitXaiStatusQuery,
+} from "@/lib/orbit-page-queries";
 
 const LIST_STALE_TIME = 60_000;
 
@@ -32,8 +37,10 @@ export function prefetchAppRouteDocument(
 }
 
 /**
- * Warm a destination list so the page can paint from cache.
- * Tags and collections are already cached by the sidebar.
+ * Warm a destination's data so the page can paint from cache: on sidebar
+ * hover, and when KeptRoutes pre-renders the page hidden (hidden pages run no
+ * effects, so they can't fetch for themselves). Tags and collections are
+ * already cached by the sidebar.
  */
 export function prefetchAppRoute(queryClient: QueryClient, href: string) {
   if (href === "/dashboard") {
@@ -52,13 +59,7 @@ export function prefetchAppRoute(queryClient: QueryClient, href: string) {
   }
 
   if (href === "/orbit") {
-    const queryString = buildOrbitQueueListQueryString({
-      orbitView: "recent",
-      page: 1,
-      pageSize: ORBIT_RECENT_PAGE_SIZE,
-      sortDirection: "desc",
-      search: "",
-    });
+    const queryString = defaultOrbitQueueListQueryString();
     void queryClient.prefetchQuery({
       queryKey: ["bookmarks", "orbit", queryString],
       queryFn: () =>
@@ -69,6 +70,13 @@ export function prefetchAppRoute(queryClient: QueryClient, href: string) {
         ),
       staleTime: LIST_STALE_TIME,
     });
+    // The scan button is planned from these; without them it would relabel
+    // a moment after the page shows.
+    void queryClient.prefetchQuery(
+      orbitScanCandidatesQuery(defaultOrbitScanCandidatesQueryString())
+    );
+    void queryClient.prefetchQuery(orbitScanQualityQuery);
+    void queryClient.prefetchQuery(orbitXaiStatusQuery);
     return;
   }
 

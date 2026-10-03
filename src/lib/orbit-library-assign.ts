@@ -209,7 +209,8 @@ export function shortlistLibraryPackTags(
 
 async function assignPack(
   posts: LibraryAssignBookmark[],
-  tags: string[]
+  tags: string[],
+  signal?: AbortSignal
 ): Promise<Map<string, string[]>> {
   const client = getTypeSafeClient();
   const questions: Record<string, ReturnType<typeof noul>> = {};
@@ -228,18 +229,21 @@ async function assignPack(
     }
   }
 
-  const response = await client.systemOne({
-    model: getTypeSafeModel(),
-    state: {
-      posts: posts.map((post) => ({
-        id: post.id,
-        text: libraryPostJudgmentText(post) || "(no text)",
-        authorBio: getOrbitAuthorBio(post.xMetadata),
-      })),
-      tags,
+  const response = await client.systemOne(
+    {
+      model: getTypeSafeModel(),
+      state: {
+        posts: posts.map((post) => ({
+          id: post.id,
+          text: libraryPostJudgmentText(post) || "(no text)",
+          authorBio: getOrbitAuthorBio(post.xMetadata),
+        })),
+        tags,
+      },
+      questions,
     },
-    questions,
-  });
+    signal ? { signal } : undefined
+  );
 
   const nouls: Record<string, number> = {};
   for (const [key, answer] of Object.entries(response.answers)) {
@@ -253,8 +257,23 @@ const PACK_RATE_LIMIT_RETRIES = 3;
 const PACK_RETRY_BASE_DELAY_MS = 500;
 const PACK_RETRY_MAX_DELAY_MS = 10_000;
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Waits out a backoff, ending early (rejecting) if the batch is abandoned. */
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /** Credential failures would fail every pack; stop the run instead of skipping the library. */
@@ -268,11 +287,12 @@ function isFatalPackError(error: unknown) {
 async function assignPackWithRetry(
   posts: LibraryAssignBookmark[],
   tags: string[],
-  retryBaseDelayMs: number
+  retryBaseDelayMs: number,
+  signal?: AbortSignal
 ): Promise<Map<string, string[]>> {
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await assignPack(posts, tags);
+      return await assignPack(posts, tags, signal);
     } catch (error) {
       if (
         !(error instanceof RateLimitError) ||
@@ -285,51 +305,95 @@ async function assignPackWithRetry(
         Math.min(
           PACK_RETRY_MAX_DELAY_MS,
           error.retryAfterMs ?? backoff + Math.random() * backoff
-        )
+        ),
+        signal
       );
     }
   }
 }
 
+/** Runs a Jev pack call when a slot is free. */
+export type PackLimiter = <T>(task: () => Promise<T>) => Promise<T>;
+
+/**
+ * At most `concurrency` Jev calls in flight, started in the order they were
+ * queued. Sharing one limiter across library pages lets the next page's packs
+ * take the slots the current page's slowest packs leave idle.
+ */
+export function createPackLimiter(
+  concurrency = ORBIT_LIBRARY_PACK_CONCURRENCY
+): PackLimiter {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+
+  return (task) =>
+    new Promise((resolve, reject) => {
+      const run = () => {
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            // Hand the slot straight to the next queued call.
+            const next = waiting.shift();
+            if (next) next();
+            else active -= 1;
+          });
+      };
+      if (active < concurrency) {
+        active += 1;
+        run();
+      } else {
+        waiting.push(run);
+      }
+    });
+}
+
 async function mapPacks(
   packs: LibraryAssignBookmark[][],
   tags: string[],
-  retryBaseDelayMs: number
+  options: {
+    retryBaseDelayMs: number;
+    limiter: PackLimiter;
+    signal?: AbortSignal;
+  }
 ): Promise<{ assigned: Map<string, string[]>; failed: number }> {
   const assigned = new Map<string, string[]>();
   let failed = 0;
   let fatal: unknown = null;
-  let next = 0;
-
-  async function worker() {
-    while (next < packs.length && !fatal) {
-      const index = next;
-      next += 1;
-      const pack = packs[index];
-      if (!pack || pack.length === 0) continue;
-      try {
-        const packTags = shortlistLibraryPackTags(pack, tags.map((name) => ({ name, color: "" })));
-        const packAssigned = await assignPackWithRetry(pack, packTags, retryBaseDelayMs);
-        for (const [id, names] of packAssigned) assigned.set(id, names);
-      } catch (error) {
-        if (isFatalPackError(error)) {
-          fatal = error;
-          return;
-        }
-        failed += pack.length;
-        logWarn(
-          "OrbitLibrary",
-          `Packed assignment failed for ${pack.length} posts; leaving them untagged.`,
-          error instanceof Error ? error.message : error
-        );
-      }
-    }
-  }
 
   await Promise.all(
-    Array.from(
-      { length: Math.min(ORBIT_LIBRARY_PACK_CONCURRENCY, packs.length) },
-      () => worker()
+    packs.map((pack) =>
+      options.limiter(async () => {
+        // Packs still queued when the batch stops (credential failure, or the
+        // page was abandoned) never reach Jev; abandoning also cancels the
+        // calls and backoffs already in flight.
+        if (fatal || options.signal?.aborted || pack.length === 0) return;
+        try {
+          const packTags = shortlistLibraryPackTags(
+            pack,
+            tags.map((name) => ({ name, color: "" }))
+          );
+          const packAssigned = await assignPackWithRetry(
+            pack,
+            packTags,
+            options.retryBaseDelayMs,
+            options.signal
+          );
+          for (const [id, names] of packAssigned) assigned.set(id, names);
+        } catch (error) {
+          // Cancelled with its page: nothing will read this result.
+          if (options.signal?.aborted) return;
+          if (isFatalPackError(error)) {
+            fatal = error;
+            return;
+          }
+          failed += pack.length;
+          logWarn(
+            "OrbitLibrary",
+            `Packed assignment failed for ${pack.length} posts; leaving them untagged.`,
+            error instanceof Error ? error.message : error
+          );
+        }
+      })
     )
   );
   if (fatal) {
@@ -374,6 +438,10 @@ export type LibraryAssignmentPlan = {
 export async function planLibraryAssignments(args: {
   bookmarks: LibraryAssignBookmark[];
   vocabulary: LibraryVocabularyTag[];
+  /** Shared Jev slots (a run shares one across pages); defaults to a fresh pool. */
+  limiter?: PackLimiter;
+  /** Abandons packs that have not started yet. */
+  signal?: AbortSignal;
   /** Test hook — base backoff for rate-limit retries. */
   retryBaseDelayMs?: number;
 }): Promise<LibraryAssignmentPlan> {
@@ -405,11 +473,11 @@ export async function planLibraryAssignments(args: {
   }
   const { assigned, failed } =
     tagNames.length > 0 && packs.length > 0
-      ? await mapPacks(
-          packs,
-          tagNames,
-          args.retryBaseDelayMs ?? PACK_RETRY_BASE_DELAY_MS
-        )
+      ? await mapPacks(packs, tagNames, {
+          retryBaseDelayMs: args.retryBaseDelayMs ?? PACK_RETRY_BASE_DELAY_MS,
+          limiter: args.limiter ?? createPackLimiter(),
+          signal: args.signal,
+        })
       : { assigned: new Map<string, string[]>(), failed: 0 };
 
   for (const bookmark of needsModel) {

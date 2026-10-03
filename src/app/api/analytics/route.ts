@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildMediaBreakdown } from "@/lib/analytics";
-import { getCachedJson, getUserCacheVersion } from "@/lib/upstash-cache";
+import { getUserCachedJson } from "@/lib/upstash-cache";
 import { timeZoneSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { logWarn } from "@/lib/logger";
@@ -53,10 +53,9 @@ export async function GET(req: NextRequest) {
   }
   const timeZone = parsedTimeZone?.data ?? "UTC";
 
-  const cacheVersion = await getUserCacheVersion(user.id);
-  const cacheKey = `cache:analytics:${user.id}:v${cacheVersion}:${range}:${timeZone}`;
+  const cacheKey = `cache:analytics:${user.id}:${range}:${timeZone}`;
 
-  const analyticsPayload = await getCachedJson<AnalyticsData>(cacheKey, 120, async () => {
+  const { value: analyticsPayload } = await getUserCachedJson<AnalyticsData>(user.id, cacheKey, 120, async () => {
   const [
     authorRows,
     monthRows,

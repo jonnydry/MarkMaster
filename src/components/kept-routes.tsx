@@ -1,16 +1,20 @@
 "use client";
 
 import {
+  Activity,
   Component,
   memo,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { AppRouteError } from "@/components/app-route-error";
 import { PageActiveProvider } from "@/components/page-activity";
+import { prefetchAppRoute } from "@/lib/prefetch-app-route";
 
 const DashboardClient = dynamic(
   () => import("@/app/(main)/dashboard/dashboard-client")
@@ -91,16 +95,16 @@ function KeptRoute({
   children: ReactNode;
 }) {
   if (!mounted) return null;
+  // A hidden Activity keeps the page's state and DOM but unmounts its effects
+  // (listeners, observers, query subscriptions, polls) and renders its updates
+  // only when the browser is idle, so pages off screen never compete with the
+  // one on screen. Showing it remounts effects; stale queries refetch then.
   return (
-    <div
-      className={active ? "contents" : "hidden"}
-      hidden={active ? undefined : true}
-      inert={active ? undefined : true}
-    >
+    <Activity mode={active ? "visible" : "hidden"}>
       <PageActiveProvider active={active}>
         <KeptRouteErrorBoundary>{children}</KeptRouteErrorBoundary>
       </PageActiveProvider>
-    </div>
+    </Activity>
   );
 }
 
@@ -111,9 +115,18 @@ export function isKeptRoute(pathname: string) {
 /**
  * Sidebar destinations stay mounted after the first visit. Later clicks only
  * show or hide them, so the page does not render from scratch again.
+ *
+ * Unvisited destinations are pre-rendered hidden shortly after load. A hidden
+ * page runs no effects, so it can't load its own data; each warm-up step
+ * prefetches the page's main data instead, and the rest loads on first show.
  */
 export function KeptRoutes({ pathname }: { pathname: string }) {
+  const queryClient = useQueryClient();
   const [warm, setWarm] = useState<ReadonlySet<string>>(() => new Set([pathname]));
+  // The warm set is only read inside this effect. Skip routes already warm at
+  // mount (the page on screen, including a deep link) so we don't fetch the
+  // default queue for a page that isn't showing that query.
+  const warmRef = useRef(warm);
 
   useEffect(() => {
     let index = 0;
@@ -122,17 +135,18 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
       const href = KEPT_ROUTES[index]?.href;
       index += 1;
       if (!href) return;
-      setWarm((current) => {
-        if (current.has(href)) return current;
-        const next = new Set(current);
+      if (!warmRef.current.has(href)) {
+        prefetchAppRoute(queryClient, href);
+        const next = new Set(warmRef.current);
         next.add(href);
-        return next;
-      });
+        warmRef.current = next;
+        setWarm(next);
+      }
       timer = window.setTimeout(step, 500);
     };
     timer = window.setTimeout(step, 700);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     let index = 0;
@@ -149,9 +163,20 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
     return () => window.clearTimeout(timer);
   }, []);
 
+  // Focus left inside a page that was just hidden is lost (the browser drops
+  // it to <body>, possibly a frame later); hand it to the page now on screen.
+  // Not on first load: Tab should still reach the skip link first.
+  const focusPathRef = useRef(pathname);
   useEffect(() => {
+    if (pathname === focusPathRef.current) return;
+    focusPathRef.current = pathname;
     const focused = document.activeElement;
-    if (!(focused instanceof HTMLElement) || !focused.closest("[hidden]")) return;
+    const focusLost =
+      !focused ||
+      focused === document.body ||
+      // Hidden Activity content is display:none, so it has no boxes.
+      focused.getClientRects().length === 0;
+    if (!focusLost) return;
     document.getElementById("app-main-content")?.focus({ preventScroll: true });
   }, [pathname]);
 

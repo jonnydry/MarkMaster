@@ -5,6 +5,7 @@ import type { OrbitLibraryRun } from "@prisma/client";
 import {
   ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
   ORBIT_LIBRARY_INVOCATION_BUDGET_MS,
+  ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS,
   ORBIT_LIBRARY_PACK_SIZE,
   ORBIT_LIBRARY_RUN_RESUME_WINDOW_MS,
   ORBIT_LIBRARY_RUN_STALE_MS,
@@ -14,8 +15,11 @@ import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
 import { isVideoFormatTag } from "@/lib/orbit-video-tag";
 import { applyOrbitScanPlan, OrbitScanError } from "@/lib/orbit-grok";
 import {
+  createPackLimiter,
   planLibraryAssignments,
+  type LibraryAssignmentPlan,
   type LibraryVocabularyTag,
+  type PackLimiter,
 } from "@/lib/orbit-library-assign";
 import { ensureLibraryVocabulary } from "@/lib/orbit-library-vocabulary";
 import { logError } from "@/lib/logger";
@@ -243,14 +247,13 @@ export type OrbitLibraryPageResult = {
   cursor: OrbitLibraryClassifyCursor | null;
 };
 
-/** Tags one page of untagged bookmarks after the cursor from the closed tag list. */
-async function tagUntaggedLibraryPage(args: {
-  userId: string;
-  vocabulary: LibraryVocabularyTag[];
-  cursor: OrbitLibraryClassifyCursor | null;
-}): Promise<OrbitLibraryPageResult> {
-  const bookmarks = await prisma.bookmark.findMany({
-    where: untaggedOrbitWhere(args.userId, args.cursor),
+/** Untagged bookmarks after the cursor, newest first. */
+function fetchUntaggedLibraryPage(
+  userId: string,
+  cursor: OrbitLibraryClassifyCursor | null
+) {
+  return prisma.bookmark.findMany({
+    where: untaggedOrbitWhere(userId, cursor),
     select: {
       id: true,
       tweetText: true,
@@ -262,42 +265,67 @@ async function tagUntaggedLibraryPage(args: {
     orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
     take: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
   });
+}
 
-  if (bookmarks.length === 0) {
-    return { processed: 0, applied: 0, failed: 0, cursor: args.cursor };
-  }
+type LibraryPageBookmark = Awaited<
+  ReturnType<typeof fetchUntaggedLibraryPage>
+>[number];
 
-  const { plan, modelChecked, failed } = await planLibraryAssignments({
+function cursorAfter(bookmarks: LibraryPageBookmark[]): OrbitLibraryClassifyCursor {
+  const last = bookmarks[bookmarks.length - 1]!;
+  return { bookmarkedAt: last.bookmarkedAt, id: last.id };
+}
+
+/** Asks Jev about one page against the closed tag list. Applies nothing. */
+async function planUntaggedLibraryPage(
+  bookmarks: LibraryPageBookmark[],
+  vocabulary: LibraryVocabularyTag[],
+  limiter: PackLimiter,
+  signal: AbortSignal
+) {
+  const planned = await planLibraryAssignments({
     bookmarks,
-    vocabulary: args.vocabulary,
+    vocabulary,
+    limiter,
+    signal,
   });
   // Several packs failing with none succeeding means TypeSafe is down, not
   // that the posts fit nothing. Stop instead of skipping the rest of the queue.
-  if (modelChecked > ORBIT_LIBRARY_PACK_SIZE && failed === modelChecked) {
+  if (
+    planned.modelChecked > ORBIT_LIBRARY_PACK_SIZE &&
+    planned.failed === planned.modelChecked
+  ) {
     throw new OrbitScanError(
       "TypeSafe could not be reached.",
       503,
       "typesafe_unavailable"
     );
   }
+  return planned;
+}
 
+/** Applies one planned page. Pages are applied strictly in queue order. */
+async function applyUntaggedLibraryPage(
+  userId: string,
+  bookmarks: LibraryPageBookmark[],
+  { plan, failed }: LibraryAssignmentPlan
+): Promise<OrbitLibraryPageResult> {
   if (plan.suggestions.length > 0) {
-    await applyOrbitScanPlan({
-      userId: args.userId,
-      plan,
-      createCollections: false,
-    });
-    await invalidateUserResponseCache(args.userId);
+    await applyOrbitScanPlan({ userId, plan, createCollections: false });
+    await invalidateUserResponseCache(userId);
   }
-
-  const last = bookmarks[bookmarks.length - 1]!;
   return {
     processed: bookmarks.length,
     applied: plan.suggestions.length,
     failed,
-    cursor: { bookmarkedAt: last.bookmarkedAt, id: last.id },
+    cursor: cursorAfter(bookmarks),
   };
 }
+
+type LibraryPageWork = {
+  bookmarks: Promise<LibraryPageBookmark[]>;
+  planned: Promise<LibraryAssignmentPlan>;
+};
 
 /** Writes one page of progress. False when the run was stopped meanwhile. */
 async function recordPage(runId: string, page: OrbitLibraryPageResult) {
@@ -330,6 +358,11 @@ async function finishRun(
 /**
  * One budgeted slice of a run: resolve the tag list once, then tag pages until
  * the queue ends, the run is stopped, or the time budget is spent.
+ *
+ * Pages overlap: once a page's bookmarks are known, the following page is
+ * fetched and its packs queue on the same Jev slots, filling the ones this
+ * page's slowest packs leave idle (about a third faster end to end). Results
+ * are still applied and recorded one page at a time, in order.
  */
 export async function runOrbitLibraryInvocation(
   runId: string,
@@ -339,10 +372,20 @@ export async function runOrbitLibraryInvocation(
   const run = await prisma.orbitLibraryRun.findUnique({ where: { id: runId } });
   if (!run || run.status !== "RUNNING") return { continued: false };
 
+  const limiter = createPackLimiter();
+  // Stops the queued packs of a look-ahead page this slice won't apply.
+  const abandon = new AbortController();
+
   try {
     let vocabulary = parseVocabulary(run.vocabulary);
     if (!vocabulary) {
-      vocabulary = await ensureLibraryVocabulary(run.userId);
+      const ensured = await ensureLibraryVocabulary(run.userId);
+      vocabulary = ensured.tags;
+      // Invalidate only when a tag was actually inserted. An existing list
+      // (or a duplicate Video tag) does not change the graph or analytics.
+      if (ensured.created) {
+        await invalidateUserResponseCache(run.userId);
+      }
       if (vocabulary.length === 0) {
         await finishRun(run.id, "COMPLETED");
         return { continued: false };
@@ -357,27 +400,57 @@ export async function runOrbitLibraryInvocation(
       if (count === 0) return { continued: false };
     }
 
-    let cursor: OrbitLibraryClassifyCursor | null =
+    const cursor: OrbitLibraryClassifyCursor | null =
       run.cursorBookmarkedAt && run.cursorId
         ? { bookmarkedAt: run.cursorBookmarkedAt, id: run.cursorId }
         : null;
+    const tagList = vocabulary;
+    const startPage = (pageCursor: OrbitLibraryClassifyCursor | null) => {
+      const bookmarks = fetchUntaggedLibraryPage(run.userId, pageCursor);
+      const planned = bookmarks.then((rows) =>
+        planUntaggedLibraryPage(rows, tagList, limiter, abandon.signal)
+      );
+      // A look-ahead page can be abandoned (run stopped, earlier page
+      // failed); its rejections must not surface as unhandled.
+      bookmarks.catch(() => {});
+      planned.catch(() => {});
+      return { bookmarks, planned } satisfies LibraryPageWork;
+    };
+    const underBudget = (budgetMs: number) => now() - startedAt < budgetMs;
 
-    while (now() - startedAt < ORBIT_LIBRARY_INVOCATION_BUDGET_MS) {
-      const page = await tagUntaggedLibraryPage({
-        userId: run.userId,
-        vocabulary,
-        cursor,
-      });
-      if (page.processed === 0) {
+    let current: LibraryPageWork | null = underBudget(
+      ORBIT_LIBRARY_INVOCATION_BUDGET_MS
+    )
+      ? startPage(cursor)
+      : null;
+
+    while (current) {
+      const bookmarks = await current.bookmarks;
+      if (bookmarks.length === 0) {
         await finishRun(run.id, "COMPLETED");
         return { continued: false };
       }
+      const fullPage = bookmarks.length === ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE;
+      let following =
+        fullPage && underBudget(ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS)
+          ? startPage(cursorAfter(bookmarks))
+          : null;
+
+      const page = await applyUntaggedLibraryPage(
+        run.userId,
+        bookmarks,
+        await current.planned
+      );
       if (!(await recordPage(run.id, page))) return { continued: false };
-      if (page.processed < ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE) {
+      if (!fullPage) {
         await finishRun(run.id, "COMPLETED");
         return { continued: false };
       }
-      cursor = page.cursor;
+      // Past the look-ahead budget, pages run one at a time until the slice ends.
+      if (!following && underBudget(ORBIT_LIBRARY_INVOCATION_BUDGET_MS)) {
+        following = startPage(cursorAfter(bookmarks));
+      }
+      current = following;
     }
     return { continued: true };
   } catch (error) {
@@ -392,6 +465,8 @@ export async function runOrbitLibraryInvocation(
         : "Auto-tag stopped unexpectedly."
     );
     return { continued: false };
+  } finally {
+    abandon.abort();
   }
 }
 

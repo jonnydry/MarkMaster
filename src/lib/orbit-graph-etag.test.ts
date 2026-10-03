@@ -1,32 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { buildOrbitGraphETag } from "@/lib/orbit-graph-etag";
+import {
+  buildOrbitGraphETag,
+  ORBIT_GRAPH_ETAG_WINDOW_MS,
+} from "@/lib/orbit-graph-etag";
+
+const base = {
+  cacheVersion: 3,
+  scope: "library",
+  nodeCap: 1000,
+  expandKey: "tag-1",
+  now: Date.UTC(2026, 5, 11, 12, 5),
+};
 
 describe("buildOrbitGraphETag", () => {
   it("returns a stable weak etag for the same inputs", () => {
-    const input = {
-      cacheVersion: 3,
-      scope: "library" as const,
-      nodeCap: 1000,
-      expandKey: "tag-1",
-      generatedAt: "2026-06-11T12:00:00.000Z",
-    };
-
-    expect(buildOrbitGraphETag(input)).toBe(buildOrbitGraphETag(input));
-    expect(buildOrbitGraphETag(input)).toMatch(/^W\/"orbit-graph-[a-f0-9]{16}"$/);
+    expect(buildOrbitGraphETag(base)).toBe(buildOrbitGraphETag(base));
+    expect(buildOrbitGraphETag(base)).toMatch(/^W\/"orbit-graph-[a-f0-9]{16}"$/);
   });
 
-  it("changes when the payload fingerprint changes", () => {
-    const base = {
-      cacheVersion: 1,
-      scope: "library" as const,
-      nodeCap: 1000,
-      expandKey: "",
-      generatedAt: "2026-06-11T12:00:00.000Z",
-    };
-
-    expect(buildOrbitGraphETag(base)).not.toBe(
-      buildOrbitGraphETag({ ...base, generatedAt: "2026-06-11T12:00:01.000Z" })
+  it("stays the same across recomputes within the hour", () => {
+    expect(buildOrbitGraphETag({ ...base, now: base.now + 30 * 60_000 })).toBe(
+      buildOrbitGraphETag(base)
     );
+  });
+
+  it("changes when the library changes or the hour turns", () => {
+    const etag = buildOrbitGraphETag(base);
+    expect(buildOrbitGraphETag({ ...base, cacheVersion: 4 })).not.toBe(etag);
+    expect(
+      buildOrbitGraphETag({ ...base, now: base.now + ORBIT_GRAPH_ETAG_WINDOW_MS })
+    ).not.toBe(etag);
+  });
+
+  it("changes with each deployment", () => {
+    expect(buildOrbitGraphETag({ ...base, buildId: "dpl_a" })).not.toBe(
+      buildOrbitGraphETag({ ...base, buildId: "dpl_b" })
+    );
+  });
+
+  it("separates scopes, caps, and expand states", () => {
+    const etag = buildOrbitGraphETag(base);
+    expect(buildOrbitGraphETag({ ...base, scope: "orbit" })).not.toBe(etag);
+    expect(buildOrbitGraphETag({ ...base, nodeCap: 500 })).not.toBe(etag);
+    expect(buildOrbitGraphETag({ ...base, expandKey: "" })).not.toBe(etag);
   });
 });

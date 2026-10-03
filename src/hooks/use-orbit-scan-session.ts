@@ -20,27 +20,23 @@ import { useOrbitReviewBridge } from "@/hooks/use-orbit-review-bridge";
 import { useOrbitScanRunners } from "@/hooks/use-orbit-scan-runners";
 import { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
-import { fetchJson } from "@/lib/fetch-json";
 import {
-  orbitScanCandidatesResponseSchema,
-  orbitScanQualityPayloadSchema,
-  orbitXaiStatusPayloadSchema,
-} from "@/lib/api-response-schemas";
-import type { OrbitScanCandidatesResponse } from "@/lib/orbit-page-types";
+  orbitScanCandidatesQuery,
+  orbitScanQualityQuery,
+  orbitXaiStatusQuery,
+} from "@/lib/orbit-page-queries";
 import { buildOrbitScanCandidatesQueryString } from "@/lib/orbit-queue-params";
 import {
   ORBIT_SCAN_CANDIDATE_POOL_SIZE,
   type OrbitScanBatchMode,
 } from "@/lib/orbit-config";
 import type { OrbitSortDirection, OrbitView } from "@/lib/orbit-navigation";
-import type {
-  BookmarkWithRelations,
-  OrbitScanQualityPayload,
-} from "@/types";
+import type { BookmarkWithRelations } from "@/types";
 
 type UseOrbitScanSessionOptions = {
   router: ReturnType<typeof import("next/navigation").useRouter>;
-  searchParams: ReturnType<typeof import("next/navigation").useSearchParams>;
+  /** Orbit's route-scoped query, not the global one. */
+  searchParams: URLSearchParams;
   /** Current user id — scopes the persisted scan snapshot (UX-H1). */
   userId: string | null;
   orbitView: OrbitView;
@@ -112,32 +108,14 @@ export function useOrbitScanSession(options: UseOrbitScanSessionOptions) {
     [deferredSearch, orbitView, page, pageSize, queueSortDirection]
   );
 
-  const { data: scanCandidatesData } = useQuery<OrbitScanCandidatesResponse>({
-    queryKey: ["orbit", "scan-candidates", scanCandidatesQueryString],
-    queryFn: () =>
-      fetchJson(
-        `/api/orbit/scan-candidates?${scanCandidatesQueryString}`,
-        undefined,
-        orbitScanCandidatesResponseSchema
-      ),
-    enabled: !queueIsLoading,
-    staleTime: 30_000,
+  // Loads alongside the queue page rather than after it: it shares the
+  // queue's filters, not its response.
+  const { data: scanCandidatesData } = useQuery({
+    ...orbitScanCandidatesQuery(scanCandidatesQueryString),
     placeholderData: keepPreviousData,
   });
-
-  const { data: scanQuality } = useQuery<OrbitScanQualityPayload>({
-    queryKey: ["orbit", "scan-quality"],
-    queryFn: () =>
-      fetchJson("/api/orbit/scan-quality", undefined, orbitScanQualityPayloadSchema),
-    staleTime: 60_000,
-  });
-
-  const { data: orbitStatus } = useQuery({
-    queryKey: ["orbit", "xai-status", null],
-    queryFn: () =>
-      fetchJson("/api/orbit/status", undefined, orbitXaiStatusPayloadSchema),
-    staleTime: 30_000,
-  });
+  const { data: scanQuality } = useQuery(orbitScanQualityQuery);
+  const { data: orbitStatus } = useQuery(orbitXaiStatusQuery);
   const hybridScanAvailable = Boolean(orbitStatus?.typesafe.apiKeyConfigured);
 
   const scanCandidateBookmarks = scanCandidatesData

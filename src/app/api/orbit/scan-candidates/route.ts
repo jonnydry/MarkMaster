@@ -7,7 +7,7 @@ import {
   buildBookmarkSearchTermSql,
   tokenizeBookmarkSearch,
 } from "@/lib/bookmark-search";
-import { bookmarkListSelect } from "@/lib/bookmark-list-query";
+import { bookmarkCompactSelect } from "@/lib/bookmark-list-query";
 import { ORBIT_SCAN_CANDIDATE_POOL_SIZE } from "@/lib/orbit-config";
 import { prisma } from "@/lib/prisma";
 import {
@@ -35,8 +35,9 @@ const scanCandidatesQuerySchema = z.object({
  * only consume the slim list fields (tweetText, urls, media alt text, notes,
  * tags, collections); the scan route re-reads full rows server-side, so the
  * big JSON blobs are returned as explicit nulls to keep the response shape.
+ * Same compact row as the feed: no owner/author ids or sync stamps either.
  */
-const scanCandidateSelect = bookmarkListSelect;
+const scanCandidateSelect = bookmarkCompactSelect;
 
 function toScanCandidateRow<T extends object>(bookmark: T) {
   return { ...bookmark, quotedTweet: null, xMetadata: null };

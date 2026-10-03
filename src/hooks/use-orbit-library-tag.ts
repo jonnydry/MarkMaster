@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { orbitLibraryStatusSchema } from "@/lib/api-response-schemas";
@@ -118,6 +118,9 @@ export function libraryRunOutcome(run: OrbitLibraryRunView): {
 /**
  * Whole-queue auto-tag. The server owns the run, so progress is real, it
  * survives reloads, and a second click never starts a duplicate pass.
+ *
+ * Mounted once in the app frame (OrbitLibraryTagProvider) so a live run keeps
+ * polling, refreshing tag counts, and announcing its end on every page.
  */
 export function useOrbitLibraryTag() {
   const queryClient = useQueryClient();
@@ -198,27 +201,33 @@ export function useOrbitLibraryTag() {
     }
   }, [pending, queryClient]);
 
-  // Running (live or stalled) or failed-but-resumable: the banner owns it.
-  const activeRun =
-    run?.status === "running" || run?.status === "failed" ? run : null;
-  const failed = activeRun?.status === "failed";
+  const untaggedCount = statusQuery.data?.untaggedCount ?? null;
 
-  return {
-    untaggedCount: statusQuery.data?.untaggedCount ?? null,
-    /** The pass the banner shows: running, stalled, or failed and resumable. */
-    run: activeRun,
-    live: isLive(activeRun),
-    stalled: Boolean(activeRun?.stalled),
-    failed,
-    /** Waiting on the user to Resume or dismiss. */
-    paused: Boolean(activeRun?.stalled) || failed,
-    progress: libraryRunProgress(activeRun),
-    detail: activeRun ? libraryRunDetail(activeRun) : null,
-    starting: pending === "start",
-    stopping: pending === "stop",
-    start,
-    stop,
-  };
+  // Stable between status changes: the frame re-renders on every navigation,
+  // and the Orbit page should only re-render when the run does.
+  return useMemo(() => {
+    // Running (live or stalled) or failed-but-resumable: the banner owns it.
+    const activeRun =
+      run?.status === "running" || run?.status === "failed" ? run : null;
+    const failed = activeRun?.status === "failed";
+
+    return {
+      untaggedCount,
+      /** The pass the banner shows: running, stalled, or failed and resumable. */
+      run: activeRun,
+      live: isLive(activeRun),
+      stalled: Boolean(activeRun?.stalled),
+      failed,
+      /** Waiting on the user to Resume or dismiss. */
+      paused: Boolean(activeRun?.stalled) || failed,
+      progress: libraryRunProgress(activeRun),
+      detail: activeRun ? libraryRunDetail(activeRun) : null,
+      starting: pending === "start",
+      stopping: pending === "stop",
+      start,
+      stop,
+    };
+  }, [pending, run, start, stop, untaggedCount]);
 }
 
 export type OrbitLibraryTagHandle = ReturnType<typeof useOrbitLibraryTag>;

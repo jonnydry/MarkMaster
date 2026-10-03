@@ -160,17 +160,20 @@ export async function GET(req: NextRequest) {
     // count here would both be expensive and shrink as the user pages. The
     // client carries the page-1 total forward instead.
     const [bookmarks, total] = await Promise.all([
-      prisma.bookmark.findMany({
-        where,
-        ...listQuery,
-        orderBy:
-          sortField === "tweetCreatedAt"
-            ? [{ tweetCreatedAt: sortDirection }, { id: sortDirection }]
-            : sortField === "authorUsername"
-              ? [{ authorUsername: sortDirection }, { id: sortDirection }]
-              : [{ bookmarkedAt: sortDirection }, { id: sortDirection }],
-        ...(useKeyset ? { take: limit } : { skip: offset, take: limit }),
-      }),
+      prisma.bookmark
+        .findMany({
+          where,
+          ...listQuery,
+          orderBy:
+            sortField === "tweetCreatedAt"
+              ? [{ tweetCreatedAt: sortDirection }, { id: sortDirection }]
+              : sortField === "authorUsername"
+                ? [{ authorUsername: sortDirection }, { id: sortDirection }]
+                : [{ bookmarkedAt: sortDirection }, { id: sortDirection }],
+          ...(useKeyset ? { take: limit } : { skip: offset, take: limit }),
+        })
+        // The card lookup overlaps COUNT(*), usually the slower query.
+        .then((rows) => withBookmarkCardUrls(rows)),
       useKeyset ? Promise.resolve(null) : prisma.bookmark.count({ where }),
     ]);
 
@@ -182,7 +185,7 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({
-      bookmarks: await withBookmarkCardUrls(bookmarks),
+      bookmarks,
       page,
       ...(total !== null
         ? { total, totalPages: Math.ceil(total / limit) || 1 }

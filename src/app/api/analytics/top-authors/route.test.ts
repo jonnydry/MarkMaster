@@ -9,13 +9,13 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/upstash-cache", () => ({
-  getUserCacheVersion: vi.fn(async () => 3),
-  getCachedJson: vi.fn(
+  getUserCachedJson: vi.fn(
     async (
+      _userId: string,
       _key: string,
       _ttl: number,
       producer: () => Promise<unknown>
-    ) => producer()
+    ) => ({ value: await producer(), version: 3 })
   ),
 }));
 

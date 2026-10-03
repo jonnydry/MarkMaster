@@ -430,7 +430,7 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
           workerRef.current = null;
         }
       };
-    }, [canvasInstance, bumpLayoutVersion]);
+    }, [canvasInstance, bumpLayoutVersion, cameraStore]);
 
     useEffect(() => {
       if (!workerRef.current || useFallback) return;
@@ -452,10 +452,11 @@ const OrbitMapCanvasHost = forwardRef<OrbitMapCanvasHandle, OrbitMapCanvasHostPr
       [graph]
     );
 
+    const { hideLooseFilter, onFilterChange } = props;
     useEffect(() => {
-      if (!props.hideLooseFilter || requestedFilter !== "loose") return;
-      props.onFilterChange?.("all");
-    }, [requestedFilter, props.hideLooseFilter, props.onFilterChange]);
+      if (!hideLooseFilter || requestedFilter !== "loose") return;
+      onFilterChange?.("all");
+    }, [requestedFilter, hideLooseFilter, onFilterChange]);
 
     useEffect(() => {
       if (!graph || useFallback || didFocusStageRef.current) return;

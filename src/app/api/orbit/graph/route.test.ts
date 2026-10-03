@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrbitGraphPayload } from "@/types";
 
-const { graphRouteCacheStore } = vi.hoisted(() => ({
+const { graphRouteCacheStore, cacheVersion } = vi.hoisted(() => ({
   graphRouteCacheStore: new Map<string, unknown>(),
+  cacheVersion: { current: 1 as number | null },
 }));
 
 const checkRateLimitMock = vi.hoisted(() => vi.fn());
@@ -21,19 +22,32 @@ vi.mock("@/lib/rate-limit", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/upstash-cache", () => ({
-  getUserCacheVersion: vi.fn(async () => 1),
-  getCachedJson: vi.fn(
-    async (key: string, _ttl: number, loader: () => Promise<unknown>) => {
-      if (graphRouteCacheStore.has(key)) {
-        return graphRouteCacheStore.get(key);
+vi.mock("@/lib/upstash-cache", () => {
+  const lookupUserCache = vi.fn(async (_userId: string, key: string) => ({
+    version: cacheVersion.current,
+    value: graphRouteCacheStore.get(key) ?? null,
+  }));
+  return {
+    readUserCacheVersion: vi.fn(async () => cacheVersion.current),
+    lookupUserCache,
+    getUserCachedJson: vi.fn(
+      async (
+        userId: string,
+        key: string,
+        _ttl: number,
+        loader: () => Promise<unknown>,
+        lookup?: ReturnType<typeof lookupUserCache>
+      ) => {
+        const { version, value: cached } = await (lookup ??
+          lookupUserCache(userId, key));
+        if (cached !== null) return { value: cached, version };
+        const value = await loader();
+        graphRouteCacheStore.set(key, value);
+        return { value, version };
       }
-      const value = await loader();
-      graphRouteCacheStore.set(key, value);
-      return value;
-    }
-  ),
-}));
+    ),
+  };
+});
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -54,6 +68,7 @@ describe("/api/orbit/graph", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     graphRouteCacheStore.clear();
+    cacheVersion.current = 1;
     checkRateLimitMock.mockResolvedValue({
       success: true,
       limit: 120,
@@ -337,6 +352,84 @@ describe("/api/orbit/graph", () => {
     expect(second.headers.get("ETag")).toBe(etag);
   });
 
+  it("revalidates from the cache generation without reading or rebuilding the graph", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { getUserCachedJson, lookupUserCache } = await import(
+      "@/lib/upstash-cache"
+    );
+    const { GET } = await import("./route");
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+
+    const first = await GET(new NextRequest("http://localhost/api/orbit/graph"));
+    const etag = first.headers.get("ETag")!;
+    // The cached graph expired; the library did not change.
+    graphRouteCacheStore.clear();
+    vi.clearAllMocks();
+
+    const second = await GET(
+      new NextRequest("http://localhost/api/orbit/graph", {
+        headers: { "If-None-Match": etag },
+      })
+    );
+
+    expect(second.status).toBe(304);
+    expect(lookupUserCache).not.toHaveBeenCalled();
+    expect(getUserCachedJson).not.toHaveBeenCalled();
+    expect(prisma.bookmark.findMany).not.toHaveBeenCalled();
+  });
+
+  it("sends the new graph once the library changed", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+
+    const first = await GET(new NextRequest("http://localhost/api/orbit/graph"));
+    const etag = first.headers.get("ETag")!;
+    cacheVersion.current = 2;
+
+    const second = await GET(
+      new NextRequest("http://localhost/api/orbit/graph", {
+        headers: { "If-None-Match": etag },
+      })
+    );
+
+    expect(second.status).toBe(200);
+    expect(second.headers.get("ETag")).not.toBe(etag);
+  });
+
+  it("offers no ETag and never 304s when the cache generation is unknown", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.collection.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.bookmark.count).mockResolvedValue(0);
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([]);
+    const { buildOrbitGraphETag } = await import("@/lib/orbit-graph-etag");
+    cacheVersion.current = null;
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/orbit/graph", {
+        headers: {
+          "If-None-Match": buildOrbitGraphETag({
+            cacheVersion: 0,
+            scope: "library",
+            nodeCap: 1000,
+            expandKey: "",
+          }),
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("ETag")).toBeNull();
+  });
+
   it("rejects invalid graph query parameters", async () => {
     const { prisma } = await import("@/lib/prisma");
     const { GET } = await import("./route");
@@ -349,6 +442,8 @@ describe("/api/orbit/graph", () => {
     expect(response.status).toBe(400);
     expect(payload.error).toBe("Invalid query parameters");
     expect(prisma.bookmark.findMany).not.toHaveBeenCalled();
+    // Malformed requests still spend the graph budget.
+    expect(checkRateLimitMock).toHaveBeenCalledWith("orbit:graph", "user-1");
   });
 
   it("uses the orbit:graph rate limit bucket, not the orbit scan bucket", async () => {

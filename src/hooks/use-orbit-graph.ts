@@ -47,7 +47,8 @@ export function useOrbitGraphQuery(
     // the new state loads instead of flashing empty.
     placeholderData: keepPreviousData,
     staleTime: 30_000,
-    refetchOnMount: false,
+    // Opening the map revalidates a graph that went stale while it was
+    // closed (edits elsewhere invalidate it); unchanged libraries get a 304.
     refetchOnWindowFocus: false,
     retry: 1,
   });
@@ -81,6 +82,9 @@ async function fetchOrbitGraph(
   const etag = res.headers.get("etag");
   if (etag) {
     orbitGraphEtags.set(requestKey, etag);
+  } else if (res.ok) {
+    // The server could not vouch for this payload (no cache generation).
+    orbitGraphEtags.delete(requestKey);
   }
 
   if (res.status === 304) {

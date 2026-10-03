@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import type { OrbitMapSelection } from "@/components/orbit/orbit-map-canvas-host";
 import {
@@ -17,7 +17,6 @@ import type { OrbitGraphScope } from "@/types";
 export { MAP_SELECTION_KINDS } from "@/lib/orbit-map-url-params";
 
 export function useOrbitMapUrl() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const focusBookmarkIdParam = searchParams?.get("focus") ?? null;
@@ -44,16 +43,22 @@ export function useOrbitMapUrl() {
     [focusBookmarkIdParam, selectIdParam, selectKindParam]
   );
 
+  // Native replaceState syncs useSearchParams without a navigation: the map
+  // page renders nothing from its query server-side, so router.replace only
+  // cost a server round trip on every node click. Reading location (not the
+  // last render's searchParams) keeps back-to-back updates from dropping one.
   const replaceMapUrl = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      const params = new URLSearchParams(window.location.search);
       mutate(params);
       const query = params.toString();
-      router.replace(query ? `/orbit/map?${query}` : "/orbit/map", {
-        scroll: false,
-      });
+      window.history.replaceState(
+        null,
+        "",
+        query ? `/orbit/map?${query}` : "/orbit/map"
+      );
     },
-    [router, searchParams]
+    []
   );
 
   const handleSelectionChange = useCallback(

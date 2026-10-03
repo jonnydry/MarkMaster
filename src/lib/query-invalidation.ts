@@ -8,7 +8,7 @@ type InvalidateOptions = {
   refetchType?: "active" | "all" | "none";
 };
 
-function invalidateOrbitGraphQuery(
+export function invalidateOrbitGraphQuery(
   queryClient: QueryClient,
   options?: InvalidateOptions
 ) {
@@ -38,10 +38,16 @@ export function invalidateTagsQuery(queryClient: QueryClient) {
  * Tag sidebar + orbit graph + collection-detail rows after bookmark tag
  * attach/detach (list rows are optimistic).
  */
-export function invalidateBookmarkTagSideEffects(queryClient: QueryClient) {
+export function invalidateBookmarkTagSideEffects(
+  queryClient: QueryClient,
+  options?: { graphRefetch?: "active" | "none" }
+) {
   return Promise.all([
-    invalidateTagsQuery(queryClient),
+    queryClient.invalidateQueries({ queryKey: ["tags"] }),
     queryClient.invalidateQueries({ queryKey: ["collection"] }),
+    invalidateOrbitGraphQuery(queryClient, {
+      refetchType: options?.graphRefetch ?? "active",
+    }),
   ]);
 }
 
@@ -63,11 +69,16 @@ export function invalidateCollectionsQuery(queryClient: QueryClient) {
 
 export function invalidateBookmarkCollectionSideEffects(
   queryClient: QueryClient,
-  collectionId: string
+  collectionId: string,
+  options?: { graphRefetch?: "active" | "none" }
 ) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["collection", collectionId] }),
-    invalidateCollectionsQuery(queryClient),
+    queryClient.invalidateQueries({ queryKey: ["collections"] }),
+    queryClient.invalidateQueries({ queryKey: ["library-stats"] }),
+    invalidateOrbitGraphQuery(queryClient, {
+      refetchType: options?.graphRefetch ?? "active",
+    }),
   ]);
 }
 

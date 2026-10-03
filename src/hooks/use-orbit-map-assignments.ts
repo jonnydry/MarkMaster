@@ -37,18 +37,7 @@ interface UseOrbitMapAssignmentsOptions {
   activeSelectionNode: ReturnType<typeof resolveOrbitMapSelectionNode>;
   selectedBookmarkId: string | null;
   armedBookmark: OrbitMapArmedBookmark | null;
-  refetch: () => Promise<unknown>;
   onSelectionChange: (selection: OrbitMapSelection | null) => void;
-}
-
-function applyAssignmentOrRefetch(
-  queryClient: QueryClient,
-  refetch: () => Promise<unknown>,
-  assignment: Parameters<typeof patchOrbitGraphAssignment>[1]
-) {
-  if (!patchOrbitGraphAssignment(queryClient, assignment)) {
-    void refetch();
-  }
 }
 
 /**
@@ -65,7 +54,6 @@ export function useOrbitMapAssignments({
   activeSelectionNode,
   selectedBookmarkId,
   armedBookmark,
-  refetch,
   onSelectionChange,
 }: UseOrbitMapAssignmentsOptions) {
   const [copyingCollectionId, setCopyingCollectionId] = useState<string | null>(
@@ -109,24 +97,11 @@ export function useOrbitMapAssignments({
 
         if (anchor.kind === "tag") {
           await actions.handleAddTag(bookmarkId, anchor.name, anchor.color);
-          applyAssignmentOrRefetch(queryClient, refetch, {
-            action: "add",
-            bookmarkId,
-            anchorKind: "tag",
-            anchorId: anchor.id,
-          });
           toast.success(`Tagged #${anchor.name}`, {
             action: {
               label: "Undo",
               onClick: () => {
-                void actions.handleRemoveTag(bookmarkId, anchor.id).then(() => {
-                  applyAssignmentOrRefetch(queryClient, refetch, {
-                    action: "remove",
-                    bookmarkId,
-                    anchorKind: "tag",
-                    anchorId: anchor.id,
-                  });
-                });
+                void actions.handleRemoveTag(bookmarkId, anchor.id);
               },
             },
           });
@@ -134,12 +109,6 @@ export function useOrbitMapAssignments({
         }
 
         await actions.handleAddToCollection(bookmarkId, anchor.id);
-        applyAssignmentOrRefetch(queryClient, refetch, {
-          action: "add",
-          bookmarkId,
-          anchorKind: "collection",
-          anchorId: anchor.id,
-        });
         toast.success(`Added to ${anchor.name}`, {
           action: {
             label: "Undo",
@@ -148,17 +117,18 @@ export function useOrbitMapAssignments({
                 method: "DELETE",
                 body: { bookmarkIds: [bookmarkId] },
               }).then(() => {
-                void invalidateBookmarkListQueries(queryClient);
-                void invalidateBookmarkCollectionSideEffects(
-                  queryClient,
-                  anchor.id
-                );
-                applyAssignmentOrRefetch(queryClient, refetch, {
+                const patched = patchOrbitGraphAssignment(queryClient, {
                   action: "remove",
                   bookmarkId,
                   anchorKind: "collection",
                   anchorId: anchor.id,
                 });
+                void invalidateBookmarkListQueries(queryClient);
+                void invalidateBookmarkCollectionSideEffects(
+                  queryClient,
+                  anchor.id,
+                  { graphRefetch: patched ? "none" : "active" }
+                );
               });
             },
           },
@@ -167,7 +137,7 @@ export function useOrbitMapAssignments({
         // Failure toasts come from the underlying mutations in useBookmarkActions.
       }
     },
-    [actions, canvasRef, connectionIndex, queryClient, refetch]
+    [actions, canvasRef, connectionIndex, queryClient]
   );
 
   const handleAssign = useCallback(async () => {
