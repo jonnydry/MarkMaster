@@ -36,15 +36,17 @@ export function OrbitalAuthExperience({
         className="auth-splash__scene pointer-events-none absolute inset-0 -z-10"
       >
         <div className="auth-splash__flight">
-          <Image
-            src={SPLASH_BACKGROUND_IMAGE_URL}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="auth-splash__rocket object-cover"
-          />
-          <div className="auth-splash__burn" />
+          <div className="auth-splash__plate">
+            <Image
+              src={SPLASH_BACKGROUND_IMAGE_URL}
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="auth-splash__rocket object-cover"
+            />
+            <div className="auth-splash__burn" />
+          </div>
         </div>
         <div className="auth-splash__scrim absolute inset-0" />
       </div>
@@ -97,12 +99,12 @@ export function OrbitalAuthExperience({
               Read-only bookmark access. No posting, no feed clutter.
             </p>
           </div>
+
+          <footer className="auth-splash__footer text-[13px] text-muted-foreground">
+            © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
+          </footer>
         </div>
       </main>
-
-      <footer className="auth-splash__footer auth-splash__inset-x mx-auto w-full max-w-[1200px] text-center text-[13px] text-muted-foreground">
-        © {CURRENT_YEAR} MarkMaster · Built for people who save too much.
-      </footer>
     </div>
   );
 }
