@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Bookmark, Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import Image from "next/image";
@@ -343,29 +344,39 @@ export default async function PublicSharePage({
           ) : null}
         </section>
 
-        <div className="space-y-0">
-          {collection.items.map((item) => {
-            const b = item.bookmark;
-            const media = Array.isArray(b.media)
-              ? (b.media as BookmarkMediaJson[])
-              : null;
+        {collection.items.length === 0 ? (
+          <EmptyState
+            layout="stage"
+            className="py-16"
+            icon={Bookmark}
+            title="Nothing in this collection yet"
+            description="This public collection doesn't have any bookmarks."
+          />
+        ) : (
+          <div className="space-y-0">
+            {collection.items.map((item) => {
+              const b = item.bookmark;
+              const media = Array.isArray(b.media)
+                ? (b.media as BookmarkMediaJson[])
+                : null;
 
-            return (
-              <ShareBookmarkRow
-                key={item.id}
-                id={b.id}
-                tweetId={b.tweetId}
-                authorUsername={b.authorUsername}
-                authorDisplayName={b.authorDisplayName}
-                authorProfileImage={b.authorProfileImage}
-                tweetText={b.tweetText}
-                tweetCreatedAt={b.tweetCreatedAt}
-                media={media}
-                tags={b.tags}
-              />
-            );
-          })}
-        </div>
+              return (
+                <ShareBookmarkRow
+                  key={item.id}
+                  id={b.id}
+                  tweetId={b.tweetId}
+                  authorUsername={b.authorUsername}
+                  authorDisplayName={b.authorDisplayName}
+                  authorProfileImage={b.authorProfileImage}
+                  tweetText={b.tweetText}
+                  tweetCreatedAt={b.tweetCreatedAt}
+                  media={media}
+                  tags={b.tags}
+                />
+              );
+            })}
+          </div>
+        )}
 
         {pagination.totalPages > 1 ? (
           <SharePagination
