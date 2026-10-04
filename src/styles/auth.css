@@ -21,9 +21,15 @@
   }
 
   /* Launch plate. The rocket sits in the open right field; the sign-in
-     stays in the dark sky to its left. */
+     stays in the dark sky to its left. The crop transform is on the plate,
+     not the image, so the engine burn rides with the photograph. */
   .auth-splash__rocket {
     object-position: center 74%;
+  }
+
+  .auth-splash__plate {
+    position: absolute;
+    inset: 0;
     transform: translateX(7%) scale(1.16);
     transform-origin: center 72%;
   }
@@ -67,6 +73,9 @@
 
     .auth-splash__rocket {
       object-position: center 80%;
+    }
+
+    .auth-splash__plate {
       transform: translateX(13%) scale(1.2);
       transform-origin: 42% 78%;
     }
@@ -164,6 +173,9 @@
     /* Phone: rocket in the top half, type on a solid dark floor. */
     .auth-splash__rocket {
       object-position: center 18%;
+    }
+
+    .auth-splash__plate {
       transform: translateY(-16%) scale(1.12);
       transform-origin: center 22%;
     }
@@ -245,7 +257,9 @@
   .auth-splash__flight {
     position: absolute;
     inset: 0;
-    transform-origin: 50% 76%;
+    /* Pivot of the climb, after the plate shift. The burn stays on the
+       same point of the photograph through the move. */
+    transform-origin: 57% 76.6%;
     animation: auth-splash-liftoff 10.5s cubic-bezier(0.16, 0.84, 0.28, 1) both;
   }
 
@@ -307,6 +321,24 @@
 
     50% {
       opacity: 0.78;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .auth-splash__flight {
+      transform-origin: 64.6% 75.6%;
+    }
+  }
+
+  @media (max-width: 639px) {
+    /* The phone crop lifts the nozzle into the top half. The old 76%
+       anchor would sit under the dark floor, off the visible engine. */
+    .auth-splash__burn {
+      top: 45.4%;
+    }
+
+    .auth-splash__flight {
+      transform-origin: 50% 32.2%;
     }
   }
 
