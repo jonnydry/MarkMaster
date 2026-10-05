@@ -117,9 +117,14 @@ export function isKeptRoute(pathname: string) {
  * Sidebar destinations stay mounted after the first visit. Later clicks only
  * show or hide them, so the page does not render from scratch again.
  *
- * Unvisited destinations are pre-rendered hidden shortly after load. A hidden
- * page runs no effects, so it can't load its own data; each warm-up step
- * prefetches the page's main data instead, and the rest loads on first show.
+ * Outside development, unvisited destinations are pre-rendered hidden shortly
+ * after load. A hidden page runs no effects, so it can't load its own data;
+ * each warm-up step prefetches the page's main data instead, and the rest
+ * loads on first show.
+ *
+ * Development skips that warm-up. Webpack compiles one route at a time, and
+ * mounting every page up front makes the click wait behind compiles the user
+ * did not ask for. A page stays mounted once it has been opened.
  */
 export function KeptRoutes({ pathname }: { pathname: string }) {
   const queryClient = useQueryClient();
@@ -129,7 +134,15 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
   // default queue for a page that isn't showing that query.
   const warmRef = useRef(warm);
 
+  if (process.env.NODE_ENV === "development" && !warm.has(pathname)) {
+    const next = new Set(warm);
+    next.add(pathname);
+    warmRef.current = next;
+    setWarm(next);
+  }
+
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") return;
     let index = 0;
     let timer = 0;
     const step = () => {
@@ -150,6 +163,7 @@ export function KeptRoutes({ pathname }: { pathname: string }) {
   }, [queryClient]);
 
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") return;
     let index = 0;
     let timer = 0;
     const step = () => {

@@ -33,6 +33,10 @@ export function prefetchAppRouteDocument(
   router: AppRouterInstance,
   href: string
 ) {
+  // Webpack dev compiles one route at a time. Prefetching a page the user has
+  // not opened queues that compile ahead of the click, so navigation waits
+  // behind routes they are not looking at.
+  if (process.env.NODE_ENV === "development") return;
   router.prefetch(href, { kind: "full" as PrefetchKind });
 }
 

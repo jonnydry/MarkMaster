@@ -123,6 +123,10 @@ export function Sidebar({
     [queryClient, router]
   );
   useEffect(() => {
+    // See prefetchAppRouteDocument: this loop compiles every destination in
+    // webpack dev and the click waits behind it. Production bundles are
+    // already built, so warming them is just a fetch.
+    if (process.env.NODE_ENV === "development") return;
     let cancelled = false;
     let timer = 0;
     let index = 0;
