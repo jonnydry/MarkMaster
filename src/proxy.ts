@@ -3,7 +3,10 @@ import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { checkRateLimit, createRateLimitResponse, isRateLimitingEnabled } from "@/lib/rate-limit";
 import { isLightweightApiRequest } from "@/lib/lightweight-api-routes";
-import { getUserIdFromRequest } from "@/lib/auth-edge";
+import {
+  getUserIdFromRequest,
+  undecryptableSessionCookieNames,
+} from "@/lib/auth-edge";
 import { getClientIp } from "@/lib/client-ip";
 import { logError } from "@/lib/logger";
 
@@ -87,19 +90,77 @@ function isTrustedOrigin(originHeader: string, request: NextRequest): boolean {
   return false;
 }
 
+function requestHeadersWithoutCookies(
+  request: NextRequest,
+  names: readonly string[]
+): Headers {
+  const drop = new Set(names);
+  const headers = new Headers(request.headers);
+  const remaining = (headers.get("cookie") ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const eq = part.indexOf("=");
+      const name = (eq === -1 ? part : part.slice(0, eq)).trim();
+      return !drop.has(name);
+    })
+    .join("; ");
+  // Override the incoming Cookie header. Omitting it would keep the original.
+  headers.set("cookie", remaining);
+  return headers;
+}
+
+function expireSessionCookies(
+  response: NextResponse,
+  names: readonly string[]
+): NextResponse {
+  for (const name of names) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 0,
+    });
+  }
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Auth.js owns Set-Cookie on its own routes (sign-in writes a new session
+  // while the request may still carry the old one). Everywhere else, drop a
+  // session cookie this process cannot decrypt before Server Components call
+  // auth() — otherwise the failure is logged and the cookie is never cleared.
+  const staleSessionCookies = pathname.startsWith("/api/auth")
+    ? []
+    : await undecryptableSessionCookieNames(request);
+
+  const continueNext = () => {
+    if (staleSessionCookies.length === 0) return NextResponse.next();
+    const response = NextResponse.next({
+      request: { headers: requestHeadersWithoutCookies(request, staleSessionCookies) },
+    });
+    return expireSessionCookies(response, staleSessionCookies);
+  };
+
+  const finish = (response: NextResponse) =>
+    staleSessionCookies.length === 0
+      ? response
+      : expireSessionCookies(response, staleSessionCookies);
+
   const isApiRoute = pathname.startsWith("/api");
   const isPublicShareRoute = pathname.startsWith("/share/");
 
   if (!isApiRoute && !isPublicShareRoute) {
-    return NextResponse.next();
+    return continueNext();
   }
 
   // Health checks bypass all rate limiting: uptime monitors poll frequently
   // and must see real service state even when Redis is down or unconfigured.
   if (pathname === "/api/health") {
-    return NextResponse.next();
+    return continueNext();
   }
 
   const isAuthRoute = pathname.startsWith("/api/auth");
@@ -111,10 +172,10 @@ export async function proxy(request: NextRequest) {
   if (isApiRoute && !isAuthRoute && MUTATING_METHODS.has(request.method)) {
     const originHeader = request.headers.get("origin");
     if (originHeader && !isTrustedOrigin(originHeader, request)) {
-      return NextResponse.json(
+      return finish(NextResponse.json(
         { error: "Forbidden", message: "Cross-origin request rejected." },
         { status: 403 }
-      );
+      ));
     }
   }
 
@@ -131,13 +192,13 @@ export async function proxy(request: NextRequest) {
     !skipsPerUserLimit
   ) {
     logError("Proxy", "UPSTASH_REDIS_REST_URL is required in production");
-    return NextResponse.json(
+    return finish(NextResponse.json(
       {
         error: "Service Unavailable",
         message: "Rate limiting is not configured.",
       },
       { status: 503 }
-    );
+    ));
   }
 
   // === Rate limiting ===
@@ -158,7 +219,7 @@ export async function proxy(request: NextRequest) {
     try {
       const authResult = await limiters.authLimiter.limit(ip);
       if (!authResult.success) {
-        return NextResponse.json(
+        return finish(NextResponse.json(
           { error: "Too Many Requests", message: "Too many sign-in attempts." },
           {
             status: 429,
@@ -168,7 +229,7 @@ export async function proxy(request: NextRequest) {
               ),
             },
           }
-        );
+        ));
       }
     } catch (error) {
       logError("Proxy", "Auth rate limit check failed (failing open)", error);
@@ -181,7 +242,7 @@ export async function proxy(request: NextRequest) {
     try {
       const globalResult = await limiters.globalLimiter.limit(ip);
       if (!globalResult.success) {
-        return NextResponse.json(
+        return finish(NextResponse.json(
           {
             error: "Too Many Requests",
             message: "The system is under high load. Please try again later.",
@@ -194,7 +255,7 @@ export async function proxy(request: NextRequest) {
               ),
             },
           }
-        );
+        ));
       }
     } catch (error) {
       logError("Proxy", "Global rate limit check failed (failing open)", error);
@@ -219,7 +280,7 @@ export async function proxy(request: NextRequest) {
     try {
       const rateLimitResult = await checkRateLimit(action, userId);
       if (!rateLimitResult.success) {
-        return createRateLimitResponse(rateLimitResult);
+        return finish(createRateLimitResponse(rateLimitResult));
       }
     } catch (error) {
       logError("Proxy", "Per-user rate limit check failed (failing open)", error);
@@ -235,7 +296,7 @@ export async function proxy(request: NextRequest) {
     ]);
     if (authDenied) return authDenied;
     if (globalDenied) return globalDenied;
-    return NextResponse.next();
+    return continueNext();
   }
 
   const [globalDenied, perUserDenied] = await Promise.all([
@@ -245,9 +306,17 @@ export async function proxy(request: NextRequest) {
   if (globalDenied) return globalDenied;
   if (perUserDenied) return perUserDenied;
 
-  return NextResponse.next();
+  return continueNext();
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/share/:path*"],
+  matcher: [
+    "/api/:path*",
+    "/share/:path*",
+    // Pages call auth() in Server Components. Auth.js logs JWTSessionError for
+    // an undecryptable session and tries to expire the cookie, but that
+    // Set-Cookie is dropped on the RSC path. Match documents so the proxy can
+    // remove it first. Static files stay off this path.
+    "/((?!api/|_next/|share/|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
+  ],
 };
