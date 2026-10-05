@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const getUserIdFromRequestMock = vi.hoisted(() => vi.fn());
+const undecryptableSessionCookieNamesMock = vi.hoisted(() => vi.fn());
 const checkRateLimitMock = vi.hoisted(() => vi.fn());
 const createRateLimitResponseMock = vi.hoisted(() => vi.fn());
 const rateLimitState = vi.hoisted(() => ({ enabled: false }));
@@ -17,6 +18,7 @@ const fromEnvMock = vi.hoisted(() => vi.fn(() => ({ __fakeRedis: true })));
 
 vi.mock("@/lib/auth-edge", () => ({
   getUserIdFromRequest: getUserIdFromRequestMock,
+  undecryptableSessionCookieNames: undecryptableSessionCookieNamesMock,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -81,6 +83,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   rateLimitState.enabled = true;
   getUserIdFromRequestMock.mockResolvedValue(null);
+  undecryptableSessionCookieNamesMock.mockResolvedValue([]);
   proxyLimitMock.mockResolvedValue(allowResult);
   checkRateLimitMock.mockResolvedValue(allowResult);
 });
@@ -99,7 +102,46 @@ describe("proxy routing scope", () => {
     expectPassthrough(response);
     expect(proxyLimitMock).not.toHaveBeenCalled();
     expect(getUserIdFromRequestMock).not.toHaveBeenCalled();
+    expect(undecryptableSessionCookieNamesMock).toHaveBeenCalledOnce();
     expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("expires an undecryptable session cookie and hides it from the page", async () => {
+    undecryptableSessionCookieNamesMock.mockResolvedValue(["authjs.session-token"]);
+    const proxy = await importProxy();
+
+    const response = await proxy(
+      makeRequest("/", {
+        headers: {
+          cookie: "authjs.session-token=not-a-jwt; theme=dark",
+        },
+      })
+    );
+
+    expectPassthrough(response);
+    expect(proxyLimitMock).not.toHaveBeenCalled();
+    const forwardedCookie = response.headers.get("x-middleware-request-cookie");
+    expect(forwardedCookie).toContain("theme=dark");
+    expect(forwardedCookie).not.toContain("authjs.session-token");
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("authjs.session-token=");
+    expect(setCookie.toLowerCase()).toContain("max-age=0");
+  });
+
+  it("leaves auth routes to Auth.js so sign-in can replace the session cookie", async () => {
+    undecryptableSessionCookieNamesMock.mockResolvedValue(["authjs.session-token"]);
+    const proxy = await importProxy();
+
+    const response = await proxy(
+      makeRequest("/api/auth/callback/twitter", {
+        headers: { cookie: "authjs.session-token=not-a-jwt" },
+      })
+    );
+
+    expectPassthrough(response);
+    expect(undecryptableSessionCookieNamesMock).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("lets /api/health bypass every limiter, even when limits would deny", async () => {
