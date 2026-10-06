@@ -45,6 +45,6 @@ Each feature file starts with an H1 and one paragraph. It then uses these four H
 - [Bookmark card actions](./bookmark-card.md) covers tag, note, and collection actions on a feed card.
 - [Orbit auto-tag and Mode](./orbit.md) covers the Mode menu, the locked auto-tag row, and the Queue/Map switch.
 - [Collections](./collections.md) covers the collections list and opening Reading list.
-- [Settings tags](./settings-tags.md) covers tag search and the tag editor.
+- [Settings tags](./settings-tags.md) covers tag search and saving a rename when the editor blurs.
 
 Analytics is a real route at `/analytics` and is not in this map yet.

@@ -64,7 +64,7 @@ node .cursor/skills/verify-markmaster/bin/drive.mjs --feature dashboard-feed --v
 node .cursor/skills/verify-markmaster/bin/drive.mjs --feature orbit --viewport mobile-375
 ```
 
-Features: `dashboard-feed`, `collections`, `settings-tags`, `orbit`, `bookmark-card`.
+Features, in drive order: `dashboard-feed`, `collections`, `orbit`, `bookmark-card`, `settings-tags`. Settings runs last because it renames the seeded tag `Research` to `Field notes` by blurring the editor.
 
 Viewports: `desktop` (1280x800), `mobile-375` (375x812, touch), `mobile-390` (390x844, touch).
 

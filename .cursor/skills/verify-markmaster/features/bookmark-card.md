@@ -8,6 +8,7 @@ A feed card can take a tag, a note, and a collection without leaving the dashboa
 - `card-note` saves a note on the card.
 - `card-collect` adds the card to an existing collection.
 - `card-persist` shows the tag and note after a reload.
+- `card-actions-inside` keeps every action button inside the card at 375px and 390px.
 
 ## How to get to it (user POV)
 
@@ -29,7 +30,7 @@ Preconditions:
 - **Add a note.** Choose `Add note`. The dialog is named `Add note`. Fill the textbox with `Verify note: keep this with the design tag` and choose `Save`. The card shows that sentence.
 - **Add to a collection.** Choose `Add to collection`. The dialog is named `Add to collection`. Choose the button whose name contains `Reading list`. Its `aria-pressed` becomes `true`.
 - **Reload.** Reload the dashboard. The same card still shows the note and `Research`.
-- **Mobile.** Repeat with `--viewport mobile-375` and `--viewport mobile-390`. Each measure file has `ok: true`.
+- **Mobile.** Repeat with `--viewport mobile-375` and `--viewport mobile-390`. Each measure file has `ok: true`. Touch is on. Every button in `[data-bookmark-card-actions]` stays inside the card border box, before the dialogs and again after reload. `bookmark-card.actions.json` records those boxes.
 - **Proof.** Shots `bookmark-card-tags.png` and `bookmark-card.png` sit next to the console, network, and measure files.
 
 ## Gotchas
@@ -38,3 +39,4 @@ Preconditions:
 - Choosing `Research` again removes it. Run this recipe from a fresh seed.
 - The card root is a labelled generic element, not a button. Scope the action buttons to the element whose accessible name contains `Bea Curator`.
 - `Add note` is the accessible name until a note exists. After the save, the same control is named `Edit note`.
+- At 375 and 390 the action row has no negative right margin. A button whose right edge passes the card's right edge fails the feature. Desktop keeps the wider layout and does not run this box check.

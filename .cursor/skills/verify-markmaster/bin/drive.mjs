@@ -23,12 +23,14 @@ const VIEWPORTS = [
   { id: "mobile-390", width: 390, height: 844, touch: true },
 ];
 
+const RENAMED_TAG = "Field notes";
+
 const FEATURES = [
   "dashboard-feed",
   "collections",
-  "settings-tags",
   "orbit",
   "bookmark-card",
+  "settings-tags",
 ];
 
 const args = process.argv.slice(2);
@@ -301,19 +303,39 @@ async function driveSettings(page, origin, dir) {
     .first();
   await tagsLink.click();
   await page.locator("#tags").waitFor();
-  await page.getByRole("textbox", { name: "Search tags" }).fill(TAG_RESEARCH);
-  await page.locator("#tags").getByText("1 bookmark", { exact: true }).waitFor();
-  const edit = page.getByRole("button", { name: `Edit tag ${TAG_RESEARCH}` });
+  const search = page.getByRole("textbox", { name: "Search tags" }).filter({ visible: true }).first();
+  await search.fill(TAG_RESEARCH);
+  await page.locator("#tags").getByText(TAG_RESEARCH, { exact: true }).waitFor();
+  await page.locator("#tags").getByText(/\d+ bookmarks?/).first().waitFor();
+  const edit = page.getByRole("button", { name: `Edit tag ${TAG_RESEARCH}` }).filter({ visible: true }).first();
   await edit.hover();
   await edit.click();
-  await page.locator("#tags input").nth(1).waitFor();
-  const value = await page.locator("#tags input").nth(1).inputValue();
+  const editor = page.locator("#tags input").nth(1);
+  await editor.waitFor();
+  const value = await editor.inputValue();
   if (value !== TAG_RESEARCH) {
     throw new Error(`Tag editor value was ${value}`);
   }
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await editor.fill(RENAMED_TAG);
+  if ((await editor.inputValue()) !== RENAMED_TAG) {
+    throw new Error("Tag editor did not accept the new name.");
+  }
+  await search.click();
+  await page.locator("#tags").getByRole("button", { name: "Save", exact: true }).waitFor({ state: "hidden" });
+  await search.fill(RENAMED_TAG);
+  await page.locator("#tags").getByText(RENAMED_TAG, { exact: true }).waitFor();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#tags").waitFor();
+  const searchAfter = page.getByRole("textbox", { name: "Search tags" }).filter({ visible: true }).first();
+  await searchAfter.fill(RENAMED_TAG);
+  await page.locator("#tags").getByText(RENAMED_TAG, { exact: true }).waitFor();
+  await page.locator("#tags").getByRole("button", { name: `Edit tag ${RENAMED_TAG}` }).waitFor();
+  await searchAfter.fill(TAG_RESEARCH);
+  await page.locator("#tags").getByText(/No tags match .*Research/).waitFor();
+  await searchAfter.fill(RENAMED_TAG);
+  await page.locator("#tags").getByText(RENAMED_TAG, { exact: true }).waitFor();
   await page.screenshot({ path: path.join(dir, "settings-tags.png") });
-  return "Settings tags finds Research and opens its editor.";
+  return "Blurring the tag editor saves Field notes, and the new name is still there after reload.";
 }
 
 async function driveOrbit(page, origin, dir) {
@@ -376,6 +398,8 @@ async function driveBookmarkCard(page, origin, dir) {
     .filter({ visible: true })
     .first();
   await card.waitFor();
+  const before = await assertActionsInsideCard(page, card);
+  writeFileSync(path.join(dir, "bookmark-card.actions.json"), `${JSON.stringify(before, null, 2)}\n`);
   await card.getByRole("button", { name: "Add tags" }).click();
   const tagDialog = page.getByRole("dialog", { name: "Manage tags" });
   await tagDialog.waitFor();
@@ -411,8 +435,46 @@ async function driveBookmarkCard(page, origin, dir) {
     .first();
   await reloaded.getByText(NOTE_TEXT).waitFor();
   await reloaded.getByText(TAG_RESEARCH).waitFor();
+  await assertActionsInsideCard(page, reloaded);
   await page.screenshot({ path: path.join(dir, "bookmark-card.png") });
   return "Tag, note, and collection membership stay on the card after reload.";
+}
+
+async function assertActionsInsideCard(page, card) {
+  const width = page.viewportSize()?.width ?? 0;
+  if (width > 390) return { checked: false, width };
+  const box = await card.evaluate((element) => {
+    const actions = element.querySelector("[data-bookmark-card-actions]");
+    const cardBox = element.getBoundingClientRect();
+    if (!actions) {
+      return { ok: false, reason: "missing actions", cardRight: cardBox.right };
+    }
+    const actionBox = actions.getBoundingClientRect();
+    const buttons = [...actions.querySelectorAll("button")].map((button) => {
+      const rect = button.getBoundingClientRect();
+      const inside = rect.left >= cardBox.left - 0.5 && rect.right <= cardBox.right + 0.5;
+      return {
+        name: button.getAttribute("aria-label"),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        inside,
+      };
+    });
+    const actionsInside =
+      actionBox.left >= cardBox.left - 0.5 && actionBox.right <= cardBox.right + 0.5;
+    return {
+      ok: actionsInside && buttons.length > 0 && buttons.every((button) => button.inside),
+      cardLeft: Math.round(cardBox.left),
+      cardRight: Math.round(cardBox.right),
+      actionsLeft: Math.round(actionBox.left),
+      actionsRight: Math.round(actionBox.right),
+      buttons,
+    };
+  });
+  if (!box.ok) {
+    throw new Error(`Card actions overflow the card: ${JSON.stringify(box)}`);
+  }
+  return { checked: true, width, ...box };
 }
 
 function queueHighlight(page) {
