@@ -402,7 +402,7 @@ export const BookmarkCard = memo(function BookmarkCard({
             <div
               className={cn(
                 "flex shrink-0 items-center gap-1 opacity-100 transition-opacity",
-                "-mr-1.5"
+                "sm:-mr-1.5"
               )}
             >
               {compactExpanded && canExpandCompact && (
