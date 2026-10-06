@@ -120,7 +120,11 @@ export function HighlightCard({
             setFeedbackTick((n) => n + 1);
             toast.success("Boosted for future Highlights & Digests");
           }}
-          className="relative text-muted-foreground hover:text-foreground hover:underline rounded-sm border border-transparent after:absolute after:-inset-x-[7px] after:-inset-y-[14px] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none"
+          className={cn(
+            "text-muted-foreground hover:text-foreground hover:underline rounded-sm border border-transparent focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:outline-none",
+            isCarouselLayout &&
+              "relative after:absolute after:-inset-x-[7px] after:-inset-y-[14px]"
+          )}
         >
           Good
         </button>
