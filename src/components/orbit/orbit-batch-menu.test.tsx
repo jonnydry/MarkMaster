@@ -38,6 +38,12 @@ describe("OrbitBatchMenu", () => {
     await openMenu(user);
 
     expect(screen.getByText("Review batch")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Scan queue reviews a batch. Auto-tag applies matches across the queue without review."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/writes existing tags/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Sweep/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Quick")).not.toBeInTheDocument();
     expect(
