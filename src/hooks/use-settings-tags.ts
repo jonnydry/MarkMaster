@@ -81,7 +81,7 @@ export function useSettingsTags() {
         body: { tagId, name, color },
       });
       await invalidateTagsQuery(queryClient);
-      setEditingTag(null);
+      setEditingTag((current) => (current === tagId ? null : current));
       toast.success("Tag updated on every bookmark that wears it");
     } catch (error) {
       toast.error(

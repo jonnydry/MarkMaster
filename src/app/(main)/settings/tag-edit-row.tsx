@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useState } from "react";
+import React, { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRESET_COLORS, getColorName } from "@/lib/constants";
@@ -38,7 +38,7 @@ interface TagEditRowProps {
   index: number;
   initialName: string;
   initialColor: string;
-  onSave: (tagId: string, name: string, color: string) => void;
+  onSave: (tagId: string, name: string, color: string) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -53,15 +53,39 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
-  const swallowSaveClick = useRef(false);
+  const pressInside = useRef(false);
+  const saveInFlight = useRef(false);
   const escapeCancels = useRef(false);
   const colorOptions = useMemo(
     () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
     [color]
   );
 
-  const saveEdit = useCallback(() => {
-    onSave(tag.id, name.trim(), color);
+  useEffect(() => {
+    const releasePress = () => {
+      pressInside.current = false;
+    };
+    window.addEventListener("pointerup", releasePress);
+    window.addEventListener("pointercancel", releasePress);
+    return () => {
+      window.removeEventListener("pointerup", releasePress);
+      window.removeEventListener("pointercancel", releasePress);
+    };
+  }, []);
+
+  const commitSave = useCallback(() => {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    let pending: void | Promise<void>;
+    try {
+      pending = onSave(tag.id, name.trim(), color);
+    } catch (error) {
+      saveInFlight.current = false;
+      throw error;
+    }
+    void Promise.resolve(pending).finally(() => {
+      saveInFlight.current = false;
+    });
   }, [color, name, onSave, tag.id]);
 
   const handleBlur = useCallback(
@@ -70,28 +94,20 @@ export const TagEditRow = React.memo(function TagEditRow({
         escapeCancels.current = false;
         return;
       }
+      if (pressInside.current) return;
       const nextFocus = e.relatedTarget as Node | null;
       if (nextFocus && rowRef.current?.contains(nextFocus)) {
         return;
       }
       const trimmed = name.trim();
-      if (trimmed === "" || trimmed === initialName.trim()) {
+      if (trimmed === "" || (trimmed === initialName.trim() && color === initialColor)) {
         onCancel();
         return;
       }
-      swallowSaveClick.current = true;
-      saveEdit();
-      window.setTimeout(() => {
-        swallowSaveClick.current = false;
-      }, 0);
+      commitSave();
     },
-    [initialName, name, onCancel, saveEdit]
+    [color, commitSave, initialColor, initialName, name, onCancel]
   );
-
-  const handleSaveClick = useCallback(() => {
-    if (swallowSaveClick.current) return;
-    saveEdit();
-  }, [saveEdit]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -111,6 +127,9 @@ export const TagEditRow = React.memo(function TagEditRow({
       ref={rowRef}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
+      onPointerDown={() => {
+        pressInside.current = true;
+      }}
       className={cn(
         "animate-slide-down-fade flex flex-col gap-3 bg-accent-soft/40 px-4 py-4 sm:flex-row sm:items-center",
         index > 0 && "border-t border-hairline-soft"
@@ -132,11 +151,11 @@ export const TagEditRow = React.memo(function TagEditRow({
         onChange={(e) => setName(e.target.value)}
         className="h-9 min-w-0 flex-1 border-hairline-soft bg-surface-1 sm:min-w-[12rem]"
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleSaveClick();
+          if (e.key === "Enter") commitSave();
         }}
       />
       <div className="flex shrink-0 gap-2">
-        <Button size="sm" onClick={handleSaveClick}>
+        <Button size="sm" onClick={commitSave}>
           Save
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>

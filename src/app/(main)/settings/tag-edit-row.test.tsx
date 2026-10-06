@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TagEditRow } from "./tag-edit-row";
 import type { TagWithCount } from "@/types";
@@ -165,6 +165,96 @@ describe("TagEditRow", () => {
     expect(screen.getByText("1 saved")).toBeInTheDocument();
     expect(screen.getByText("tag-1 TypeScript Kept #1d9bf0")).toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("TypeScript Kept");
+  });
+
+  it("saves once when Safari blurs with a null relatedTarget before Save", async () => {
+    render(<Editor closeOnSave={false} />);
+    await replaceName("TypeScript Kept");
+    const save = screen.getByRole("button", { name: "Save" });
+
+    fireEvent.pointerDown(save);
+    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    fireEvent.click(save);
+
+    expect(screen.getByText("1 saved")).toBeInTheDocument();
+    expect(screen.getByText("tag-1 TypeScript Kept #1d9bf0")).toBeInTheDocument();
+  });
+
+  it("restores the original name when Safari blurs before Cancel", async () => {
+    render(<Editor />);
+    await replaceName("TypeScript Kept");
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+
+    fireEvent.pointerDown(cancel);
+    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    fireEvent.click(cancel);
+
+    expect(screen.getByText("TypeScript")).toBeInTheDocument();
+    expect(screen.getByText("0 saved")).toBeInTheDocument();
+    expect(screen.getByText("no save")).toBeInTheDocument();
+  });
+
+  it("keeps the editor open when a swatch press blurs with a null relatedTarget", async () => {
+    render(<Editor />);
+    const swatch = screen.getByRole("button", { name: "Select color Cyan" });
+
+    fireEvent.pointerDown(swatch);
+    fireEvent.mouseDown(swatch);
+    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveValue("TypeScript");
+    expect(screen.getByText("0 saved")).toBeInTheDocument();
+  });
+
+  it("saves a color-only change when focus leaves the row", async () => {
+    render(<Editor />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Select color Cyan" }));
+    await user.click(screen.getByRole("button", { name: "Outside" }));
+
+    expect(screen.getByText("tag-1 TypeScript #06b6d4")).toBeInTheDocument();
+    expect(screen.getByText("1 saved")).toBeInTheDocument();
+  });
+
+  it("ignores a second save while the first request is still in flight", async () => {
+    let resolveSave: () => void = () => {};
+    const calls: string[] = [];
+    render(
+      <TagEditRow
+        tag={TAG}
+        index={0}
+        initialName={TAG.name}
+        initialColor={TAG.color}
+        onCancel={() => {}}
+        onSave={(tagId, name, color) => {
+          calls.push(`${tagId} ${name} ${color}`);
+          return new Promise<void>((resolve) => {
+            resolveSave = resolve;
+          });
+        }}
+      />
+    );
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "TypeScript Kept" } });
+    fireEvent.blur(input, { relatedTarget: null });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(calls).toEqual(["tag-1 TypeScript Kept #1d9bf0"]);
+    resolveSave();
+    await act(async () => {
+      await Promise.resolve();
+    });
   });
 
   it("still cancels from the Cancel button after the name changes", async () => {
