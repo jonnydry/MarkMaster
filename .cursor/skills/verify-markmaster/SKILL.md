@@ -7,7 +7,7 @@ description: Drive the local MarkMaster web app in a headless browser as a seede
 
 MarkMaster's primary surface is the authenticated web UI. Share pages and the API exist, but this skill drives the signed-in app. Run one instance at a time. A second launch against the same ports is refused.
 
-Sign-in uses a seeded local user and a session cookie minted with this run's `AUTH_SECRET`. It does not use an X account, an X client secret, or an xAI or TypeSafe key. Those keys are set to empty on the server process so a developer `.env` cannot turn them back on. The driver aborts any browser request that leaves `127.0.0.1`.
+Sign-in uses a seeded local user and a session cookie minted with this run's `AUTH_SECRET`. It does not use an X account, an X client secret, or an xAI or TypeSafe key. Those keys are set to empty on the server process so a developer `.env` cannot turn them back on. `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID` are set to empty for the same reason. The driver aborts any browser request whose host is not `127.0.0.1`, `localhost`, or `[::1]`.
 
 ## Launch
 
@@ -21,7 +21,9 @@ Launch creates run state under the OS temp directory at `markmaster-verify/<run-
 
 Postgres listens on `127.0.0.1:54329` and owns the database `markmaster_verify`. When `docker` is on `PATH`, launch starts a container named `markmaster-verify-pg-<run-id>` with the label `markmaster-verify=1` from `postgres:16-alpine`. Otherwise it runs `initdb` and `postgres` from `/usr/lib/postgresql/<version>/bin` with a data directory inside the run folder. It does not use `npm run db:up`, because that compose file publishes port 5432 and the `markmaster` database.
 
-Launch then runs `npx prisma migrate deploy`, `npm run db:seed:verify`, and mints `authjs.session-token` with `@auth/core/jwt` `encode`. The salt is the cookie name. The token carries `dbUser`, `sessionVersion`, and `sessionValidatedAt` for the seeded user.
+Launch then runs `npx prisma migrate deploy` and `node scripts/seed-verify.mjs` with the launch child environment, then mints `authjs.session-token` with `@auth/core/jwt` `encode`. The salt is the cookie name. The token carries `dbUser`, `sessionVersion`, and `sessionValidatedAt` for the seeded user.
+
+That child environment sets `DATABASE_URL` to `postgresql://user:password@127.0.0.1:<pg-port>/markmaster_verify`, `VERIFY_MARKMASTER=1`, `APP_URL` and `NEXT_PUBLIC_APP_URL` to the app origin, and empty strings for `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID`. The seed script parses `DATABASE_URL` with `new URL()` before it imports Prisma. It exits non-zero unless the host is `127.0.0.1` or `localhost`, the path is exactly `/markmaster_verify`, and `VERIFY_MARKMASTER` is `1`. `npm run db:seed:verify` is the same script, so it hits the same guard.
 
 Next.js starts with `npm run dev -- --hostname 127.0.0.1 --port 3100`. Ready means `GET http://127.0.0.1:3100/login` returns 200. The first compile can take a few minutes.
 
@@ -40,10 +42,13 @@ Doctor is read-only. It exits 0 only when all of these are true.
 - The state file exists and the run is not stopped.
 - The Next.js pid is alive, and the process listening on port 3100 is that pid or a child. Doctor reads `ss` when it is installed, and `/proc/net/tcp` otherwise.
 - Postgres for a local cluster is still the pid launch recorded.
-- `DATABASE_URL` is `127.0.0.1` and the database name is `markmaster_verify`.
+- `DATABASE_URL` passes the seed guard: host `127.0.0.1` or `localhost`, path exactly `/markmaster_verify`.
 - The running process env matches the state `AUTH_SECRET` and `DATABASE_URL`.
+- `VERIFY_MARKMASTER` is `1`.
+- `APP_URL` and `NEXT_PUBLIC_APP_URL` match the app origin.
 - `AUTH_TWITTER_ID` and `AUTH_TWITTER_SECRET` are the placeholders above.
 - `XAI_API_KEY` and `TYPESAFE_API_KEY` are empty.
+- `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID` are empty.
 - `npx prisma migrate status` exits 0.
 - The user `verify_reader` (`xId` `verify-markmaster-local`) exists and matches `state.userId`.
 - The session cookie decrypts to that user.
@@ -114,9 +119,9 @@ It leaves `evidence/` in place. After cleanup, confirm `evidence/summary.json` s
 | `node .cursor/skills/verify-markmaster/bin/doctor.mjs` | Read-only health check |
 | `node .cursor/skills/verify-markmaster/bin/drive.mjs` | Browser proof for every mapped feature |
 | `node .cursor/skills/verify-markmaster/bin/cleanup.mjs` | Stop this run and drop `markmaster_verify` |
-| `npm run db:seed:verify` | Replace the verify user. Requires `DATABASE_URL` and `ENCRYPTION_KEY` |
+| `npm run db:seed:verify` | Same as `node scripts/seed-verify.mjs`. Refuses unless `VERIFY_MARKMASTER=1` and `DATABASE_URL` is the local `markmaster_verify` database |
 
-The seed implementation is `scripts/seed-verify.mjs`. The shared names are `scripts/verify-fixture.mjs`.
+The seed implementation is `scripts/seed-verify.mjs`. The guard is `scripts/verify-db-guard.mjs`. The shared names are `scripts/verify-fixture.mjs`. Launch does not call the npm script. It runs `node scripts/seed-verify.mjs` with the child environment above.
 
 Playwright is a devDependency because the repo had no browser driver. Drive uses the installed Google Chrome via Playwright's `channel: "chrome"` so it does not download a second browser.
 

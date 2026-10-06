@@ -5,7 +5,7 @@
  * so a later decrypt does not throw. The plaintext is not an X credential.
  */
 import { createCipheriv, randomBytes } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { assertVerifyDatabase } from "./verify-db-guard.mjs";
 import {
   COLLECTION_BOOKMARK,
   COLLECTION_NAME,
@@ -51,13 +51,18 @@ function bookmarkData(row, when) {
   };
 }
 
-const prisma = new PrismaClient();
+const decision = assertVerifyDatabase(process.env.DATABASE_URL, process.env.VERIFY_MARKMASTER);
+if (!decision.ok) {
+  console.error(decision.message);
+  process.exit(1);
+}
+
+const { PrismaClient } = await import("@prisma/client");
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL,
+});
 
 try {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not set.");
-  }
-
   await prisma.user.deleteMany({ where: { xId: VERIFY_XID } });
 
   const now = new Date();

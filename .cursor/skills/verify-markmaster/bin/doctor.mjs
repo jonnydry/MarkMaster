@@ -15,6 +15,7 @@ import {
   runSync,
 } from "./lib.mjs";
 import { VERIFY_USERNAME, VERIFY_XID } from "../../../../scripts/verify-fixture.mjs";
+import { assertVerifyDatabase } from "../../../../scripts/verify-db-guard.mjs";
 
 const problems = [];
 
@@ -58,9 +59,10 @@ if (!pidAlive(state.nextPid)) {
   }
 }
 
-if (!state.databaseUrl?.includes("127.0.0.1") || !state.databaseUrl?.includes(DB_NAME)) {
+const databaseGuard = assertVerifyDatabase(state.databaseUrl, "1");
+if (!databaseGuard.ok) {
   problem(
-    "DATABASE_URL is not the local markmaster_verify database.",
+    databaseGuard.message,
     "Delete the state file and launch again. Do not point verification at a shared database."
   );
 }
@@ -98,6 +100,24 @@ if (pidAlive(state.nextPid)) {
       "Unset both and launch again. Verification must not call xAI or TypeSafe."
     );
   }
+  if (env.VERIFY_MARKMASTER !== "1") {
+    problem(
+      "VERIFY_MARKMASTER is not 1 on the running server.",
+      "Cleanup and launch. The seed refuses to run without that flag."
+    );
+  }
+  if (env.APP_URL !== state.appOrigin || env.NEXT_PUBLIC_APP_URL !== state.appOrigin) {
+    problem(
+      "APP_URL or NEXT_PUBLIC_APP_URL does not match this run.",
+      "Cleanup and launch so share links stay on the verify origin."
+    );
+  }
+  if (env.CRON_SECRET?.trim() || env.SYNC_WORKER_SECRET?.trim() || env.OWNER_USER_ID?.trim()) {
+    problem(
+      "CRON_SECRET, SYNC_WORKER_SECRET, or OWNER_USER_ID is set on the running server.",
+      "Cleanup and launch. Verification sets those to empty so a developer environment cannot authorize workers."
+    );
+  }
 }
 
 if (state.databaseUrl?.includes(DB_NAME) && (state.pg?.kind !== "pg_ctl" || pidAlive(state.pg?.pid))) {
@@ -122,7 +142,7 @@ try {
   if (!user) {
     problem(
       "The verify user is not in the database.",
-      "node scripts/seed-verify.mjs with DATABASE_URL and ENCRYPTION_KEY from the state file."
+      "node scripts/seed-verify.mjs with VERIFY_MARKMASTER=1 and the verify DATABASE_URL and ENCRYPTION_KEY. Launch sets those."
     );
   } else if (user.id !== state.userId) {
     problem(

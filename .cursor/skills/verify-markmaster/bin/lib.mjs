@@ -75,9 +75,15 @@ export function childEnv(state) {
   }
   env.DATABASE_URL = state.databaseUrl;
   env.DIRECT_URL = state.databaseUrl;
+  env.VERIFY_MARKMASTER = "1";
   env.AUTH_SECRET = state.authSecret;
   env.AUTH_URL = state.appOrigin;
   env.NEXTAUTH_URL = state.appOrigin;
+  env.APP_URL = state.appOrigin;
+  env.NEXT_PUBLIC_APP_URL = state.appOrigin;
+  env.CRON_SECRET = "";
+  env.SYNC_WORKER_SECRET = "";
+  env.OWNER_USER_ID = "";
   env.AUTH_TWITTER_ID = TWITTER_ID;
   env.AUTH_TWITTER_SECRET = TWITTER_SECRET;
   env.ENCRYPTION_KEY = state.encryptionKey;

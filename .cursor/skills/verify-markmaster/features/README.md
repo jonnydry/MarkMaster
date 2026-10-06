@@ -8,7 +8,7 @@ This directory is the maintained source for verifying the signed-in MarkMaster w
 - The app origin is `http://127.0.0.1:3100` unless `VERIFY_APP_PORT` was set.
 - Postgres is a database named `markmaster_verify` on `127.0.0.1:54329` unless `VERIFY_PG_PORT` was set.
 - The seeded user is `verify_reader`. The session cookie is `authjs.session-token`, minted for that user.
-- `XAI_API_KEY` and `TYPESAFE_API_KEY` are empty. `AUTH_TWITTER_ID` is `verify-not-a-real-client`.
+- `XAI_API_KEY`, `TYPESAFE_API_KEY`, `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID` are empty. `AUTH_TWITTER_ID` is `verify-not-a-real-client`. `VERIFY_MARKMASTER` is `1`.
 - Run `node .cursor/skills/verify-markmaster/bin/doctor.mjs` and require the `OK` line.
 - Never drive an instance that this launch did not start.
 
