@@ -13,6 +13,7 @@ export default defineConfig({
       "src/**/*.test.ts",
       "src/**/*.test.tsx",
       "src/**/*.live.test.ts",
+      "scripts/**/*.test.ts",
     ],
     setupFiles: ["src/test/setup.ts"],
     coverage: {

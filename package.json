@@ -32,6 +32,7 @@
     "db:check": "node scripts/check-db-migrations.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "db:seed:verify": "node scripts/seed-verify.mjs",
     "env:check": "node scripts/check-env.mjs",
     "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts"
   },
@@ -77,6 +78,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.3.8",
     "jsdom": "^29.1.1",
+    "playwright": "^1.63.0",
     "shadcn": "^4.16.1",
     "tailwindcss": "^4",
     "typescript": "^5",
