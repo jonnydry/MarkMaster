@@ -22,7 +22,7 @@ const ColorSwatch = React.memo(function ColorSwatch({
       aria-label={`Select color ${getColorName(color)}`}
       aria-pressed={selected}
       className={cn(
-        "relative size-6 rounded-full border transition-transform motion-reduce:transition-none after:absolute after:-inset-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+        "relative size-6 rounded-full border transition-transform motion-reduce:transition-none after:absolute after:-inset-[3px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
         selected
           ? "scale-105 border-foreground ring-2 ring-ring/45"
           : "border-hairline-soft hover:scale-105"

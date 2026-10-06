@@ -71,6 +71,14 @@ describe("touch hit areas", () => {
     );
   });
 
+  it("leaves the stacked highlight Good button off the review control", () => {
+    render(<HighlightCard bookmark={bookmark} index={0} onOrbitReview={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Good" }).className.includes("after:")).toBe(
+      false
+    );
+  });
+
   it("expands tag color swatches by half of the 6px gap", () => {
     render(
       <TagEditRow
@@ -84,7 +92,7 @@ describe("touch hit areas", () => {
     );
 
     const swatch = screen.getByRole("button", { name: "Select color Cyan" });
-    expectExpansion(swatch, "relative after:absolute after:-inset-1");
+    expectExpansion(swatch, "relative after:absolute after:-inset-[3px]");
   });
 
   it("expands the triage dismiss control to 44px", () => {
