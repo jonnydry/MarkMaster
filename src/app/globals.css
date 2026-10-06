@@ -371,20 +371,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-[data-typography-preset="classic"] {
-  --font-sans: var(--font-inter);
-  --font-heading: var(--font-dm-sans);
-  --font-label: var(--font-inter);
-  --font-data: var(--font-jetbrains-mono);
-  --font-mono: var(--font-jetbrains-mono);
-}
-
-[data-typography-preset="editorial"] {
+[data-typography-preset="serif"] {
   --font-sans: var(--font-source-serif);
-  --font-heading: var(--font-newsreader);
-  --font-label: var(--font-ibm-plex-sans);
-  --font-data: var(--font-ibm-plex-mono);
-  --font-mono: var(--font-ibm-plex-mono);
+  --font-heading: var(--font-source-serif);
+  --font-label: var(--font-source-serif);
+  --font-data: var(--font-source-serif);
+  --font-mono: var(--font-source-serif);
 }
 
 [data-typography-preset],
@@ -405,13 +397,13 @@
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Global Monospace Mode: full 3-tier suite (JetBrains body/data, IBM Plex labels) */
+/* Mono preset: self-hosted Berkeley Mono. */
 [data-typography-preset="mono"] {
-  --font-sans: var(--font-jetbrains-mono);
-  --font-heading: var(--font-jetbrains-mono);
-  --font-label: var(--font-ibm-plex-mono);
-  --font-data: var(--font-jetbrains-mono);
-  --font-mono: var(--font-jetbrains-mono);
+  --font-sans: var(--font-berkeley-mono);
+  --font-heading: var(--font-berkeley-mono);
+  --font-label: var(--font-berkeley-mono);
+  --font-data: var(--font-berkeley-mono);
+  --font-mono: var(--font-berkeley-mono);
   letter-spacing: 0;
 }
 
@@ -420,7 +412,7 @@
 [data-typography-preset="mono"] input,
 [data-typography-preset="mono"] textarea,
 [data-typography-preset="mono"] select {
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), ui-monospace, SFMono-Regular, monospace;
 }
 
 @keyframes fade-in {

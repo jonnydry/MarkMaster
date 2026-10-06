@@ -1,0 +1,13 @@
+Berkeley Mono™ webfonts (TX-02)
+
+Copyright 2022-2026 U.S. Graphics, LLC. All rights reserved.
+
+The files berkeley-mono-regular.woff2, berkeley-mono-bold.woff2,
+berkeley-mono-oblique.woff2, and berkeley-mono-bold-oblique.woff2 are
+proprietary. They are not licensed under the MIT license that covers the
+rest of this repository, and they are not licensed under the SIL Open Font
+License that covers the other fonts in this directory.
+
+They are included so this application can self-host Berkeley Mono under
+the project owner's U.S. Graphics website license. Do not copy them out
+for use in another project.

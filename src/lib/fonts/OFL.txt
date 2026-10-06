@@ -1,13 +1,7 @@
 Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git)
-Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
-Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
-Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
-Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
 Copyright 2014 The Source Serif 4 Project Authors (https://github.com/adobe-fonts/source-serif)
-Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader)
 
-Latin subsets of Geist, Geist Mono, IBM Plex Sans, IBM Plex Mono, JetBrains Mono,
-Inter, DM Sans, Source Serif 4, and Newsreader.
+Latin subsets of Geist, Geist Mono, and Source Serif 4.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

@@ -36,7 +36,7 @@ export type TypographyClasses = {
 };
 
 const MONO_BODY_STRONG =
-  "font-[family-name:var(--font-ibm-plex-mono)] text-[13px] font-medium tracking-normal normal-case";
+  "font-[family-name:var(--font-mono)] text-[13px] font-medium tracking-normal normal-case";
 const SANS_BODY_STRONG = "text-[15px] font-medium";
 
 export function getTypographyClasses(monoNative: boolean): TypographyClasses {

@@ -1,9 +1,4 @@
-const TYPOGRAPHY_PRESET_IDS = [
-  "orbit",
-  "classic",
-  "editorial",
-  "mono",
-] as const;
+const TYPOGRAPHY_PRESET_IDS = ["orbit", "serif", "mono"] as const;
 
 export type TypographyPresetId = (typeof TYPOGRAPHY_PRESET_IDS)[number];
 
@@ -23,8 +18,8 @@ export const DEFAULT_TYPOGRAPHY_PRESET: TypographyPresetId = "orbit";
 export const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
   {
     id: "orbit",
-    name: "Orbit",
-    description: "Clean, precise, and quietly technical.",
+    name: "Sans",
+    description: "Geist for the interface, Geist Mono for data.",
     bodyFace: "Geist",
     headingFace: "Geist",
     labelFace: "Geist",
@@ -32,38 +27,34 @@ export const TYPOGRAPHY_PRESETS: TypographyPreset[] = [
     previewCopy: "Clear reading with precise metadata.",
   },
   {
-    id: "classic",
-    name: "Classic",
-    description: "The current crisp app feel, kept as an option.",
-    bodyFace: "Inter",
-    headingFace: "DM Sans",
-    labelFace: "Inter",
-    dataFace: "JetBrains Mono",
-    previewCopy: "Neutral SaaS clarity and familiar spacing.",
-  },
-  {
-    id: "editorial",
-    name: "Editorial",
-    description: "Scholarly serif rhythm with a modern broadsheet voice.",
+    id: "serif",
+    name: "Serif",
+    description: "Source Serif 4 for a slower reading pace.",
     bodyFace: "Source Serif 4",
-    headingFace: "Newsreader",
-    labelFace: "IBM Plex Sans",
-    dataFace: "IBM Plex Mono",
+    headingFace: "Source Serif 4",
+    labelFace: "Source Serif 4",
+    dataFace: "Source Serif 4",
     previewCopy: "Built for archives, essays, and close reading.",
   },
   {
     id: "mono",
-    name: "Monospace",
-    description: "Terminal-native chrome for dense review work.",
-    bodyFace: "JetBrains Mono",
-    headingFace: "JetBrains Mono",
-    labelFace: "IBM Plex Mono",
-    dataFace: "JetBrains Mono",
+    name: "Mono",
+    description: "Berkeley Mono across the interface.",
+    bodyFace: "Berkeley Mono",
+    headingFace: "Berkeley Mono",
+    labelFace: "Berkeley Mono",
+    dataFace: "Berkeley Mono",
     previewCopy: "Tabular, compact, and highly scannable.",
   },
 ];
 
 const TYPOGRAPHY_PRESET_SET = new Set<string>(TYPOGRAPHY_PRESET_IDS);
+
+/** Retired picker ids, kept so a stored choice still resolves. */
+const LEGACY_TYPOGRAPHY_PRESETS: Record<string, TypographyPresetId> = {
+  classic: "orbit",
+  editorial: "serif",
+};
 
 export function isTypographyPresetId(
   value: string | null | undefined
@@ -76,6 +67,9 @@ export function resolveTypographyPreset(
   legacyFontMode?: string | null
 ): TypographyPresetId {
   if (isTypographyPresetId(storedPreset)) return storedPreset;
+  if (storedPreset && storedPreset in LEGACY_TYPOGRAPHY_PRESETS) {
+    return LEGACY_TYPOGRAPHY_PRESETS[storedPreset];
+  }
   if (legacyFontMode === "mono") return "mono";
   return DEFAULT_TYPOGRAPHY_PRESET;
 }
