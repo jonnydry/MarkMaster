@@ -45,10 +45,20 @@ export interface DashboardDiscoveryProps {
 }
 
 /**
- * Floor for the dashboard strip above the feed. The placeholder and the loaded
- * strip share it so highlights resolving cannot push the bookmark list down.
+ * Loading slot for the feed-integrated strip.
+ *
+ * The skeleton before the 18rem reservation was an `h-4` label, a `space-y-2`
+ * gap, and an `h-20` block (6.5rem) inside the list shell's `pt-1` + `pb-2`
+ * (0.75rem): 7.25rem border-box, about 7rem. A loaded strip is taller — the
+ * `h-7` toolbar plus `mb-1.5` (2.125rem), a carousel card of at least 10rem
+ * (the stacked label, title, subtitle, footer, and feedback land near
+ * 11.5rem), `pb-1` on the scroller, and shell padding, about 15rem with one
+ * card and about 16rem once the pager shows. Reserving that full height still
+ * drops the feed by it when there are no highlights. Keep the placeholder at
+ * the old skeleton so that collapse stays small. The loaded strip has no
+ * minimum height.
  */
-const DISCOVERY_FEED_SLOT_CLASS = "min-h-[18rem]";
+const DISCOVERY_PLACEHOLDER_CLASS = "min-h-[7.25rem]";
 
 function getDiscoveryShellClass(variant: "default" | "flush", viewMode?: ViewMode): string {
   if (variant === "flush") {
@@ -214,7 +224,7 @@ export function DashboardDiscovery({
     return (
       <section
         id="dashboard-discovery-panel"
-        className={cn(shellClass, DISCOVERY_FEED_SLOT_CLASS, "flex w-full flex-col", className)}
+        className={cn(shellClass, DISCOVERY_PLACEHOLDER_CLASS, "flex w-full flex-col", className)}
         aria-busy="true"
         aria-label="Loading Discovery"
         title={explainer ?? defaultExplainer}
@@ -364,12 +374,7 @@ export function DashboardDiscovery({
       <>
         <section
           id="dashboard-discovery-panel"
-          className={cn(
-            shellClass,
-            DISCOVERY_FEED_SLOT_CLASS,
-            "flex w-full flex-col",
-            className
-          )}
+          className={cn(shellClass, "w-full", className)}
           aria-label="Discovery"
           title={explainer ?? defaultExplainer}
         >
