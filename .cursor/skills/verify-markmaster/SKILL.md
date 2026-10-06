@@ -23,7 +23,7 @@ Postgres listens on `127.0.0.1:54329` and owns the database `markmaster_verify`.
 
 Launch then runs `npx prisma migrate deploy` and `node scripts/seed-verify.mjs` with the launch child environment, then mints `authjs.session-token` with `@auth/core/jwt` `encode`. The salt is the cookie name. The token carries `dbUser`, `sessionVersion`, and `sessionValidatedAt` for the seeded user.
 
-That child environment sets `DATABASE_URL` to `postgresql://user:password@127.0.0.1:<pg-port>/markmaster_verify`, `VERIFY_MARKMASTER=1`, `APP_URL` and `NEXT_PUBLIC_APP_URL` to the app origin, and empty strings for `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID`. The seed script parses `DATABASE_URL` with `new URL()` before it imports Prisma. It exits non-zero unless the host is `127.0.0.1` or `localhost`, the path is exactly `/markmaster_verify`, and `VERIFY_MARKMASTER` is `1`. `npm run db:seed:verify` is the same script, so it hits the same guard.
+That child environment sets `DATABASE_URL` to `postgresql://user:password@127.0.0.1:<pg-port>/markmaster_verify`, `VERIFY_MARKMASTER=1`, `APP_URL` and `NEXT_PUBLIC_APP_URL` to the app origin, and empty strings for `CRON_SECRET`, `SYNC_WORKER_SECRET`, and `OWNER_USER_ID`. The seed script parses `DATABASE_URL` with `new URL()` before it imports Prisma. It exits non-zero unless the host is `127.0.0.1` or `localhost`, the path is exactly `/markmaster_verify`, `VERIFY_MARKMASTER` is `1`, and the URL has no query string. `npm run db:seed:verify` is the same script, so it hits the same guard.
 
 Next.js starts with `npm run dev -- --hostname 127.0.0.1 --port 3100`. Ready means `GET http://127.0.0.1:3100/login` returns 200. The first compile can take a few minutes.
 
