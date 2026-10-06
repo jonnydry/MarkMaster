@@ -186,6 +186,7 @@ function DashboardContent() {
     hasMixContent: discoveryAvailable,
     rawTotal: discoveryUntouchedCount,
     isLoading: discoveryLoading,
+    discoveryParentData,
   } = useDashboardDiscovery({ feedReady });
 
   const { collapsed: railCollapsed, setCollapsed: setRailCollapsed } =
@@ -326,6 +327,7 @@ function DashboardContent() {
           {!isError && viewMode !== "grid" && (
             <DashboardDiscovery
               feedReady={feedReady}
+              parentData={discoveryParentData}
               activeBookmarkId={activeBookmarkIdForView}
               onSelectBookmark={setActiveBookmarkId}
               onFocusForTriage={focusPerformanceHighlight}

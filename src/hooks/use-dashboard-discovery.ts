@@ -16,7 +16,67 @@ import {
 import {
   buildWeeklyGemsCuration,
   buildDiscoveryCarouselItems,
+  DISCOVERY_THIN_POOL_THRESHOLD,
 } from "@/lib/weekly-gems-curation";
+
+/**
+ * Highlights share the database with the bookmark feed. Let the feed commit
+ * and paint, then wait for idle time (or this timeout) before requesting them.
+ */
+const HIGHLIGHTS_AFTER_PAINT_TIMEOUT_MS = 200;
+
+function useAfterFeedPaint(active: boolean) {
+  const [epochActive, setEpochActive] = useState(active);
+  const [ready, setReady] = useState(false);
+
+  // Reset when the feed drops back out of the ready state. Doing this during
+  // render keeps the idle wait from sticking across a later load.
+  if (active !== epochActive) {
+    setEpochActive(active);
+    setReady(false);
+  }
+
+  useEffect(() => {
+    if (!active) return;
+
+    let cancelled = false;
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const markReady = () => {
+      if (!cancelled) setReady(true);
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(markReady, {
+        timeout: HIGHLIGHTS_AFTER_PAINT_TIMEOUT_MS,
+      });
+    } else {
+      timeoutId = window.setTimeout(markReady, HIGHLIGHTS_AFTER_PAINT_TIMEOUT_MS);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
+  }, [active]);
+
+  return active && ready;
+}
+
+function unexcludedCount(ids: string[], bookmarks: { id: string }[] | undefined) {
+  if (!bookmarks) return 0;
+  if (ids.length === 0) return bookmarks.length;
+  const excluded = new Set(ids);
+  let count = 0;
+  for (const bookmark of bookmarks) {
+    if (!excluded.has(bookmark.id)) count += 1;
+  }
+  return count;
+}
 
 export type DashboardDiscoveryParentData = {
   rawData?: PerformanceHighlightsResponse;
@@ -62,10 +122,12 @@ export function useDashboardDiscovery(options: {
 
   const useParent = parentData !== undefined;
   const effectiveRefreshVersion = parentData?.refreshVersion ?? refreshVersion;
+  // The feed's first paint happens before this effect's idle callback.
+  const paintReady = useAfterFeedPaint(feedReady && !useParent);
+  const rawEnabled = paintReady && !useParent;
 
   const {
     data: rawFetched,
-    isLoading: rawLoading,
     isError: rawError,
     refetch: refetchRaw,
   } = usePerformanceHighlights(true, {
@@ -74,30 +136,43 @@ export function useDashboardDiscovery(options: {
     hardExcludeDisliked: true,
     excludeIds,
     limit: DISCOVERY_RAW_POOL_LIMIT,
-    enabled: !useParent,
+    enabled: rawEnabled,
   });
+
+  // Library filler only changes the strip when fewer than 3 raw candidates
+  // remain. A healthy raw pool is one highlights request; the filler query
+  // stays idle so it cannot compete with the feed.
+  const needsLibraryFiller =
+    rawEnabled &&
+    rawFetched != null &&
+    unexcludedCount(excludeIds, rawFetched.bookmarks) < DISCOVERY_THIN_POOL_THRESHOLD;
 
   const {
     data: libraryFetched,
-    isLoading: libraryLoading,
     isError: libraryError,
     refetch: refetchLibrary,
   } = usePerformanceHighlights(false, {
     dislikedIds,
     likedIds,
     hardExcludeDisliked: true,
-    enabled: feedReady && !useParent,
+    enabled: needsLibraryFiller,
   });
 
   const rawData = parentData?.rawData ?? rawFetched;
   const libraryData = parentData?.libraryData ?? libraryFetched;
   const parentLoading =
     parentData?.rawLoading === true || parentData?.libraryLoading === true;
+  const rawWaiting = rawEnabled && rawFetched == null && !rawError;
+  const libraryWaiting = needsLibraryFiller && libraryFetched == null && !libraryError;
   const internalLoading =
-    !useParent && (rawLoading || (feedReady && libraryLoading));
+    !useParent && feedReady && (!paintReady || rawWaiting || libraryWaiting);
   const isLoading = parentLoading || internalLoading;
   const hasError = parentData?.rawError ?? (rawError || libraryError);
-  const refetch = parentData?.refetchRaw ?? refetchRaw;
+  const refetchHighlights = useCallback(() => {
+    void refetchRaw();
+    if (needsLibraryFiller) void refetchLibrary();
+  }, [needsLibraryFiller, refetchLibrary, refetchRaw]);
+  const refetch = parentData?.refetchRaw ?? refetchHighlights;
 
   const quickPicks = useMemo(
     () => rawData?.bookmarks ?? [],
@@ -143,19 +218,11 @@ export function useDashboardDiscovery(options: {
     }
     setRefreshVersion((v) => v + 1);
     if (!useParent) {
-      void refetchRaw();
-      if (feedReady) void refetchLibrary();
+      refetchHighlights();
     } else if (parentData?.refetchRaw) {
       parentData.refetchRaw();
     }
-  }, [
-    discovery.carouselItems,
-    feedReady,
-    parentData,
-    refetchLibrary,
-    refetchRaw,
-    useParent,
-  ]);
+  }, [discovery.carouselItems, parentData, refetchHighlights, useParent]);
 
   return {
     quickPicks,
@@ -178,5 +245,15 @@ export function useDashboardDiscovery(options: {
     hasError,
     refetch,
     refreshMix,
+    /** Share one in-flight highlights fetch with a nested discovery strip. */
+    discoveryParentData: {
+      rawData,
+      libraryData,
+      rawLoading: internalLoading,
+      libraryLoading: false,
+      rawError: Boolean(rawError || libraryError),
+      refetchRaw: refetchHighlights,
+      excludeIds,
+    } satisfies DashboardDiscoveryParentData,
   };
 }

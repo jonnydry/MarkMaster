@@ -44,6 +44,12 @@ export interface DashboardDiscoveryProps {
   viewMode?: ViewMode;
 }
 
+/**
+ * Floor for the dashboard strip above the feed. The placeholder and the loaded
+ * strip share it so highlights resolving cannot push the bookmark list down.
+ */
+const DISCOVERY_FEED_SLOT_CLASS = "min-h-[18rem]";
+
 function getDiscoveryShellClass(variant: "default" | "flush", viewMode?: ViewMode): string {
   if (variant === "flush") {
     return "mb-0 max-w-none px-0";
@@ -169,6 +175,8 @@ export function DashboardDiscovery({
   const shellClass = getDiscoveryShellClass(variant, viewMode);
   const isGridView = viewMode === "grid";
   const isWideStrip = isFeedIntegrated && isGridView;
+  const defaultExplainer =
+    "A focused mix of untouched and resurfaced saves to organize in a few minutes.";
 
   const handleOrbitReview = (id: string) => {
     trackFlywheelEvent("cta.review_in_orbit", {
@@ -191,8 +199,6 @@ export function DashboardDiscovery({
     handleReviewInOrbit();
   };
 
-  const defaultExplainer =
-    "A focused mix of untouched and resurfaced saves to organize in a few minutes.";
   const moduleMetaLine =
     rawTotal > 0
       ? `${rawTotal.toLocaleString()} waiting for triage${
@@ -200,28 +206,39 @@ export function DashboardDiscovery({
         }`
       : undefined;
 
+  if (hidden && canHide) return null;
+
+  // Reserve the strip before the feed paints. Resolving highlights fills this
+  // slot instead of inserting a new block above the list.
+  if (isFeedIntegrated && !hasError && (isLoading || !feedReady)) {
+    return (
+      <section
+        id="dashboard-discovery-panel"
+        className={cn(shellClass, DISCOVERY_FEED_SLOT_CLASS, "flex w-full flex-col", className)}
+        aria-busy="true"
+        aria-label="Loading Discovery"
+        title={explainer ?? defaultExplainer}
+      >
+        <div className="mb-1.5 h-7 shrink-0" />
+        <div className="min-h-0 flex-1 rounded-sm skeleton-shimmer" />
+      </section>
+    );
+  }
+
   if (isLoading) {
-    // Don't surface a loading skeleton for a hidden module.
-    if (hidden && canHide) return null;
     return (
       <div
         className={cn(shellClass, "space-y-2", className)}
-        aria-busy
+        aria-busy="true"
         aria-label="Loading Discovery"
       >
         <div className="h-4 w-28 rounded-sm skeleton-shimmer" />
-        <div
-          className={cn(
-            "h-20 rounded-sm skeleton-shimmer",
-            !isFeedIntegrated && "border border-hairline-soft"
-          )}
-        />
+        <div className="h-20 rounded-sm border border-hairline-soft skeleton-shimmer" />
       </div>
     );
   }
 
   if (hasError) {
-    if (hidden && canHide) return null;
     return (
       <ErrorState
         layout="inline"
@@ -234,8 +251,6 @@ export function DashboardDiscovery({
 
   const showModule = discoveryCarouselItems.length > 0 || ritualTotal > 0;
   if (!showModule) return null;
-
-  if (hidden && canHide) return null;
 
   const hasRitual = ritualTotal > 0;
   const headerActions = (
@@ -349,7 +364,12 @@ export function DashboardDiscovery({
       <>
         <section
           id="dashboard-discovery-panel"
-          className={cn(shellClass, "w-full", className)}
+          className={cn(
+            shellClass,
+            DISCOVERY_FEED_SLOT_CLASS,
+            "flex w-full flex-col",
+            className
+          )}
           aria-label="Discovery"
           title={explainer ?? defaultExplainer}
         >
