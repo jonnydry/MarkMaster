@@ -28,6 +28,7 @@ const ColorSwatch = React.memo(function ColorSwatch({
           : "border-hairline-soft hover:scale-105"
       )}
       style={{ backgroundColor: color }}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
     />
   );
@@ -38,7 +39,7 @@ interface TagEditRowProps {
   index: number;
   initialName: string;
   initialColor: string;
-  onSave: (tagId: string, name: string, color: string) => void;
+  onSave: (tagId: string, name: string, color: string) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -53,30 +54,59 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
+  const saveInFlight = useRef(false);
+  const escapeCancels = useRef(false);
   const colorOptions = useMemo(
     () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
     [color]
   );
 
+  const commitSave = useCallback(() => {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    let pending: void | Promise<void>;
+    try {
+      pending = onSave(tag.id, name.trim(), color);
+    } catch (error) {
+      saveInFlight.current = false;
+      throw error;
+    }
+    void Promise.resolve(pending).finally(() => {
+      saveInFlight.current = false;
+    });
+  }, [color, name, onSave, tag.id]);
+
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
+      if (escapeCancels.current) {
+        escapeCancels.current = false;
+        return;
+      }
       const nextFocus = e.relatedTarget as Node | null;
       if (nextFocus && rowRef.current?.contains(nextFocus)) {
         return;
       }
-      onCancel();
+      const trimmed = name.trim();
+      if (trimmed === "" || (trimmed === initialName.trim() && color === initialColor)) {
+        onCancel();
+        return;
+      }
+      commitSave();
     },
-    [onCancel]
+    [color, commitSave, initialColor, initialName, name, onCancel]
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        escapeCancels.current = true;
+        setName(initialName);
+        setColor(initialColor);
         onCancel();
       }
     },
-    [onCancel]
+    [initialColor, initialName, onCancel]
   );
 
   return (
@@ -104,13 +134,20 @@ export const TagEditRow = React.memo(function TagEditRow({
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="h-9 min-w-0 flex-1 border-hairline-soft bg-surface-1 sm:min-w-[12rem]"
-        onKeyDown={(e) => e.key === "Enter" && onSave(tag.id, name.trim(), color)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commitSave();
+        }}
       />
       <div className="flex shrink-0 gap-2">
-        <Button size="sm" onClick={() => onSave(tag.id, name.trim(), color)}>
+        <Button size="sm" onMouseDown={(event) => event.preventDefault()} onClick={commitSave}>
           Save
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
       </div>
