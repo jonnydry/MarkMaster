@@ -59,7 +59,7 @@ export function OrbitTriageHint({ className }: { className?: string }) {
           window.dispatchEvent(new Event(TRIAGE_HINT_CHANGE_EVENT));
         }}
         className={cn(
-          "shrink-0 rounded-sm border border-transparent p-0.5",
+          "relative shrink-0 rounded-sm border border-transparent p-0.5 after:absolute after:-inset-[13px]",
           "text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
         )}
         aria-label="Dismiss triage tips"

@@ -49,7 +49,7 @@ export const TagRow = React.memo(function TagRow({
           <Popover>
             <PopoverTrigger
               aria-label={`Merge tag ${tag.name} into another tag`}
-              className="inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
+              className="relative inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground after:absolute after:-inset-y-1.5 after:-left-[15px] after:-right-px hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45"
             >
               <GitMerge className="size-3.5" />
             </PopoverTrigger>
