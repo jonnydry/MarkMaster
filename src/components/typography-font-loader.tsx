@@ -5,10 +5,7 @@ import { useEffect } from "react";
 import { fontVariablesForPreset } from "@/lib/app-fonts";
 import { useFontMode } from "@/components/providers";
 
-const ALL_LAZY_FONT_VARIABLES = [
-  ...fontVariablesForPreset("classic"),
-  ...fontVariablesForPreset("editorial"),
-];
+const ALL_LAZY_FONT_VARIABLES = [...fontVariablesForPreset("serif")];
 
 /** Applies lazy-loaded font CSS variables when non-default typography presets are active. */
 export function TypographyFontLoader() {

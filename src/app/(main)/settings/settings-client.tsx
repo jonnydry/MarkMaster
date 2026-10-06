@@ -42,6 +42,7 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import { completeLibrarySync } from "@/lib/library-sync";
 import { useSyncSettings } from "@/hooks/use-sync-settings";
+import { fontVariablesForPreset } from "@/lib/app-fonts";
 import {
   TYPOGRAPHY_PRESETS,
   type TypographyPresetId,
@@ -333,7 +334,7 @@ export default function SettingsPage() {
                             Typography
                           </p>
                           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                            Type for reading, labels, and data.
+                            Sans, serif, or monospace.
                           </p>
                         </div>
                         <TypographyPresetPicker
@@ -424,7 +425,7 @@ function TypographyPresetPicker({
     <div
       role="radiogroup"
       aria-label="Typography family"
-      className="mt-3 grid gap-2 sm:grid-cols-2"
+      className="mt-3 grid gap-2 sm:grid-cols-3"
     >
       {TYPOGRAPHY_PRESETS.map((preset) => {
         const selected = value === preset.id;
@@ -440,6 +441,7 @@ function TypographyPresetPicker({
             className={cn(
               "min-h-[6.25rem] rounded-sm border p-3 text-left font-sans transition-colors",
               "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
+              fontVariablesForPreset(preset.id),
               selected
                 ? highlightSurfaceActiveClass
                 : "border-hairline-soft bg-transparent hover:bg-hover"
@@ -482,7 +484,9 @@ function TypographyPresetPicker({
             </div>
 
             <p className="font-label mt-2 truncate text-xs font-medium text-primary">
-              {preset.bodyFace} / {preset.dataFace}
+              {preset.bodyFace === preset.dataFace
+                ? preset.bodyFace
+                : `${preset.bodyFace} / ${preset.dataFace}`}
             </p>
           </button>
         );
