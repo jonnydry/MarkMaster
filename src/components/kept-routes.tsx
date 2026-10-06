@@ -129,17 +129,24 @@ export function isKeptRoute(pathname: string) {
 export function KeptRoutes({ pathname }: { pathname: string }) {
   const queryClient = useQueryClient();
   const [warm, setWarm] = useState<ReadonlySet<string>>(() => new Set([pathname]));
-  // The warm set is only read inside this effect. Skip routes already warm at
-  // mount (the page on screen, including a deep link) so we don't fetch the
-  // default queue for a page that isn't showing that query.
+  // The warm set is only read inside the warm-up effect. Skip routes already
+  // warm — the page on screen at mount (including a deep link) and routes
+  // opened in development — so we don't fetch the default queue for a page
+  // that isn't showing that query.
   const warmRef = useRef(warm);
 
   if (process.env.NODE_ENV === "development" && !warm.has(pathname)) {
     const next = new Set(warm);
     next.add(pathname);
-    warmRef.current = next;
     setWarm(next);
   }
+
+  // Mirror warm into the ref after commit. The development branch above
+  // updates state during render; writing the ref there is invalid, and the
+  // warm-up timers read this after effects have run.
+  useEffect(() => {
+    warmRef.current = warm;
+  }, [warm]);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "development") return;
