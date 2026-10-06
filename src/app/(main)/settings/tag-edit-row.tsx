@@ -53,30 +53,57 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
+  const swallowSaveClick = useRef(false);
+  const escapeCancels = useRef(false);
   const colorOptions = useMemo(
     () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
     [color]
   );
 
+  const saveEdit = useCallback(() => {
+    onSave(tag.id, name.trim(), color);
+  }, [color, name, onSave, tag.id]);
+
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
+      if (escapeCancels.current) {
+        escapeCancels.current = false;
+        return;
+      }
       const nextFocus = e.relatedTarget as Node | null;
       if (nextFocus && rowRef.current?.contains(nextFocus)) {
         return;
       }
-      onCancel();
+      const trimmed = name.trim();
+      if (trimmed === "" || trimmed === initialName.trim()) {
+        onCancel();
+        return;
+      }
+      swallowSaveClick.current = true;
+      saveEdit();
+      window.setTimeout(() => {
+        swallowSaveClick.current = false;
+      }, 0);
     },
-    [onCancel]
+    [initialName, name, onCancel, saveEdit]
   );
+
+  const handleSaveClick = useCallback(() => {
+    if (swallowSaveClick.current) return;
+    saveEdit();
+  }, [saveEdit]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        escapeCancels.current = true;
+        setName(initialName);
+        setColor(initialColor);
         onCancel();
       }
     },
-    [onCancel]
+    [initialColor, initialName, onCancel]
   );
 
   return (
@@ -104,10 +131,12 @@ export const TagEditRow = React.memo(function TagEditRow({
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="h-9 min-w-0 flex-1 border-hairline-soft bg-surface-1 sm:min-w-[12rem]"
-        onKeyDown={(e) => e.key === "Enter" && onSave(tag.id, name.trim(), color)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSaveClick();
+        }}
       />
       <div className="flex shrink-0 gap-2">
-        <Button size="sm" onClick={() => onSave(tag.id, name.trim(), color)}>
+        <Button size="sm" onClick={handleSaveClick}>
           Save
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
