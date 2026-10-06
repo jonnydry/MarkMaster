@@ -83,7 +83,7 @@ export function OrbitBatchMenu({
         <div className="space-y-0.5 px-2 pb-1 pt-1.5">
           <p className="text-xs font-medium text-muted-foreground">Mode</p>
           <p className="text-xs leading-4 text-muted-foreground">
-            Scan queue reviews a batch. Auto-tag writes existing tags across the queue.
+            Scan queue reviews a batch. Auto-tag applies matches across the queue without review.
           </p>
         </div>
         <div
