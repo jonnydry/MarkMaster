@@ -18,6 +18,13 @@ export function assertVerifyDatabase(databaseUrl, verifyFlag) {
     };
   }
 
+  if (url.search !== "") {
+    return {
+      ok: false,
+      message: "Refusing to seed: DATABASE_URL must not have query parameters",
+    };
+  }
+
   if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") {
     return {
       ok: false,
