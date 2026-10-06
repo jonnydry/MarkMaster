@@ -72,7 +72,7 @@ export function OrbitalAuthExperience({
           </h1>
 
           <p className="auth-splash__lead animate-fade-in-up stagger-3 text-muted-foreground">
-            Grok auto-tags your saves. Orbit maps them into a living graph.
+            Orbit tags your saves using your own tags or a starter set.
           </p>
 
           {errorMessage && (
