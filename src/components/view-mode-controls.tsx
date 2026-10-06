@@ -27,7 +27,6 @@ type ViewModeControlsProps = {
   gridIcon?: ElementType;
 };
 
-/** Feed / compact / grid toggle — shared by dashboard and collection detail. */
 export function ViewModeControls({
   viewMode,
   onViewModeChange,
@@ -67,7 +66,9 @@ export function ViewModeControls({
             aria-pressed={selected}
             className={cn(
               "dashboard-view-button rounded-sm border border-transparent text-sm",
-              compact ? "size-7 px-0" : "h-8 px-2.5",
+              compact
+                ? "relative size-7 px-0 after:absolute after:-inset-x-0.5 after:-inset-y-1"
+                : "h-8 px-2.5",
               selected
                 ? cn(highlightActiveClass, "border")
                 : highlightIdleClass
