@@ -73,6 +73,23 @@ async function replaceName(next: string) {
   return user;
 }
 
+function pressLikeIos(control: HTMLElement) {
+  const input = screen.getByRole("textbox");
+  input.focus();
+  let blurred = false;
+  const onBlur = () => {
+    blurred = true;
+  };
+  input.addEventListener("blur", onBlur);
+  fireEvent.pointerDown(control);
+  fireEvent.pointerUp(control);
+  const mouseDownAllowed = fireEvent.mouseDown(control);
+  input.removeEventListener("blur", onBlur);
+  expect(mouseDownAllowed).toBe(false);
+  expect(blurred).toBe(false);
+  expect(input).toHaveFocus();
+}
+
 describe("TagEditRow", () => {
   it("saves the typed name when focus leaves the row", async () => {
     render(<Editor />);
@@ -167,32 +184,26 @@ describe("TagEditRow", () => {
     expect(screen.getByRole("textbox")).toHaveValue("TypeScript Kept");
   });
 
-  it("saves once when Safari blurs with a null relatedTarget before Save", async () => {
-    render(<Editor closeOnSave={false} />);
+  it("saves once on the iOS press order for Save", async () => {
+    render(<Editor />);
     await replaceName("TypeScript Kept");
     const save = screen.getByRole("button", { name: "Save" });
 
-    fireEvent.pointerDown(save);
-    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    });
+    pressLikeIos(save);
+    expect(screen.getByText("0 saved")).toBeInTheDocument();
     fireEvent.click(save);
 
     expect(screen.getByText("1 saved")).toBeInTheDocument();
     expect(screen.getByText("tag-1 TypeScript Kept #1d9bf0")).toBeInTheDocument();
   });
 
-  it("restores the original name when Safari blurs before Cancel", async () => {
+  it("restores the original name on the iOS press order for Cancel", async () => {
     render(<Editor />);
     await replaceName("TypeScript Kept");
     const cancel = screen.getByRole("button", { name: "Cancel" });
 
-    fireEvent.pointerDown(cancel);
-    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    });
+    pressLikeIos(cancel);
+    expect(screen.getByText("0 saved")).toBeInTheDocument();
     fireEvent.click(cancel);
 
     expect(screen.getByText("TypeScript")).toBeInTheDocument();
@@ -200,17 +211,21 @@ describe("TagEditRow", () => {
     expect(screen.getByText("no save")).toBeInTheDocument();
   });
 
-  it("keeps the editor open when a swatch press blurs with a null relatedTarget", async () => {
+  it("keeps the editor open and the new color on the iOS press order for a swatch", async () => {
     render(<Editor />);
+    await replaceName("TypeScript Kept");
     const swatch = screen.getByRole("button", { name: "Select color Cyan" });
 
-    fireEvent.pointerDown(swatch);
-    fireEvent.mouseDown(swatch);
-    fireEvent.blur(screen.getByRole("textbox"), { relatedTarget: null });
+    pressLikeIos(swatch);
+    expect(screen.getByText("0 saved")).toBeInTheDocument();
+    fireEvent.click(swatch);
 
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveValue("TypeScript");
+    expect(screen.getByRole("textbox")).toHaveValue("TypeScript Kept");
+    expect(screen.getByRole("textbox")).toHaveFocus();
+    expect(swatch).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("0 saved")).toBeInTheDocument();
+    expect(screen.getByText("no save")).toBeInTheDocument();
   });
 
   it("saves a color-only change when focus leaves the row", async () => {

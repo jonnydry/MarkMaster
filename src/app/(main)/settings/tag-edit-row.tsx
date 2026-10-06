@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect, useMemo, useState } from "react";
+import React, { useRef, useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PRESET_COLORS, getColorName } from "@/lib/constants";
@@ -28,6 +28,7 @@ const ColorSwatch = React.memo(function ColorSwatch({
           : "border-hairline-soft hover:scale-105"
       )}
       style={{ backgroundColor: color }}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
     />
   );
@@ -53,25 +54,12 @@ export const TagEditRow = React.memo(function TagEditRow({
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
   const rowRef = useRef<HTMLDivElement>(null);
-  const pressInside = useRef(false);
   const saveInFlight = useRef(false);
   const escapeCancels = useRef(false);
   const colorOptions = useMemo(
     () => (PRESET_COLORS.includes(color) ? PRESET_COLORS : [color, ...PRESET_COLORS]),
     [color]
   );
-
-  useEffect(() => {
-    const releasePress = () => {
-      pressInside.current = false;
-    };
-    window.addEventListener("pointerup", releasePress);
-    window.addEventListener("pointercancel", releasePress);
-    return () => {
-      window.removeEventListener("pointerup", releasePress);
-      window.removeEventListener("pointercancel", releasePress);
-    };
-  }, []);
 
   const commitSave = useCallback(() => {
     if (saveInFlight.current) return;
@@ -94,7 +82,6 @@ export const TagEditRow = React.memo(function TagEditRow({
         escapeCancels.current = false;
         return;
       }
-      if (pressInside.current) return;
       const nextFocus = e.relatedTarget as Node | null;
       if (nextFocus && rowRef.current?.contains(nextFocus)) {
         return;
@@ -127,9 +114,6 @@ export const TagEditRow = React.memo(function TagEditRow({
       ref={rowRef}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      onPointerDown={() => {
-        pressInside.current = true;
-      }}
       className={cn(
         "animate-slide-down-fade flex flex-col gap-3 bg-accent-soft/40 px-4 py-4 sm:flex-row sm:items-center",
         index > 0 && "border-t border-hairline-soft"
@@ -155,10 +139,15 @@ export const TagEditRow = React.memo(function TagEditRow({
         }}
       />
       <div className="flex shrink-0 gap-2">
-        <Button size="sm" onClick={commitSave}>
+        <Button size="sm" onMouseDown={(event) => event.preventDefault()} onClick={commitSave}>
           Save
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
       </div>
