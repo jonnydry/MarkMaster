@@ -37,4 +37,17 @@ describe("assertVerifyDatabase", () => {
   it("accepts the local verify database when the flag is set", () => {
     expect(assertVerifyDatabase(LOCAL, "1")).toEqual({ ok: true });
   });
+
+  it("refuses a query string that can retarget the host", () => {
+    const result = assertVerifyDatabase(
+      "postgresql://user:password@127.0.0.1:5432/markmaster_verify?host=evil.com",
+      "1"
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toBe(
+        "Refusing to seed: DATABASE_URL must not have query parameters"
+      );
+    }
+  });
 });
