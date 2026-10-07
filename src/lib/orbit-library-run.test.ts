@@ -245,50 +245,37 @@ describe("runOrbitLibraryInvocation", () => {
     });
   });
 
-  it("does not record a page aborted at the slice deadline", async () => {
+  it("does not record a later page aborted at the slice deadline", async () => {
     vi.useFakeTimers();
     try {
       mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
       mocks.prisma.bookmark.findMany.mockResolvedValue(
         page(ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE)
       );
+      let call = 0;
       mocks.planLibraryAssignments.mockImplementation(
         ({ signal }: { signal?: AbortSignal }) =>
           new Promise((resolve) => {
-            const finish = () =>
-              resolve({
-                plan: {
-                  overview: {
-                    summary: "",
-                    taggingStrategy: "",
-                    collectionStrategy: "",
-                  },
-                  suggestions: [],
-                },
-                modelChecked: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
-                failed: 0,
-              });
+            const finish = () => resolve(planTagging(1));
+            call += 1;
+            if (call === 1) {
+              finish();
+              return;
+            }
             if (signal?.aborted) finish();
             else signal?.addEventListener("abort", finish, { once: true });
           })
       );
 
-      let finished = false;
-      const pending = runOrbitLibraryInvocation("run-1").finally(() => {
-        finished = true;
-      });
+      const pending = runOrbitLibraryInvocation("run-1");
       await vi.advanceTimersByTimeAsync(ORBIT_LIBRARY_INVOCATION_BUDGET_MS);
 
-      expect(finished).toBe(true);
       await expect(pending).resolves.toEqual({ continued: true });
+      expect(writes().filter((data) => "processed" in data)).toHaveLength(1);
       expect(
-        writes().some(
-          (data) =>
-            "processed" in data ||
-            "cursorId" in data ||
-            data.status === "FAILED"
-        )
-      ).toBe(false);
+        writes().some((data) => data.updatedAt instanceof Date && !("processed" in data))
+      ).toBe(true);
+      expect(writes().some((data) => data.status === "FAILED")).toBe(false);
     } finally {
       vi.useRealTimers();
     }

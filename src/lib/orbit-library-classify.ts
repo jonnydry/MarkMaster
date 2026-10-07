@@ -366,6 +366,11 @@ async function finishRun(
   });
 }
 
+function libraryGrowthEnabled() {
+  const value = process.env.ORBIT_LIBRARY_GROWTH?.trim().toLowerCase();
+  return value !== "false" && value !== "0" && value !== "off";
+}
+
 /**
  * The pass over the closed list reached the end of the queue. With Grok
  * available, the run takes one more round: the next slice names new tags for
@@ -377,7 +382,7 @@ async function finishPass(
 ): Promise<{ continued: boolean }> {
   if (
     run.round !== 0 ||
-    process.env.ORBIT_LIBRARY_GROWTH === "false" ||
+    !libraryGrowthEnabled() ||
     !process.env.XAI_API_KEY?.trim()
   ) {
     await finishRun(run.id, "COMPLETED");
@@ -467,9 +472,13 @@ export async function runOrbitLibraryInvocation(
   const deadlineTimer = setTimeout(() => {
     deadline.abort();
   }, ORBIT_LIBRARY_INVOCATION_BUDGET_MS);
-  const pageSignal = AbortSignal.any([abandon.signal, deadline.signal]);
 
   try {
+    if (run.round === 1 && !libraryGrowthEnabled()) {
+      await finishRun(run.id, "COMPLETED");
+      return { continued: false };
+    }
+
     let vocabulary = parseVocabulary(run.vocabulary);
     if (!vocabulary) {
       vocabulary = await ensureLibraryVocabulary(run.userId);
@@ -504,10 +513,17 @@ export async function runOrbitLibraryInvocation(
       run.cursorBookmarkedAt && run.cursorId
         ? { bookmarkedAt: run.cursorBookmarkedAt, id: run.cursorId }
         : null;
+    let recordedPage = false;
+    let startedPages = 0;
     const startPage = (pageCursor: OrbitLibraryClassifyCursor | null) => {
+      startedPages += 1;
+      const exemptFromDeadline = startedPages === 1;
+      const signal = exemptFromDeadline
+        ? abandon.signal
+        : AbortSignal.any([abandon.signal, deadline.signal]);
       const bookmarks = fetchUntaggedLibraryPage(run.userId, pageCursor);
       const planned = bookmarks.then((rows) =>
-        planUntaggedLibraryPage(rows, tagList, limiter, pageSignal, examples)
+        planUntaggedLibraryPage(rows, tagList, limiter, signal, examples)
       );
       // A look-ahead page can be abandoned (run stopped, earlier page
       // failed); its rejections must not surface as unhandled.
@@ -534,13 +550,20 @@ export async function runOrbitLibraryInvocation(
           : null;
 
       const planned = await current.planned;
-      if (deadline.signal.aborted) return { continued: true };
+      if (deadline.signal.aborted && recordedPage) {
+        await prisma.orbitLibraryRun.updateMany({
+          where: { id: run.id, status: "RUNNING" },
+          data: { updatedAt: new Date() },
+        });
+        return { continued: true };
+      }
       const page = await applyUntaggedLibraryPage(
         run.userId,
         bookmarks,
         planned
       );
       if (!(await recordPage(run.id, page))) return { continued: false };
+      recordedPage = true;
       if (!fullPage) return finishPass(run);
       // Past the look-ahead budget, pages run one at a time until the slice ends.
       if (!following && underBudget(ORBIT_LIBRARY_INVOCATION_BUDGET_MS)) {
