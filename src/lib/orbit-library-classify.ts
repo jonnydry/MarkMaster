@@ -375,7 +375,11 @@ async function finishRun(
 async function finishPass(
   run: Pick<OrbitLibraryRun, "id" | "round">
 ): Promise<{ continued: boolean }> {
-  if (run.round !== 0 || !process.env.XAI_API_KEY?.trim()) {
+  if (
+    run.round !== 0 ||
+    process.env.ORBIT_LIBRARY_GROWTH === "false" ||
+    !process.env.XAI_API_KEY?.trim()
+  ) {
     await finishRun(run.id, "COMPLETED");
     return { continued: false };
   }
@@ -459,6 +463,11 @@ export async function runOrbitLibraryInvocation(
   const limiter = createPackLimiter();
   // Stops the queued packs of a look-ahead page this slice won't apply.
   const abandon = new AbortController();
+  const deadline = new AbortController();
+  const deadlineTimer = setTimeout(() => {
+    deadline.abort();
+  }, ORBIT_LIBRARY_INVOCATION_BUDGET_MS);
+  const pageSignal = AbortSignal.any([abandon.signal, deadline.signal]);
 
   try {
     let vocabulary = parseVocabulary(run.vocabulary);
@@ -498,7 +507,7 @@ export async function runOrbitLibraryInvocation(
     const startPage = (pageCursor: OrbitLibraryClassifyCursor | null) => {
       const bookmarks = fetchUntaggedLibraryPage(run.userId, pageCursor);
       const planned = bookmarks.then((rows) =>
-        planUntaggedLibraryPage(rows, tagList, limiter, abandon.signal, examples)
+        planUntaggedLibraryPage(rows, tagList, limiter, pageSignal, examples)
       );
       // A look-ahead page can be abandoned (run stopped, earlier page
       // failed); its rejections must not surface as unhandled.
@@ -506,7 +515,8 @@ export async function runOrbitLibraryInvocation(
       planned.catch(() => {});
       return { bookmarks, planned } satisfies LibraryPageWork;
     };
-    const underBudget = (budgetMs: number) => now() - startedAt < budgetMs;
+    const underBudget = (budgetMs: number) =>
+      !deadline.signal.aborted && now() - startedAt < budgetMs;
 
     let current: LibraryPageWork | null = underBudget(
       ORBIT_LIBRARY_INVOCATION_BUDGET_MS
@@ -523,10 +533,12 @@ export async function runOrbitLibraryInvocation(
           ? startPage(cursorAfter(bookmarks))
           : null;
 
+      const planned = await current.planned;
+      if (deadline.signal.aborted) return { continued: true };
       const page = await applyUntaggedLibraryPage(
         run.userId,
         bookmarks,
-        await current.planned
+        planned
       );
       if (!(await recordPage(run.id, page))) return { continued: false };
       if (!fullPage) return finishPass(run);
@@ -550,6 +562,7 @@ export async function runOrbitLibraryInvocation(
     );
     return { continued: false };
   } finally {
+    clearTimeout(deadlineTimer);
     abandon.abort();
   }
 }
