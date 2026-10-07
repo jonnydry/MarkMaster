@@ -115,6 +115,11 @@ function isCollectionDetailPath(pathname: string) {
   return /^\/collections\/[^/]+/.test(pathname);
 }
 
+type RoutePreview = {
+  target: string;
+  from: string;
+};
+
 /**
  * Authenticated chrome that stays mounted across navigations.
  * The sidebar does not unmount when the main column swaps.
@@ -122,29 +127,27 @@ function isCollectionDetailPath(pathname: string) {
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [previewRoute, setPreviewRoute] = useState<string | null>(null);
-  // Drop the optimistic route once the URL catches up, during render, so a
-  // later navigation does not replay a stale preview.
-  if (previewRoute !== null && previewRoute === pathname) {
-    setPreviewRoute(null);
+  const [preview, setPreview] = useState<RoutePreview | null>(null);
+  if (preview !== null && pathname !== preview.from) {
+    setPreview(null);
   }
+  const previewRoute = preview?.target ?? null;
   const shownPath = previewRoute ?? pathname;
   noteVisiblePath(shownPath);
   useEffect(() => {
-    // The map preview stays up until the route arrives. A short timeout would
-    // put the previous page back while the first map compile is still running.
-    if (!previewRoute || previewRoute === "/orbit/map") return;
-    const timer = window.setTimeout(() => setPreviewRoute(null), 2000);
+    if (!preview) return;
+    const delay = preview.target === "/orbit/map" ? 15_000 : 2_000;
+    const timer = window.setTimeout(() => setPreview(null), delay);
     return () => window.clearTimeout(timer);
-  }, [pathname, previewRoute]);
+  }, [preview]);
   const showRoute = useCallback((href: string) => {
     const path = href.split("?")[0] || href;
     if (path !== "/orbit/map" && !isKeptRoute(path)) return;
     if (path === pathname) {
-      setPreviewRoute(null);
+      setPreview(null);
       return;
     }
-    setPreviewRoute(path);
+    setPreview({ target: path, from: pathname });
   }, [pathname]);
   const { createCollection } = useCreateCollection();
   const syncStatus = useSyncStatus();
