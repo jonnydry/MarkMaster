@@ -16,9 +16,10 @@ function parseHexColor(value: string | undefined, fallback: number) {
 
 /**
  * Flat glyph colours on the neutral canvas. The accent (`palette.glow`) is
- * reserved for the queue and loose bookmarks; tags keep the user's colour;
- * collections are neutral ink. Filed dots start neutral and take a calm tint
- * of their home tag in the worker (applyBookmarkAccentColors).
+ * reserved for the queue and loose bookmarks; tags keep the user's colour
+ * (the worker paints that colour as an orbit trace, not a solid disc); collections
+ * are neutral ink. Filed dots start neutral and take a calm tint of their
+ * home tag in the worker (applyBookmarkAccentColors).
  */
 export function getOrbitMapNodeVisualStyle(
   node: OrbitGraphNode,

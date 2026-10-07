@@ -55,6 +55,7 @@ import {
   isHotPathWorkerMessageType,
 } from '@/lib/orbit-worker-protocol';
 
+import { getTagOrbitGeometry, TAG_MARK_DIM_ALPHA } from '@/lib/tag-mark';
 import type { OrbitGraphPayload, OrbitGraphNode } from '@/types';
 import type { GraphFilter, OrbitMapSelection } from '@/lib/orbit-worker-protocol';
 import {
@@ -1603,11 +1604,23 @@ function rebuildLinkDataFromGraph() {
 }
 
 /**
- * Glyphs: tags are circles in their colour, collections are squares (X
- * folders outlined, since they're read-only), the core is the queue's accent
- * ring. Filed bookmarks are filled dots; loose ones are hollow rings. Each hub
- * gets a knockout ring in the canvas colour so nearby dots never touch it.
+ * Glyphs: tags are orbits in their colour (same trace as the UI), collections
+ * are squares (X folders outlined, since they're read-only), the core is the
+ * queue's accent ring. Filed bookmarks are filled dots; loose ones are hollow
+ * rings. Each hub gets a knockout ring in the canvas colour so nearby dots
+ * never touch it.
  */
+function drawTagOrbit(g: Graphics, radius: number, color: number, name: string) {
+  const mark = getTagOrbitGeometry(name, radius);
+  g.circle(0, 0, mark.discRadius).fill({ color, alpha: TAG_MARK_DIM_ALPHA });
+  g.arc(0, 0, mark.arcRadius, mark.start, mark.end).stroke({
+    width: mark.arcWidth,
+    color,
+    cap: 'butt',
+  });
+  g.rect(mark.head.x, mark.head.y, mark.head.size, mark.head.size).fill({ color });
+}
+
 function drawNodeShape(g: Graphics, datum: MapNode) {
   g.clear();
   const { color, strokeWidth } = datum.visual;
@@ -1618,7 +1631,7 @@ function drawNodeShape(g: Graphics, datum: MapNode) {
   switch (node.kind) {
     case 'tag':
       g.circle(0, 0, r + 3).fill({ color: background });
-      g.circle(0, 0, r).fill({ color });
+      drawTagOrbit(g, r, color, node.name);
       break;
     case 'collection': {
       g.circle(0, 0, r + 3).fill({ color: background });

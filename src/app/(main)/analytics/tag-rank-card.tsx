@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { HighlightProgress } from "@/components/highlight-progress";
+import { TagDot } from "@/components/tag-dot";
 import type { AnalyticsData } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +53,7 @@ export const TagRankCard = React.memo(function TagRankCard({
                     "hover:bg-surface-1"
                   )}
                 >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: t.color }}
-                    aria-hidden="true"
-                  />
+                  <TagDot name={t.tag} color={t.color} size={10} />
                   <span className="truncate text-sm font-medium">{t.tag}</span>
                   <HighlightProgress
                     className="w-full"

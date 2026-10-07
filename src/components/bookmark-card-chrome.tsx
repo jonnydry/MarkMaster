@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { TagDot } from "@/components/tag-dot";
 import { Button } from "@/components/ui/button";
 import { highlightIndicatorActiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -105,13 +106,7 @@ export function BookmarkTagChip({
         className
       )}
     >
-      {color ? (
-        <span
-          aria-hidden
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{ backgroundColor: color }}
-        />
-      ) : null}
+      {color ? <TagDot name={name} color={color} size={10} /> : null}
       <span className="truncate">{name}</span>
       {extraCount ? (
         <span className="text-muted-foreground">+{extraCount}</span>

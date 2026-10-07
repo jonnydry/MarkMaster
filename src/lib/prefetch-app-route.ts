@@ -29,15 +29,32 @@ type PrefetchKind = NonNullable<
  * compiler and then the page chunk. `router.prefetch` still fills the
  * segment cache in both modes when asked for the full route.
  */
+function isOrbitMapHref(href: string) {
+  return href === "/orbit/map" || href.startsWith("/orbit/map?");
+}
+
 export function prefetchAppRouteDocument(
   router: AppRouterInstance,
   href: string
 ) {
-  // Webpack dev compiles one route at a time. Prefetching a page the user has
-  // not opened queues that compile ahead of the click, so navigation waits
-  // behind routes they are not looking at.
-  if (process.env.NODE_ENV === "development") return;
-  router.prefetch(href, { kind: "full" as PrefetchKind });
+  // Webpack dev compiles one route at a time. Prefetching every page the user
+  // has not opened queues those compiles ahead of the click. The map is the
+  // exception: it is not kept mounted, and its first open is the slow one.
+  if (process.env.NODE_ENV === "development" && !isOrbitMapHref(href)) return;
+  router.prefetch(isOrbitMapHref(href) ? "/orbit/map" : href, {
+    kind: "full" as PrefetchKind,
+  });
+}
+
+let orbitMapChunkWarm = false;
+
+/** Route, graph, and canvas chunk. Safe to call more than once. */
+export function warmOrbitMap(router: AppRouterInstance, queryClient: QueryClient) {
+  prefetchAppRouteDocument(router, "/orbit/map");
+  prefetchAppRoute(queryClient, "/orbit/map");
+  if (orbitMapChunkWarm || typeof window === "undefined") return;
+  orbitMapChunkWarm = true;
+  void import("@/app/(main)/orbit/map/orbit-map-client");
 }
 
 /**

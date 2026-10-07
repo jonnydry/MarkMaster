@@ -77,7 +77,7 @@ export function ShareBookmarkRow({
                   key={tag.id}
                   className="inline-flex items-center gap-1.5 surface-inset px-2 py-0.5 text-xs font-medium text-muted-foreground"
                 >
-                  <TagDot name={tag.name} color={tag.color} size={8} />
+                  <TagDot name={tag.name} color={tag.color} size={10} />
                   {tag.name}
                 </span>
               ))}

@@ -84,7 +84,7 @@ export function OrbitMapHoverCard({
     >
       <div className="flex items-center gap-2">
         {node.kind === "tag" ? (
-          <TagDot name={node.name} color={node.color} size={8} />
+          <TagDot name={node.name} color={node.color} size={10} />
         ) : node.kind === "collection" ? (
           <Folder className="size-3.5 shrink-0 text-primary" aria-hidden />
         ) : (

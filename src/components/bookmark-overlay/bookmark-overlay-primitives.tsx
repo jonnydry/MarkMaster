@@ -12,6 +12,7 @@ import {
   XPostReplyIcon,
   XPostRepostIcon,
 } from "@/components/brands/x-post-metric-icons";
+import { TagDot } from "@/components/tag-dot";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -143,11 +144,7 @@ function BookmarkOverlaySectionHeader({
 export function BookmarkOverlayTagPill({ name, color }: { name: string; color: string }) {
   return (
     <span className="inline-flex max-w-full items-center gap-1.5 rounded-sm bg-surface-2 px-2 py-1 text-xs text-foreground">
-      <span
-        aria-hidden
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
-      />
+      <TagDot name={name} color={color} size={10} />
       <span className="truncate">{name}</span>
     </span>
   );

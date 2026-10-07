@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 
 import { isKeptRoute, KeptRoutes } from "@/components/kept-routes";
+import { OrbitMapChartingPlaceholder } from "@/components/orbit/orbit-map-charting-placeholder";
 import { noteVisiblePath, RoutePreviewProvider } from "@/components/route-preview";
 import { OrbitLibraryTagProvider } from "@/components/orbit-library-tag-provider";
 import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
@@ -114,6 +115,11 @@ function isCollectionDetailPath(pathname: string) {
   return /^\/collections\/[^/]+/.test(pathname);
 }
 
+type RoutePreview = {
+  target: string;
+  from: string;
+};
+
 /**
  * Authenticated chrome that stays mounted across navigations.
  * The sidebar does not unmount when the main column swaps.
@@ -121,26 +127,27 @@ function isCollectionDetailPath(pathname: string) {
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [previewRoute, setPreviewRoute] = useState<string | null>(null);
-  // Drop the optimistic route once the URL catches up, during render, so a
-  // later navigation does not replay a stale preview.
-  if (previewRoute !== null && previewRoute === pathname) {
-    setPreviewRoute(null);
+  const [preview, setPreview] = useState<RoutePreview | null>(null);
+  if (preview !== null && pathname !== preview.from) {
+    setPreview(null);
   }
+  const previewRoute = preview?.target ?? null;
   const shownPath = previewRoute ?? pathname;
   noteVisiblePath(shownPath);
   useEffect(() => {
-    if (!previewRoute) return;
-    const timer = window.setTimeout(() => setPreviewRoute(null), 2000);
+    if (!preview) return;
+    const delay = preview.target === "/orbit/map" ? 15_000 : 2_000;
+    const timer = window.setTimeout(() => setPreview(null), delay);
     return () => window.clearTimeout(timer);
-  }, [pathname, previewRoute]);
+  }, [preview]);
   const showRoute = useCallback((href: string) => {
-    if (!isKeptRoute(href)) return;
-    if (href === pathname) {
-      setPreviewRoute(null);
+    const path = href.split("?")[0] || href;
+    if (path !== "/orbit/map" && !isKeptRoute(path)) return;
+    if (path === pathname) {
+      setPreview(null);
       return;
     }
-    setPreviewRoute(href);
+    setPreview({ target: path, from: pathname });
   }, [pathname]);
   const { createCollection } = useCreateCollection();
   const syncStatus = useSyncStatus();
@@ -216,12 +223,17 @@ export function AppFrame({ children }: { children: ReactNode }) {
       >
         {orbitRoute ? <OrbitPageWatermark /> : null}
         <div className={cn(appPageSidebarClassName, hideSidebar && "md:hidden")}>
-          <PersistentSidebar preferCollapsed={pathname === "/orbit/map"} />
+          <PersistentSidebar preferCollapsed={shownPath === "/orbit/map"} />
         </div>
         <div className={appPageMainClassName} aria-busy={syncActive || undefined}>
           {syncActive ? <ScrollingProgressBar className="relative z-50" /> : null}
           <KeptRoutes pathname={shownPath} />
-          {isKeptRoute(shownPath) ? null : children}
+          {isKeptRoute(shownPath) ? null : shownPath === "/orbit/map" &&
+            pathname !== "/orbit/map" ? (
+            <OrbitMapChartingPlaceholder className="min-h-0 flex-1" />
+          ) : (
+            children
+          )}
         </div>
       </div>
       <CreateCollectionDialog

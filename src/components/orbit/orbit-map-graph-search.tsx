@@ -191,7 +191,7 @@ function SearchResultButton({
     >
       {node.kind === "tag" && (
         <>
-          <TagDot name={node.name} color={node.color} size={8} />
+          <TagDot name={node.name} color={node.color} size={10} />
           <span className="truncate">{node.name}</span>
           <ResultKindLabel>Tag</ResultKindLabel>
         </>

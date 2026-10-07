@@ -106,7 +106,7 @@ export function OrbitReviewTagField({
           disabled: taken || atTagCap,
           label: (
             <>
-              <TagDot name={tag.name} color={tag.color} size={8} />
+              <TagDot name={tag.name} color={tag.color} size={10} />
               {tag.name}
             </>
           ),
@@ -133,7 +133,7 @@ export function OrbitReviewTagField({
               <TagDot
                 name={label}
                 color={tagColorForDisplay(label)}
-                size={6}
+                size={10}
               />
               {label}
               <button

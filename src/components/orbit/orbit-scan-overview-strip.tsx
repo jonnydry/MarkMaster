@@ -276,7 +276,7 @@ export function OrbitScanOverviewStrip({
                 <RollupItem
                   key={tag.name}
                   item={tag}
-                  dot={<TagDot name={tag.name} color={tag.color} size={8} />}
+                  dot={<TagDot name={tag.name} color={tag.color} size={10} />}
                 />
               ))}
             </RollupSection>

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, type MouseEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Folder,
   Loader2,
@@ -12,7 +13,8 @@ import {
 } from "lucide-react";
 
 import { AppPageShell } from "@/components/app-page-shell";
-import { visiblePathname } from "@/components/route-preview";
+import { useRoutePreview, visiblePathname } from "@/components/route-preview";
+import { warmOrbitMap } from "@/lib/prefetch-app-route";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -89,6 +91,8 @@ const OrbitBookmarkOverlay = dynamic(
 
 export default function OrbitPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const { showRoute } = useRoutePreview();
   const { queue, session, interactions, selection } = useOrbitPage();
   const libraryTag = useOrbitLibraryTagRun();
   const scan = session.scan;
@@ -124,6 +128,13 @@ export default function OrbitPage() {
     handleSearchChange,
     handlePageChange,
   } = queue;
+
+  // The map is not kept mounted. Start its route, graph, and canvas while the
+  // queue is on screen so the Map button does not wait on a cold first open.
+  useEffect(() => {
+    const timer = window.setTimeout(() => warmOrbitMap(router, queryClient), 500);
+    return () => window.clearTimeout(timer);
+  }, [queryClient, router]);
   const {
     reviewBookmarks,
     appliedBookmarkIds,
@@ -576,6 +587,9 @@ export default function OrbitPage() {
                       <div className="flex flex-wrap justify-center gap-2">
                         <Link
                           href="/orbit/map"
+                          onClick={() => showRoute("/orbit/map")}
+                          onMouseEnter={() => warmOrbitMap(router, queryClient)}
+                          onFocus={() => warmOrbitMap(router, queryClient)}
                           className={cn(
                             buttonVariants({ size: "sm" }),
                             "rounded-sm"

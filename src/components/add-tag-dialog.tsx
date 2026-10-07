@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2 } from "lucide-react";
+import { TagDot } from "@/components/tag-dot";
 import { PRESET_COLORS, getColorName } from "@/lib/constants";
 import { highlightActiveClass, highlightIdleClass, highlightInteractiveClass } from "@/lib/highlight-chrome";
 import { cn } from "@/lib/utils";
@@ -175,11 +176,7 @@ export function AddTagDialog({
                           {isPending ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
-                            <span
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: tag.color }}
-                              aria-hidden
-                            />
+                            <TagDot name={tag.name} color={tag.color} size={10} />
                           )}
                           <span className="min-w-0 truncate">{tag.name}</span>
                           {isApplied && !isPending && (
