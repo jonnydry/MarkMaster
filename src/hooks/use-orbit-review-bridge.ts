@@ -71,8 +71,13 @@ async function postDecisionEventsWithRetry(events: OrbitDecisionEventPayload[]) 
         break;
       } catch (err) {
         const delayMs = DECISION_EVENT_RETRY_DELAYS_MS[attempt];
-        if (delayMs === undefined || !isRetryableDecisionEventError(err)) {
-          console.warn("[orbit] decision event write failed after retries:", err);
+        const retryable = isRetryableDecisionEventError(err);
+        if (delayMs === undefined || !retryable) {
+          const detail =
+            !retryable && err instanceof FetchJsonError
+              ? `failed without retry (non-retryable status ${err.status})`
+              : `failed after ${attempt + 1} attempts`;
+          console.warn(`[orbit] decision event write ${detail}:`, err);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, delayMs));
