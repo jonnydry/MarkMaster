@@ -133,7 +133,7 @@ export const OrbitMapConsole = forwardRef<HTMLInputElement, OrbitMapConsoleProps
             </span>
             <OrbitMapIdentity className="hidden min-w-0 xl:block" />
             <span className="hidden h-5 w-px shrink-0 bg-hairline-soft xl:block" />
-            <OrbitModeSwitch active="map" size="md" />
+            <OrbitModeSwitch active="map" size="md" auditHref="/orbit/audit" />
             <div className="hidden items-center gap-2 lg:flex">
               {scopeMenu}
               <span className="h-5 w-px shrink-0 bg-hairline-soft" />

@@ -46,5 +46,6 @@ Each feature file starts with an H1 and one paragraph. It then uses these four H
 - [Orbit auto-tag and Mode](./orbit.md) covers the Mode menu, the locked auto-tag row, and the Queue/Map switch.
 - [Collections](./collections.md) covers the collections list and opening Reading list.
 - [Settings tags](./settings-tags.md) covers tag search and saving a rename when the editor blurs.
+- [Tag audit](./tag-audit.md) covers the Orbit review of tags already on bookmarks.
 
 Analytics is a real route at `/analytics` and is not in this map yet.

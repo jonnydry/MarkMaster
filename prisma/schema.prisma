@@ -39,6 +39,7 @@ model User {
   orbitDecisionEvents OrbitDecisionEvent[]
   orbitScanSnapshot   OrbitScanSnapshot?
   orbitLibraryRuns    OrbitLibraryRun[]
+  orbitTagAudits      OrbitTagAudit[]
 }
 
 enum CollectionType {
@@ -277,6 +278,50 @@ model OrbitLibraryRun {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startedAt(sort: Desc)])
+}
+
+model OrbitTagAudit {
+  id                  String    @id @default(cuid())
+  userId              String
+  phase               String
+  taggedBookmarkCount Int
+  judgedBookmarkCount Int
+  outcome             Json?
+  appliedAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposals OrbitTagAuditProposal[]
+  undo      OrbitTagAuditUndo?
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model OrbitTagAuditProposal {
+  id           String  @id @default(cuid())
+  auditId      String
+  bookmarkId   String
+  tagId        String
+  kind         String
+  swapTagId    String?
+  reason       String
+  currentScore Float
+  rank         Int
+
+  audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, bookmarkId, tagId])
+  @@index([auditId, rank])
+}
+
+model OrbitTagAuditUndo {
+  auditId    String    @id
+  userId     String
+  joins      Json
+  createdAt  DateTime  @default(now())
+  restoredAt DateTime?
+
+  audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
 model OrbitDecisionEvent {

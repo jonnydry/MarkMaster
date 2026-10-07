@@ -250,7 +250,9 @@ export function Sidebar({
       <nav className="flex flex-col gap-0.5">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive =
-            shownPath === href || (href === "/dashboard" && shownPath === "/");
+            shownPath === href ||
+            (href === "/dashboard" && shownPath === "/") ||
+            (href === "/orbit" && shownPath === "/orbit/audit");
           return (
             <Link
               key={href}

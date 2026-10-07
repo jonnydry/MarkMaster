@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutList, Waypoints } from "lucide-react";
+import { ClipboardCheck, LayoutList, Waypoints } from "lucide-react";
 
 import { useRoutePreview } from "@/components/route-preview";
 import {
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 const MODES = [
   { key: "queue", label: "Queue", icon: LayoutList },
   { key: "map", label: "Map", icon: Waypoints },
+  { key: "audit", label: "Audit", icon: ClipboardCheck },
 ] as const;
 
 export type OrbitMode = (typeof MODES)[number]["key"];
@@ -30,25 +31,21 @@ interface OrbitModeSwitchProps {
   queueHref?: string;
   /** Override the map destination (e.g. deep-link to a focused bookmark). */
   mapHref?: string;
+  auditHref?: string;
   className?: string;
 }
 
-/**
- * Shared Queue⇄Map switch. Navigation, not local state — each option is a
- * prefetched Link so the transition between the two Orbit surfaces feels
- * continuous. Mirrors the ToolbarSegmentControl shell so it reads as one of the
- * family of segmented controls.
- */
 export function OrbitModeSwitch({
   active,
   size = "sm",
   compact = false,
   queueHref = "/orbit",
   mapHref = "/orbit/map",
+  auditHref = "/orbit/audit",
   className,
 }: OrbitModeSwitchProps) {
   const buttonHeight = size === "md" ? "h-8" : "h-7";
-  const hrefByMode = { queue: queueHref, map: mapHref } as const;
+  const hrefByMode = { queue: queueHref, map: mapHref, audit: auditHref } as const;
   const { showRoute } = useRoutePreview();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -87,7 +84,7 @@ export function OrbitModeSwitch({
             )}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />
-            <span className={cn(compact && "sr-only")}>
+            <span className={cn(compact ? "sr-only" : "max-sm:sr-only")}>
               {label}
             </span>
           </Link>

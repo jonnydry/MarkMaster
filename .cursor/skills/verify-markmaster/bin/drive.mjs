@@ -14,6 +14,7 @@ import {
   FEED_BOOKMARK,
   HIGHLIGHTS,
   NOTE_TEXT,
+  TAG_DESIGN,
   TAG_RESEARCH,
 } from "../../../../scripts/verify-fixture.mjs";
 
@@ -31,6 +32,7 @@ const FEATURES = [
   "orbit",
   "bookmark-card",
   "settings-tags",
+  "tag-audit",
 ];
 
 const args = process.argv.slice(2);
@@ -251,6 +253,7 @@ async function runFeature(page, origin, feature, dir) {
   if (feature === "settings-tags") return driveSettings(page, origin, dir);
   if (feature === "orbit") return driveOrbit(page, origin, dir);
   if (feature === "bookmark-card") return driveBookmarkCard(page, origin, dir);
+  if (feature === "tag-audit") return driveTagAudit(page, origin, dir);
   throw new Error(`No driver for ${feature}`);
 }
 
@@ -384,6 +387,34 @@ async function driveOrbit(page, origin, dir) {
     }
   );
   return "Mode menu shows auto-tag locked, and Queue/Map both open.";
+}
+
+async function driveTagAudit(page, origin, dir) {
+  await page.goto(`${origin}/orbit/audit`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Tag audit" }).waitFor();
+  await page.getByText(FEED_BOOKMARK.tweetText).waitFor();
+  await page.getByText("Design is a weak match for this post.").waitFor();
+  await page.getByText("Design fits this post better than Research.").waitFor();
+  const removeBox = page.getByRole("checkbox", {
+    name: `Remove ${TAG_DESIGN}`,
+  });
+  await removeBox.waitFor();
+  if (!(await removeBox.isChecked())) {
+    throw new Error("The seeded removal was not checked.");
+  }
+  await removeBox.click();
+  if (await removeBox.isChecked()) {
+    throw new Error("The removal checkbox stayed checked.");
+  }
+  await page.screenshot({ path: path.join(dir, "tag-audit.png") });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Tag audit" }).waitFor();
+  const after = page.getByRole("checkbox", { name: `Remove ${TAG_DESIGN}` });
+  await after.waitFor();
+  if (!(await after.isChecked())) {
+    throw new Error("A reload kept a checkbox the server does not store.");
+  }
+  return "The audit lists a removal and a swap. Unchecking is local, and a reload checks the row again.";
 }
 
 async function driveBookmarkCard(page, origin, dir) {
