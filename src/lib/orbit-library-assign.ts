@@ -210,6 +210,7 @@ export function shortlistLibraryPackTags(
 /** Example posts per tag, keyed by normalized tag name. */
 export type LibraryTagExamples = Map<string, string[]>;
 
+// 20s with 1 retry is two tries. That keeps a two-wave page around 80-100s, inside the route's 240s maxDuration.
 const PACK_REQUEST_TIMEOUT_MS = 20_000;
 const PACK_MAX_RETRIES = 1;
 

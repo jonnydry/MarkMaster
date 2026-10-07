@@ -281,11 +281,15 @@ export async function requestLibraryGrowthTags(
     allowEmpty: true,
   });
   const taken = new Set(existing.flatMap((tag) => tagLookupKeys(tag.name)));
-  return names
-    .filter((name) => !taken.has(normalizeTagKey(name)))
-    .slice(0, ORBIT_LIBRARY_GROWTH_MAX_TAGS)
-    .map((name) => ({
-      name,
-      color: normalizeColor(name, undefined, PRESET_COLORS),
-    }));
+  const growthNames: string[] = [];
+  for (const name of names) {
+    if (taken.has(normalizeTagKey(name))) continue;
+    if (growthNames.length >= ORBIT_LIBRARY_GROWTH_MAX_TAGS) break;
+    for (const key of tagLookupKeys(name)) taken.add(key);
+    growthNames.push(name);
+  }
+  return growthNames.map((name) => ({
+    name,
+    color: normalizeColor(name, undefined, PRESET_COLORS),
+  }));
 }
