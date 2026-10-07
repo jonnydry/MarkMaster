@@ -2,25 +2,35 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import type { Usage } from "@typesafe-ai/sdk";
+
 import {
+  ORBIT_GROK_ESCALATION_TIMEOUT_MS,
   ORBIT_GROK_MAX_BOOKMARKS_PER_SCAN,
+  ORBIT_GROK_MIN_CALL_MS,
+  ORBIT_GROK_VOCAB_TIMEOUT_MS,
   ORBIT_JEV_MAX_COLLECTION_SHORTLIST,
   ORBIT_JEV_MAX_TAG_SHORTLIST,
   ORBIT_MAX_TAGS_PER_BOOKMARK,
   ORBIT_SCAN_BATCH_PROFILES,
+  ORBIT_SCAN_JEV_PASS_RESERVE_MS,
 } from "@/lib/orbit-config";
 import {
+  addNarrowedLabels,
   assignOrbitBookmarksWithJev,
   batchVocabularyFromPool,
   harvestOrbitAcceptedLabels,
   jevAssignmentsToRawPlan,
   leftoverNotesFromAssignments,
+  orbitBookmarkMentionsAnyLabel,
   replaceOrbitJevAssignments,
+  verifyOrbitSuggestionsWithJev,
   type OrbitBatchVocabulary,
   type OrbitHybridLeftoverNote,
   type OrbitJevAssignment,
   type OrbitLabelPool,
 } from "@/lib/orbit-jev-assign";
+import type { OrbitGrokUsage } from "@/lib/orbit-grok-parse";
 import { normalizeKey } from "@/lib/orbit-grok-normalize";
 import {
   buildSeedOrbitLabelPool,
@@ -46,12 +56,83 @@ import { getTypeSafeModel } from "@/lib/typesafe";
 import type {
   OrbitHybridScanMetrics,
   OrbitScanBatchMetadata,
+  OrbitScanModelUsage,
   OrbitScanProgressEvent,
   OrbitScanResponsePayload,
 } from "@/types";
 
 /** Receives live scan progress; streamed to the Orbit page when it asked for it. */
 export type OrbitScanProgressSink = (event: OrbitScanProgressEvent) => void;
+
+/** Per-call limits handed to a Grok call made during a hybrid scan. */
+export type OrbitGrokCallOptions = {
+  timeoutMs: number;
+  onUsage?: (usage: OrbitGrokUsage) => void;
+};
+
+export type OrbitProposeLeftoverVocab = (
+  bookmarks: OrbitBookmarkForScan[],
+  notes: OrbitHybridLeftoverNote[],
+  options: OrbitGrokCallOptions
+) => Promise<OrbitLabelPool>;
+
+export type OrbitEscalateLeftovers = (
+  bookmarks: OrbitBookmarkForScan[],
+  notes: OrbitHybridLeftoverNote[],
+  options: OrbitGrokCallOptions
+) => Promise<OrbitScanPlanFromXai>;
+
+/** Counts model calls and tokens across one scan. */
+export function createOrbitScanUsageTracker() {
+  const usage: OrbitScanModelUsage = {
+    jevCalls: 0,
+    jevInputTokens: 0,
+    jevOutputTokens: 0,
+    grokCalls: 0,
+    grokInputTokens: 0,
+    grokOutputTokens: 0,
+  };
+  return {
+    usage,
+    onJevUsage: (call: Usage) => {
+      usage.jevCalls += 1;
+      usage.jevInputTokens += call.input_tokens ?? 0;
+      usage.jevOutputTokens += call.output_tokens ?? 0;
+    },
+    onGrokUsage: (call: OrbitGrokUsage) => {
+      usage.grokCalls += 1;
+      usage.grokInputTokens += call.inputTokens;
+      usage.grokOutputTokens += call.outputTokens;
+    },
+  };
+}
+
+export type OrbitScanUsageTracker = ReturnType<typeof createOrbitScanUsageTracker>;
+
+/**
+ * Time a Grok call may take while still leaving `reserveMs` for the Jev pass
+ * after it. Null when that leaves less than a useful call: the step is skipped
+ * and its bookmarks stay for review instead of the function being killed
+ * mid-stream (which would lose the whole result).
+ */
+export function grokCallBudgetMs(
+  deadline: number | undefined,
+  capMs: number,
+  reserveMs = ORBIT_SCAN_JEV_PASS_RESERVE_MS,
+  now = Date.now()
+): number | null {
+  if (deadline === undefined) return capMs;
+  const available = deadline - now - reserveMs;
+  if (available < ORBIT_GROK_MIN_CALL_MS) return null;
+  return Math.min(capMs, available);
+}
+
+/** Aborts Jev calls still running at the scan's deadline. */
+function deadlineSignal(deadline: number | undefined) {
+  return deadline === undefined
+    ? undefined
+    : AbortSignal.timeout(Math.max(0, deadline - Date.now()));
+}
 
 /** A Jev answer as a row event: matched (with a preview label) or left over. */
 function orbitScanRowEvent(
@@ -98,12 +179,20 @@ function stripNormalizedSuggestion(
       name: tag.name,
       color: tag.color,
       reason: tag.reason,
+      ...(typeof tag.score === "number" ? { score: tag.score } : {}),
+      ...(tag.origin ? { origin: tag.origin } : {}),
     })),
     collection: suggestion.collection
       ? {
           name: suggestion.collection.name,
           description: suggestion.collection.description,
           reason: suggestion.collection.reason,
+          ...(typeof suggestion.collection.score === "number"
+            ? { score: suggestion.collection.score }
+            : {}),
+          ...(suggestion.collection.origin
+            ? { origin: suggestion.collection.origin }
+            : {}),
         }
       : null,
   };
@@ -166,6 +255,32 @@ export function mergeOrbitScanPlans(
   };
 }
 
+/**
+ * Placed bookmarks worth asking about Grok's new names: coarse fits, plus any
+ * whose text names one of the new tags (they share the topic but matched a
+ * broader existing tag first).
+ */
+function selectNarrowingTargets(
+  bookmarks: OrbitBookmarkForScan[],
+  assignments: OrbitJevAssignment[],
+  proposed: OrbitLabelPool
+) {
+  const proposedNames = proposed.tags.map((tag) => tag.name);
+  const placed = new Map(
+    assignments
+      .filter((assignment) => assignment.tags.length > 0 || assignment.collection)
+      .map((assignment) => [assignment.bookmarkId, assignment])
+  );
+  return bookmarks.filter((bookmark) => {
+    const assignment = placed.get(bookmark.id);
+    if (!assignment) return false;
+    return (
+      assignment.coarseFit ||
+      orbitBookmarkMentionsAnyLabel(bookmark, proposedNames)
+    );
+  });
+}
+
 export async function refineOrbitJevLeftovers(args: {
   bookmarks: OrbitBookmarkForScan[];
   assignments: OrbitJevAssignment[];
@@ -175,35 +290,52 @@ export async function refineOrbitJevLeftovers(args: {
   authorPriorHints?: OrbitAuthorPriorHint[];
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
-  proposeLeftoverVocab?: (
-    bookmarks: OrbitBookmarkForScan[],
-    notes: OrbitHybridLeftoverNote[]
-  ) => Promise<OrbitLabelPool>;
+  proposeLeftoverVocab?: OrbitProposeLeftoverVocab;
   onProgress?: OrbitScanProgressSink;
-}): Promise<{ assignments: OrbitJevAssignment[]; pool: OrbitLabelPool }> {
+  /** Epoch ms after which no new Grok call starts and Jev calls abort. */
+  deadline?: number;
+  usage?: OrbitScanUsageTracker;
+}): Promise<{
+  assignments: OrbitJevAssignment[];
+  pool: OrbitLabelPool;
+  coarseFits: number;
+  namedByGrok: number;
+  narrowed: number;
+}> {
   const harvest = harvestOrbitAcceptedLabels(args.assignments);
   let pool = mergeOrbitLabelPool(args.pool, harvest, { asProposed: false });
   const leftovers = selectOrbitJevLeftovers(args.assignments);
-  if (leftovers.length === 0) {
-    return { assignments: args.assignments, pool };
+  const coarse = args.assignments.filter((assignment) => assignment.coarseFit);
+  if (leftovers.length === 0 && coarse.length === 0) {
+    return { assignments: args.assignments, pool, coarseFits: 0, namedByGrok: 0, narrowed: 0 };
   }
 
   const leftoverIds = new Set(leftovers.map((assignment) => assignment.bookmarkId));
-  const leftoverBookmarks = args.bookmarks.filter((bookmark) =>
-    leftoverIds.has(bookmark.id)
-  );
-  const notes = leftoverNotesFromAssignments(leftovers);
+  const gaps = [...leftovers, ...coarse];
+  const gapIds = new Set(gaps.map((assignment) => assignment.bookmarkId));
   let proposed: OrbitLabelPool = { tags: [], collections: [] };
+  let namedByGrok = 0;
 
-  if (args.proposeLeftoverVocab) {
-    args.onProgress?.({
-      type: "phase",
-      phase: "name",
-      bookmarkIds: [...leftoverIds],
-    });
+  const vocabBudget = args.proposeLeftoverVocab
+    ? grokCallBudgetMs(args.deadline, ORBIT_GROK_VOCAB_TIMEOUT_MS)
+    : null;
+  if (args.proposeLeftoverVocab && vocabBudget !== null) {
+    // Coarse fits already show as matched; only leftovers wait on Grok.
+    if (leftoverIds.size > 0) {
+      args.onProgress?.({
+        type: "phase",
+        phase: "name",
+        bookmarkIds: [...leftoverIds],
+      });
+    }
     try {
-      proposed = await args.proposeLeftoverVocab(leftoverBookmarks, notes);
+      proposed = await args.proposeLeftoverVocab(
+        args.bookmarks.filter((bookmark) => gapIds.has(bookmark.id)),
+        leftoverNotesFromAssignments(gaps),
+        { timeoutMs: vocabBudget, onUsage: args.usage?.onGrokUsage }
+      );
       pool = mergeOrbitLabelPool(pool, proposed);
+      namedByGrok = gapIds.size;
     } catch (error) {
       logWarn(
         "OrbitHybrid",
@@ -211,56 +343,95 @@ export async function refineOrbitJevLeftovers(args: {
         error instanceof Error ? error.message : error
       );
     }
+  } else if (args.proposeLeftoverVocab) {
+    logWarn("OrbitHybrid", "Skipped Grok naming: the scan is short on time.");
   }
 
-  args.onProgress?.({
-    type: "phase",
-    phase: "refine",
-    bookmarkIds: [...leftoverIds],
-  });
+  let assignments = args.assignments;
+  if (leftovers.length > 0) {
+    args.onProgress?.({
+      type: "phase",
+      phase: "refine",
+      bookmarkIds: [...leftoverIds],
+    });
 
-  // Prefer labels Jev already accepted, plus the names Grok just proposed.
-  // The shortlist grows by those new names so they are actually asked about.
-  const harvestVocabulary = batchVocabularyFromPool(harvest);
-  const refined = await assignOrbitBookmarksWithJev({
-    bookmarks: leftoverBookmarks,
-    existingTags: args.existingTags,
-    existingCollections: args.existingCollections,
-    pool,
-    authorPriorHints: args.authorPriorHints,
-    learningHints: args.learningHints,
-    neighborHints: args.neighborHints,
-    maxTagShortlist: ORBIT_JEV_MAX_TAG_SHORTLIST + proposed.tags.length,
-    maxCollectionShortlist:
-      ORBIT_JEV_MAX_COLLECTION_SHORTLIST + proposed.collections.length,
-    batchVocabulary: {
-      tags: [...harvestVocabulary.tags, ...proposed.tags.map((tag) => tag.name)],
-      collections: [
-        ...harvestVocabulary.collections,
-        ...proposed.collections.map((collection) => collection.name),
-      ],
-    },
-    onAssigned: args.onProgress
-      ? (assignment) => args.onProgress?.(orbitScanRowEvent(assignment))
-      : undefined,
-  });
+    // Prefer labels Jev already accepted, plus the names Grok just proposed.
+    // The shortlist grows by those new names so they are actually asked about.
+    const harvestVocabulary = batchVocabularyFromPool(harvest);
+    const refined = await assignOrbitBookmarksWithJev({
+      bookmarks: args.bookmarks.filter((bookmark) => leftoverIds.has(bookmark.id)),
+      existingTags: args.existingTags,
+      existingCollections: args.existingCollections,
+      pool,
+      authorPriorHints: args.authorPriorHints,
+      learningHints: args.learningHints,
+      neighborHints: args.neighborHints,
+      maxTagShortlist: ORBIT_JEV_MAX_TAG_SHORTLIST + proposed.tags.length,
+      maxCollectionShortlist:
+        ORBIT_JEV_MAX_COLLECTION_SHORTLIST + proposed.collections.length,
+      batchVocabulary: {
+        tags: [...harvestVocabulary.tags, ...proposed.tags.map((tag) => tag.name)],
+        collections: [
+          ...harvestVocabulary.collections,
+          ...proposed.collections.map((collection) => collection.name),
+        ],
+      },
+      onAssigned: args.onProgress
+        ? (assignment) => args.onProgress?.(orbitScanRowEvent(assignment))
+        : undefined,
+      signal: deadlineSignal(args.deadline),
+      onUsage: args.usage?.onJevUsage,
+    });
+    assignments = replaceOrbitJevAssignments(assignments, refined);
+  }
 
-  return {
-    assignments: replaceOrbitJevAssignments(args.assignments, refined),
-    pool,
-  };
+  // Grok's new names only reached the leftovers above. Bookmarks already
+  // placed under broader tags are asked about them too, as extra tags.
+  let narrowed = 0;
+  if (proposed.tags.length > 0 || proposed.collections.length > 0) {
+    const targets = selectNarrowingTargets(args.bookmarks, assignments, proposed);
+    if (targets.length > 0) {
+      const extra = await assignOrbitBookmarksWithJev({
+        bookmarks: targets,
+        existingTags: args.existingTags,
+        existingCollections: args.existingCollections,
+        pool: proposed,
+        maxTagShortlist: proposed.tags.length,
+        maxCollectionShortlist: proposed.collections.length,
+        batchVocabulary: batchVocabularyFromPool(proposed),
+        askNewLabelGap: false,
+        signal: deadlineSignal(args.deadline),
+        onUsage: args.usage?.onJevUsage,
+      });
+      const merged = addNarrowedLabels(assignments, extra);
+      assignments = merged.assignments;
+      narrowed = merged.narrowedCount;
+    }
+  }
+
+  return { assignments, pool, coarseFits: coarse.length, namedByGrok, narrowed };
 }
 
 export function computeOrbitHybridScanMetrics(args: {
   firstPassLeftovers: number;
   refinedLeftovers: number;
   escalatedToGrok: number;
+  coarseFits?: number;
+  namedByGrok?: number;
+  narrowed?: number;
+  escalationSkipped?: number;
+  usage?: OrbitScanModelUsage;
 }): OrbitHybridScanMetrics {
   return {
     firstPassLeftovers: args.firstPassLeftovers,
     refinedLeftovers: args.refinedLeftovers,
     recoveredOnRefine: Math.max(0, args.firstPassLeftovers - args.refinedLeftovers),
     escalatedToGrok: args.escalatedToGrok,
+    coarseFits: args.coarseFits ?? 0,
+    namedByGrok: args.namedByGrok ?? 0,
+    narrowed: args.narrowed ?? 0,
+    escalationSkipped: args.escalationSkipped ?? 0,
+    ...(args.usage ? { usage: { ...args.usage } } : {}),
   };
 }
 
@@ -307,12 +478,17 @@ export async function assignAndRefineOrbitJev(args: {
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   /** Classify warm-pool names for the first pass. Omit on Scan. */
   firstPassBatchVocabulary?: OrbitBatchVocabulary;
-  proposeLeftoverVocab?: (
-    bookmarks: OrbitBookmarkForScan[],
-    notes: OrbitHybridLeftoverNote[]
-  ) => Promise<OrbitLabelPool>;
+  proposeLeftoverVocab?: OrbitProposeLeftoverVocab;
   onProgress?: OrbitScanProgressSink;
-}): Promise<{ assignments: OrbitJevAssignment[]; firstPassLeftovers: number }> {
+  deadline?: number;
+  usage?: OrbitScanUsageTracker;
+}): Promise<{
+  assignments: OrbitJevAssignment[];
+  firstPassLeftovers: number;
+  coarseFits: number;
+  namedByGrok: number;
+  narrowed: number;
+}> {
   args.onProgress?.({ type: "phase", phase: "match" });
   const firstPass = await assignOrbitBookmarksWithJev({
     bookmarks: args.bookmarks,
@@ -326,6 +502,8 @@ export async function assignAndRefineOrbitJev(args: {
     onAssigned: args.onProgress
       ? (assignment) => args.onProgress?.(orbitScanRowEvent(assignment))
       : undefined,
+    signal: deadlineSignal(args.deadline),
+    onUsage: args.usage?.onJevUsage,
   });
   const firstPassLeftovers = selectOrbitJevLeftovers(firstPass).length;
   const refined = await refineOrbitJevLeftovers({
@@ -339,8 +517,16 @@ export async function assignAndRefineOrbitJev(args: {
     neighborHints: args.neighborHints,
     proposeLeftoverVocab: args.proposeLeftoverVocab,
     onProgress: args.onProgress,
+    deadline: args.deadline,
+    usage: args.usage,
   });
-  return { assignments: refined.assignments, firstPassLeftovers };
+  return {
+    assignments: refined.assignments,
+    firstPassLeftovers,
+    coarseFits: refined.coarseFits,
+    namedByGrok: refined.namedByGrok,
+    narrowed: refined.narrowed,
+  };
 }
 
 export async function runHybridOrbitScan(args: {
@@ -351,20 +537,23 @@ export async function runHybridOrbitScan(args: {
   learningHints?: OrbitLearningHint[];
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   batch?: OrbitScanBatchMetadata;
-  escalateLeftovers?: (
-    bookmarks: OrbitBookmarkForScan[],
-    notes: OrbitHybridLeftoverNote[]
-  ) => Promise<OrbitScanPlanFromXai>;
+  /** Grok tags what is still left over; Jev checks those tags before they land. */
+  escalateLeftovers?: OrbitEscalateLeftovers;
   /** Grok names a few new labels; Jev places them before any full Grok assignment. */
-  proposeLeftoverVocab?: (
-    bookmarks: OrbitBookmarkForScan[],
-    notes: OrbitHybridLeftoverNote[]
-  ) => Promise<OrbitLabelPool>;
+  proposeLeftoverVocab?: OrbitProposeLeftoverVocab;
   onProgress?: OrbitScanProgressSink;
+  /** Epoch ms by which the scan must finish (the route's maxDuration less a margin). */
+  deadline?: number;
 }): Promise<OrbitScanResponsePayload> {
   const seed = buildSeedOrbitLabelPool(args);
-  let grokUsed = false;
-  const { assignments, firstPassLeftovers } = await assignAndRefineOrbitJev({
+  const tracker = createOrbitScanUsageTracker();
+  const {
+    assignments,
+    firstPassLeftovers,
+    coarseFits,
+    namedByGrok,
+    narrowed,
+  } = await assignAndRefineOrbitJev({
     bookmarks: args.bookmarks,
     existingTags: args.existingTags,
     existingCollections: args.existingCollections,
@@ -374,12 +563,25 @@ export async function runHybridOrbitScan(args: {
     neighborHints: args.neighborHints,
     proposeLeftoverVocab: args.proposeLeftoverVocab,
     onProgress: args.onProgress,
+    deadline: args.deadline,
+    usage: tracker,
   });
   let rawPlan = jevAssignmentsToRawPlan(assignments);
 
   const leftovers = selectOrbitJevLeftovers(assignments);
   let escalatedToGrok = 0;
-  if (leftovers.length > 0 && args.escalateLeftovers) {
+  let escalationSkipped = 0;
+  const escalationBudget =
+    leftovers.length > 0 && args.escalateLeftovers
+      ? grokCallBudgetMs(args.deadline, ORBIT_GROK_ESCALATION_TIMEOUT_MS)
+      : null;
+  if (leftovers.length > 0 && args.escalateLeftovers && escalationBudget === null) {
+    escalationSkipped = leftovers.length;
+    logWarn(
+      "OrbitHybrid",
+      `Skipped Grok tagging for ${leftovers.length} leftovers: the scan is short on time.`
+    );
+  } else if (leftovers.length > 0 && args.escalateLeftovers && escalationBudget !== null) {
     const escalate = args.escalateLeftovers;
     const leftoverIds = new Set(leftovers.map((assignment) => assignment.bookmarkId));
     const leftoverBookmarks = args.bookmarks.filter((bookmark) =>
@@ -400,7 +602,23 @@ export async function runHybridOrbitScan(args: {
             const notes = leftoverNotesFromAssignments(
               leftovers.filter((assignment) => chunkIds.has(assignment.bookmarkId))
             );
-            return { chunkIds, plan: await escalate(chunk, notes) };
+            const plan = await escalate(chunk, notes, {
+              timeoutMs: escalationBudget,
+              onUsage: tracker.onGrokUsage,
+            });
+            // Grok tagged what Jev could not place; Jev still judges each tag,
+            // so its confidence means the same as on every other row.
+            const suggestions = await verifyOrbitSuggestionsWithJev({
+              bookmarks: chunk,
+              suggestions: plan.suggestions.filter((suggestion) =>
+                chunkIds.has(suggestion.bookmarkId)
+              ),
+              existingTags: args.existingTags,
+              existingCollections: args.existingCollections,
+              signal: deadlineSignal(args.deadline),
+              onUsage: tracker.onJevUsage,
+            });
+            return { chunkIds, plan: { ...plan, suggestions } };
           } finally {
             args.onProgress?.({ type: "named", bookmarkIds: [...chunkIds] });
           }
@@ -411,7 +629,6 @@ export async function runHybridOrbitScan(args: {
       if (result.status === "fulfilled") {
         rawPlan = mergeOrbitScanPlans(rawPlan, result.value.plan, result.value.chunkIds);
         escalatedToGrok += result.value.chunkIds.size;
-        grokUsed = true;
       } else {
         logWarn(
           "OrbitHybrid",
@@ -445,6 +662,7 @@ export async function runHybridOrbitScan(args: {
 
   const runtime = getOrbitXaiRuntimeStatus();
   const jevModel = getTypeSafeModel();
+  const grokUsed = escalatedToGrok > 0 || namedByGrok > 0;
   const model = grokUsed ? `${jevModel}+${runtime.model}` : jevModel;
 
   return {
@@ -461,6 +679,11 @@ export async function runHybridOrbitScan(args: {
         firstPassLeftovers,
         refinedLeftovers: leftovers.length,
         escalatedToGrok,
+        coarseFits,
+        namedByGrok,
+        narrowed,
+        escalationSkipped,
+        usage: tracker.usage,
       }),
     },
     plan,

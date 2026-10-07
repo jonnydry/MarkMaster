@@ -1,7 +1,11 @@
 import "server-only";
 
 import { normalizeKey } from "@/lib/orbit-grok-normalize";
-import type { OrbitDecisionEventAction, OrbitDecisionEventPayload } from "@/types";
+import type {
+  OrbitDecisionEventAction,
+  OrbitDecisionEventPayload,
+  OrbitSuggestionOrigin,
+} from "@/types";
 
 import type { OrbitJevAssignment, OrbitLabelPool } from "@/lib/orbit-jev-assign";
 
@@ -189,5 +193,126 @@ export function summarizeOrbitJevEval(scores: OrbitJevEvalScore[]) {
     abstainCorrect,
     tagRecall: expectedTags === 0 ? 1 : tagHits / expectedTags,
     falsePositiveCount: falsePositives,
+  };
+}
+
+// ── Threshold calibration from recorded review decisions ────────────────────
+
+/** One tag a scan suggested, with Jev's score (when it had one) and the user's verdict. */
+export type OrbitTagOutcome = {
+  name: string;
+  score: number | null;
+  origin: OrbitSuggestionOrigin | null;
+  kept: boolean;
+};
+
+const ORIGINS = new Set<string>(["jev", "jev_new_name", "grok"]);
+
+/**
+ * Per-tag verdicts from one review event. Accepted or edited: a suggested tag
+ * was kept when it is still on the reviewed suggestion (an accept with no
+ * reviewed copy keeps them all). Kept in Orbit or rejected: none were kept.
+ */
+export function tagOutcomesFromEvent(
+  event: Pick<OrbitDecisionEventPayload, "action" | "originalSuggestion" | "reviewedSuggestion">
+): OrbitTagOutcome[] {
+  const original = event.originalSuggestion?.tags ?? [];
+  if (original.length === 0) return [];
+  const positive = event.action === "accepted" || event.action === "edited";
+  const reviewed = event.reviewedSuggestion
+    ? new Set(event.reviewedSuggestion.tags.map((tag) => normalizeKey(tag.name)))
+    : null;
+
+  return original.flatMap((tag) => {
+    if (typeof tag.name !== "string" || !tag.name.trim()) return [];
+    const kept =
+      positive && (reviewed ? reviewed.has(normalizeKey(tag.name)) : event.action === "accepted");
+    return [
+      {
+        name: tag.name,
+        score:
+          typeof tag.score === "number" && Number.isFinite(tag.score) ? tag.score : null,
+        origin:
+          typeof tag.origin === "string" && ORIGINS.has(tag.origin)
+            ? (tag.origin as OrbitSuggestionOrigin)
+            : null,
+        kept,
+      },
+    ];
+  });
+}
+
+export const ORBIT_CALIBRATION_THRESHOLDS = [
+  0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95,
+] as const;
+
+export type OrbitThresholdRow = {
+  threshold: number;
+  /** Scored tags at or above the threshold. */
+  suggested: number;
+  /** Of those, tags the user kept. */
+  kept: number;
+  /** kept / suggested; null with nothing suggested. */
+  precision: number | null;
+  /** Share of all kept scored tags that clear the threshold; null with none kept. */
+  recall: number | null;
+};
+
+export type OrbitOriginRow = {
+  origin: OrbitSuggestionOrigin | "unknown";
+  suggested: number;
+  kept: number;
+  keptRate: number | null;
+};
+
+/**
+ * How well Jev's tag scores predicted what users kept, per candidate
+ * threshold, plus the keep rate of each step that produced tags. Scores are
+ * stored on every hybrid suggestion, so this needs no model calls: it reads
+ * the review history the decision-events endpoint already records.
+ */
+export function calibrateOrbitTagThresholds(
+  events: Array<Pick<OrbitDecisionEventPayload, "action" | "originalSuggestion" | "reviewedSuggestion">>,
+  thresholds: readonly number[] = ORBIT_CALIBRATION_THRESHOLDS
+) {
+  const outcomes = events.flatMap(tagOutcomesFromEvent);
+  const scored = outcomes.filter(
+    (outcome): outcome is OrbitTagOutcome & { score: number } => outcome.score !== null
+  );
+  const totalKept = scored.filter((outcome) => outcome.kept).length;
+
+  const rows: OrbitThresholdRow[] = thresholds.map((threshold) => {
+    const atOrAbove = scored.filter((outcome) => outcome.score >= threshold);
+    const kept = atOrAbove.filter((outcome) => outcome.kept).length;
+    return {
+      threshold,
+      suggested: atOrAbove.length,
+      kept,
+      precision: atOrAbove.length === 0 ? null : kept / atOrAbove.length,
+      recall: totalKept === 0 ? null : kept / totalKept,
+    };
+  });
+
+  const byOrigin = new Map<OrbitOriginRow["origin"], { suggested: number; kept: number }>();
+  for (const outcome of outcomes) {
+    const key = outcome.origin ?? "unknown";
+    const entry = byOrigin.get(key) ?? { suggested: 0, kept: 0 };
+    entry.suggested += 1;
+    if (outcome.kept) entry.kept += 1;
+    byOrigin.set(key, entry);
+  }
+
+  return {
+    tagCount: outcomes.length,
+    scoredTagCount: scored.length,
+    rows,
+    origins: [...byOrigin].map(
+      ([origin, { suggested, kept }]): OrbitOriginRow => ({
+        origin,
+        suggested,
+        kept,
+        keptRate: suggested === 0 ? null : kept / suggested,
+      })
+    ),
   };
 }

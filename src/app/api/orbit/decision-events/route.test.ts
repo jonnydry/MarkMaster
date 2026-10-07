@@ -94,6 +94,48 @@ describe("/api/orbit/decision-events", () => {
     });
   });
 
+  it("accepts a suggestion with the full five tags and their Jev scores", async () => {
+    const { POST } = await import("./route");
+    const tags = ["AI", "LLM", "Evals", "Papers", "Scaling"].map((name, index) => ({
+      name,
+      color: "#1d9bf0",
+      reason: "Topic",
+      reuseExisting: true,
+      score: 0.9 - index * 0.05,
+      origin: "jev",
+    }));
+    const suggestion = {
+      bookmarkId: "bookmark-1",
+      confidence: "high",
+      reasoning: "Matched",
+      tags,
+      collection: null,
+    };
+
+    const response = await POST(
+      createDecisionEventsRequest({
+        events: [
+          {
+            bookmarkId: "bookmark-1",
+            action: "accepted",
+            originalSuggestion: suggestion,
+            reviewedSuggestion: suggestion,
+          },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const recorded = recordOrbitDecisionEventsMock.mock.calls[0] as unknown as [
+      { events: Array<{ originalSuggestion: { tags: Array<{ score: number; origin: string }> } }> },
+    ];
+    expect(recorded[0].events[0]?.originalSuggestion.tags).toHaveLength(5);
+    expect(recorded[0].events[0]?.originalSuggestion.tags[0]).toMatchObject({
+      score: 0.9,
+      origin: "jev",
+    });
+  });
+
   it("rejects invalid decision event payloads before persistence", async () => {
     const { POST } = await import("./route");
 

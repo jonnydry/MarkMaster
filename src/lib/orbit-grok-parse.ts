@@ -33,6 +33,7 @@ import {
 import type {
   OrbitCollectionRollup,
   OrbitScanSummary,
+  OrbitSuggestionOrigin,
   OrbitTagRollup,
 } from "@/types";
 
@@ -155,6 +156,36 @@ function readOutputTextPart(part: unknown): string | null {
 
   const text = (part as { text?: unknown }).text;
   return typeof text === "string" && text.trim() ? text : null;
+}
+
+/** Jev's score and the producing step, copied only when present. */
+function labelEvidence(label: {
+  score?: number;
+  origin?: OrbitSuggestionOrigin;
+}): { score?: number; origin?: OrbitSuggestionOrigin } {
+  return {
+    ...(typeof label.score === "number" ? { score: label.score } : {}),
+    ...(label.origin ? { origin: label.origin } : {}),
+  };
+}
+
+/** Tokens one xAI Responses call used. */
+export type OrbitGrokUsage = { inputTokens: number; outputTokens: number };
+
+/** Reads `usage` from an xAI Responses body; zeros when the body has none. */
+export function readXaiResponsesUsage(payload: unknown): OrbitGrokUsage {
+  const usage =
+    payload && typeof payload === "object"
+      ? (payload as { usage?: unknown }).usage
+      : null;
+  const count = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+  if (!usage || typeof usage !== "object") return { inputTokens: 0, outputTokens: 0 };
+  const record = usage as { input_tokens?: unknown; output_tokens?: unknown };
+  return {
+    inputTokens: count(record.input_tokens),
+    outputTokens: count(record.output_tokens),
+  };
 }
 
 /** Parses xAI Responses API JSON bodies (message / output_text shape). Exported for tests. */
@@ -307,6 +338,7 @@ export function normalizeOrbitScanPlan(
             normalizeColor(normalizedName, tag.color, palette),
           reason: truncateText(tag.reason, 180) || "Suggested from bookmark content.",
           reuseExisting: Boolean(existingTag),
+          ...labelEvidence(tag),
         };
       })
       .filter(Boolean)
@@ -343,6 +375,7 @@ export function normalizeOrbitScanPlan(
             truncateText(suggestion.collection.reason, 180) ||
             "Suggested from bookmark content.",
           reuseExisting: Boolean(existingCollection),
+          ...labelEvidence(suggestion.collection),
         };
       } else if (
         hasSpecificCollectionName &&
@@ -364,6 +397,8 @@ export function normalizeOrbitScanPlan(
               truncateText(suggestion.collection.reason, 180) ||
               "Preserved from a one-off collection suggestion.",
             reuseExisting: Boolean(existingTag),
+            // Same evidence as the collection it came from.
+            ...labelEvidence(suggestion.collection),
           });
         }
       }

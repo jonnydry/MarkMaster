@@ -8,7 +8,12 @@ import {
   scanOrbitBookmarksWithXai,
 } from "@/lib/orbit-grok";
 import { getAuthorPriorHintsForScan } from "@/lib/orbit-author-history";
-import { ORBIT_SCAN_ENRICHMENT } from "@/lib/orbit-config";
+import {
+  ORBIT_LABEL_EXAMPLE_LABEL_CAP,
+  ORBIT_SCAN_DEADLINE_MARGIN_MS,
+  ORBIT_SCAN_ENRICHMENT,
+} from "@/lib/orbit-config";
+import { loadOrbitLabelExamples } from "@/lib/orbit-label-examples";
 import { getOrbitLearningHintsForScan } from "@/lib/orbit-decision-events";
 import { enrichBookmarksForScan } from "@/lib/orbit-scan-enrichment";
 import { getOrbitNeighborHintsForScan } from "@/lib/orbit-scan-neighbors";
@@ -101,6 +106,9 @@ function streamScan(
 }
 
 export async function POST(req: NextRequest) {
+  // Grok steps that would run past maxDuration are skipped instead of the
+  // platform killing the function and losing the whole streamed result.
+  const deadline = Date.now() + maxDuration * 1000 - ORBIT_SCAN_DEADLINE_MARGIN_MS;
   const user = await getDbUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -218,25 +226,7 @@ export async function POST(req: NextRequest) {
           enrichmentMetadata = enrichmentResult.enrichment;
         }
 
-        const existingTags = tags.map((tag) => ({
-          id: tag.id,
-          name: tag.name,
-          color: tag.color,
-          bookmarkCount: tag._count.bookmarks,
-        }));
-        const existingCollections = collections.map((collection) => ({
-          id: collection.id,
-          name: collection.name,
-          description: collection.description,
-          bookmarkCount: collection._count.items,
-        }));
-        const signalQuality = computeOrbitScanSignalQuality({
-          bookmarks: bookmarksWithFolderHints,
-          existingTags,
-          existingCollections,
-        });
-
-        const [authorPriorHints, learningHints, neighborHints] = await Promise.all([
+        const [authorPriorHints, learningHints, neighborHints, labelExamples] = await Promise.all([
           authorPriorHintsPromise,
           getOrbitLearningHintsForScan({
             userId: user.id,
@@ -246,7 +236,35 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             bookmarks: bookmarksWithFolderHints,
           }),
+          // Tags and collections arrive most-used first.
+          loadOrbitLabelExamples({
+            userId: user.id,
+            tagIds: tags.slice(0, ORBIT_LABEL_EXAMPLE_LABEL_CAP).map((tag) => tag.id),
+            collectionIds: collections
+              .slice(0, ORBIT_LABEL_EXAMPLE_LABEL_CAP)
+              .map((collection) => collection.id),
+          }),
         ]);
+
+        const existingTags = tags.map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          color: tag.color,
+          bookmarkCount: tag._count.bookmarks,
+          examples: labelExamples.tags.get(tag.id),
+        }));
+        const existingCollections = collections.map((collection) => ({
+          id: collection.id,
+          name: collection.name,
+          description: collection.description,
+          bookmarkCount: collection._count.items,
+          examples: labelExamples.collections.get(collection.id),
+        }));
+        const signalQuality = computeOrbitScanSignalQuality({
+          bookmarks: bookmarksWithFolderHints,
+          existingTags,
+          existingCollections,
+        });
 
         const scan = await scanOrbitBookmarksWithXai({
           userId: user.id,
@@ -258,6 +276,7 @@ export async function POST(req: NextRequest) {
           neighborHints,
           batch: scanRequest.batch,
           onProgress,
+          deadline,
         });
 
         scan.batch = {

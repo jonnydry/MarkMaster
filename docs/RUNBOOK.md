@@ -126,11 +126,37 @@ in CI.
 |---|---|---|
 | `src/lib/orbit-grok.live.test.ts` | `RUN_LIVE_XAI_TESTS=1` | `XAI_API_KEY` |
 | `src/lib/orbit-jev-eval.live.test.ts` | `RUN_LIVE_TYPESAFE_TESTS=1` | `TYPESAFE_API_KEY` |
+| `src/lib/orbit-jev-replay.live.test.ts` | `RUN_ORBIT_JEV_REPLAY=1` | `DATABASE_URL` (live part: also `RUN_LIVE_TYPESAFE_TESTS=1`, `ORBIT_REPLAY_USER_ID`) |
 
 ```bash
 RUN_LIVE_XAI_TESTS=1 npx vitest run src/lib/orbit-grok.live.test.ts
 RUN_LIVE_TYPESAFE_TESTS=1 npx vitest run src/lib/orbit-jev-eval.live.test.ts
 ```
+
+## Calibrating Orbit's Jev thresholds
+
+Hybrid scans store Jev's score and the producing step (`origin`: `jev`,
+`jev_new_name`, `grok`) on every suggested tag, and Orbit review records
+those suggestions with the user's verdict in `OrbitDecisionEvent`. The
+replay reads that history — no model calls — and prints, per candidate
+threshold, how many scored tags clear it and how many of those users kept,
+plus the keep rate per origin:
+
+```bash
+npm run eval:orbit-calibrate                           # all users, newest 500 decisions
+ORBIT_REPLAY_USER_ID=<id> npm run eval:orbit-calibrate # one user
+```
+
+Use it before moving `ORBIT_JEV_TAG_INCLUDE_THRESHOLD` (0.55, shown in
+review) or `ORBIT_JEV_TAG_STRONG_THRESHOLD` (0.8, applied by "Apply strong
+matches" and library auto-tag) in `src/lib/orbit-config.ts`. Only decisions
+recorded after scores were stored carry them; older ones count as unscored.
+
+Adding `RUN_LIVE_TYPESAFE_TESTS=1` with `ORBIT_REPLAY_USER_ID` also re-runs
+Jev on that user's 25 newest decisions against their current tags and
+reports how many kept tags never made Jev's shortlist (raise
+`ORBIT_JEV_MAX_TAG_SHORTLIST` only if that number is material). This spends
+TypeSafe tokens.
 
 ## Share pages serving stale/revoked content
 

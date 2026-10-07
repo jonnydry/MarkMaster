@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
+import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
@@ -18,9 +19,11 @@ import type { OrbitDecisionEventPayload } from "@/types";
 
 const MAX_DECISION_EVENTS_BODY_BYTES = 64 * 1024;
 
+// Plans carry up to ORBIT_MAX_TAGS_PER_BOOKMARK tags; a lower cap here rejected
+// the whole event batch whenever one suggestion had more.
 const orbitDecisionEventSuggestionSchema = orbitBookmarkSuggestionSchema.extend({
   bookmarkId: z.string().trim().min(1).max(128),
-  tags: z.array(orbitTagSuggestionSchema).max(3),
+  tags: z.array(orbitTagSuggestionSchema).max(ORBIT_MAX_TAGS_PER_BOOKMARK),
   collection: z.union([orbitCollectionSuggestionSchema, z.null()]),
 });
 

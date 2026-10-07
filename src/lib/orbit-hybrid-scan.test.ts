@@ -5,6 +5,7 @@ import {
   assignAndRefineOrbitJev,
   chunkItems,
   computeOrbitHybridScanMetrics,
+  grokCallBudgetMs,
   mergeLeftoverSuggestion,
   mergeOrbitScanPlans,
   refineOrbitJevLeftovers,
@@ -20,10 +21,15 @@ import type { OrbitBookmarkForScan } from "@/lib/orbit-grok-schemas";
 
 const assignSpy = vi.hoisted(() => vi.fn());
 const proposeSpy = vi.hoisted(() => vi.fn());
+const verifySpy = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/orbit-jev-assign", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/orbit-jev-assign")>();
-  return { ...actual, assignOrbitBookmarksWithJev: assignSpy };
+  return {
+    ...actual,
+    assignOrbitBookmarksWithJev: assignSpy,
+    verifyOrbitSuggestionsWithJev: verifySpy,
+  };
 });
 
 vi.mock("@/lib/orbit-grok-vocab", () => ({
@@ -57,13 +63,48 @@ function abstainAssignment(bookmarkId: string): OrbitJevAssignment {
     collection: null,
     needsNewLabel: false,
     abstain: true,
+    coarseFit: false,
   };
+}
+
+function placedAssignment(
+  bookmarkId: string,
+  tag: string,
+  score = 0.9
+): OrbitJevAssignment {
+  return {
+    ...abstainAssignment(bookmarkId),
+    confidence: score >= 0.8 ? "high" : "medium",
+    reasoning: "Matched 1 existing tag from your library.",
+    tags: [{ name: tag, color: "#1d9bf0", reason: "match", score, origin: "jev" }],
+    abstain: false,
+  };
+}
+
+/** Jev's check of Grok's tags: every tag kept at the given score. */
+function verifyAll(score: number) {
+  return async (call: {
+    suggestions: Array<{
+      bookmarkId: string;
+      reasoning: string;
+      tags: Array<{ name: string; color: string; reason: string }>;
+      collection: null;
+    }>;
+  }) =>
+    call.suggestions.map((suggestion) => ({
+      ...suggestion,
+      confidence: score >= 0.8 ? ("high" as const) : ("medium" as const),
+      tags: suggestion.tags.map((tag) => ({ ...tag, score, origin: "grok" as const })),
+    }));
 }
 
 beforeEach(() => {
   assignSpy.mockReset();
+  assignSpy.mockResolvedValue([]);
   proposeSpy.mockReset();
   proposeSpy.mockResolvedValue({ tags: [], collections: [] });
+  verifySpy.mockReset();
+  verifySpy.mockImplementation(verifyAll(0.7));
 });
 
 describe("computeOrbitHybridScanMetrics", () => {
@@ -79,7 +120,28 @@ describe("computeOrbitHybridScanMetrics", () => {
       refinedLeftovers: 7,
       recoveredOnRefine: 11,
       escalatedToGrok: 7,
+      coarseFits: 0,
+      namedByGrok: 0,
+      narrowed: 0,
+      escalationSkipped: 0,
     });
+  });
+});
+
+describe("grokCallBudgetMs", () => {
+  it("uses the full cap without a deadline", () => {
+    expect(grokCallBudgetMs(undefined, 60_000)).toBe(60_000);
+  });
+
+  it("keeps the Jev reserve back and caps at the step's limit", () => {
+    const now = 1_000_000;
+    expect(grokCallBudgetMs(now + 200_000, 60_000, 20_000, now)).toBe(60_000);
+    expect(grokCallBudgetMs(now + 50_000, 60_000, 20_000, now)).toBe(30_000);
+  });
+
+  it("skips the call when too little time is left", () => {
+    const now = 1_000_000;
+    expect(grokCallBudgetMs(now + 30_000, 60_000, 20_000, now)).toBeNull();
   });
 });
 
@@ -459,11 +521,12 @@ describe("runHybridOrbitScan", () => {
       },
     });
 
-    expect(result.batch.hybrid).toEqual({
+    expect(result.batch.hybrid).toMatchObject({
       firstPassLeftovers: 40,
       refinedLeftovers: 40,
       recoveredOnRefine: 0,
       escalatedToGrok: 4,
+      escalationSkipped: 0,
     });
     const summaryMatches =
       result.plan.overview.summary.match(
@@ -549,11 +612,12 @@ describe("runHybridOrbitScan", () => {
     });
 
     expect(result.model).not.toContain("+");
-    expect(result.batch.hybrid).toEqual({
+    expect(result.batch.hybrid).toMatchObject({
       firstPassLeftovers: 0,
       refinedLeftovers: 0,
       recoveredOnRefine: 0,
       escalatedToGrok: 0,
+      namedByGrok: 0,
     });
   });
 
@@ -694,5 +758,199 @@ describe("assignAndRefineOrbitJev", () => {
       tags: [],
       collections: [],
     });
+  });
+});
+
+describe("Grok and Jev interplay", () => {
+  const grokPlan = (
+    bookmarks: Array<{ id: string }>,
+    tags: string[],
+    confidence: "high" | "medium" = "high"
+  ) => ({
+    overview: { summary: "Grok", taggingStrategy: "", collectionStrategy: "" },
+    suggestions: bookmarks.map((bookmark) => ({
+      bookmarkId: bookmark.id,
+      confidence,
+      reasoning: "Grok named it",
+      tags: tags.map((name) => ({ name, color: "#64748b", reason: "gap" })),
+      collection: null,
+    })),
+  });
+
+  it("keeps only the Grok tags Jev confirms, with Jev's score", async () => {
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) =>
+        call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id))
+    );
+    verifySpy.mockImplementation(
+      async (call: { suggestions: Array<{ bookmarkId: string; reasoning: string; tags: Array<{ name: string; color: string; reason: string }> }> }) =>
+        call.suggestions.map((suggestion) => ({
+          ...suggestion,
+          confidence: "medium" as const,
+          // Jev accepts Compilers, rejects Rust.
+          tags: suggestion.tags
+            .filter((tag) => tag.name === "Compilers")
+            .map((tag) => ({ ...tag, score: 0.7, origin: "grok" as const })),
+          collection: null,
+        }))
+    );
+
+    const result = await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "Rust", color: "#f97316", bookmarkCount: 3 }],
+      existingCollections: [],
+      escalateLeftovers: async (chunk) => grokPlan(chunk, ["Compilers", "Rust"]),
+    });
+
+    expect(verifySpy).toHaveBeenCalledTimes(1);
+    const suggestion = result.plan.suggestions[0];
+    expect(suggestion?.tags.map((tag) => tag.name)).toEqual(["Compilers"]);
+    expect(suggestion?.tags[0]).toMatchObject({ score: 0.7, origin: "grok" });
+    // Grok said "high"; Jev's check decides the confidence.
+    expect(suggestion?.confidence).toBe("medium");
+  });
+
+  it("skips Grok steps that would run past the deadline and leaves the rows for review", async () => {
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) =>
+        call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id))
+    );
+    const propose = vi.fn();
+    const escalate = vi.fn();
+
+    const result = await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1"), scanBookmark("bm-2")],
+      existingTags: [],
+      existingCollections: [],
+      proposeLeftoverVocab: propose,
+      escalateLeftovers: escalate,
+      deadline: Date.now() + 5_000,
+    });
+
+    expect(propose).not.toHaveBeenCalled();
+    expect(escalate).not.toHaveBeenCalled();
+    expect(result.batch.hybrid?.escalationSkipped).toBe(2);
+    expect(result.plan.suggestions.every((suggestion) => suggestion.tags.length === 0)).toBe(true);
+    expect(result.model).not.toContain("+");
+  });
+
+  it("passes each Grok call its time budget and counts usage", async () => {
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) =>
+        call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id))
+    );
+    const escalate = vi.fn(
+      async (
+        chunk: Array<{ id: string }>,
+        _notes: unknown,
+        options: { timeoutMs: number; onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void }
+      ) => {
+        options.onUsage?.({ inputTokens: 1200, outputTokens: 300 });
+        return grokPlan(chunk, ["Compilers"]);
+      }
+    );
+
+    const result = await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [],
+      existingCollections: [],
+      escalateLeftovers: escalate,
+      deadline: Date.now() + 100_000,
+    });
+
+    const timeoutMs = escalate.mock.calls[0]?.[2]?.timeoutMs ?? 0;
+    expect(timeoutMs).toBeGreaterThan(0);
+    expect(timeoutMs).toBeLessThanOrEqual(80_000);
+    expect(result.batch.hybrid?.usage).toMatchObject({
+      grokCalls: 1,
+      grokInputTokens: 1200,
+      grokOutputTokens: 300,
+    });
+  });
+
+  it("sends coarse fits to Grok's naming call and adds the narrower name Jev accepts", async () => {
+    const coarse: OrbitJevAssignment = {
+      ...placedAssignment("bm-1", "Programming", 0.6),
+      coarseFit: true,
+    };
+    let pass = 0;
+    assignSpy.mockImplementation(
+      async (call: {
+        bookmarks: Array<{ id: string }>;
+        pool: { tags: Array<{ name: string }> };
+        askNewLabelGap?: boolean;
+      }) => {
+        pass += 1;
+        if (pass === 1) return [coarse];
+        // The narrowing pass asks only about the new names.
+        expect(call.askNewLabelGap).toBe(false);
+        expect(call.pool.tags.map((tag) => tag.name)).toEqual(["Rust"]);
+        return [
+          {
+            ...placedAssignment("bm-1", "Rust", 0.88),
+            tags: [
+              { name: "Rust", color: "#64748b", reason: "new", score: 0.88, origin: "jev_new_name" as const },
+            ],
+          },
+        ];
+      }
+    );
+    const propose = vi.fn(async () => ({
+      tags: [{ name: "Rust", existing: false, reason: "narrower" }],
+      collections: [],
+    }));
+    const events: Array<{ type: string; phase?: string }> = [];
+
+    const result = await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1")],
+      existingTags: [{ name: "Programming", color: "#1d9bf0", bookmarkCount: 9 }],
+      existingCollections: [],
+      proposeLeftoverVocab: propose,
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(propose).toHaveBeenCalledTimes(1);
+    const notes = (propose.mock.calls[0] as unknown[] | undefined)?.[1] as Array<{
+      bookmarkId: string;
+      matchedTags: string[];
+    }>;
+    expect(notes).toEqual([
+      expect.objectContaining({ bookmarkId: "bm-1", matchedTags: ["Programming"] }),
+    ]);
+    // A coarse fit already shows as matched; it never flips back to "naming".
+    expect(events.some((event) => event.phase === "name")).toBe(false);
+    const tags = result.plan.suggestions[0]?.tags ?? [];
+    expect(tags.map((tag) => tag.name)).toEqual(["Rust", "Programming"]);
+    expect(tags[0]).toMatchObject({ origin: "jev_new_name", reuseExisting: false });
+    expect(result.batch.hybrid).toMatchObject({ coarseFits: 1, namedByGrok: 1, narrowed: 1 });
+    expect(result.model).toContain("+");
+  });
+
+  it("asks placed bookmarks that name a new tag about it too", async () => {
+    let pass = 0;
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) => {
+        pass += 1;
+        if (pass === 1) {
+          return [placedAssignment("bm-1", "AI", 0.95), abstainAssignment("bm-2")];
+        }
+        return call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id));
+      }
+    );
+
+    await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1"), scanBookmark("bm-2")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 9 }],
+      existingCollections: [],
+      // scanBookmark's text mentions "scaling laws".
+      proposeLeftoverVocab: async () => ({
+        tags: [{ name: "Scaling Laws", existing: false }],
+        collections: [],
+      }),
+    });
+
+    // Pass 2 re-asks the leftover; pass 3 narrows bm-1, which names the tag.
+    expect(pass).toBe(3);
+    expect(assignSpy.mock.calls[2]?.[0].bookmarks.map((bookmark: { id: string }) => bookmark.id)).toEqual(["bm-1"]);
   });
 });

@@ -252,11 +252,20 @@ export interface OrbitXaiStatusPayload {
   issues: OrbitXaiStatusIssue[];
 }
 
+/**
+ * Which step produced a suggested label: Jev on one of the user's labels, Jev
+ * on a name Grok just proposed, or Grok's full tagging pass (checked by Jev).
+ */
+export type OrbitSuggestionOrigin = "jev" | "jev_new_name" | "grok";
+
 export interface OrbitTagSuggestion {
   name: string;
   color: string;
   reason: string;
   reuseExisting: boolean;
+  /** Jev's probability that the tag fits, 0–1. Absent on Grok-only scans. */
+  score?: number;
+  origin?: OrbitSuggestionOrigin;
 }
 
 export interface OrbitCollectionSuggestion {
@@ -264,6 +273,9 @@ export interface OrbitCollectionSuggestion {
   description: string;
   reason: string;
   reuseExisting: boolean;
+  /** Jev's probability that the collection fits, 0–1. Absent on Grok-only scans. */
+  score?: number;
+  origin?: OrbitSuggestionOrigin;
 }
 
 export interface OrbitBookmarkSuggestion {
@@ -326,6 +338,25 @@ export interface OrbitHybridScanMetrics {
   refinedLeftovers: number;
   recoveredOnRefine: number;
   escalatedToGrok: number;
+  /** Placed bookmarks Jev flagged as needing a narrower name than their tags. */
+  coarseFits?: number;
+  /** Bookmarks sent to Grok's naming call (leftovers plus coarse fits). */
+  namedByGrok?: number;
+  /** Placed bookmarks that took one of Grok's new, narrower names. */
+  narrowed?: number;
+  /** Leftovers that skipped Grok's tagging pass because the scan ran short on time. */
+  escalationSkipped?: number;
+  usage?: OrbitScanModelUsage;
+}
+
+/** Model calls and tokens one scan spent, for cost tracking. */
+export interface OrbitScanModelUsage {
+  jevCalls: number;
+  jevInputTokens: number;
+  jevOutputTokens: number;
+  grokCalls: number;
+  grokInputTokens: number;
+  grokOutputTokens: number;
 }
 
 export interface OrbitScanPlan {
@@ -489,6 +520,18 @@ export interface OrbitLibraryRunView {
   failed: number;
   /** Tag list in use; null until the worker has resolved it. */
   vocabulary: Array<{ name: string; color: string }> | null;
+  /**
+   * 0: the pass over the tag list. 1: a second pass over posts it left
+   * untagged, with new tags Grok named for them. `total` and `processed`
+   * count the current round; `applied` and `failed` count the whole run.
+   */
+  round: number;
+  /** Round 1's new tags; null until named (or when the run has no round 1). */
+  newTags: Array<{ name: string; color: string }> | null;
+  /** `applied` when round 1 began. */
+  priorRoundApplied: number;
+  /** When the current round began. */
+  roundStartedAt: string;
   errorMessage: string | null;
   startedAt: string;
   updatedAt: string;

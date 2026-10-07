@@ -3,7 +3,6 @@ import "server-only";
 import {
   AuthenticationError,
   PermissionDeniedError,
-  RateLimitError,
   noul,
 } from "@typesafe-ai/sdk";
 
@@ -67,11 +66,15 @@ function postHasVideo(media: unknown) {
   return mediaIncludesVideo(media);
 }
 
-/** Tags decided without a model: a matching X topic, plus Video when the post has video. */
+/**
+ * Tags decided without a model: a matching X topic, plus Video when the post
+ * has video. Jev still judges every post — X topics are broad ("Technology"),
+ * so a topic match must not stop a more specific tag from being found.
+ */
 export function freeLibraryTags(
   bookmark: Pick<LibrarySampleBookmark, "media" | "xMetadata">,
   vocabulary: LibraryVocabularyTag[]
-): { tags: string[]; skipModel: boolean } {
+): string[] {
   const byKey = new Map(
     vocabulary.map((tag) => [normalizeTagKey(tag.name), tag.name])
   );
@@ -82,10 +85,7 @@ export function freeLibraryTags(
   const video = postHasVideo(bookmark.media)
     ? byKey.get(normalizeTagKey(VIDEO_TAG_NAME))
     : undefined;
-  return {
-    tags: dedupeTags([...(video ? [video] : []), ...topicTags]),
-    skipModel: topicTags.length > 0,
-  };
+  return dedupeTags([...(video ? [video] : []), ...topicTags]);
 }
 
 export function tagsFromPackedNouls(args: {
@@ -207,9 +207,20 @@ export function shortlistLibraryPackTags(
   return [...matched, ...rest].slice(0, limit);
 }
 
+/** Example posts per tag, keyed by normalized tag name. */
+export type LibraryTagExamples = Map<string, string[]>;
+
+/**
+ * A pack asks up to 6 × 48 questions in one call, so it gets a longer
+ * per-attempt timeout and more client retries than a single-bookmark call.
+ */
+const PACK_REQUEST_TIMEOUT_MS = 30_000;
+const PACK_MAX_RETRIES = 4;
+
 async function assignPack(
   posts: LibraryAssignBookmark[],
   tags: string[],
+  examples: LibraryTagExamples | undefined,
   signal?: AbortSignal
 ): Promise<Map<string, string[]>> {
   const client = getTypeSafeClient();
@@ -218,7 +229,7 @@ async function assignPack(
     for (const [tagIndex, tag] of tags.entries()) {
       questions[questionKey(postIndex, tagIndex)] = noul(
         {
-          question: `Does posts[${postIndex}] belong under the tag "${tag}"?`,
+          question: `Does \`posts[${postIndex}]\` belong under the tag "${tag}" (\`tags[${tagIndex}]\`)? When the tag has examples, they show what this library files under it.`,
           postId: post.id,
         },
         {
@@ -238,11 +249,20 @@ async function assignPack(
           text: libraryPostJudgmentText(post) || "(no text)",
           authorBio: getOrbitAuthorBio(post.xMetadata),
         })),
-        tags,
+        tags: tags.map((name) => {
+          const entry: { [key: string]: string | string[] } = { name };
+          const tagExamples = examples?.get(normalizeTagKey(name));
+          if (tagExamples?.length) entry.examples = tagExamples;
+          return entry;
+        }),
       },
       questions,
     },
-    signal ? { signal } : undefined
+    {
+      ...(signal ? { signal } : {}),
+      timeout: PACK_REQUEST_TIMEOUT_MS,
+      retry: { maxRetries: PACK_MAX_RETRIES },
+    }
   );
 
   const nouls: Record<string, number> = {};
@@ -252,64 +272,12 @@ async function assignPack(
   return tagsFromPackedNouls({ posts, tags, nouls });
 }
 
-/** Rate-limit retries per pack (server Retry-After, else jittered exponential backoff). */
-const PACK_RATE_LIMIT_RETRIES = 3;
-const PACK_RETRY_BASE_DELAY_MS = 500;
-const PACK_RETRY_MAX_DELAY_MS = 10_000;
-
-/** Waits out a backoff, ending early (rejecting) if the batch is abandoned. */
-function sleep(ms: number, signal?: AbortSignal) {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(signal.reason);
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(signal?.reason);
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
 /** Credential failures would fail every pack; stop the run instead of skipping the library. */
 function isFatalPackError(error: unknown) {
   return (
     error instanceof AuthenticationError ||
     error instanceof PermissionDeniedError
   );
-}
-
-async function assignPackWithRetry(
-  posts: LibraryAssignBookmark[],
-  tags: string[],
-  retryBaseDelayMs: number,
-  signal?: AbortSignal
-): Promise<Map<string, string[]>> {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await assignPack(posts, tags, signal);
-    } catch (error) {
-      if (
-        !(error instanceof RateLimitError) ||
-        attempt >= PACK_RATE_LIMIT_RETRIES
-      ) {
-        throw error;
-      }
-      const backoff = retryBaseDelayMs * 2 ** attempt;
-      await sleep(
-        Math.min(
-          PACK_RETRY_MAX_DELAY_MS,
-          error.retryAfterMs ?? backoff + Math.random() * backoff
-        ),
-        signal
-      );
-    }
-  }
 }
 
 /** Runs a Jev pack call when a slot is free. */
@@ -351,8 +319,8 @@ async function mapPacks(
   packs: LibraryAssignBookmark[][],
   tags: string[],
   options: {
-    retryBaseDelayMs: number;
     limiter: PackLimiter;
+    examples?: LibraryTagExamples;
     signal?: AbortSignal;
   }
 ): Promise<{ assigned: Map<string, string[]>; failed: number }> {
@@ -372,10 +340,11 @@ async function mapPacks(
             pack,
             tags.map((name) => ({ name, color: "" }))
           );
-          const packAssigned = await assignPackWithRetry(
+          // Rate limits and transient failures are retried by the client.
+          const packAssigned = await assignPack(
             pack,
             packTags,
-            options.retryBaseDelayMs,
+            options.examples,
             options.signal
           );
           for (const [id, names] of packAssigned) assigned.set(id, names);
@@ -440,32 +409,14 @@ export async function planLibraryAssignments(args: {
   vocabulary: LibraryVocabularyTag[];
   /** Shared Jev slots (a run shares one across pages); defaults to a fresh pool. */
   limiter?: PackLimiter;
+  /** Posts already under each tag, shown to Jev as what the tag means. */
+  examples?: LibraryTagExamples;
   /** Abandons packs that have not started yet. */
   signal?: AbortSignal;
-  /** Test hook — base backoff for rate-limit retries. */
-  retryBaseDelayMs?: number;
 }): Promise<LibraryAssignmentPlan> {
   const tagNames = args.vocabulary.map((tag) => tag.name);
   const suggestions: OrbitBookmarkSuggestion[] = [];
-  const needsModel: LibraryAssignBookmark[] = [];
-
-  for (const bookmark of args.bookmarks) {
-    const free = freeLibraryTags(bookmark, args.vocabulary);
-    if (free.skipModel) {
-      if (free.tags.length > 0) {
-        suggestions.push(
-          suggestion(
-            bookmark.id,
-            free.tags,
-            args.vocabulary,
-            "Matched a topic already stored on the post."
-          )
-        );
-      }
-      continue;
-    }
-    needsModel.push(bookmark);
-  }
+  const needsModel = args.bookmarks;
 
   const packs: LibraryAssignBookmark[][] = [];
   for (let index = 0; index < needsModel.length; index += ORBIT_LIBRARY_PACK_SIZE) {
@@ -474,16 +425,15 @@ export async function planLibraryAssignments(args: {
   const { assigned, failed } =
     tagNames.length > 0 && packs.length > 0
       ? await mapPacks(packs, tagNames, {
-          retryBaseDelayMs: args.retryBaseDelayMs ?? PACK_RETRY_BASE_DELAY_MS,
           limiter: args.limiter ?? createPackLimiter(),
+          examples: args.examples,
           signal: args.signal,
         })
       : { assigned: new Map<string, string[]>(), failed: 0 };
 
   for (const bookmark of needsModel) {
-    const free = freeLibraryTags(bookmark, args.vocabulary);
     const names = dedupeTags([
-      ...free.tags,
+      ...freeLibraryTags(bookmark, args.vocabulary),
       ...(assigned.get(bookmark.id) ?? []),
     ]);
     if (names.length === 0) continue;

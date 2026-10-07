@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addNarrowedLabels,
   assignOrbitBookmarksWithJev,
   buildJevAssignmentFromAnswers,
   jevAssignmentsToRawPlan,
   mapJevScoreToConfidence,
+  orbitBookmarkMentionsAnyLabel,
   shortlistOrbitCollectionsForJev,
   shortlistOrbitTagsForJev,
+  verifyOrbitSuggestionWithJev,
+  verifyOrbitSuggestionsWithJev,
+  type OrbitJevAssignment,
 } from "@/lib/orbit-jev-assign";
 import { buildBookmarkPayload } from "@/lib/orbit-grok-normalize";
 import { OrbitGrokError } from "@/lib/orbit-grok-schemas";
@@ -50,9 +55,14 @@ function bookmark(overrides?: Partial<OrbitBookmarkForScan>): OrbitBookmarkForSc
 
 describe("mapJevScoreToConfidence", () => {
   it("maps strong evidence to high and weak evidence to low", () => {
-    expect(mapJevScoreToConfidence(2, 0.9, 0.8)).toBe("high");
-    expect(mapJevScoreToConfidence(1, 0.6, null)).toBe("medium");
-    expect(mapJevScoreToConfidence(0, 0.2, 0.1)).toBe("low");
+    expect(mapJevScoreToConfidence(0.9, 0.8)).toBe("high");
+    expect(mapJevScoreToConfidence(0.6, null)).toBe("medium");
+    expect(mapJevScoreToConfidence(0.2, 0.1)).toBe("low");
+  });
+
+  it("is high only when a placed label is strong", () => {
+    expect(mapJevScoreToConfidence(0.6, null)).toBe("medium");
+    expect(mapJevScoreToConfidence(0.6, 0.85)).toBe("high");
   });
 });
 
@@ -349,7 +359,6 @@ describe("buildJevAssignmentFromAnswers", () => {
       collectionChoice: "coll_0",
       collectionConfidence: 0.81,
       needsNewLabel: 0.1,
-      matchScore: 1.8,
       existingTags: [{ name: "AI", color: "#1d9bf0" }],
     });
 
@@ -368,7 +377,6 @@ describe("buildJevAssignmentFromAnswers", () => {
       collectionChoice: "none",
       collectionConfidence: 0.9,
       needsNewLabel: 0.86,
-      matchScore: 0.2,
       existingTags: [],
     });
 
@@ -388,13 +396,104 @@ describe("buildJevAssignmentFromAnswers", () => {
       collectionChoice: "none",
       collectionConfidence: 0.1,
       needsNewLabel: 0.95,
-      matchScore: 1.5,
       existingTags: [{ name: "AI", color: "#1d9bf0" }],
     });
 
     expect(assignment.tags.map((tag) => tag.name)).toEqual(["AI"]);
     expect(assignment.needsNewLabel).toBe(false);
     expect(assignment.abstain).toBe(false);
+    // A strong tag means the topic is named; nothing narrower is needed.
+    expect(assignment.coarseFit).toBe(false);
+  });
+
+  it("keeps each tag's score and origin, strongest first", () => {
+    const assignment = buildJevAssignmentFromAnswers({
+      bookmarkId: "bm-1",
+      tagShortlist: [
+        { name: "AI", existing: true },
+        { name: "LLM Evals", existing: false },
+      ],
+      collectionShortlist: collections,
+      tagNouls: { tag_0: 0.62, tag_1: 0.91 },
+      collectionChoice: "coll_0",
+      collectionConfidence: 0.7,
+      needsNewLabel: 0.1,
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+    });
+
+    expect(assignment.tags).toEqual([
+      expect.objectContaining({ name: "LLM Evals", score: 0.91, origin: "jev_new_name" }),
+      expect.objectContaining({ name: "AI", score: 0.62, origin: "jev" }),
+    ]);
+    expect(assignment.collection).toMatchObject({ name: "Research", score: 0.7, origin: "jev" });
+  });
+
+  it("flags a coarse fit when only weak tags placed and a new label is wanted", () => {
+    const assignment = buildJevAssignmentFromAnswers({
+      bookmarkId: "bm-1",
+      tagShortlist: tags,
+      collectionShortlist: collections,
+      tagNouls: { tag_0: 0.62, tag_1: 0.1 },
+      collectionChoice: "none",
+      collectionConfidence: 0.2,
+      needsNewLabel: 0.9,
+      existingTags: [{ name: "AI", color: "#1d9bf0" }],
+    });
+
+    expect(assignment.tags.map((tag) => tag.name)).toEqual(["AI"]);
+    expect(assignment.coarseFit).toBe(true);
+    // Placed, so not a leftover.
+    expect(assignment.needsNewLabel).toBe(false);
+    expect(assignment.abstain).toBe(false);
+    expect(assignment.confidence).toBe("medium");
+  });
+});
+
+describe("addNarrowedLabels", () => {
+  const base: OrbitJevAssignment = {
+    bookmarkId: "bm-1",
+    confidence: "medium",
+    reasoning: "Matched 1 existing tag from your library.",
+    tags: [{ name: "Programming", color: "#1d9bf0", reason: "match", score: 0.6, origin: "jev" }],
+    collection: null,
+    needsNewLabel: false,
+    abstain: false,
+    coarseFit: true,
+  };
+
+  it("appends accepted new names, re-sorts, and recomputes confidence", () => {
+    const { assignments, narrowedCount } = addNarrowedLabels(
+      [base],
+      [
+        {
+          ...base,
+          tags: [{ name: "Rust", color: "#64748b", reason: "new", score: 0.86, origin: "jev_new_name" }],
+          coarseFit: false,
+        },
+      ]
+    );
+
+    expect(narrowedCount).toBe(1);
+    expect(assignments[0]?.tags.map((tag) => tag.name)).toEqual(["Rust", "Programming"]);
+    expect(assignments[0]?.confidence).toBe("high");
+    expect(assignments[0]?.coarseFit).toBe(false);
+  });
+
+  it("leaves a bookmark alone when the narrowing pass abstained", () => {
+    const { assignments, narrowedCount } = addNarrowedLabels(
+      [base],
+      [{ ...base, tags: [], abstain: true }]
+    );
+    expect(narrowedCount).toBe(0);
+    expect(assignments[0]).toBe(base);
+  });
+});
+
+describe("orbitBookmarkMentionsAnyLabel", () => {
+  it("matches only when every word of a name is in the post", () => {
+    expect(orbitBookmarkMentionsAnyLabel(bookmark(), ["Scaling Laws"])).toBe(true);
+    expect(orbitBookmarkMentionsAnyLabel(bookmark(), ["Scaling Rust"])).toBe(false);
+    expect(orbitBookmarkMentionsAnyLabel(bookmark(), [])).toBe(false);
   });
 });
 
@@ -403,9 +502,9 @@ describe("assignOrbitBookmarksWithJev failure isolation", () => {
     answers: {
       tag_0: { noul: 0.9 },
       needs_new_label: { noul: 0.1 },
-      match_quality: { score: 2 },
       collection: { choice: "none", confidence: 0.2 },
     },
+    usage: { input_tokens: 900, output_tokens: 40 },
   };
 
   const batchArgs = {
@@ -415,7 +514,6 @@ describe("assignOrbitBookmarksWithJev failure isolation", () => {
       tags: [{ name: "AI", existing: true }],
       collections: [],
     },
-    retryBaseDelayMs: 1,
   };
 
   beforeEach(() => {
@@ -481,24 +579,89 @@ describe("assignOrbitBookmarksWithJev failure isolation", () => {
     ).toHaveLength(1);
   });
 
-  it("retries rate-limited items with backoff and recovers", async () => {
-    let failuresLeft = 1;
-    systemOneMock.mockImplementation(async () => {
-      if (failuresLeft > 0) {
-        failuresLeft -= 1;
-        throw new OrbitGrokError("slow down", 429, "typesafe_unavailable");
-      }
-      return successAnswers;
-    });
+  it("leaves retries to the TypeSafe client: a still-throttled item abstains after one call", async () => {
+    systemOneMock.mockRejectedValue(
+      new OrbitGrokError("slow down", 429, "typesafe_unavailable")
+    );
 
     const assignments = await assignOrbitBookmarksWithJev({
       ...batchArgs,
       bookmarks: [bookmark({ id: "bm-1" })],
     });
 
-    expect(systemOneMock).toHaveBeenCalledTimes(2);
-    expect(assignments[0]?.abstain).toBe(false);
-    expect(assignments[0]?.tags.map((tag) => tag.name)).toEqual(["AI"]);
+    expect(systemOneMock).toHaveBeenCalledTimes(1);
+    expect(assignments[0]?.abstain).toBe(true);
+  });
+
+  it("passes the scan's abort signal and reports token usage", async () => {
+    systemOneMock.mockResolvedValue(successAnswers);
+    const controller = new AbortController();
+    const onUsage = vi.fn();
+
+    await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-1" })],
+      signal: controller.signal,
+      onUsage,
+    });
+
+    expect(systemOneMock.mock.calls[0]?.[1]).toEqual({ signal: controller.signal });
+    expect(onUsage).toHaveBeenCalledWith({ input_tokens: 900, output_tokens: 40 });
+  });
+
+  it("abstains without calling Jev once the scan's deadline has passed", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const assignments = await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-1" })],
+      signal: controller.signal,
+    });
+
+    expect(systemOneMock).not.toHaveBeenCalled();
+    expect(assignments[0]?.abstain).toBe(true);
+  });
+
+  it("asks per-tag questions that point at each candidate's examples, with no match-quality question", async () => {
+    systemOneMock.mockResolvedValue(successAnswers);
+
+    await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      pool: {
+        tags: [{ name: "AI", existing: true, examples: ["Notes on transformer scaling"] }],
+        collections: [],
+      },
+      bookmarks: [bookmark({ id: "bm-1" })],
+    });
+
+    const request = systemOneMock.mock.calls[0]?.[0] as {
+      state: { candidateTags: Array<{ name: string; examples?: string[] }> };
+      questions: Record<string, { instructions: string }>;
+    };
+    expect(request.state.candidateTags[0]).toEqual({
+      name: "AI",
+      existing: true,
+      examples: ["Notes on transformer scaling"],
+    });
+    expect(request.questions.tag_0?.instructions).toContain("`candidateTags[0]`");
+    expect(request.questions.match_quality).toBeUndefined();
+    expect(request.questions.needs_new_label).toBeDefined();
+  });
+
+  it("skips the new-label question on a narrowing pass", async () => {
+    systemOneMock.mockResolvedValue(successAnswers);
+
+    await assignOrbitBookmarksWithJev({
+      ...batchArgs,
+      bookmarks: [bookmark({ id: "bm-1" })],
+      askNewLabelGap: false,
+    });
+
+    const request = systemOneMock.mock.calls[0]?.[0] as {
+      questions: Record<string, unknown>;
+    };
+    expect(request.questions.needs_new_label).toBeUndefined();
   });
 
   it("forwards an enlarged tag shortlist budget into the TypeSafe call", async () => {
@@ -538,14 +701,95 @@ describe("jevAssignmentsToRawPlan", () => {
         bookmarkId: "bm-1",
         confidence: "high",
         reasoning: "Assigned",
-        tags: [{ name: "AI", color: "#1d9bf0", reason: "match" }],
+        tags: [{ name: "AI", color: "#1d9bf0", reason: "match", score: 0.9, origin: "jev" }],
         collection: null,
         needsNewLabel: false,
         abstain: false,
+        coarseFit: false,
       },
     ]);
 
     expect(plan.suggestions).toHaveLength(1);
-    expect(plan.suggestions[0]?.tags[0]?.name).toBe("AI");
+    expect(plan.suggestions[0]?.tags[0]).toMatchObject({ name: "AI", score: 0.9, origin: "jev" });
+  });
+});
+
+describe("verifyOrbitSuggestionWithJev", () => {
+  const grokSuggestion = {
+    bookmarkId: "bm-1",
+    confidence: "high" as const,
+    reasoning: "Grok named it",
+    tags: [
+      { name: "Compilers", color: "#64748b", reason: "gap" },
+      { name: "AI", color: "#1d9bf0", reason: "gap" },
+    ],
+    collection: { name: "Systems", description: "Low-level work", reason: "home" },
+  };
+
+  beforeEach(() => {
+    systemOneMock.mockReset();
+  });
+
+  it("keeps only the labels Jev confirms and derives confidence from their scores", async () => {
+    systemOneMock.mockResolvedValue({
+      answers: {
+        tag_0: { noul: 0.72 },
+        tag_1: { noul: 0.2 },
+        collection: { noul: 0.4 },
+      },
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+
+    const verified = await verifyOrbitSuggestionWithJev({
+      bookmark: bookmark(),
+      suggestion: grokSuggestion,
+      existingTags: [{ name: "AI", color: "#1d9bf0", examples: ["An AI post"] }],
+      existingCollections: [],
+    });
+
+    expect(verified.tags).toEqual([
+      expect.objectContaining({ name: "Compilers", score: 0.72, origin: "grok" }),
+    ]);
+    expect(verified.collection).toBeNull();
+    expect(verified.confidence).toBe("medium");
+    const request = systemOneMock.mock.calls[0]?.[0] as {
+      state: { candidateTags: Array<{ name: string; existing: boolean; examples?: string[] }> };
+    };
+    expect(request.state.candidateTags[1]).toEqual({
+      name: "AI",
+      existing: true,
+      examples: ["An AI post"],
+    });
+  });
+
+  it("empties the suggestion when Jev rejects every label", async () => {
+    systemOneMock.mockResolvedValue({
+      answers: { tag_0: { noul: 0.1 }, tag_1: { noul: 0.2 }, collection: { noul: 0.1 } },
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+
+    const verified = await verifyOrbitSuggestionWithJev({
+      bookmark: bookmark(),
+      suggestion: grokSuggestion,
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(verified).toMatchObject({ confidence: "low", tags: [], collection: null });
+  });
+
+  it("keeps an unchecked Grok suggestion below high when Jev fails", async () => {
+    systemOneMock.mockRejectedValue(new Error("down"));
+
+    const [verified] = await verifyOrbitSuggestionsWithJev({
+      bookmarks: [bookmark()],
+      suggestions: [grokSuggestion],
+      existingTags: [],
+      existingCollections: [],
+    });
+
+    expect(verified?.confidence).toBe("medium");
+    expect(verified?.tags.map((tag) => tag.name)).toEqual(["Compilers", "AI"]);
+    expect(verified?.tags.every((tag) => tag.origin === "grok" && tag.score === undefined)).toBe(true);
   });
 });

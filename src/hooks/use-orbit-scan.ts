@@ -9,6 +9,7 @@ import {
   buildBookmarkDecision,
   buildSingleSuggestionPlan,
   isSafeAutoApplySuggestion,
+  safeAutoApplySubset,
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import { ORBIT_JEV_MAX_BOOKMARKS_PER_SCAN } from "@/lib/orbit-config";
@@ -532,12 +533,17 @@ export function useOrbitScan(): OrbitScanHandle {
       const pool = plan.plan.suggestions.filter(
         (suggestion) => !dismissed.has(suggestion.bookmarkId)
       );
-      const filtered = pool.filter(
-        (suggestion) =>
-          suggestion.confidence === opts.minConfidence &&
-          (!opts.safeExistingOnly || isSafeAutoApplySuggestion(suggestion)) &&
-          (suggestion.tags.length > 0 || suggestion.collection !== null)
-      );
+      // Safe mode sends only each suggestion's strong, reusable labels.
+      const filtered = pool.flatMap((suggestion) => {
+        if (suggestion.confidence !== opts.minConfidence) return [];
+        const candidate = opts.safeExistingOnly
+          ? safeAutoApplySubset(suggestion)
+          : suggestion;
+        return candidate &&
+          (candidate.tags.length > 0 || candidate.collection !== null)
+          ? [candidate]
+          : [];
+      });
       if (filtered.length === 0) return null;
 
       const filteredPlan: OrbitScanPlan = {

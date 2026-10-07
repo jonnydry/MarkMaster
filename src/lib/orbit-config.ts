@@ -77,6 +77,33 @@ export const ORBIT_JEV_NEEDS_NEW_LABEL_THRESHOLD = 0.7;
 /** Accept a collection Choice other than none at or above this confidence. */
 export const ORBIT_JEV_COLLECTION_CONFIDENCE_THRESHOLD = 0.6;
 
+/** Example posts shown to Jev per tag or collection, as what the label means here. */
+export const ORBIT_LABEL_EXAMPLES_PER_LABEL = 2;
+
+/** Each example is trimmed to this many characters. */
+export const ORBIT_LABEL_EXAMPLE_MAX_CHARS = 100;
+
+/** Labels (most-used first) whose examples one scan or library slice loads. */
+export const ORBIT_LABEL_EXAMPLE_LABEL_CAP = 300;
+
+/**
+ * A streamed scan stops starting Grok calls this long before the route's
+ * maxDuration, so a slow call cannot kill the function and lose the result.
+ */
+export const ORBIT_SCAN_DEADLINE_MARGIN_MS = 20_000;
+
+/** Upper bound for Grok's naming call during a scan. */
+export const ORBIT_GROK_VOCAB_TIMEOUT_MS = 60_000;
+
+/** Upper bound for Grok's full tagging pass on leftovers. */
+export const ORBIT_GROK_ESCALATION_TIMEOUT_MS = 180_000;
+
+/** Time kept back after a Grok call for the Jev pass that follows it. */
+export const ORBIT_SCAN_JEV_PASS_RESERVE_MS = 20_000;
+
+/** Grok calls are skipped when less than this is left for them. */
+export const ORBIT_GROK_MIN_CALL_MS = 15_000;
+
 function parseBoundedIntEnv(
   raw: string | undefined,
   fallback: number,
@@ -100,14 +127,23 @@ export const ORBIT_JEV_ASSIGN_CONCURRENCY = parseBoundedIntEnv(
   32
 );
 
+const ORBIT_LIBRARY_PACK_SIZE_DEFAULT = 6;
+
 /** Tags learned from one untagged library when the user has none yet. */
 export const ORBIT_LIBRARY_VOCAB_MAX = 24;
 
 /**
  * Existing tags loaded for a library pass. The most-used names come first;
- * a pack shortlist still decides which of them Jev is asked about.
+ * a pack shortlist still decides which of them Jev is asked about, so a long
+ * list only widens which names can match a post's words.
  */
-export const ORBIT_LIBRARY_EXISTING_TAG_CAP = 80;
+export const ORBIT_LIBRARY_EXISTING_TAG_CAP = 300;
+
+/** New tags Grok may name for posts the library pass could not tag. */
+export const ORBIT_LIBRARY_GROWTH_MAX_TAGS = 12;
+
+/** A second, new-tag pass runs only when at least this many posts are left untagged. */
+export const ORBIT_LIBRARY_GROWTH_MIN_POSTS = ORBIT_LIBRARY_PACK_SIZE_DEFAULT;
 
 /** Tags one packed Jev call may judge. Lexical matches are kept ahead of this cap. */
 export const ORBIT_LIBRARY_PACK_TAG_CAP = 32;
@@ -119,7 +155,7 @@ export const ORBIT_LIBRARY_SAMPLE_POOL = 240;
 export const ORBIT_LIBRARY_SAMPLE_SIZE = 36;
 
 /** Posts scored together in one Jev call against the closed tag list. */
-export const ORBIT_LIBRARY_PACK_SIZE = 6;
+export const ORBIT_LIBRARY_PACK_SIZE = ORBIT_LIBRARY_PACK_SIZE_DEFAULT;
 
 /**
  * Packed Jev calls in flight during a library page (override with

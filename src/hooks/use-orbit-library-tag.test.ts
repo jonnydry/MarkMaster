@@ -18,6 +18,10 @@ function run(overrides: Partial<OrbitLibraryRunView> = {}): OrbitLibraryRunView 
     applied: 0,
     failed: 0,
     vocabulary: [{ name: "AI", color: "#1d9bf0" }],
+    round: 0,
+    newTags: null,
+    priorRoundApplied: 0,
+    roundStartedAt: "2026-09-24T12:00:00.000Z",
     errorMessage: null,
     startedAt: "2026-09-24T12:00:00.000Z",
     updatedAt: "2026-09-24T12:00:00.000Z",
@@ -153,5 +157,60 @@ describe("libraryRunOutcome", () => {
         run({ status: "failed", errorMessage: "TypeSafe could not be reached." })
       )
     ).toEqual({ tone: "error", message: "TypeSafe could not be reached." });
+  });
+});
+
+describe("library run round 1", () => {
+  const newTags = [
+    { name: "Rust", color: "#f97316" },
+    { name: "Sourdough", color: "#a16207" },
+  ];
+
+  it("says it is naming new tags before they exist", () => {
+    expect(libraryRunDetail(run({ round: 1, applied: 300, processed: 1_000 }))).toBe(
+      "300 tagged · Naming new tags for posts nothing fit…"
+    );
+    expect(libraryRunRemainingMs(run({ round: 1, processed: 1_000 }))).toBeNull();
+  });
+
+  it("reports the second pass against the new tags", () => {
+    expect(
+      libraryRunDetail(
+        run({ round: 1, newTags, total: 400, processed: 100, applied: 320, priorRoundApplied: 300 })
+      )
+    ).toMatch(/^100 of 400 checked with 2 new tags · 320 tagged/);
+  });
+
+  it("measures the ETA from the round's start", () => {
+    // 100 checked in 60 s of round 1 → 300 left takes 180 s.
+    const remaining = libraryRunRemainingMs(
+      run({
+        round: 1,
+        newTags,
+        total: 400,
+        processed: 100,
+        roundStartedAt: "2026-09-24T13:00:00.000Z",
+        updatedAt: "2026-09-24T13:01:00.000Z",
+      })
+    );
+    expect(remaining).toBe(180_000);
+  });
+
+  it("credits the new tags and counts what is still untagged from round 1", () => {
+    const outcome = libraryRunOutcome(
+      run({
+        status: "completed",
+        round: 1,
+        newTags,
+        total: 400,
+        processed: 400,
+        applied: 360,
+        priorRoundApplied: 300,
+        failed: 10,
+      })
+    );
+    expect(outcome.message).toBe(
+      "Tagged 360 bookmarks. 60 took one of 2 new tags. 330 had no confident match and stay in Orbit. 10 couldn't be checked; run auto-tag again to retry them."
+    );
   });
 });

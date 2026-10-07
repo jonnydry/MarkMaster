@@ -33,10 +33,22 @@ export function libraryRunProgress(run: OrbitLibraryRunView | null) {
   return Math.min(1, run.processed / run.total);
 }
 
+/** Round 1 has started naming new tags but has none yet. */
+function namingNewTags(run: OrbitLibraryRunView) {
+  return run.round === 1 && !run.newTags;
+}
+
+/** Bookmarks tagged in the current round. */
+function roundApplied(run: OrbitLibraryRunView) {
+  return Math.max(0, run.applied - (run.round === 1 ? run.priorRoundApplied : 0));
+}
+
 /** Time left at the pace so far, from server timestamps. Null until the pace is known. */
 export function libraryRunRemainingMs(run: OrbitLibraryRunView | null) {
   if (!isLive(run) || !run || run.processed < ETA_MIN_PROCESSED) return null;
-  const elapsed = Date.parse(run.updatedAt) - Date.parse(run.startedAt);
+  if (namingNewTags(run)) return null;
+  const elapsed =
+    Date.parse(run.updatedAt) - Date.parse(run.roundStartedAt ?? run.startedAt);
   if (!(elapsed > 0)) return null;
   const left = Math.max(0, run.total - run.processed);
   return (left * elapsed) / run.processed;
@@ -60,12 +72,19 @@ export function libraryRunDetail(run: OrbitLibraryRunView) {
     return `Stopped responding at ${of}. Resume picks up where it left off.`;
   }
   if (!run.vocabulary) return "Getting the tag list ready…";
+  if (namingNewTags(run)) {
+    return `${run.applied.toLocaleString()} tagged · Naming new tags for posts nothing fit…`;
+  }
   if (run.processed === 0) {
-    return `Starting on ${count(run.total, "bookmark", "bookmarks")}…`;
+    return run.round === 1
+      ? `Trying ${count(run.newTags?.length ?? 0, "new tag", "new tags")} on ${count(run.total, "bookmark", "bookmarks")}…`
+      : `Starting on ${count(run.total, "bookmark", "bookmarks")}…`;
   }
   const remaining = libraryRunRemainingMs(run);
   return [
-    `${of} checked`,
+    run.round === 1
+      ? `${of} checked with ${count(run.newTags?.length ?? 0, "new tag", "new tags")}`
+      : `${of} checked`,
     `${run.applied.toLocaleString()} tagged`,
     remaining == null ? null : formatLibraryRunEta(remaining),
   ]
@@ -100,11 +119,16 @@ export function libraryRunOutcome(run: OrbitLibraryRunView): {
         "Auto-tag finished with no confident matches. Scan can propose new tags.",
     };
   }
-  const noMatch = Math.max(0, run.processed - run.applied - run.failed);
+  // The last round's posts are the ones still untagged.
+  const noMatch = Math.max(0, run.processed - roundApplied(run) - run.failed);
+  const newTagHits = run.round === 1 && run.newTags ? roundApplied(run) : 0;
   return {
     tone: "success",
     message: [
       `Tagged ${count(run.applied, "bookmark", "bookmarks")}.`,
+      newTagHits > 0
+        ? `${newTagHits.toLocaleString()} took one of ${count(run.newTags?.length ?? 0, "new tag", "new tags")}.`
+        : null,
       noMatch > 0 ? `${noMatch.toLocaleString()} had no confident match and stay in Orbit.` : null,
       run.failed > 0
         ? `${run.failed.toLocaleString()} couldn't be checked; run auto-tag again to retry them.`

@@ -138,18 +138,48 @@ export function OrbitScanOverviewStrip({
   // hidden when nothing was left over; raw engine metrics stay in the
   // tooltip for power users.
   const hybrid = payload.batch.hybrid;
+  const namedByGrok = hybrid?.namedByGrok ?? 0;
+  const narrowed = hybrid?.narrowed ?? 0;
+  const escalationSkipped = hybrid?.escalationSkipped ?? 0;
   const hasHybridActivity = Boolean(
     hybrid &&
       (hybrid.firstPassLeftovers > 0 ||
         hybrid.recoveredOnRefine > 0 ||
-        hybrid.escalatedToGrok > 0)
+        hybrid.escalatedToGrok > 0 ||
+        narrowed > 0 ||
+        escalationSkipped > 0)
   );
   const hybridOutcomeLine =
     hybrid && hasHybridActivity
-      ? `Couldn't match: ${hybrid.firstPassLeftovers} · Fixed on retry: ${hybrid.recoveredOnRefine} · Sent to Grok for new names: ${hybrid.escalatedToGrok}`
+      ? [
+          `Couldn't match: ${hybrid.firstPassLeftovers}`,
+          `Fixed on retry: ${hybrid.recoveredOnRefine}`,
+          narrowed > 0 ? `Given a narrower tag: ${narrowed}` : null,
+          `Tagged by Grok: ${hybrid.escalatedToGrok}`,
+          escalationSkipped > 0 ? `Out of time, left for review: ${escalationSkipped}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : null;
+  const usage = hybrid?.usage;
   const hybridEngineDetail = hybrid
-    ? `Jev leftovers ${hybrid.firstPassLeftovers} · recovered ${hybrid.recoveredOnRefine} · Grok escalations ${hybrid.escalatedToGrok}`
+    ? [
+        `Jev leftovers ${hybrid.firstPassLeftovers}`,
+        `recovered ${hybrid.recoveredOnRefine}`,
+        `coarse fits ${hybrid.coarseFits ?? 0}`,
+        `Grok named for ${namedByGrok}`,
+        `narrowed ${narrowed}`,
+        `Grok escalations ${hybrid.escalatedToGrok}`,
+        escalationSkipped > 0 ? `skipped ${escalationSkipped}` : null,
+        usage
+          ? `Jev ${usage.jevCalls} calls, ${usage.jevInputTokens.toLocaleString()} in / ${usage.jevOutputTokens.toLocaleString()} out tokens`
+          : null,
+        usage && usage.grokCalls > 0
+          ? `Grok ${usage.grokCalls} calls, ${usage.grokInputTokens.toLocaleString()} in / ${usage.grokOutputTokens.toLocaleString()} out tokens`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : null;
   const reviewLabel =
     suggestionCount === 1

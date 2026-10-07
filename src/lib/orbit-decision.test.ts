@@ -4,6 +4,8 @@ import {
   buildSingleSuggestionPlan,
   derivePrimaryAndAlternative,
   formatConfidence,
+  isSafeAutoApplySuggestion,
+  safeAutoApplySubset,
   shouldCreateCollectionsForPlan,
 } from "@/lib/orbit-decision";
 import type { OrbitBookmarkSuggestion, OrbitScanPlan } from "@/types";
@@ -197,5 +199,65 @@ describe("buildSingleSuggestionPlan", () => {
       ],
     };
     expect(buildSingleSuggestionPlan(singleTag, "b1", "alt")).toBeNull();
+  });
+});
+
+describe("safeAutoApplySubset", () => {
+  const tag = (name: string, score?: number, reuseExisting = true) => ({
+    name,
+    color: "#1d9bf0",
+    reason: "match",
+    reuseExisting,
+    ...(score === undefined ? {} : { score }),
+  });
+  const suggestion = (
+    tags: OrbitBookmarkSuggestion["tags"],
+    collection: OrbitBookmarkSuggestion["collection"] = null
+  ): OrbitBookmarkSuggestion => ({
+    bookmarkId: "b1",
+    confidence: "high",
+    reasoning: "Matched",
+    tags,
+    collection,
+  });
+
+  it("drops weak tags that ride along with a strong one", () => {
+    const subset = safeAutoApplySubset(suggestion([tag("AI", 0.92), tag("Design", 0.58)]));
+    expect(subset?.tags.map((entry) => entry.name)).toEqual(["AI"]);
+  });
+
+  it("applies nothing when every tag is below the strong threshold", () => {
+    expect(safeAutoApplySubset(suggestion([tag("AI", 0.7)]))).toBeNull();
+    expect(isSafeAutoApplySuggestion(suggestion([tag("AI", 0.7)]))).toBe(false);
+  });
+
+  it("keeps new-name tags for Review but may still file a strong existing collection", () => {
+    const subset = safeAutoApplySubset(
+      suggestion([tag("AI", 0.95), tag("Scaling Laws", 0.9, false)], {
+        name: "Research",
+        description: "Papers",
+        reason: "home",
+        reuseExisting: true,
+        score: 0.85,
+      })
+    );
+    expect(subset?.tags).toEqual([]);
+    expect(subset?.collection?.name).toBe("Research");
+  });
+
+  it("keeps a Video format tag beside strong topical tags", () => {
+    const subset = safeAutoApplySubset(suggestion([tag("AI", 0.9), tag("Video")]));
+    expect(subset?.tags.map((entry) => entry.name)).toEqual(["AI", "Video"]);
+  });
+
+  it("trusts a Grok-only plan's high confidence when tags carry no score", () => {
+    const subset = safeAutoApplySubset(suggestion([tag("AI"), tag("Design")]));
+    expect(subset?.tags.map((entry) => entry.name)).toEqual(["AI", "Design"]);
+  });
+
+  it("never auto-applies a suggestion below high confidence", () => {
+    expect(
+      safeAutoApplySubset({ ...suggestion([tag("AI", 0.95)]), confidence: "medium" })
+    ).toBeNull();
   });
 });

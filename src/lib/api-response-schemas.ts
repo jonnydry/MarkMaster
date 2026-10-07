@@ -235,6 +235,14 @@ const orbitLibraryRunViewSchema = v.object({
   vocabulary: v.nullable(
     v.array(v.object({ name: v.string(), color: v.string() }))
   ),
+  // Defaults keep a client that loaded before a deploy reading older payloads.
+  round: v.optional(v.number(), 0),
+  newTags: v.optional(
+    v.nullable(v.array(v.object({ name: v.string(), color: v.string() }))),
+    null
+  ),
+  priorRoundApplied: v.optional(v.number(), 0),
+  roundStartedAt: v.optional(v.string()),
   errorMessage: v.nullable(v.string()),
   startedAt: v.string(),
   updatedAt: v.string(),

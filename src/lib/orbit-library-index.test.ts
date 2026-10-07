@@ -68,8 +68,8 @@ describe("freeLibraryTags", () => {
     { name: "Video", color: "#2563eb" },
   ];
 
-  it("skips the model when a stored topic matches a tag", () => {
-    const result = freeLibraryTags(
+  it("adds a tag that matches a stored X topic, plus Video", () => {
+    const tags = freeLibraryTags(
       {
         media: [{ type: "video" }],
         xMetadata: {
@@ -79,18 +79,16 @@ describe("freeLibraryTags", () => {
       vocabulary
     );
 
-    expect(result.skipModel).toBe(true);
-    expect(result.tags).toEqual(["Video", "Compilers"]);
+    expect(tags).toEqual(["Video", "Compilers"]);
   });
 
-  it("keeps a video post on the model path when no topic matches", () => {
-    const result = freeLibraryTags(
+  it("adds only Video when no topic matches", () => {
+    const tags = freeLibraryTags(
       { media: [{ type: "video" }], xMetadata: null },
       vocabulary
     );
 
-    expect(result.skipModel).toBe(false);
-    expect(result.tags).toEqual(["Video"]);
+    expect(tags).toEqual(["Video"]);
   });
 });
 

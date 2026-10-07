@@ -17,6 +17,7 @@ import {
   orbitScanPlanFromXaiSchema,
   parseXaiOrbitScanPlanJson,
 } from "@/lib/orbit-grok";
+import { readXaiResponsesUsage } from "@/lib/orbit-grok-parse";
 
 const ORIGINAL_XAI_ENV = {
   XAI_API_KEY: process.env.XAI_API_KEY,
@@ -239,6 +240,87 @@ describe("parseXaiOrbitScanPlanJson", () => {
       bookmarkId: "b1",
       confidence: "medium",
     });
+  });
+});
+
+describe("normalizeOrbitScanPlan evidence", () => {
+  it("carries Jev scores and origins through, including a collection kept as a tag", () => {
+    const normalized = normalizeOrbitScanPlan(
+      {
+        overview: { summary: "s", taggingStrategy: "t", collectionStrategy: "c" },
+        suggestions: [
+          {
+            bookmarkId: "b1",
+            confidence: "medium",
+            reasoning: "Jev placed it",
+            tags: [
+              { name: "AI", color: "#1d9bf0", reason: "match", score: 0.71, origin: "jev" },
+            ],
+            collection: null,
+          },
+          {
+            bookmarkId: "b2",
+            confidence: "medium",
+            reasoning: "One-off home",
+            tags: [],
+            collection: {
+              name: "Compilers",
+              description: "Compiler posts",
+              reason: "home",
+              score: 0.66,
+              origin: "jev_new_name",
+            },
+          },
+        ],
+      },
+      {
+        bookmarkIds: ["b1", "b2"],
+        existingTags: [{ name: "AI", color: "#1d9bf0" }],
+        existingCollections: [],
+      }
+    );
+
+    expect(normalized.suggestions[0]?.tags[0]).toMatchObject({
+      name: "AI",
+      reuseExisting: true,
+      score: 0.71,
+      origin: "jev",
+    });
+    // A new singleton collection becomes a tag with the same evidence.
+    expect(normalized.suggestions[1]?.collection).toBeNull();
+    expect(normalized.suggestions[1]?.tags[0]).toMatchObject({
+      name: "Compilers",
+      score: 0.66,
+      origin: "jev_new_name",
+    });
+  });
+
+  it("drops any score a Grok response tries to send", () => {
+    const parsed = parseXaiOrbitScanPlanJson({
+      overview: { summary: "s", taggingStrategy: "t", collectionStrategy: "c" },
+      suggestions: [
+        {
+          bookmarkId: "b1",
+          confidence: "high",
+          reasoning: "r",
+          tags: [{ name: "AI", color: "#1d9bf0", reason: "x", score: 1, origin: "jev" }],
+          collection: null,
+        },
+      ],
+    });
+    expect(parsed.suggestions[0]?.tags[0]).not.toHaveProperty("score");
+    expect(parsed.suggestions[0]?.tags[0]).not.toHaveProperty("origin");
+  });
+});
+
+describe("readXaiResponsesUsage", () => {
+  it("reads token counts and tolerates a missing usage block", () => {
+    expect(readXaiResponsesUsage({ usage: { input_tokens: 1200, output_tokens: 80 } })).toEqual({
+      inputTokens: 1200,
+      outputTokens: 80,
+    });
+    expect(readXaiResponsesUsage({})).toEqual({ inputTokens: 0, outputTokens: 0 });
+    expect(readXaiResponsesUsage(null)).toEqual({ inputTokens: 0, outputTokens: 0 });
   });
 });
 

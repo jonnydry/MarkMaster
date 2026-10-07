@@ -28,6 +28,17 @@ function addUnique(
   target.set(key, { ...item, name });
 }
 
+function examplesByKey(labels: Array<{ name: string; examples?: string[] }>) {
+  const byKey = new Map<string, string[]>();
+  for (const label of labels) {
+    const key = normalizeKey(label.name);
+    if (key && label.examples?.length && !byKey.has(key)) {
+      byKey.set(key, label.examples);
+    }
+  }
+  return byKey;
+}
+
 export function buildSeedOrbitLabelPool(args: {
   bookmarks: OrbitBookmarkForScan[];
   existingTags: OrbitTagContext[];
@@ -39,13 +50,21 @@ export function buildSeedOrbitLabelPool(args: {
   const payload = buildOrbitPromptPayload(args);
   const tags = new Map<string, OrbitLabelPoolItem>();
   const collections = new Map<string, OrbitLabelPoolItem>();
+  // The prompt payload drops examples (Grok never sees them); Jev reads them
+  // as what each label means in this library.
+  const tagExamples = examplesByKey(args.existingTags);
+  const collectionExamples = examplesByKey(args.existingCollections);
 
   for (const tag of payload.existingTags) {
     const name = normalizeSuggestedTagName(tag.name);
     if (!name || GENERIC_TAG_NAMES.has(normalizeKey(name)) || isUrlLikeLabel(name)) {
       continue;
     }
-    addUnique(tags, { name, existing: true });
+    addUnique(tags, {
+      name,
+      existing: true,
+      examples: tagExamples.get(normalizeKey(tag.name)),
+    });
   }
 
   for (const collection of payload.existingCollections) {
@@ -61,6 +80,7 @@ export function buildSeedOrbitLabelPool(args: {
       name,
       existing: true,
       description: collection.description,
+      examples: collectionExamples.get(normalizeKey(collection.name)),
     });
   }
 
@@ -80,7 +100,11 @@ export function buildSeedOrbitLabelPool(args: {
     if (!name || GENERIC_TAG_NAMES.has(normalizeKey(name)) || isUrlLikeLabel(name)) {
       continue;
     }
-    addUnique(tags, { name, existing: existingTagKeys.has(normalizeKey(name)) });
+    addUnique(tags, {
+      name,
+      existing: existingTagKeys.has(normalizeKey(name)),
+      examples: tagExamples.get(normalizeKey(name)),
+    });
   }
 
   const existingCollectionKeys = new Set(
@@ -106,6 +130,7 @@ export function buildSeedOrbitLabelPool(args: {
     addUnique(collections, {
       name,
       existing: existingCollectionKeys.has(normalizeKey(name)),
+      examples: collectionExamples.get(normalizeKey(name)),
     });
   }
 
