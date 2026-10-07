@@ -10,7 +10,11 @@ import {
   ORBIT_LIBRARY_VOCAB_MAX,
 } from "@/lib/orbit-config";
 import { OrbitScanError, getOrbitXaiRuntimeStatus } from "@/lib/orbit-grok-schemas";
-import { normalizeColor, normalizeTagKey } from "@/lib/orbit-grok-normalize";
+import {
+  normalizeColor,
+  normalizeTagKey,
+  tagLookupKeys,
+} from "@/lib/orbit-grok-normalize";
 import { VIDEO_TAG_NAME } from "@/lib/orbit-video-tag";
 import { extractXaiResponsesOutputText } from "@/lib/orbit-grok-parse";
 import {
@@ -276,7 +280,7 @@ export async function requestLibraryGrowthTags(
     cacheKey: "markmaster-orbit-library-growth",
     allowEmpty: true,
   });
-  const taken = new Set(existing.map((tag) => normalizeTagKey(tag.name)));
+  const taken = new Set(existing.flatMap((tag) => tagLookupKeys(tag.name)));
   return names
     .filter((name) => !taken.has(normalizeTagKey(name)))
     .slice(0, ORBIT_LIBRARY_GROWTH_MAX_TAGS)

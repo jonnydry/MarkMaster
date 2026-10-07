@@ -210,12 +210,8 @@ export function shortlistLibraryPackTags(
 /** Example posts per tag, keyed by normalized tag name. */
 export type LibraryTagExamples = Map<string, string[]>;
 
-/**
- * A pack asks up to 6 × 48 questions in one call, so it gets a longer
- * per-attempt timeout and more client retries than a single-bookmark call.
- */
-const PACK_REQUEST_TIMEOUT_MS = 30_000;
-const PACK_MAX_RETRIES = 4;
+const PACK_REQUEST_TIMEOUT_MS = 20_000;
+const PACK_MAX_RETRIES = 1;
 
 async function assignPack(
   posts: LibraryAssignBookmark[],
