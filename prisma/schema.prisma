@@ -39,6 +39,7 @@ model User {
   orbitDecisionEvents OrbitDecisionEvent[]
   orbitScanSnapshot   OrbitScanSnapshot?
   orbitLibraryRuns    OrbitLibraryRun[]
+  orbitTagAudits      OrbitTagAudit[]
 }
 
 enum CollectionType {
@@ -277,6 +278,60 @@ model OrbitLibraryRun {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startedAt(sort: Desc)])
+}
+
+/// One pass over tags already on bookmarks. Jev flags a pair, Grok vetoes,
+/// and apply writes the only BookmarkTag change plus this undo snapshot.
+model OrbitTagAudit {
+  id                  String    @id @default(cuid())
+  userId              String
+  /// open, applied, or undone. A string so the migration adds no enum.
+  phase               String
+  taggedBookmarkCount Int
+  judgedBookmarkCount Int
+  vetoedPairKeys      Json
+  outcome             Json?
+  rejectionsRecorded  Boolean   @default(false)
+  /// Set when joins commit, so a retried rejection log can skip events already stored.
+  appliedAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  user      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposals OrbitTagAuditProposal[]
+  undo      OrbitTagAuditUndo?
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model OrbitTagAuditProposal {
+  id           String  @id @default(cuid())
+  auditId      String
+  bookmarkId   String
+  tagId        String
+  /// remove or swap. The swap target is swapTagId.
+  kind         String
+  swapTagId    String?
+  reason       String
+  currentScore Float
+  checked      Boolean @default(true)
+  rank         Int
+
+  audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, bookmarkId, tagId])
+  @@index([auditId, rank])
+}
+
+/// Historical tag ids for the bookmarks an apply touched. Not a live join.
+model OrbitTagAuditUndo {
+  auditId    String    @id
+  userId     String
+  joins      Json
+  createdAt  DateTime  @default(now())
+  restoredAt DateTime?
+  releasedAt DateTime?
+
+  audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
 model OrbitDecisionEvent {
