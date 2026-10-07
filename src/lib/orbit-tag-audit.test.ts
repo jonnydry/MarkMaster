@@ -129,9 +129,10 @@ const memory = vi.hoisted(() => {
   function bookmarkMatches(bookmark: BookmarkRow, where: Record<string, unknown> | undefined): boolean {
     if (!where) return true;
     if (typeof where.userId === "string" && bookmark.userId !== where.userId) return false;
-    const idFilter = where.id as { in?: string[]; notIn?: string[] } | undefined;
+    const idFilter = where.id as { in?: string[]; notIn?: string[]; lt?: string } | undefined;
     if (idFilter?.in && !idFilter.in.includes(bookmark.id)) return false;
     if (idFilter?.notIn && idFilter.notIn.includes(bookmark.id)) return false;
+    if (idFilter?.lt && bookmark.id >= idFilter.lt) return false;
     const bookmarkedAt = where.bookmarkedAt as Date | { lt?: Date } | undefined;
     if (bookmarkedAt instanceof Date) {
       if (bookmark.bookmarkedAt.getTime() !== bookmarkedAt.getTime()) return false;
@@ -558,6 +559,7 @@ vi.mock("@/lib/typesafe", () => ({
   getTypeSafeModel: () => "jev-latest",
   getTypeSafeModelSource: () => "default",
   isTypeSafeConfigured: () => Boolean(process.env.TYPESAFE_API_KEY?.trim()),
+  TYPESAFE_TIMEOUT_MS: 15_000,
 }));
 
 import {
@@ -565,6 +567,7 @@ import {
   readOrbitTagAudit,
   runOrbitTagAudit,
   tagAuditCoverageSentence,
+  tagAuditGrokTimeoutMs,
   undoOrbitTagAudit,
 } from "@/lib/orbit-tag-audit";
 
@@ -1116,6 +1119,8 @@ describe("orbit tag audit", () => {
 
     expect(signal?.aborted).toBe(true);
     expect(view.coverage.judgedBookmarkCount).toBe(0);
+    expect(tagAuditGrokTimeoutMs(10_000, 0)).toBe(10_000);
+    expect(tagAuditGrokTimeoutMs(90_000, 0)).toBe(60_000);
   });
 
   it("reviews the next page of tagged bookmarks and then wraps to the newest", async () => {

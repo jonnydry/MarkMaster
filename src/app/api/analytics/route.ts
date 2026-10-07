@@ -236,6 +236,7 @@ export async function GET(req: NextRequest) {
         COUNT(*)::bigint as count
       FROM "OrbitDecisionEvent"
       WHERE "userId" = ${user.id}
+        AND COALESCE("source", '') <> 'tag-audit'
       ${fwTimeFilter}
       GROUP BY "action", COALESCE("originalSuggestion"->>'confidence', '')
     `;

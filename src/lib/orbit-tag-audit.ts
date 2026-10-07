@@ -36,7 +36,7 @@ import {
   orbitScanBookmarkInclude,
   withOrbitFolderHints,
 } from "@/lib/orbit-scan-bookmarks";
-import { getTypeSafeClient, getTypeSafeModel } from "@/lib/typesafe";
+import { TYPESAFE_TIMEOUT_MS, getTypeSafeClient, getTypeSafeModel } from "@/lib/typesafe";
 import type { OrbitDecisionEventPayload } from "@/types";
 
 export const ORBIT_TAG_AUDIT_GROK_CAP = 24;
@@ -47,7 +47,21 @@ export const ORBIT_TAG_AUDIT_CLASH_MARGIN = 0.2;
 
 export const ORBIT_TAG_AUDIT_RIVAL_CAP = 8;
 
+/**
+ * Grok cap for this audit. maxDuration is 240s and the route keeps a 20s
+ * margin, so work must finish by 220s. Scheduling stops one Jev attempt
+ * (15s) plus this cap before that deadline: 145s of new calls, 15s for a
+ * late attempt, 60s of Grok, then the 20s margin.
+ */
 export const ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS = 60_000;
+
+export function tagAuditGrokTimeoutMs(deadlineMs: number, now = Date.now()): number {
+  return Math.max(0, Math.min(ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS, deadlineMs - now));
+}
+
+export function tagAuditJevStopAt(deadlineMs: number): number {
+  return deadlineMs - ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS - TYPESAFE_TIMEOUT_MS;
+}
 
 const REASON_MAX = 180;
 const TAG_NAME_MAX = 50;
@@ -109,6 +123,8 @@ export type TagAuditCoverage = {
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
   bookmarkCap: number;
+  resumed?: boolean;
+  wrapped?: boolean;
 };
 
 export type TagAuditPhase = "open" | "applied" | "undone";
@@ -117,8 +133,10 @@ export type TagAuditView = {
   auditId: string;
   phase: TagAuditPhase;
   coverage: TagAuditCoverage;
-  /** True only when phase is applied and the undo has not been restored. */
+  /** True when some applied audit still has an unrestored undo. */
   undoAvailable: boolean;
+  /** Applied audit whose undo is still available. Null when undo is not. */
+  undoAuditId: string | null;
   proposals: TagAuditProposalView[];
 };
 
@@ -194,12 +212,20 @@ type ParsedUndo = {
   restoredAt: string | null;
 };
 
+type AuditPage = {
+  endBookmarkedAt: string;
+  endBookmarkId: string;
+  resumed: boolean;
+  wrapped: boolean;
+};
+
 type ParsedAudit = {
   id: string;
   phase: TagAuditPhase;
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
   outcome: ApplyOutcome | null;
+  page: AuditPage | null;
   appliedAt: Date | null;
   undo: ParsedUndo | null;
   proposals: ParsedProposal[];
@@ -279,10 +305,16 @@ export function tagAuditCoverageSentence(coverage: TagAuditCoverage): string {
   if (coverage.judgedBookmarkCount < targeted) {
     return `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
   }
-  if (coverage.taggedBookmarkCount > coverage.bookmarkCap) {
-    return `Reviewed the newest ${coverage.bookmarkCap} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+  if (coverage.taggedBookmarkCount <= coverage.bookmarkCap) {
+    return `Reviewed all ${coverage.taggedBookmarkCount} tagged bookmarks.`;
   }
-  return `Reviewed all ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+  if (coverage.wrapped) {
+    return `Reviewed ${coverage.bookmarkCap} tagged bookmarks, wrapping back to the newest.`;
+  }
+  if (coverage.resumed) {
+    return `Reviewed ${coverage.bookmarkCap} tagged bookmarks, continuing past the previous review.`;
+  }
+  return `Reviewed the newest ${coverage.bookmarkCap} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
 }
 
 function oneLineReason(value: string, fallback: string): string {
@@ -553,6 +585,7 @@ function emptyUndoDelta(): UndoDelta {
 }
 
 function buildTagAuditRejection(args: {
+  auditId: string;
   bookmarkId: string;
   tagName: string;
   tagColor: string;
@@ -581,6 +614,7 @@ function buildTagAuditRejection(args: {
           origin: "jev",
         },
       ],
+      auditId: args.auditId,
     },
   };
 }
@@ -613,9 +647,10 @@ function parseGrokVerdicts(
 function suggestionFromRow(
   kind: string,
   swapTagId: string | null,
-): ParsedProposal["suggestion"] {
+): ParsedProposal["suggestion"] | null {
+  if (kind === "remove") return { kind: "remove" };
   if (kind === "swap" && swapTagId) return { kind: "swap", tagId: swapTagId };
-  return { kind: "remove" };
+  return null;
 }
 
 function stringList(value: unknown): string[] {
@@ -647,15 +682,47 @@ function readOutcome(value: unknown): ApplyOutcome | null {
   };
 }
 
+function readPage(value: unknown): AuditPage | null {
+  if (!isRecord(value) || !isRecord(value.page)) return null;
+  const page = value.page;
+  if (typeof page.endBookmarkedAt !== "string" || typeof page.endBookmarkId !== "string") {
+    return null;
+  }
+  return {
+    endBookmarkedAt: page.endBookmarkedAt,
+    endBookmarkId: page.endBookmarkId,
+    resumed: page.resumed === true,
+    wrapped: page.wrapped === true,
+  };
+}
+
+function parsePhase(phase: string): TagAuditPhase {
+  if (phase === "open" || phase === "applied" || phase === "undone") return phase;
+  throw new OrbitTagAuditError("Tag audit phase is not recognized.", 500, "closed");
+}
+
 function parseAuditRow(row: AuditRow): ParsedAudit {
-  const phase: TagAuditPhase =
-    row.phase === "applied" || row.phase === "undone" ? row.phase : "open";
+  const proposals: ParsedProposal[] = [];
+  for (const proposal of row.proposals) {
+    const suggestion = suggestionFromRow(proposal.kind, proposal.swapTagId);
+    if (!suggestion) continue;
+    proposals.push({
+      id: proposal.id,
+      bookmarkId: proposal.bookmarkId,
+      tagId: proposal.tagId,
+      suggestion,
+      reason: proposal.reason,
+      currentScore: proposal.currentScore,
+      rank: proposal.rank,
+    });
+  }
   return {
     id: row.id,
-    phase,
+    phase: parsePhase(row.phase),
     taggedBookmarkCount: row.taggedBookmarkCount,
     judgedBookmarkCount: row.judgedBookmarkCount,
     outcome: readOutcome(row.outcome),
+    page: readPage(row.outcome),
     appliedAt: row.appliedAt,
     undo: row.undo
       ? {
@@ -663,15 +730,7 @@ function parseAuditRow(row: AuditRow): ParsedAudit {
           restoredAt: row.undo.restoredAt?.toISOString() ?? null,
         }
       : null,
-    proposals: row.proposals.map((proposal) => ({
-      id: proposal.id,
-      bookmarkId: proposal.bookmarkId,
-      tagId: proposal.tagId,
-      suggestion: suggestionFromRow(proposal.kind, proposal.swapTagId),
-      reason: proposal.reason,
-      currentScore: proposal.currentScore,
-      rank: proposal.rank,
-    })),
+    proposals,
   };
 }
 
@@ -727,14 +786,18 @@ function toTagAuditView(
     });
   }
 
+  const undoId = undoAvailable(audit) ? audit.id : null;
   return {
     auditId: audit.id,
     phase: audit.phase,
-    undoAvailable: undoAvailable(audit),
+    undoAvailable: undoId !== null,
+    undoAuditId: undoId,
     coverage: {
       taggedBookmarkCount: audit.taggedBookmarkCount,
       judgedBookmarkCount: audit.judgedBookmarkCount,
       bookmarkCap: ORBIT_TAG_AUDIT_BOOKMARK_CAP,
+      resumed: audit.page?.resumed ?? false,
+      wrapped: audit.page?.wrapped ?? false,
     },
     proposals,
   };
@@ -934,6 +997,7 @@ async function scoreBookmark(args: {
 async function weighWithGrok(
   pairs: readonly FlaggedPair[],
   excerpts: ReadonlyMap<string, string>,
+  timeoutMs: number,
 ): Promise<Map<string, { agree: boolean; reason: string }>> {
   assertWithinGrokCap(pairs.length);
   const apiKey = requireApiKey("XAI_API_KEY");
@@ -969,7 +1033,7 @@ async function weighWithGrok(
           },
         },
       }),
-      signal: AbortSignal.timeout(ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new OrbitScanError(
@@ -1041,6 +1105,7 @@ async function judgeSlice(args: {
     Awaited<ReturnType<typeof getOrbitLearningHintsForScan>>[number]
   >;
   stopAt: number;
+  signal: AbortSignal;
 }): Promise<{ flagged: FlaggedPair[]; judged: number }> {
   const flagged: FlaggedPair[] = [];
   let judged = 0;
@@ -1072,6 +1137,7 @@ async function judgeSlice(args: {
         })),
         rivals,
         payload,
+        signal: args.signal,
       });
       if (!scored.ok) continue;
       flagged.push(...scored.pairs);
@@ -1089,6 +1155,7 @@ async function persistOpenAudit(args: {
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
   proposals: readonly FlaggedPair[];
+  page: AuditPage | null;
 }) {
   await prisma.$transaction(async (tx) => {
     await lockOrbitApply(tx, args.userId);
@@ -1102,6 +1169,7 @@ async function persistOpenAudit(args: {
         phase: "open",
         taggedBookmarkCount: args.taggedBookmarkCount,
         judgedBookmarkCount: args.judgedBookmarkCount,
+        outcome: args.page ? { page: args.page } : undefined,
         proposals: {
           create: args.proposals.map((pair, rank) => ({
             id: randomUUID(),
@@ -1123,6 +1191,7 @@ async function writeAppliedRejections(
   db: Db,
   args: {
     userId: string;
+    auditId: string;
     proposals: readonly ParsedProposal[];
     appliedIds: readonly string[];
   },
@@ -1146,6 +1215,7 @@ async function writeAppliedRejections(
     if (!tag || !canRecordRejectionName(tag.name)) continue;
     events.push(
       buildTagAuditRejection({
+        auditId: args.auditId,
         bookmarkId: item.bookmarkId,
         tagName: tag.name.trim(),
         tagColor: tag.color,
@@ -1158,32 +1228,113 @@ async function writeAppliedRejections(
   await recordOrbitDecisionEvents({ userId: args.userId, events, db });
 }
 
+const bookmarkOrder = [{ bookmarkedAt: "desc" as const }, { id: "desc" as const }];
+
+function taggedBookmarkInclude() {
+  return {
+    ...orbitScanBookmarkInclude,
+    tags: {
+      select: {
+        tagId: true,
+        tag: { select: { id: true, name: true, color: true } },
+      },
+    },
+  };
+}
+
+function pageFromRows(
+  rows: readonly TaggedBookmarkRow[],
+  resumed: boolean,
+  wrapped: boolean,
+): AuditPage | null {
+  const end = rows[rows.length - 1];
+  if (!end) return null;
+  const bookmarkedAt =
+    end.bookmarkedAt instanceof Date ? end.bookmarkedAt : new Date(end.bookmarkedAt);
+  return {
+    endBookmarkedAt: bookmarkedAt.toISOString(),
+    endBookmarkId: end.id,
+    resumed,
+    wrapped,
+  };
+}
+
+async function selectTaggedBookmarks(userId: string, cursor: AuditPage | null) {
+  const taggedWhere = { userId, tags: { some: {} } };
+  const include = taggedBookmarkInclude();
+  if (!cursor) {
+    const rows = await prisma.bookmark.findMany({
+      where: taggedWhere,
+      orderBy: bookmarkOrder,
+      take: ORBIT_TAG_AUDIT_BOOKMARK_CAP,
+      include,
+    });
+    return { rows: rows as TaggedBookmarkRow[], resumed: false, wrapped: false };
+  }
+
+  const endAt = new Date(cursor.endBookmarkedAt);
+  const older = await prisma.bookmark.findMany({
+    where: {
+      ...taggedWhere,
+      OR: [
+        { bookmarkedAt: { lt: endAt } },
+        { bookmarkedAt: endAt, id: { lt: cursor.endBookmarkId } },
+      ],
+    },
+    orderBy: bookmarkOrder,
+    take: ORBIT_TAG_AUDIT_BOOKMARK_CAP,
+    include,
+  });
+  if (older.length >= ORBIT_TAG_AUDIT_BOOKMARK_CAP) {
+    return { rows: older as TaggedBookmarkRow[], resumed: true, wrapped: false };
+  }
+
+  const fill = await prisma.bookmark.findMany({
+    where: {
+      ...taggedWhere,
+      ...(older.length > 0 ? { id: { notIn: older.map((row) => row.id) } } : {}),
+    },
+    orderBy: bookmarkOrder,
+    take: ORBIT_TAG_AUDIT_BOOKMARK_CAP - older.length,
+    include,
+  });
+  return {
+    rows: [...older, ...fill] as TaggedBookmarkRow[],
+    resumed: true,
+    wrapped: fill.length > 0,
+  };
+}
+
+async function findUndoAuditId(db: Db, userId: string): Promise<string | null> {
+  const row = await db.orbitTagAudit.findFirst({
+    where: {
+      userId,
+      phase: "applied",
+      undo: { is: { restoredAt: null } },
+    },
+    orderBy: { appliedAt: "desc" },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
 export async function runOrbitTagAudit(args: {
   userId: string;
   deadlineMs: number;
 }): Promise<TagAuditView> {
   const taggedWhere = { userId: args.userId, tags: { some: {} } };
-  const [taggedBookmarkCount, rows, tagRows] = await Promise.all([
+  const previous = await findAuditRow(prisma, args.userId);
+  const cursor = readPage(previous?.outcome);
+  const [taggedBookmarkCount, slice, tagRows] = await Promise.all([
     prisma.bookmark.count({ where: taggedWhere }),
-    prisma.bookmark.findMany({
-      where: taggedWhere,
-      orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
-      take: ORBIT_TAG_AUDIT_BOOKMARK_CAP,
-      include: {
-        ...orbitScanBookmarkInclude,
-        tags: {
-          select: {
-            tagId: true,
-            tag: { select: { id: true, name: true, color: true } },
-          },
-        },
-      },
-    }),
+    selectTaggedBookmarks(args.userId, cursor),
     prisma.tag.findMany({
       where: { userId: args.userId },
       select: { id: true, name: true, color: true },
     }),
   ]);
+  const rows = slice.rows;
+  const page = pageFromRows(rows, slice.resumed, slice.wrapped);
 
   let judgedBookmarkCount = 0;
   let proposals: FlaggedPair[] = [];
@@ -1222,12 +1373,14 @@ export async function runOrbitTagAudit(args: {
         xFolderHints: bookmark.xFolderHints,
       })),
     });
+    const stopAt = tagAuditJevStopAt(args.deadlineMs);
     const judged = await judgeSlice({
       rows: rows as TaggedBookmarkRow[],
       library,
       existingTags,
       learningByBookmark: new Map(learning.map((hint) => [hint.bookmarkId, hint])),
-      stopAt: args.deadlineMs - ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS,
+      stopAt,
+      signal: AbortSignal.timeout(Math.max(0, stopAt - Date.now())),
     });
     judgedBookmarkCount = judged.judged;
     const selected = selectPairsForGrok(rankFlaggedPairs(judged.flagged));
@@ -1238,7 +1391,10 @@ export async function runOrbitTagAudit(args: {
           truncateText(bookmark.tweetText, EXCERPT_MAX) ?? "",
         ]),
       );
-      proposals = mergeOpinions(selected, await weighWithGrok(selected, excerpts));
+      proposals = mergeOpinions(
+        selected,
+        await weighWithGrok(selected, excerpts, tagAuditGrokTimeoutMs(args.deadlineMs)),
+      );
     }
   }
 
@@ -1247,6 +1403,7 @@ export async function runOrbitTagAudit(args: {
     taggedBookmarkCount,
     judgedBookmarkCount,
     proposals,
+    page,
   });
 
   const view = await readOrbitTagAudit({ userId: args.userId });
@@ -1259,9 +1416,17 @@ export async function runOrbitTagAudit(args: {
 export async function readOrbitTagAudit(args: {
   userId: string;
 }): Promise<TagAuditView | null> {
-  const row = await findAuditRow(prisma, args.userId);
+  const [row, undoAuditId] = await Promise.all([
+    findAuditRow(prisma, args.userId),
+    findUndoAuditId(prisma, args.userId),
+  ]);
   if (!row) return null;
-  return viewFromAudit(args.userId, parseAuditRow(row));
+  const view = await viewFromAudit(args.userId, parseAuditRow(row));
+  return {
+    ...view,
+    undoAvailable: undoAuditId !== null,
+    undoAuditId,
+  };
 }
 
 async function readJoins(
@@ -1382,11 +1547,13 @@ export async function applyOrbitTagAudit(args: {
         outcome: {
           appliedProposalIds: plan.appliedProposalIds,
           skippedProposalIds: plan.skippedProposalIds,
+          ...(audit.page ? { page: audit.page } : {}),
         },
       },
     });
     await writeAppliedRejections(tx, {
       userId: args.userId,
+      auditId: audit.id,
       proposals: audit.proposals,
       appliedIds: plan.appliedProposalIds,
     });
@@ -1472,23 +1639,26 @@ export async function undoOrbitTagAudit(args: {
     if (readd.length > 0) {
       await tx.bookmarkTag.createMany({ data: readd, skipDuplicates: true });
     }
-    if (audit.appliedAt && bookmarkIds.length > 0) {
-      await tx.orbitDecisionEvent.deleteMany({
-        where: {
-          userId: args.userId,
-          source: TAG_AUDIT_SOURCE,
-          createdAt: { gte: audit.appliedAt },
-          bookmarkId: { in: bookmarkIds },
+    await tx.orbitDecisionEvent.deleteMany({
+      where: {
+        userId: args.userId,
+        source: TAG_AUDIT_SOURCE,
+        originalSuggestion: {
+          path: ["auditId"],
+          equals: audit.id,
         },
-      });
-    }
+      },
+    });
     await tx.orbitTagAuditUndo.update({
       where: { auditId: audit.id },
       data: { restoredAt: new Date() },
     });
     await tx.orbitTagAudit.update({
       where: { id: audit.id },
-      data: { phase: "undone", outcome: Prisma.DbNull },
+      data: {
+        phase: "undone",
+        outcome: audit.page ? { page: audit.page } : Prisma.DbNull,
+      },
     });
     return {
       auditId: audit.id,

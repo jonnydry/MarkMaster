@@ -284,6 +284,7 @@ export interface OrbitBookmarkSuggestion {
   reasoning: string;
   tags: OrbitTagSuggestion[];
   collection: OrbitCollectionSuggestion | null;
+  auditId?: string;
 }
 
 export type OrbitDecisionEventAction =
