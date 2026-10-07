@@ -115,6 +115,42 @@ try {
   }
 
   const collectionBookmark = created.find((item) => item.inCollection);
+  const feedBookmark = created.find(
+    (item) => item.bookmark.tweetId === FEED_BOOKMARK.tweetId,
+  );
+  await prisma.orbitTagAudit.create({
+    data: {
+      userId: user.id,
+      phase: "open",
+      taggedBookmarkCount: 2,
+      judgedBookmarkCount: 2,
+      vetoedPairKeys: [],
+      rejectionsRecorded: false,
+      proposals: {
+        create: [
+          {
+            bookmarkId: feedBookmark.bookmark.id,
+            tagId: design.id,
+            kind: "remove",
+            reason: "Design is a weak match for this post.",
+            currentScore: 0.2,
+            checked: true,
+            rank: 0,
+          },
+          {
+            bookmarkId: collectionBookmark.bookmark.id,
+            tagId: research.id,
+            kind: "swap",
+            swapTagId: design.id,
+            reason: "Design fits this post better than Research.",
+            currentScore: 0.4,
+            checked: true,
+            rank: 1,
+          },
+        ],
+      },
+    },
+  });
   await prisma.collection.create({
     data: {
       userId: user.id,
