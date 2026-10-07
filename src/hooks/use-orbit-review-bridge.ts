@@ -24,27 +24,28 @@ import type {
 type OrbitScanApi = ReturnType<typeof useOrbitScan>;
 
 const DECISION_EVENT_RETRY_DELAYS_MS = [2_000, 8_000];
+const DECISION_EVENT_BATCH_SIZE = 20;
 
-/**
- * Best-effort learning signal: retry each failed batch in the background with
- * backoff (3 attempts total), then drop it. The batch is retried serially in
- * its own chain, so the same events are never in flight twice; the server
- * inserts blindly, and this keeps the duplicate window to "response lost after
- * commit" only.
- */
 async function postDecisionEventsWithRetry(events: OrbitDecisionEventPayload[]) {
-  const body = JSON.parse(JSON.stringify({ events })) as JsonValue;
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await sendJson("/api/orbit/decision-events", { method: "POST", body });
-      return;
-    } catch (err) {
-      const delayMs = DECISION_EVENT_RETRY_DELAYS_MS[attempt];
-      if (delayMs === undefined) {
-        console.warn("[orbit] decision event write failed after retries:", err);
-        return;
+  for (let offset = 0; offset < events.length; offset += DECISION_EVENT_BATCH_SIZE) {
+    const body = JSON.parse(
+      JSON.stringify({
+        events: events.slice(offset, offset + DECISION_EVENT_BATCH_SIZE),
+      })
+    ) as JsonValue;
+
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await sendJson("/api/orbit/decision-events", { method: "POST", body });
+        break;
+      } catch (err) {
+        const delayMs = DECISION_EVENT_RETRY_DELAYS_MS[attempt];
+        if (delayMs === undefined) {
+          console.warn("[orbit] decision event write failed after retries:", err);
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
 }
