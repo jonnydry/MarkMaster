@@ -252,7 +252,7 @@ function SelectedClusterBody({
     return (
       <div className="min-w-0 space-y-3">
         <InspectorHeader
-          icon={<TagDot name={node.name} color={node.color} size={8} />}
+          icon={<TagDot name={node.name} color={node.color} size={10} />}
           kicker="Tag"
           title={node.name}
           count={node.count}
@@ -484,7 +484,7 @@ function SelectedClusterBody({
                 <HubChip
                   key={t.id}
                   label={t.name}
-                  icon={<TagDot name={t.name} color={t.color} size={8} />}
+                  icon={<TagDot name={t.name} color={t.color} size={10} />}
                   onClick={onSelectHub ? () => onSelectHub({ kind: "tag", id: t.id }) : undefined}
                 />
               ))}
@@ -616,7 +616,7 @@ function SharedHubsRow({
             count={count}
             icon={
               node.kind === "tag" ? (
-                <TagDot name={node.name} color={node.color} size={8} />
+                <TagDot name={node.name} color={node.color} size={10} />
               ) : (
                 <CollectionGlyph />
               )

@@ -46,7 +46,7 @@ function SidebarSkeletonRows({
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-2 py-1">
           {withDot ? (
-            <span className="skeleton-shimmer h-1.5 w-1.5 shrink-0 rounded-full" />
+            <span className="skeleton-shimmer size-2.5 shrink-0 rounded-full" />
           ) : (
             <span className="skeleton-shimmer size-4 shrink-0 rounded-[2px]" />
           )}
@@ -310,7 +310,7 @@ export function Sidebar({
                             <TagDot
                               name={tag.name}
                               color={tag.color}
-                              size={6}
+                              size={10}
                               className="shrink-0"
                             />
                             <span className="truncate">{tag.name}</span>

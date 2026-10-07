@@ -335,7 +335,7 @@ export default async function PublicSharePage({
                   key={tag.id}
                   className="inline-flex items-center gap-1.5 rounded-sm border border-hairline-soft px-2 py-1 text-xs font-medium text-muted-foreground"
                 >
-                  <TagDot name={tag.name} color={tag.color} size={8} />
+                  <TagDot name={tag.name} color={tag.color} size={10} />
                   {tag.name}
                   <span className="tabular-nums">{tag.count}</span>
                 </span>

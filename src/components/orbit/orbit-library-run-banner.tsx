@@ -76,7 +76,7 @@ export function OrbitLibraryRunBanner({
               key={tag.name}
               className="inline-flex max-w-[12rem] items-center gap-1.5 text-xs text-muted-foreground"
             >
-              <TagDot name={tag.name} color={tag.color} size={8} />
+              <TagDot name={tag.name} color={tag.color} size={10} />
               <span className="truncate">{tag.name}</span>
             </li>
           ))}

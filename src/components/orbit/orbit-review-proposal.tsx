@@ -1,7 +1,8 @@
 "use client";
 
-import { FolderInput, Tag as TagIcon } from "lucide-react";
+import { FolderInput } from "lucide-react";
 
+import { TagDot } from "@/components/tag-dot";
 import { cn } from "@/lib/utils";
 import type {
   OrbitBookmarkSuggestion,
@@ -36,12 +37,7 @@ function TagChip({
           : "border-hairline-soft bg-surface-2 text-foreground"
       )}
     >
-      <span
-        className="size-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: color }}
-        aria-hidden
-      />
-      <TagIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+      <TagDot name={tag.name} color={color} size={10} />
       <span className={cn("min-w-0 truncate font-medium", compact && "max-w-[8rem]")}>
         {tag.name}
       </span>
