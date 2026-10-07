@@ -64,6 +64,7 @@ const memory = vi.hoisted(() => {
   const undos: UndoRow[] = [];
   const events: Array<Record<string, unknown>> = [];
   const txCalls: unknown[] = [];
+  const transactionFaults: unknown[] = [];
   let clock = Date.now();
 
   function nextTick() {
@@ -80,6 +81,7 @@ const memory = vi.hoisted(() => {
     undos.length = 0;
     events.length = 0;
     txCalls.length = 0;
+    transactionFaults.length = 0;
     createMany.mockClear();
   }
 
@@ -474,6 +476,8 @@ const memory = vi.hoisted(() => {
     },
     async $transaction<T>(fn: (tx: unknown) => Promise<T>, options?: unknown) {
       txCalls.push(options);
+      const fault = transactionFaults.shift();
+      if (fault) throw fault;
       const saved = snapshotMemory();
       try {
         return await fn(prisma);
@@ -547,6 +551,7 @@ const memory = vi.hoisted(() => {
     undos,
     events,
     txCalls,
+    transactionFaults,
     createMany,
     addJoin,
     removeJoin,
@@ -1265,5 +1270,79 @@ describe("orbit tag audit", () => {
       { maxWait: 5_000, timeout: 15_000 },
       { maxWait: 5_000, timeout: 15_000 },
     ]);
+  });
+
+  it("moves past a bookmark that fails twice and still reaches the rest", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    for (let index = 0; index < 161; index += 1) {
+      memory.seedBookmark({
+        id: `bm-${String(index).padStart(3, "0")}`,
+        tagIds: ["tag-loose"],
+        bookmarkedAt: new Date(Date.UTC(2026, 0, 1) + index * 60_000),
+      });
+    }
+    const seen = new Set<string>();
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      seen.add(request.state.id);
+      if (request.state.id === "bm-100") throw new Error("jev down");
+      return { answers: { current_0: { noul: 0.9 } } };
+    });
+
+    for (let run = 0; run < 5; run += 1) {
+      await runOrbitTagAudit({ userId: "user-1", deadlineMs: Date.now() + 600_000 });
+    }
+
+    expect(seen.size).toBe(161);
+  });
+
+  it("loads the page when undo data is unreadable and still refuses the undo", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: view.auditId,
+      checkedProposalIds: view.proposals.map((proposal) => proposal.id),
+    });
+    memory.undos[0]!.joins = { removes: "bad", adds: [] } as unknown as (typeof memory.undos)[number]["joins"];
+
+    const loaded = await readOrbitTagAudit({ userId: "user-1" });
+    expect(loaded?.undoLabel).toBe("Undo");
+    expect(loaded?.undoAvailable).toBe(true);
+    memory.addJoin("bm-loose", "tag-loose");
+    const again = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    expect(again.undoLabel).toBe("Undo");
+    await expect(
+      undoOrbitTagAudit({ userId: "user-1", auditId: view.auditId }),
+    ).rejects.toThrow(/unreadable/);
+    expect(memory.undos[0]?.restoredAt).toBeNull();
+  });
+
+  it("retries saving the audit once when the lock times out", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.9 } });
+    const timeout = Object.assign(new Error("Transaction already closed"), { code: "P2028" });
+    memory.transactionFaults.push(timeout);
+
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+
+    expect(view.phase).toBe("open");
+    expect(memory.txCalls).toEqual([undefined, undefined]);
+
+    memory.transactionFaults.push(timeout, timeout);
+    await expect(
+      runOrbitTagAudit({ userId: "user-1", deadlineMs: Date.now() + 600_000 }),
+    ).rejects.toMatchObject({ code: "P2028" });
   });
 });
