@@ -332,7 +332,9 @@ export function tagAuditCoverageSentence(coverage: TagAuditCoverage): string {
     sentence = "No tagged bookmarks.";
   } else {
     const targeted = Math.min(coverage.taggedBookmarkCount, coverage.bookmarkCap);
-    if (coverage.judgedBookmarkCount < targeted) {
+    if (coverage.judgedBookmarkCount === 0) {
+      sentence = "Jev couldn't be reached.";
+    } else if (coverage.judgedBookmarkCount < targeted) {
       sentence = `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
     } else if (coverage.taggedBookmarkCount <= coverage.bookmarkCap) {
       sentence = `Reviewed all ${coverage.taggedBookmarkCount} tagged bookmarks.`;
@@ -1313,8 +1315,10 @@ function pageFromMarks(
   wrapped: boolean,
 ): AuditPage | null {
   const previousFailed = new Set(previous?.failedIds ?? []);
-  const failedIds = rows.flatMap((row, index) => (marks[index] === "failed" ? [row.id] : []));
   const anyScored = marks.some((mark) => mark === "scored");
+  const failedIds = anyScored
+    ? rows.flatMap((row, index) => (marks[index] === "failed" ? [row.id] : []))
+    : (previous?.failedIds ?? []);
   let prefix = 0;
   let skippedBookmarkCount = 0;
   while (prefix < rows.length) {

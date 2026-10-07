@@ -1411,4 +1411,50 @@ describe("orbit tag audit", () => {
       "Reviewed 1 of 2 tagged bookmarks. 1 skipped after repeated failures.",
     );
   });
+
+  it("does not record strikes when Jev scores nothing", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({
+      id: "bm-old",
+      tagIds: ["tag-loose"],
+      bookmarkedAt: new Date(Date.UTC(2026, 0, 1)),
+    });
+    memory.seedBookmark({
+      id: "bm-mid",
+      tagIds: ["tag-loose"],
+      bookmarkedAt: new Date(Date.UTC(2026, 0, 2)),
+    });
+    memory.seedBookmark({
+      id: "bm-new",
+      tagIds: ["tag-loose"],
+      bookmarkedAt: new Date(Date.UTC(2026, 0, 3)),
+    });
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      if (request.state.id === "bm-new") throw new Error("jev down");
+      return { answers: { current_0: { noul: 0.9 } } };
+    });
+    await runOrbitTagAudit({ userId: "user-1", deadlineMs: Date.now() + 600_000 });
+
+    systemOneMock.mockImplementation(async () => {
+      throw new Error("jev down");
+    });
+    const outage = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      if (request.state.id === "bm-mid") return { answers: { current_0: { noul: 0.9 } } };
+      throw new Error("jev down");
+    });
+    const flaky = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+
+    expect(tagAuditCoverageSentence(flaky.coverage)).toBe(
+      "Reviewed 1 of 3 tagged bookmarks. 1 skipped after repeated failures.",
+    );
+    expect(tagAuditCoverageSentence(outage.coverage)).toBe("Jev couldn't be reached.");
+  });
 });
