@@ -280,19 +280,15 @@ model OrbitLibraryRun {
   @@index([userId, startedAt(sort: Desc)])
 }
 
-/// One pass over tags already on bookmarks. Jev flags a pair, Grok vetoes,
-/// and apply writes the only BookmarkTag change plus this undo snapshot.
 model OrbitTagAudit {
   id                  String    @id @default(cuid())
   userId              String
-  /// open, applied, or undone. A string so the migration adds no enum.
   phase               String
   taggedBookmarkCount Int
   judgedBookmarkCount Int
   vetoedPairKeys      Json
   outcome             Json?
   rejectionsRecorded  Boolean   @default(false)
-  /// Set when joins commit, so a retried rejection log can skip events already stored.
   appliedAt           DateTime?
   createdAt           DateTime  @default(now())
 
@@ -308,7 +304,6 @@ model OrbitTagAuditProposal {
   auditId      String
   bookmarkId   String
   tagId        String
-  /// remove or swap. The swap target is swapTagId.
   kind         String
   swapTagId    String?
   reason       String
@@ -322,7 +317,6 @@ model OrbitTagAuditProposal {
   @@index([auditId, rank])
 }
 
-/// Historical tag ids for the bookmarks an apply touched. Not a live join.
 model OrbitTagAuditUndo {
   auditId    String    @id
   userId     String
