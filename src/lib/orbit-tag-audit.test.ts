@@ -63,6 +63,12 @@ const memory = vi.hoisted(() => {
   const proposals: ProposalRow[] = [];
   const undos: UndoRow[] = [];
   const events: Array<Record<string, unknown>> = [];
+  let clock = Date.now();
+
+  function nextTick() {
+    clock = Math.max(Date.now(), clock + 1);
+    return new Date(clock);
+  }
 
   function reset() {
     bookmarks.length = 0;
@@ -120,14 +126,32 @@ const memory = vi.hoisted(() => {
       .sort();
   }
 
-  function bookmarkMatches(bookmark: BookmarkRow, where: Record<string, unknown> | undefined) {
+  function bookmarkMatches(bookmark: BookmarkRow, where: Record<string, unknown> | undefined): boolean {
     if (!where) return true;
     if (typeof where.userId === "string" && bookmark.userId !== where.userId) return false;
-    const idFilter = where.id as { in?: string[] } | undefined;
+    const idFilter = where.id as { in?: string[]; notIn?: string[]; lt?: string } | undefined;
     if (idFilter?.in && !idFilter.in.includes(bookmark.id)) return false;
+    if (idFilter?.notIn && idFilter.notIn.includes(bookmark.id)) return false;
+    if (idFilter?.lt && bookmark.id >= idFilter.lt) return false;
+    const bookmarkedAt = where.bookmarkedAt as Date | { lt?: Date } | undefined;
+    if (bookmarkedAt instanceof Date) {
+      if (bookmark.bookmarkedAt.getTime() !== bookmarkedAt.getTime()) return false;
+    } else if (bookmarkedAt?.lt && bookmark.bookmarkedAt >= bookmarkedAt.lt) {
+      return false;
+    }
     if (where.tags && typeof where.tags === "object") {
       const tagged = joins.some((join) => join.bookmarkId === bookmark.id);
       if (!tagged) return false;
+    }
+    if (Array.isArray(where.AND)) {
+      if (!where.AND.every((part) => bookmarkMatches(bookmark, part as Record<string, unknown>))) {
+        return false;
+      }
+    }
+    if (Array.isArray(where.OR)) {
+      if (!where.OR.some((part) => bookmarkMatches(bookmark, part as Record<string, unknown>))) {
+        return false;
+      }
     }
     return true;
   }
@@ -251,16 +275,30 @@ const memory = vi.hoisted(() => {
     },
     orbitTagAudit: {
       async findFirst(args: {
-        where?: { id?: string; userId?: string };
-        orderBy?: { createdAt?: "asc" | "desc" };
+        where?: {
+          id?: string;
+          userId?: string;
+          phase?: string;
+          undo?: { is?: { restoredAt?: Date | null } };
+        };
+        orderBy?: { createdAt?: "asc" | "desc"; appliedAt?: "asc" | "desc" };
         include?: { proposals?: unknown; undo?: boolean };
       }) {
         let rows = audits.filter((audit) => {
           if (args.where?.id && audit.id !== args.where.id) return false;
           if (args.where?.userId && audit.userId !== args.where.userId) return false;
+          if (args.where?.phase && audit.phase !== args.where.phase) return false;
+          if (args.where?.undo?.is && "restoredAt" in args.where.undo.is) {
+            const undo = undos.find((item) => item.auditId === audit.id);
+            if (!undo || undo.restoredAt !== args.where.undo.is.restoredAt) return false;
+          }
           return true;
         });
-        if (args.orderBy?.createdAt === "desc") {
+        if (args.orderBy?.appliedAt === "desc") {
+          rows = [...rows].sort(
+            (left, right) => (right.appliedAt?.getTime() ?? 0) - (left.appliedAt?.getTime() ?? 0),
+          );
+        } else if (args.orderBy?.createdAt === "desc") {
           rows = [...rows].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
         }
         const audit = rows[0];
@@ -289,7 +327,7 @@ const memory = vi.hoisted(() => {
           judgedBookmarkCount: args.data.judgedBookmarkCount,
           outcome: args.data.outcome ?? null,
           appliedAt: args.data.appliedAt ?? null,
-          createdAt: args.data.createdAt ?? new Date(),
+          createdAt: args.data.createdAt ?? nextTick(),
         };
         audits.push(audit);
         for (const proposal of args.data.proposals?.create ?? []) {
@@ -351,22 +389,38 @@ const memory = vi.hoisted(() => {
           createdAt?: { gte?: Date };
           bookmarkId?: { in?: string[] };
         };
-        select?: { originalSuggestion?: boolean };
+        select?: { originalSuggestion?: boolean; bookmark?: unknown };
       }) {
         if (!args.select?.originalSuggestion) return [];
-        return events.filter((event) => {
-          if (args.where?.userId && event.userId !== args.where.userId) return false;
-          if (args.where?.action && event.action !== args.where.action) return false;
-          if (args.where?.source && event.source !== args.where.source) return false;
-          if (args.where?.bookmarkId?.in && !args.where.bookmarkId.in.includes(String(event.bookmarkId))) {
-            return false;
-          }
-          const createdAt = event.createdAt;
-          if (args.where?.createdAt?.gte && (!(createdAt instanceof Date) || createdAt < args.where.createdAt.gte)) {
-            return false;
-          }
-          return true;
-        });
+        return events
+          .filter((event) => {
+            if (args.where?.userId && event.userId !== args.where.userId) return false;
+            if (args.where?.action && event.action !== args.where.action) return false;
+            if (args.where?.source && event.source !== args.where.source) return false;
+            if (args.where?.bookmarkId?.in && !args.where.bookmarkId.in.includes(String(event.bookmarkId))) {
+              return false;
+            }
+            const createdAt = event.createdAt;
+            if (args.where?.createdAt?.gte && (!(createdAt instanceof Date) || createdAt < args.where.createdAt.gte)) {
+              return false;
+            }
+            return true;
+          })
+          .map((event) => {
+            if (!args.select?.bookmark) return event;
+            const bookmark = bookmarks.find((item) => item.id === event.bookmarkId);
+            return {
+              ...event,
+              bookmark: {
+                authorUsername: bookmark?.authorUsername ?? "reader",
+                tweetText: bookmark?.tweetText ?? "",
+                media: bookmark?.media ?? null,
+                urls: bookmark?.urls ?? [],
+                xMetadata: null,
+                collectionItems: [],
+              },
+            };
+          });
       },
       async deleteMany(args: {
         where?: {
@@ -374,6 +428,7 @@ const memory = vi.hoisted(() => {
           source?: string;
           createdAt?: { gte?: Date };
           bookmarkId?: { in?: string[] };
+          originalSuggestion?: { path?: string[]; equals?: string };
         };
       }) {
         const before = events.length;
@@ -387,6 +442,15 @@ const memory = vi.hoisted(() => {
             !args.where.bookmarkId.in.includes(String(event.bookmarkId))
           ) {
             continue;
+          }
+          const auditEquals = args.where?.originalSuggestion;
+          if (auditEquals?.path?.[0] === "auditId") {
+            const suggestion = event.originalSuggestion;
+            const auditId =
+              suggestion && typeof suggestion === "object"
+                ? (suggestion as { auditId?: unknown }).auditId
+                : undefined;
+            if (auditId !== auditEquals.equals) continue;
           }
           const createdAt = event.createdAt;
           if (
@@ -452,12 +516,13 @@ const memory = vi.hoisted(() => {
   function seedOpenAudit(args: {
     id: string;
     userId?: string;
+    phase?: string;
     proposals: Array<Omit<ProposalRow, "auditId">>;
   }) {
     audits.push({
       id: args.id,
       userId: args.userId ?? "user-1",
-      phase: "open",
+      phase: args.phase ?? "open",
       taggedBookmarkCount: 1,
       judgedBookmarkCount: 1,
       outcome: null,
@@ -494,9 +559,17 @@ vi.mock("@/lib/typesafe", () => ({
   getTypeSafeModel: () => "jev-latest",
   getTypeSafeModelSource: () => "default",
   isTypeSafeConfigured: () => Boolean(process.env.TYPESAFE_API_KEY?.trim()),
+  TYPESAFE_TIMEOUT_MS: 15_000,
 }));
 
-import { applyOrbitTagAudit, runOrbitTagAudit, undoOrbitTagAudit } from "@/lib/orbit-tag-audit";
+import {
+  applyOrbitTagAudit,
+  readOrbitTagAudit,
+  runOrbitTagAudit,
+  tagAuditCoverageSentence,
+  tagAuditGrokTimeoutMs,
+  undoOrbitTagAudit,
+} from "@/lib/orbit-tag-audit";
 
 const fetchMock = vi.fn();
 
@@ -883,5 +956,217 @@ describe("orbit tag audit", () => {
     });
 
     expect(memory.tagIds("bm-ab")).toEqual([]);
+  });
+
+  it("undo of an older audit leaves a newer audit's rejection events", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+
+    const older = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: older.auditId,
+      checkedProposalIds: older.proposals.map((proposal) => proposal.id),
+    });
+    memory.addJoin("bm-loose", "tag-loose");
+    const newer = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: newer.auditId,
+      checkedProposalIds: newer.proposals.map((proposal) => proposal.id),
+    });
+    const onBookmark = () =>
+      memory.events.filter((event) => event.bookmarkId === "bm-loose" && event.source === "tag-audit");
+    expect(onBookmark()).toHaveLength(2);
+
+    await undoOrbitTagAudit({ userId: "user-1", auditId: older.auditId });
+
+    const remaining = onBookmark();
+    expect(remaining).toHaveLength(1);
+    expect((remaining[0]?.originalSuggestion as { auditId?: string } | undefined)?.auditId).toBe(
+      newer.auditId,
+    );
+  });
+
+  it("does not remove a tag when the proposal kind or the audit phase is unknown", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-kind", tagIds: ["tag-loose"] });
+    memory.seedBookmark({ id: "bm-phase", tagIds: ["tag-loose"] });
+    memory.seedOpenAudit({
+      id: "audit-kind",
+      proposals: [
+        {
+          id: "p-kind",
+          bookmarkId: "bm-kind",
+          tagId: "tag-loose",
+          kind: "explode",
+          swapTagId: null,
+          reason: "Unknown action.",
+          currentScore: 0.2,
+          rank: 0,
+        },
+      ],
+    });
+    memory.seedOpenAudit({
+      id: "audit-phase",
+      phase: "retired",
+      proposals: [
+        {
+          id: "p-phase",
+          bookmarkId: "bm-phase",
+          tagId: "tag-loose",
+          kind: "remove",
+          swapTagId: null,
+          reason: "Loose is a weak match for this post.",
+          currentScore: 0.2,
+          rank: 0,
+        },
+      ],
+    });
+
+    try {
+      await applyOrbitTagAudit({
+        userId: "user-1",
+        auditId: "audit-kind",
+        checkedProposalIds: ["p-kind"],
+      });
+    } catch {
+      // Fail closed may throw instead of skipping.
+    }
+    try {
+      await applyOrbitTagAudit({
+        userId: "user-1",
+        auditId: "audit-phase",
+        checkedProposalIds: ["p-phase"],
+      });
+    } catch {
+      // Fail closed may throw instead of skipping.
+    }
+
+    expect(memory.tagIds("bm-kind")).toEqual(["tag-loose"]);
+    expect(memory.tagIds("bm-phase")).toEqual(["tag-loose"]);
+  });
+
+  it("keeps the last apply undo available after review again", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+
+    const applied = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: applied.auditId,
+      checkedProposalIds: applied.proposals.map((proposal) => proposal.id),
+    });
+    expect(memory.tagIds("bm-loose")).toEqual([]);
+
+    const again = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    const loaded = await readOrbitTagAudit({ userId: "user-1" });
+
+    const againUndoId = (again as { undoAuditId?: string }).undoAuditId;
+    const loadedUndoId = (loaded as { undoAuditId?: string } | null)?.undoAuditId;
+    expect(again.phase).toBe("open");
+    expect(again.undoAvailable).toBe(true);
+    expect(againUndoId).toBe(applied.auditId);
+    expect(loaded?.undoAvailable).toBe(true);
+    expect(loadedUndoId).toBe(applied.auditId);
+
+    await undoOrbitTagAudit({ userId: "user-1", auditId: againUndoId! });
+    expect(memory.tagIds("bm-loose")).toEqual(["tag-loose"]);
+  });
+
+  it("aborts in-flight Jev calls when the audit deadline leaves only the Grok window", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    let signal: AbortSignal | undefined;
+    systemOneMock.mockImplementation(
+      (_request: unknown, options?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal = options?.signal;
+          if (!signal) return;
+          if (signal.aborted) {
+            reject(new DOMException("aborted", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        }),
+    );
+
+    const view = await Promise.race([
+      runOrbitTagAudit({
+        userId: "user-1",
+        deadlineMs: Date.now() + 60_000 + 15_000 + 40,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("signal did not abort Jev")), 500);
+      }),
+    ]);
+
+    expect(signal?.aborted).toBe(true);
+    expect(view.coverage.judgedBookmarkCount).toBe(0);
+    expect(tagAuditGrokTimeoutMs(10_000, 0)).toBe(10_000);
+    expect(tagAuditGrokTimeoutMs(90_000, 0)).toBe(60_000);
+  });
+
+  it("reviews the next page of tagged bookmarks and then wraps to the newest", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    const total = 161;
+    for (let index = 0; index < total; index += 1) {
+      const suffix = String(index).padStart(3, "0");
+      memory.seedBookmark({
+        id: `bm-${suffix}`,
+        tagIds: ["tag-loose"],
+        bookmarkedAt: new Date(Date.UTC(2026, 0, 1) + index * 60_000),
+      });
+    }
+    const judgedIds: string[] = [];
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      judgedIds.push(request.state.id);
+      return { answers: { current_0: { noul: 0.9 } } };
+    });
+
+    const first = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    const firstIds = judgedIds.splice(0, judgedIds.length);
+    const second = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    const secondIds = judgedIds.splice(0, judgedIds.length);
+    const third = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    const thirdIds = judgedIds.splice(0, judgedIds.length);
+
+    expect(new Set(firstIds)).toEqual(new Set(Array.from({ length: 80 }, (_item, index) => {
+      return `bm-${String(total - 1 - index).padStart(3, "0")}`;
+    })));
+    expect(new Set(secondIds).size).toBe(80);
+    expect(secondIds.some((id) => firstIds.includes(id))).toBe(false);
+    expect(thirdIds).toContain("bm-000");
+    expect(thirdIds.some((id) => firstIds.includes(id))).toBe(true);
+    expect(tagAuditCoverageSentence(first.coverage)).toBe(
+      "Reviewed the newest 80 of 161 tagged bookmarks.",
+    );
+    expect(tagAuditCoverageSentence(second.coverage)).toMatch(/continuing/);
+    expect(tagAuditCoverageSentence(third.coverage)).toMatch(/wrapping/);
   });
 });

@@ -38,6 +38,7 @@ type TagAuditResponse = {
   phase: "open" | "applied" | "undone";
   coverageSentence: string;
   undoAvailable: boolean;
+  undoAuditId: string | null;
   proposals: TagAuditProposal[];
 };
 
@@ -150,9 +151,10 @@ export default function OrbitAuditClient() {
     setBusy("undo");
     setError(null);
     try {
+      if (!view.undoAuditId) return;
       await sendJson("/api/orbit/tag-audit/undo", {
         method: "POST",
-        body: { auditId: view.auditId },
+        body: { auditId: view.undoAuditId },
       });
       await load();
     } catch (caught) {
