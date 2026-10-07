@@ -195,6 +195,7 @@ export const OrbitCommandBar = forwardRef<HTMLInputElement, OrbitCommandBarProps
           active="queue"
           size={compact ? "sm" : "md"}
           mapHref={mapHref}
+          auditHref="/orbit/audit"
           className={appToolbarSurfaceClassName}
         />
         {selectionMode ? (
