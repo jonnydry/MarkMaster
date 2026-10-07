@@ -154,3 +154,11 @@ Downstream sticky subbars use `--header-height` — do not hard-code compact too
 search-strip pixel offsets; keep the search trigger inline in the toolbar row (`min-w-0`
 flex chain) so the header measures correctly on narrow viewports.
 
+## Cursor Cloud specific instructions
+
+Node is already on the image (`node -v` must satisfy `engines` in `package.json`). PostgreSQL 16 is installed as the Ubuntu cluster `16/main`. systemd is not running here, and `policy-rc.d` blocks `service postgresql start`; start the cluster with `sudo pg_ctlcluster 16 main start` and wait until `pg_isready -q` succeeds.
+
+The Cloud Agent `start` script creates the `user` / `markmaster` role and database (same names as `docker-compose.yml`), writes a gitignored `.env` when one is missing, and runs `npx prisma migrate deploy`. It does not launch `npm run dev`. Next.js 16 keeps a single dev-server lock for this directory, and `node .cursor/skills/verify-markmaster/bin/launch.mjs` has to be that process. Placeholder `AUTH_TWITTER_*` values let the app boot. Real X sync still needs a developer app's client id and secret in `.env`.
+
+Seeded UI checks do not use X, xAI, or TypeSafe. From the repo root: `node .cursor/skills/verify-markmaster/bin/launch.mjs`, then `doctor.mjs`, then `drive.mjs`. That cluster uses port 54329 and the app port 3100. For an unsigned session, `npm run dev` serves `http://127.0.0.1:3000`. Run only one of those at a time. Canonical checks before pushing: `npm run lint`, `npm run typecheck`, `npm run test`.
+
