@@ -5,6 +5,7 @@ import type {
   OrbitScanConfidence,
   OrbitScanPlan,
 } from "@/types";
+import { ORBIT_JEV_TAG_STRONG_THRESHOLD } from "@/lib/orbit-config";
 import { isVideoFormatTag } from "@/lib/orbit-video-tag";
 
 /** Grok returns tri-state confidence only — surface qualitative labels, not fake percentages. */
@@ -32,23 +33,50 @@ export function shouldCreateCollectionsForPlan(plan: OrbitScanPlan): boolean {
 }
 
 /**
- * Guardrail for one-click/batch automation: only auto-apply high-confidence
- * suggestions that reuse the user's existing vocabulary or collections.
- * New labels can still be applied through Review, where the user can inspect them.
+ * A label is strong enough to apply unreviewed when Jev scored it at the
+ * strong threshold. Grok-only scans carry no scores; there the suggestion's
+ * own "high" confidence is all there is to go on.
  */
+function isStrongLabel(label: { score?: number }) {
+  return label.score === undefined || label.score >= ORBIT_JEV_TAG_STRONG_THRESHOLD;
+}
+
+/**
+ * Guardrail for one-click/batch automation: the part of a high-confidence
+ * suggestion that is safe to apply unreviewed, or null when nothing is.
+ *
+ * Only labels that reuse the user's existing tags or collections and that Jev
+ * scored as strong are kept — one strong tag no longer carries weaker ones
+ * along. A suggestion that names a new tag keeps its tags for Review, where
+ * the user can inspect them; its reusable collection may still apply.
+ */
+export function safeAutoApplySubset(
+  suggestion: OrbitBookmarkSuggestion
+): OrbitBookmarkSuggestion | null {
+  if (suggestion.confidence !== "high") return null;
+
+  const topicalTags = suggestion.tags.filter((tag) => !isVideoFormatTag(tag));
+  const namesNewTag = topicalTags.some((tag) => !tag.reuseExisting);
+  const strongTags = namesNewTag
+    ? []
+    : topicalTags.filter((tag) => isStrongLabel(tag));
+  const collection =
+    suggestion.collection?.reuseExisting && isStrongLabel(suggestion.collection)
+      ? suggestion.collection
+      : null;
+
+  if (strongTags.length === 0 && !collection) return null;
+  return {
+    ...suggestion,
+    tags: [...strongTags, ...suggestion.tags.filter(isVideoFormatTag)],
+    collection,
+  };
+}
+
 export function isSafeAutoApplySuggestion(
   suggestion: OrbitBookmarkSuggestion
 ): boolean {
-  if (suggestion.confidence !== "high") return false;
-
-  const topicalTags = suggestion.tags.filter((tag) => !isVideoFormatTag(tag));
-  const hasReusableTag =
-    topicalTags.length > 0 && topicalTags.every((tag) => tag.reuseExisting);
-  const hasReusableCollection = Boolean(
-    suggestion.collection && suggestion.collection.reuseExisting
-  );
-
-  return hasReusableTag || hasReusableCollection;
+  return safeAutoApplySubset(suggestion) !== null;
 }
 
 function tagDecision(

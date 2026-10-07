@@ -34,7 +34,8 @@
     "db:studio": "prisma studio",
     "db:seed:verify": "node scripts/seed-verify.mjs",
     "env:check": "node scripts/check-env.mjs",
-    "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts"
+    "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts",
+    "eval:orbit-calibrate": "RUN_ORBIT_JEV_REPLAY=1 vitest run src/lib/orbit-jev-replay.live.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

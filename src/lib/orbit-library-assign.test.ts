@@ -133,25 +133,76 @@ describe("shortlistLibraryPackTags", () => {
 });
 
 describe("planLibraryAssignments", () => {
-  it("retries a rate-limited pack instead of skipping its posts", async () => {
-    systemOneMock
-      .mockRejectedValueOnce(rateLimited())
-      .mockRejectedValueOnce(rateLimited())
-      .mockImplementation(async (request) => strongFirstTag(request));
+  it("leaves retries to the TypeSafe client with a pack-sized timeout", async () => {
+    systemOneMock.mockImplementation(async (request) => strongFirstTag(request));
 
     const result = await planLibraryAssignments({
       bookmarks: posts(3),
       vocabulary,
-      retryBaseDelayMs: 0,
     });
 
-    expect(systemOneMock).toHaveBeenCalledTimes(3);
+    expect(systemOneMock).toHaveBeenCalledTimes(1);
+    expect(systemOneMock.mock.calls[0]?.[1]).toEqual({
+      timeout: 30_000,
+      retry: { maxRetries: 4 },
+    });
     expect(result.failed).toBe(0);
     expect(result.modelChecked).toBe(3);
     expect(result.plan.suggestions.map((s) => s.tags.map((t) => t.name))).toEqual([
       ["AI"],
       ["AI"],
       ["AI"],
+    ]);
+  });
+
+  it("shows Jev each tag's examples and points questions at them", async () => {
+    systemOneMock.mockImplementation(async (request) => strongFirstTag(request));
+
+    await planLibraryAssignments({
+      bookmarks: posts(1),
+      vocabulary,
+      examples: new Map([["ai", ["Notes on transformer scaling"]]]),
+    });
+
+    const request = systemOneMock.mock.calls[0]?.[0] as {
+      state: { tags: Array<{ name: string; examples?: string[] }> };
+      questions: Record<string, { instructions: { question: string } }>;
+    };
+    expect(request.state.tags).toEqual([
+      { name: "AI", examples: ["Notes on transformer scaling"] },
+      { name: "Cooking" },
+    ]);
+    expect(request.questions.p0t1?.instructions.question).toContain("`tags[1]`");
+  });
+
+  it("still asks Jev about a post whose X topic matched a tag", async () => {
+    systemOneMock.mockImplementation(async (request) => {
+      const answers: Record<string, { noul: number }> = {};
+      for (const key of Object.keys(request.questions)) {
+        // Jev finds the specific tag (Cooking) the broad topic would have hidden.
+        answers[key] = { noul: key.endsWith("t1") ? 0.92 : 0.1 };
+      }
+      return { answers };
+    });
+
+    const result = await planLibraryAssignments({
+      bookmarks: [
+        {
+          id: "bm-topic",
+          tweetText: "Weeknight pasta",
+          media: null,
+          xMetadata: {
+            tweet: { context_annotations: [{ entity: { name: "AI" } }] },
+          },
+        },
+      ],
+      vocabulary,
+    });
+
+    expect(systemOneMock).toHaveBeenCalledTimes(1);
+    expect(result.plan.suggestions[0]?.tags.map((tag) => tag.name)).toEqual([
+      "AI",
+      "Cooking",
     ]);
   });
 
@@ -166,9 +217,9 @@ describe("planLibraryAssignments", () => {
     const result = await planLibraryAssignments({
       bookmarks: posts(8),
       vocabulary,
-      retryBaseDelayMs: 0,
     });
 
+    // The client already retried; a pack still throttled is skipped, not fatal.
     expect(result.failed).toBe(6);
     expect(result.plan.suggestions.map((s) => s.bookmarkId)).toEqual([
       "bm-6",
@@ -185,7 +236,6 @@ describe("planLibraryAssignments", () => {
       planLibraryAssignments({
         bookmarks: posts(12),
         vocabulary,
-        retryBaseDelayMs: 0,
       })
     ).rejects.toMatchObject({ code: "typesafe_auth" });
   });
@@ -294,20 +344,4 @@ describe("createPackLimiter", () => {
     expect(result.plan.suggestions).toEqual([]);
   });
 
-  it("cuts a rate-limit backoff short when the batch is abandoned", async () => {
-    const abandon = new AbortController();
-    systemOneMock.mockRejectedValue(rateLimited());
-
-    const planning = planLibraryAssignments({
-      bookmarks: posts(6),
-      vocabulary,
-      signal: abandon.signal,
-      retryBaseDelayMs: 60_000,
-    });
-    await vi.waitFor(() => expect(systemOneMock).toHaveBeenCalledOnce());
-    abandon.abort();
-
-    await expect(planning).resolves.toMatchObject({ failed: 0 });
-    expect(systemOneMock).toHaveBeenCalledOnce();
-  });
 });

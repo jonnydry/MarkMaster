@@ -3,6 +3,8 @@ import "server-only";
 import { PRESET_COLORS } from "@/lib/constants";
 import {
   ORBIT_LIBRARY_EXISTING_TAG_CAP,
+  ORBIT_LIBRARY_GROWTH_MAX_TAGS,
+  ORBIT_LIBRARY_GROWTH_MIN_POSTS,
   ORBIT_LIBRARY_SAMPLE_POOL,
   ORBIT_LIBRARY_SAMPLE_SIZE,
   ORBIT_LIBRARY_VOCAB_MAX,
@@ -19,6 +21,7 @@ import {
   selectStratifiedLibrarySample,
   type LibrarySampleBookmark,
 } from "@/lib/orbit-library-sample";
+import type { LibraryVocabularyTag } from "@/lib/orbit-library-assign";
 import { prisma } from "@/lib/prisma";
 
 const VOCAB_SCHEMA = {
@@ -67,8 +70,27 @@ function vocabularyPrompt(sample: LibrarySampleBookmark[]) {
   ].join("\n");
 }
 
+function growthPrompt(
+  sample: LibrarySampleBookmark[],
+  existing: Array<{ name: string }>
+) {
+  return [
+    "These X bookmarks did not fit any tag on the library's tag list.",
+    `Name at most ${ORBIT_LIBRARY_GROWTH_MAX_TAGS} NEW reusable tags, each covering several of these posts. Each tag is 1-3 words in Title Case.`,
+    "Do not repeat, reword, or pluralize a tag already on the list.",
+    "No generic labels: Post, Tweet, Link, Article, Bookmark, Misc, Other, Saved.",
+    "Return an empty list when the posts share no reusable topic.",
+    "",
+    `Existing tags: ${existing.map((tag) => tag.name).join(", ")}`,
+    "",
+    "Posts:",
+    sample.map(formatSamplePost).join("\n\n"),
+  ].join("\n");
+}
+
 async function requestLibraryVocabulary(
-  sample: LibrarySampleBookmark[]
+  sample: LibrarySampleBookmark[],
+  options: { prompt?: string; cacheKey?: string; allowEmpty?: boolean } = {}
 ): Promise<string[]> {
   const apiKey = process.env.XAI_API_KEY?.trim();
   if (!apiKey) {
@@ -96,10 +118,10 @@ async function requestLibraryVocabulary(
             content:
               "You name a short reusable tag list for a bookmark library. Reply with the JSON schema only.",
           },
-          { role: "user", content: vocabularyPrompt(sample) },
+          { role: "user", content: options.prompt ?? vocabularyPrompt(sample) },
         ],
         store: false,
-        prompt_cache_key: "markmaster-orbit-library-vocab",
+        prompt_cache_key: options.cacheKey ?? "markmaster-orbit-library-vocab",
         reasoning: { effort: "low" },
         text: {
           format: {
@@ -150,8 +172,9 @@ async function requestLibraryVocabulary(
   }
 
   const names = parseLibraryVocabularyTags(parsed, {
-    includeVideo: librarySampleHasVideo(sample),
+    includeVideo: !options.allowEmpty && librarySampleHasVideo(sample),
   });
+  if (names.length === 0 && options.allowEmpty) return [];
   if (names.length === 0) {
     throw new OrbitScanError(
       "No usable tags came back for this library.",
@@ -167,53 +190,33 @@ function includesVideoTag(tags: Array<{ name: string }>) {
   return tags.some((tag) => normalizeTagKey(tag.name) === videoKey);
 }
 
-type LibraryVocabularyResult = {
-  tags: Array<{ name: string; color: string }>;
-  /** True only when this call inserted a tag. Callers invalidate caches then. */
-  created: boolean;
-};
-
-/** Video is a format tag, so it stays on the list when the untagged posts include video. */
+/**
+ * Video is a format tag, so it stays on the list when the untagged posts
+ * include video. Like every name on the list, it becomes a Tag row only when
+ * a post is actually tagged with it.
+ */
 async function withVideoTag(
   userId: string,
-  tags: Array<{ name: string; color: string }>
-): Promise<LibraryVocabularyResult> {
-  if (includesVideoTag(tags)) return { tags, created: false };
+  tags: LibraryVocabularyTag[]
+): Promise<LibraryVocabularyTag[]> {
+  if (includesVideoTag(tags)) return tags;
   const probe = await prisma.bookmark.findMany({
     where: untaggedSampleWhere(userId),
     select: { media: true },
     take: 80,
   });
-  if (!librarySampleHasVideo(probe)) return { tags, created: false };
+  if (!librarySampleHasVideo(probe)) return tags;
 
   const color = normalizeColor(VIDEO_TAG_NAME, undefined, PRESET_COLORS);
-  const inserted = await prisma.tag.createMany({
-    data: [{ userId, name: VIDEO_TAG_NAME, color }],
-    skipDuplicates: true,
-  });
   const kept =
     tags.length > ORBIT_LIBRARY_VOCAB_MAX
       ? tags
       : tags.slice(0, ORBIT_LIBRARY_VOCAB_MAX - 1);
-  return {
-    tags: [...kept, { name: VIDEO_TAG_NAME, color }],
-    created: inserted.count > 0,
-  };
+  return [...kept, { name: VIDEO_TAG_NAME, color }];
 }
 
-/** Existing tags, or one new list learned from a sample of the untagged library. */
-export async function ensureLibraryVocabulary(
-  userId: string
-): Promise<LibraryVocabularyResult> {
-  const existing = await prisma.tag.findMany({
-    where: { userId },
-    select: { name: true, color: true },
-    orderBy: { bookmarks: { _count: "desc" } },
-    take: ORBIT_LIBRARY_EXISTING_TAG_CAP,
-  });
-  if (existing.length > 0) return withVideoTag(userId, existing);
-
-  const pool = await prisma.bookmark.findMany({
+function untaggedSamplePool(userId: string) {
+  return prisma.bookmark.findMany({
     where: untaggedSampleWhere(userId),
     select: {
       id: true,
@@ -226,20 +229,59 @@ export async function ensureLibraryVocabulary(
     orderBy: [{ bookmarkedAt: "desc" }, { id: "desc" }],
     take: ORBIT_LIBRARY_SAMPLE_POOL,
   });
-  if (pool.length === 0) return { tags: [], created: false };
+}
+
+/**
+ * Existing tags, or one new list learned from a sample of the untagged
+ * library. A learned list is kept on the run, not written as Tag rows:
+ * applying a page creates each tag the first time a post receives it, so
+ * names no post fits never become empty tags.
+ */
+export async function ensureLibraryVocabulary(
+  userId: string
+): Promise<LibraryVocabularyTag[]> {
+  const existing = await prisma.tag.findMany({
+    where: { userId },
+    select: { name: true, color: true },
+    orderBy: { bookmarks: { _count: "desc" } },
+    take: ORBIT_LIBRARY_EXISTING_TAG_CAP,
+  });
+  if (existing.length > 0) return withVideoTag(userId, existing);
+
+  const pool = await untaggedSamplePool(userId);
+  if (pool.length === 0) return [];
 
   const sample = selectStratifiedLibrarySample(pool, ORBIT_LIBRARY_SAMPLE_SIZE);
   const names = await requestLibraryVocabulary(sample);
-  const data = names.map((name) => ({
-    userId,
+  return names.map((name) => ({
     name,
     color: normalizeColor(name, undefined, PRESET_COLORS),
   }));
+}
 
-  const inserted = await prisma.tag.createMany({ data, skipDuplicates: true });
+/**
+ * New tags for the posts a library pass left untagged, named by Grok from a
+ * sample of them. Empty when too few posts are left or they share no topic.
+ */
+export async function requestLibraryGrowthTags(
+  userId: string,
+  existing: LibraryVocabularyTag[]
+): Promise<LibraryVocabularyTag[]> {
+  const pool = await untaggedSamplePool(userId);
+  if (pool.length < ORBIT_LIBRARY_GROWTH_MIN_POSTS) return [];
 
-  return {
-    tags: data.map((tag) => ({ name: tag.name, color: tag.color })),
-    created: inserted.count > 0,
-  };
+  const sample = selectStratifiedLibrarySample(pool, ORBIT_LIBRARY_SAMPLE_SIZE);
+  const names = await requestLibraryVocabulary(sample, {
+    prompt: growthPrompt(sample, existing),
+    cacheKey: "markmaster-orbit-library-growth",
+    allowEmpty: true,
+  });
+  const taken = new Set(existing.map((tag) => normalizeTagKey(tag.name)));
+  return names
+    .filter((name) => !taken.has(normalizeTagKey(name)))
+    .slice(0, ORBIT_LIBRARY_GROWTH_MAX_TAGS)
+    .map((name) => ({
+      name,
+      color: normalizeColor(name, undefined, PRESET_COLORS),
+    }));
 }

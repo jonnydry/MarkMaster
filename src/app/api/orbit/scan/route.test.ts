@@ -23,6 +23,13 @@ vi.mock("@/lib/orbit-scan-neighbors", () => ({
 }));
 
 const enrichBookmarksForScanMock = vi.hoisted(() => vi.fn());
+const loadOrbitLabelExamplesMock = vi.hoisted(() =>
+  vi.fn(async () => ({ tags: new Map<string, string[]>(), collections: new Map<string, string[]>() }))
+);
+
+vi.mock("@/lib/orbit-label-examples", () => ({
+  loadOrbitLabelExamples: loadOrbitLabelExamplesMock,
+}));
 
 vi.mock("@/lib/orbit-scan-enrichment", () => ({
   enrichBookmarksForScan: enrichBookmarksForScanMock,
@@ -397,6 +404,39 @@ describe("/api/orbit/scan", () => {
         ],
       })
     );
+  });
+
+  it("gives each tag its example posts and the scan a deadline inside maxDuration", async () => {
+    const { POST, maxDuration } = await import("./route");
+    const { prisma } = await import("@/lib/prisma");
+
+    await mockScanData();
+    vi.mocked(prisma.tag.findMany).mockResolvedValue([
+      { id: "tag-1", name: "Rust", color: "#f97316", _count: { bookmarks: 4 } },
+    ] as never);
+    loadOrbitLabelExamplesMock.mockResolvedValueOnce({
+      tags: new Map([["tag-1", ["Async Rust in practice"]]]),
+      collections: new Map(),
+    });
+    const before = Date.now();
+
+    await POST(createScanRequest());
+
+    expect(loadOrbitLabelExamplesMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      tagIds: ["tag-1"],
+      collectionIds: [],
+    });
+    const call = scanOrbitBookmarksWithXaiMock.mock.calls[0]?.[0] as {
+      existingTags: Array<{ name: string; examples?: string[] }>;
+      deadline: number;
+    };
+    expect(call.existingTags[0]).toMatchObject({
+      name: "Rust",
+      examples: ["Async Rust in practice"],
+    });
+    expect(call.deadline).toBeGreaterThan(before);
+    expect(call.deadline).toBeLessThan(before + maxDuration * 1000);
   });
 
   it("continues scan with enrichment failure telemetry on the batch", async () => {

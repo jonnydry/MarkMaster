@@ -8,7 +8,11 @@ import {
   getTypeSafeModelSource,
   isTypeSafeConfigured,
 } from "@/lib/typesafe";
-import type { OrbitScanFailureCode, OrbitXaiStatusPayload } from "@/types";
+import type {
+  OrbitScanFailureCode,
+  OrbitSuggestionOrigin,
+  OrbitXaiStatusPayload,
+} from "@/types";
 
 const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
 export const DEFAULT_XAI_MODEL = "grok-4.7";
@@ -123,6 +127,8 @@ export interface OrbitTagContext {
   name: string;
   color: string;
   bookmarkCount?: number;
+  /** Short texts of posts already under this tag; Jev reads them as its meaning. */
+  examples?: string[];
 }
 
 export interface OrbitCollectionContext {
@@ -130,6 +136,8 @@ export interface OrbitCollectionContext {
   name: string;
   description: string | null;
   bookmarkCount?: number;
+  /** Short texts of posts already in this collection. */
+  examples?: string[];
 }
 
 export interface OrbitHybridLeftoverNote {
@@ -148,12 +156,20 @@ export interface OrbitAuthorPriorHint {
 
 export const orbitConfidenceSchema = z.enum(["high", "medium", "low"]);
 
+/** Jev's probability for one label; computed server-side, never sent by xAI. */
+const orbitLabelScoreSchema = z.number().min(0).max(1).optional();
+export const orbitSuggestionOriginSchema = z
+  .enum(["jev", "jev_new_name", "grok"])
+  .optional();
+
 /** Normalized tag suggestion — `reuseExisting` is computed locally, not from xAI. */
 export const orbitTagSuggestionSchema = z.object({
   name: z.string().trim().min(1).max(50),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   reason: z.string().trim().min(1).max(180),
   reuseExisting: z.boolean(),
+  score: orbitLabelScoreSchema,
+  origin: orbitSuggestionOriginSchema,
 });
 
 /** Normalized collection suggestion — `reuseExisting` is computed locally, not from xAI. */
@@ -162,6 +178,8 @@ export const orbitCollectionSuggestionSchema = z.object({
   description: z.string().trim().min(1).max(240),
   reason: z.string().trim().min(1).max(180),
   reuseExisting: z.boolean(),
+  score: orbitLabelScoreSchema,
+  origin: orbitSuggestionOriginSchema,
 });
 
 /** xAI response contract — matches `ORBIT_SCAN_PLAN_JSON_SCHEMA` (no `reuseExisting`). */
@@ -194,7 +212,29 @@ export const orbitScanPlanFromXaiSchema = z.object({
   suggestions: z.array(orbitBookmarkSuggestionFromXaiSchema),
 });
 
-export type OrbitScanPlanFromXai = z.infer<typeof orbitScanPlanFromXaiSchema>;
+type XaiScanPlan = z.infer<typeof orbitScanPlanFromXaiSchema>;
+type XaiBookmarkSuggestion = XaiScanPlan["suggestions"][number];
+
+/** Jev's evidence for a label: set only from Jev answers, never parsed from xAI. */
+type OrbitLabelEvidence = { score?: number; origin?: OrbitSuggestionOrigin };
+
+/**
+ * A raw plan before normalization: xAI's response shape, plus the Jev
+ * evidence hybrid scans attach. Parsing xAI output with
+ * `orbitScanPlanFromXaiSchema` strips `score`/`origin`, so Grok cannot
+ * supply its own scores.
+ */
+export type OrbitScanPlanFromXai = {
+  overview: XaiScanPlan["overview"];
+  suggestions: Array<
+    Omit<XaiBookmarkSuggestion, "tags" | "collection"> & {
+      tags: Array<XaiBookmarkSuggestion["tags"][number] & OrbitLabelEvidence>;
+      collection:
+        | (NonNullable<XaiBookmarkSuggestion["collection"]> & OrbitLabelEvidence)
+        | null;
+    }
+  >;
+};
 
 export const orbitBookmarkSuggestionSchema = z.object({
   bookmarkId: z.string().trim().min(1),
@@ -261,6 +301,10 @@ export const orbitScanBatchMetadataSchema = z.object({
       refinedLeftovers: z.number().int().min(0),
       recoveredOnRefine: z.number().int().min(0),
       escalatedToGrok: z.number().int().min(0),
+      coarseFits: z.number().int().min(0).optional(),
+      namedByGrok: z.number().int().min(0).optional(),
+      narrowed: z.number().int().min(0).optional(),
+      escalationSkipped: z.number().int().min(0).optional(),
     })
     .optional(),
 });

@@ -172,7 +172,7 @@ describe("OrbitScanOverviewStrip", () => {
     // Engine telemetry lives behind the Details disclosure.
     expect(screen.getAllByText(/Orbit pass/).length).toBeGreaterThanOrEqual(1);
     const outcomeLine = screen.getByText(
-      /Couldn't match: 8 · Fixed on retry: 5 · Sent to Grok for new names: 3/
+      /Couldn't match: 8 · Fixed on retry: 5 · Tagged by Grok: 3/
     );
     expect(outcomeLine).toBeInTheDocument();
     // Raw engine metrics stay available for power users via the tooltip.
@@ -180,6 +180,55 @@ describe("OrbitScanOverviewStrip", () => {
       "title",
       expect.stringContaining("Jev leftovers 8")
     );
+  });
+
+  it("reports narrowed tags, skipped work, and model usage", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrbitScanOverviewStrip
+        payload={{
+          ...payload,
+          model: "jev-latest+grok-4.7",
+          batch: {
+            ...payload.batch,
+            hybrid: {
+              firstPassLeftovers: 4,
+              refinedLeftovers: 2,
+              recoveredOnRefine: 2,
+              escalatedToGrok: 0,
+              coarseFits: 3,
+              namedByGrok: 7,
+              narrowed: 2,
+              escalationSkipped: 2,
+              usage: {
+                jevCalls: 30,
+                jevInputTokens: 45_000,
+                jevOutputTokens: 900,
+                grokCalls: 1,
+                grokInputTokens: 6_000,
+                grokOutputTokens: 400,
+              },
+            },
+          },
+        }}
+        suggestionCount={2}
+        scanning={false}
+        applyingBatch={false}
+        canApplyStrongMatches
+        onReview={vi.fn()}
+        onApplyStrongMatches={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /details/i }));
+    const outcomeLine = screen.getByText(
+      /Given a narrower tag: 2 · Tagged by Grok: 0 · Out of time, left for review: 2/
+    );
+    expect(outcomeLine).toHaveAttribute(
+      "title",
+      expect.stringContaining("Grok named for 7")
+    );
+    expect(outcomeLine.getAttribute("title")).toContain("Jev 30 calls");
   });
 
   it("hides the hybrid breakdown when every bookmark matched first pass", async () => {

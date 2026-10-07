@@ -18,7 +18,8 @@ export function OrbitLibraryRunBanner({
     libraryTag;
   if (!run) return null;
 
-  const vocabulary = run.vocabulary ?? [];
+  // Round 1 applies only the new names, so those are what the list shows.
+  const vocabulary = (run.round === 1 ? run.newTags : run.vocabulary) ?? [];
   const shown = vocabulary.slice(0, VOCABULARY_PREVIEW);
   const more = vocabulary.length - shown.length;
 
@@ -44,8 +45,10 @@ export function OrbitLibraryRunBanner({
             : "Auto-tagging the queue"
       }
       detail={detail}
-      // Indeterminate until the tag list is ready and the count means something.
-      progress={run.vocabulary ? progress : null}
+      // Indeterminate until the round's tag list is ready and the count means something.
+      progress={
+        run.vocabulary && !(run.round === 1 && !run.newTags) ? progress : null
+      }
       paused={paused}
       action={
         paused ? (

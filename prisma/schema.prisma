@@ -256,6 +256,17 @@ model OrbitLibraryRun {
   failed             Int                   @default(0)
   /** Closed tag list the run assigns from, fixed before the first page. */
   vocabulary         Json?
+  /**
+   * 0: the pass over the closed tag list. 1: a second pass over the posts it
+   * left untagged, judged only against new tags Grok named for them.
+   */
+  round              Int                   @default(0)
+  /** Round 1's new tags; null until the worker has named them. */
+  growthVocabulary   Json?
+  /** When the current round began; the progress ETA is measured from here. */
+  roundStartedAt     DateTime?
+  /** `applied` when round 1 began; `total` and `processed` restart per round. */
+  priorRoundApplied  Int                   @default(0)
   cursorBookmarkedAt DateTime?
   cursorId           String?
   errorMessage       String?

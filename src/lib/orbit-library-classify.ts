@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { OrbitLibraryRun } from "@prisma/client";
+import { Prisma, type OrbitLibraryRun } from "@prisma/client";
 
 import {
   ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
@@ -18,11 +18,16 @@ import {
   createPackLimiter,
   planLibraryAssignments,
   type LibraryAssignmentPlan,
+  type LibraryTagExamples,
   type LibraryVocabularyTag,
   type PackLimiter,
 } from "@/lib/orbit-library-assign";
-import { ensureLibraryVocabulary } from "@/lib/orbit-library-vocabulary";
-import { logError } from "@/lib/logger";
+import { loadOrbitTagExamplesByName } from "@/lib/orbit-label-examples";
+import {
+  ensureLibraryVocabulary,
+  requestLibraryGrowthTags,
+} from "@/lib/orbit-library-vocabulary";
+import { logError, logWarn } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { isTypeSafeConfigured } from "@/lib/typesafe";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
@@ -163,6 +168,10 @@ export function toOrbitLibraryRunView(
     applied: run.applied,
     failed: run.failed,
     vocabulary: parseVocabulary(run.vocabulary),
+    round: run.round,
+    newTags: parseVocabulary(run.growthVocabulary),
+    priorRoundApplied: run.priorRoundApplied,
+    roundStartedAt: (run.roundStartedAt ?? run.startedAt).toISOString(),
     errorMessage: run.errorMessage,
     startedAt: run.startedAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
@@ -281,12 +290,14 @@ async function planUntaggedLibraryPage(
   bookmarks: LibraryPageBookmark[],
   vocabulary: LibraryVocabularyTag[],
   limiter: PackLimiter,
-  signal: AbortSignal
+  signal: AbortSignal,
+  examples: LibraryTagExamples
 ) {
   const planned = await planLibraryAssignments({
     bookmarks,
     vocabulary,
     limiter,
+    examples,
     signal,
   });
   // Several packs failing with none succeeding means TypeSafe is down, not
@@ -356,6 +367,79 @@ async function finishRun(
 }
 
 /**
+ * The pass over the closed list reached the end of the queue. With Grok
+ * available, the run takes one more round: the next slice names new tags for
+ * the posts nothing fit and judges only those posts against them. Otherwise,
+ * or after that round, the run is done.
+ */
+async function finishPass(
+  run: Pick<OrbitLibraryRun, "id" | "round">
+): Promise<{ continued: boolean }> {
+  if (run.round !== 0 || !process.env.XAI_API_KEY?.trim()) {
+    await finishRun(run.id, "COMPLETED");
+    return { continued: false };
+  }
+  const { count } = await prisma.orbitLibraryRun.updateMany({
+    where: { id: run.id, status: "RUNNING" },
+    data: {
+      round: 1,
+      growthVocabulary: Prisma.DbNull,
+      cursorBookmarkedAt: null,
+      cursorId: null,
+      updatedAt: new Date(),
+    },
+  });
+  return { continued: count > 0 };
+}
+
+/**
+ * Round 1's new tags, named once and stored on the run. An empty list ends
+ * the run: round 0's counts stand. Naming is best-effort — a Grok failure
+ * finishes the run as completed rather than failing work already applied.
+ */
+async function ensureGrowthVocabulary(
+  run: OrbitLibraryRun,
+  vocabulary: LibraryVocabularyTag[]
+): Promise<LibraryVocabularyTag[] | null> {
+  const stored = parseVocabulary(run.growthVocabulary);
+  if (stored) return stored;
+
+  let growth: LibraryVocabularyTag[] = [];
+  try {
+    growth = await requestLibraryGrowthTags(run.userId, vocabulary);
+  } catch (error) {
+    logWarn(
+      "OrbitLibrary",
+      `Could not name new tags for run ${run.id}; finishing without a second round.`,
+      error instanceof Error ? error.message : error
+    );
+  }
+  if (growth.length === 0) {
+    await finishRun(run.id, "COMPLETED");
+    return null;
+  }
+
+  const remaining = await countOrbitLibraryQueue(run.userId);
+  const now = new Date();
+  const { count } = await prisma.orbitLibraryRun.updateMany({
+    where: { id: run.id, status: "RUNNING" },
+    data: {
+      growthVocabulary: growth.map(({ name, color }) => ({ name, color })),
+      vocabulary: [...vocabulary, ...growth].map(({ name, color }) => ({ name, color })),
+      // Progress restarts for the round. `applied` keeps counting, and so
+      // does `failed`: posts whose round-0 call failed were never checked
+      // against the original list, so they still need a later run.
+      total: remaining,
+      processed: 0,
+      priorRoundApplied: run.applied,
+      roundStartedAt: now,
+      updatedAt: now,
+    },
+  });
+  return count > 0 ? growth : null;
+}
+
+/**
  * One budgeted slice of a run: resolve the tag list once, then tag pages until
  * the queue ends, the run is stopped, or the time budget is spent.
  *
@@ -379,13 +463,7 @@ export async function runOrbitLibraryInvocation(
   try {
     let vocabulary = parseVocabulary(run.vocabulary);
     if (!vocabulary) {
-      const ensured = await ensureLibraryVocabulary(run.userId);
-      vocabulary = ensured.tags;
-      // Invalidate only when a tag was actually inserted. An existing list
-      // (or a duplicate Video tag) does not change the graph or analytics.
-      if (ensured.created) {
-        await invalidateUserResponseCache(run.userId);
-      }
+      vocabulary = await ensureLibraryVocabulary(run.userId);
       if (vocabulary.length === 0) {
         await finishRun(run.id, "COMPLETED");
         return { continued: false };
@@ -400,15 +478,27 @@ export async function runOrbitLibraryInvocation(
       if (count === 0) return { continued: false };
     }
 
+    // Round 1 judges the posts round 0 left untagged against only the new
+    // names: the old ones were already asked about each of them.
+    let tagList = vocabulary;
+    if (run.round === 1) {
+      const growth = await ensureGrowthVocabulary(run, vocabulary);
+      if (!growth) return { continued: false };
+      tagList = growth;
+    }
+
+    const examples = await loadOrbitTagExamplesByName(
+      run.userId,
+      tagList.map((tag) => tag.name)
+    );
     const cursor: OrbitLibraryClassifyCursor | null =
       run.cursorBookmarkedAt && run.cursorId
         ? { bookmarkedAt: run.cursorBookmarkedAt, id: run.cursorId }
         : null;
-    const tagList = vocabulary;
     const startPage = (pageCursor: OrbitLibraryClassifyCursor | null) => {
       const bookmarks = fetchUntaggedLibraryPage(run.userId, pageCursor);
       const planned = bookmarks.then((rows) =>
-        planUntaggedLibraryPage(rows, tagList, limiter, abandon.signal)
+        planUntaggedLibraryPage(rows, tagList, limiter, abandon.signal, examples)
       );
       // A look-ahead page can be abandoned (run stopped, earlier page
       // failed); its rejections must not surface as unhandled.
@@ -426,10 +516,7 @@ export async function runOrbitLibraryInvocation(
 
     while (current) {
       const bookmarks = await current.bookmarks;
-      if (bookmarks.length === 0) {
-        await finishRun(run.id, "COMPLETED");
-        return { continued: false };
-      }
+      if (bookmarks.length === 0) return finishPass(run);
       const fullPage = bookmarks.length === ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE;
       let following =
         fullPage && underBudget(ORBIT_LIBRARY_LOOKAHEAD_BUDGET_MS)
@@ -442,10 +529,7 @@ export async function runOrbitLibraryInvocation(
         await current.planned
       );
       if (!(await recordPage(run.id, page))) return { continued: false };
-      if (!fullPage) {
-        await finishRun(run.id, "COMPLETED");
-        return { continued: false };
-      }
+      if (!fullPage) return finishPass(run);
       // Past the look-ahead budget, pages run one at a time until the slice ends.
       if (!following && underBudget(ORBIT_LIBRARY_INVOCATION_BUDGET_MS)) {
         following = startPage(cursorAfter(bookmarks));

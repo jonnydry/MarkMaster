@@ -115,6 +115,28 @@ describe("buildOrbitScanSnapshotRaw / parseOrbitScanSnapshotRaw", () => {
     expect(snapshot!.scanContextKey).toBe("ctx-recent-1");
   });
 
+  it("keeps Jev scores and origins so Apply strong matches still works after a reload", () => {
+    const payload = scanPayload();
+    payload.plan.suggestions[0]!.tags[0] = {
+      ...payload.plan.suggestions[0]!.tags[0]!,
+      score: 0.62,
+      origin: "jev",
+    };
+    const raw = buildOrbitScanSnapshotRaw({
+      userId: USER_ID,
+      payload,
+      dismissedBookmarkIds: new Set(),
+      appliedBookmarkIds: [],
+      scanContextKey: "ctx",
+    });
+
+    const snapshot = parseOrbitScanSnapshotRaw(raw!, USER_ID);
+    expect(snapshot!.payload.plan.suggestions[0].tags[0]).toMatchObject({
+      score: 0.62,
+      origin: "jev",
+    });
+  });
+
   it("strips full bookmark rows from the persisted payload", () => {
     const raw = buildOrbitScanSnapshotRaw({
       userId: USER_ID,

@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   planLibraryAssignments: vi.fn(),
   applyOrbitScanPlan: vi.fn(),
   ensureLibraryVocabulary: vi.fn(),
+  requestLibraryGrowthTags: vi.fn(),
+  loadOrbitTagExamplesByName: vi.fn(),
   isTypeSafeConfigured: vi.fn(() => true),
 }));
 
@@ -38,6 +40,10 @@ vi.mock("@/lib/orbit-grok", async () => {
 });
 vi.mock("@/lib/orbit-library-vocabulary", () => ({
   ensureLibraryVocabulary: mocks.ensureLibraryVocabulary,
+  requestLibraryGrowthTags: mocks.requestLibraryGrowthTags,
+}));
+vi.mock("@/lib/orbit-label-examples", () => ({
+  loadOrbitTagExamplesByName: mocks.loadOrbitTagExamplesByName,
 }));
 vi.mock("@/lib/typesafe", () => ({
   isTypeSafeConfigured: mocks.isTypeSafeConfigured,
@@ -71,6 +77,10 @@ function runRow(overrides: Record<string, unknown> = {}) {
     applied: 0,
     failed: 0,
     vocabulary: null,
+    round: 0,
+    growthVocabulary: null,
+    roundStartedAt: null,
+    priorRoundApplied: 0,
     cursorBookmarkedAt: null,
     cursorId: null,
     errorMessage: null,
@@ -116,9 +126,14 @@ function writes() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  // No Grok by default: a pass ends after round 0.
+  vi.stubEnv("XAI_API_KEY", "");
   mocks.isTypeSafeConfigured.mockReturnValue(true);
   mocks.prisma.orbitLibraryRun.updateMany.mockResolvedValue({ count: 1 });
-  mocks.ensureLibraryVocabulary.mockResolvedValue({ tags: vocabulary, created: true });
+  mocks.ensureLibraryVocabulary.mockResolvedValue(vocabulary);
+  mocks.requestLibraryGrowthTags.mockResolvedValue([]);
+  mocks.loadOrbitTagExamplesByName.mockResolvedValue(new Map());
 });
 
 describe("runOrbitLibraryInvocation", () => {
@@ -152,6 +167,94 @@ describe("runOrbitLibraryInvocation", () => {
     expect(finish).toMatchObject({ status: "COMPLETED", errorMessage: null });
     // The second page continues after the first page's last bookmark.
     expect(mocks.prisma.bookmark.findMany.mock.calls[1]![0].where.OR).toBeDefined();
+  });
+
+  it("hands the tag list's examples to every page", async () => {
+    const examples = new Map([["ai", ["An AI post"]]]);
+    mocks.loadOrbitTagExamplesByName.mockResolvedValue(examples);
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(3));
+    mocks.planLibraryAssignments.mockResolvedValueOnce(planTagging(1));
+
+    await runOrbitLibraryInvocation("run-1");
+
+    expect(mocks.loadOrbitTagExamplesByName).toHaveBeenCalledWith("user-1", ["AI"]);
+    expect(mocks.planLibraryAssignments.mock.calls[0]?.[0].examples).toBe(examples);
+  });
+
+  it("starts a second round when Grok can name tags for what is left", async () => {
+    vi.stubEnv("XAI_API_KEY", "xai-key");
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(12));
+    mocks.planLibraryAssignments.mockResolvedValueOnce(planTagging(4));
+
+    await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
+      continued: true,
+    });
+
+    expect(writes().at(-1)).toMatchObject({
+      round: 1,
+      cursorBookmarkedAt: null,
+      cursorId: null,
+    });
+    expect(writes().some((data) => data.status === "COMPLETED")).toBe(false);
+  });
+
+  it("judges round 1 against only the new tags and restarts its progress", async () => {
+    vi.stubEnv("XAI_API_KEY", "xai-key");
+    const growth = [{ name: "Rust", color: "#f97316" }];
+    mocks.requestLibraryGrowthTags.mockResolvedValue(growth);
+    mocks.prisma.bookmark.count.mockResolvedValue(20);
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(
+      runRow({ vocabulary, round: 1, applied: 40, processed: 60 })
+    );
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(20));
+    mocks.planLibraryAssignments.mockResolvedValueOnce(planTagging(5));
+
+    await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
+      continued: false,
+    });
+
+    expect(mocks.requestLibraryGrowthTags).toHaveBeenCalledWith("user-1", vocabulary);
+    const [growthWrite] = writes();
+    expect(growthWrite).toMatchObject({
+      growthVocabulary: growth,
+      vocabulary: [...vocabulary, ...growth],
+      total: 20,
+      processed: 0,
+      priorRoundApplied: 40,
+    });
+    // Round-0 failures still need a later run; the count carries over.
+    expect(growthWrite).not.toHaveProperty("failed");
+    expect(mocks.planLibraryAssignments.mock.calls[0]?.[0].vocabulary).toEqual(growth);
+    // Round 1 is the last round.
+    expect(writes().at(-1)).toMatchObject({ status: "COMPLETED" });
+  });
+
+  it("finishes without a second pass when Grok names nothing new", async () => {
+    vi.stubEnv("XAI_API_KEY", "xai-key");
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(
+      runRow({ vocabulary, round: 1, applied: 40 })
+    );
+
+    await runOrbitLibraryInvocation("run-1");
+
+    expect(mocks.planLibraryAssignments).not.toHaveBeenCalled();
+    expect(writes()).toEqual([expect.objectContaining({ status: "COMPLETED" })]);
+  });
+
+  it("completes rather than fails when naming new tags errors", async () => {
+    vi.stubEnv("XAI_API_KEY", "xai-key");
+    mocks.requestLibraryGrowthTags.mockRejectedValue(new Error("xai down"));
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(
+      runRow({ vocabulary, round: 1, applied: 40 })
+    );
+
+    await runOrbitLibraryInvocation("run-1");
+
+    expect(writes()).toEqual([
+      expect.objectContaining({ status: "COMPLETED", errorMessage: null }),
+    ]);
   });
 
   it("resumes from the stored cursor with the stored tag list", async () => {

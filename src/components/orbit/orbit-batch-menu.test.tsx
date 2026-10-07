@@ -56,7 +56,7 @@ describe("OrbitBatchMenu", () => {
     await openMenu(user);
 
     const caveat =
-      "Applies confident matches without review. Uses your tags, may add a Video tag, and names a starter set if you have none.";
+      "Applies confident matches without review. Uses your tags, may add a Video tag, names a starter set if you have none, and may name a few new tags for posts nothing fit.";
     expect(screen.getByText(caveat)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Auto-tag 3,412/ }));

@@ -22,11 +22,17 @@ export const ORBIT_SCAN_SNAPSHOT_MAX_CHARS = 400_000;
 
 const confidenceSchema = v.picklist(["high", "medium", "low"]);
 
+// Jev scores must survive a reload: "Apply strong matches" reads them.
+const labelScoreSchema = v.optional(v.number());
+const labelOriginSchema = v.optional(v.picklist(["jev", "jev_new_name", "grok"]));
+
 const tagSuggestionSchema = v.object({
   name: v.string(),
   color: v.string(),
   reason: v.string(),
   reuseExisting: v.boolean(),
+  score: labelScoreSchema,
+  origin: labelOriginSchema,
 });
 
 const collectionSuggestionSchema = v.object({
@@ -34,6 +40,8 @@ const collectionSuggestionSchema = v.object({
   description: v.string(),
   reason: v.string(),
   reuseExisting: v.boolean(),
+  score: labelScoreSchema,
+  origin: labelOriginSchema,
 });
 
 const suggestionSchema = v.object({

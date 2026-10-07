@@ -33,11 +33,12 @@ const rowClass =
   "flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left transition-colors";
 
 /**
- * Auto-tag can apply existing tags, add a Video tag, or name a starter set
- * when the library has none. The menu must not claim otherwise.
+ * Auto-tag can apply existing tags, add a Video tag, name a starter set when
+ * the library has none, and (with Grok) name a few new tags for posts nothing
+ * fit. The menu must not claim otherwise.
  */
 const AUTO_TAG_CAVEAT =
-  "Applies confident matches without review. Uses your tags, may add a Video tag, and names a starter set if you have none.";
+  "Applies confident matches without review. Uses your tags, may add a Video tag, names a starter set if you have none, and may name a few new tags for posts nothing fit.";
 
 /**
  * The two tagging behaviors that actually differ: a reviewable scan, or

@@ -12,7 +12,11 @@ import {
   normalizeSuggestedCollectionName,
   normalizeSuggestedTagName,
 } from "@/lib/orbit-grok-normalize";
-import { extractXaiResponsesOutputText } from "@/lib/orbit-grok-parse";
+import {
+  extractXaiResponsesOutputText,
+  readXaiResponsesUsage,
+  type OrbitGrokUsage,
+} from "@/lib/orbit-grok-parse";
 import { buildOrbitPromptPayload } from "@/lib/orbit-grok-prompt";
 import {
   getOrbitXaiRuntimeStatus,
@@ -130,6 +134,9 @@ export async function proposeOrbitVocabWithXai(args: {
   neighborHints?: Array<{ bookmarkId: string; hint: OrbitNeighborHint }>;
   gapHints?: OrbitHybridLeftoverNote[];
   apiKey: string;
+  /** Per-call limit; a scan passes what is left of its time budget. */
+  timeoutMs?: number;
+  onUsage?: (usage: OrbitGrokUsage) => void;
 }): Promise<OrbitLabelPool> {
   const runtime = getOrbitXaiRuntimeStatus();
   const payload = buildOrbitPromptPayload(args);
@@ -164,7 +171,7 @@ export async function proposeOrbitVocabWithXai(args: {
               })),
               leftoverGaps: args.gapHints ?? [],
               leftoverInstruction: args.gapHints?.length
-                ? "Propose only names that cover leftoverGaps. Keep already-matched tags; do not invent a second name for the same topic."
+                ? "Propose only names that cover leftoverGaps. A gap with matchedTags is already filed under those broader tags: propose a narrower, specific name for it only when the post's topic is clearly more specific than them. Never propose a synonym or rewording of an existing tag."
                 : undefined,
             }),
           },
@@ -181,7 +188,7 @@ export async function proposeOrbitVocabWithXai(args: {
           },
         },
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(args.timeoutMs ?? 60_000),
     });
   } catch {
     throw new OrbitGrokError(
@@ -214,6 +221,7 @@ export async function proposeOrbitVocabWithXai(args: {
   }
 
   const body = await response.json().catch(() => null);
+  args.onUsage?.(readXaiResponsesUsage(body));
   const rawText = extractXaiResponsesOutputText(body);
   if (!rawText) {
     return { tags: [], collections: [] };

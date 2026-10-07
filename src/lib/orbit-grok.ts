@@ -9,6 +9,7 @@ import {
 } from "@/lib/orbit-config";
 import {
   runHybridOrbitScan,
+  type OrbitGrokCallOptions,
   type OrbitScanProgressSink,
 } from "@/lib/orbit-hybrid-scan";
 import { isTypeSafeConfigured } from "@/lib/typesafe";
@@ -34,6 +35,7 @@ import {
   extractXaiResponsesOutputText,
   normalizeOrbitScanPlan,
   parseXaiOrbitScanPlanJson,
+  readXaiResponsesUsage,
 } from "@/lib/orbit-grok-parse";
 import {
   getOrbitXaiRuntimeStatus,
@@ -166,6 +168,8 @@ export async function scanOrbitBookmarksWithXai(args: {
   hybridLeftoverNotes?: OrbitHybridLeftoverNote[];
   /** Live progress for streamed scans. A cached result arrives without events. */
   onProgress?: OrbitScanProgressSink;
+  /** Epoch ms by which a hybrid scan must finish; later Grok steps are skipped. */
+  deadline?: number;
 }): Promise<OrbitScanResponsePayload> {
   if (args.bookmarks.length === 0) {
     throw new OrbitScanError(
@@ -205,8 +209,9 @@ export async function scanOrbitBookmarksWithXai(args: {
         neighborHints: args.neighborHints,
         batch: args.batch,
         onProgress: args.onProgress,
+        deadline: args.deadline,
         proposeLeftoverVocab: apiKey
-          ? (bookmarks, notes) =>
+          ? (bookmarks, notes, options) =>
               proposeOrbitVocabWithXai({
                 bookmarks,
                 existingTags: args.existingTags,
@@ -216,13 +221,16 @@ export async function scanOrbitBookmarksWithXai(args: {
                 neighborHints: args.neighborHints,
                 gapHints: notes,
                 apiKey,
+                timeoutMs: options.timeoutMs,
+                onUsage: options.onUsage,
               })
           : undefined,
         escalateLeftovers: apiKey
-          ? async (bookmarks, notes) => {
+          ? async (bookmarks, notes, options) => {
               const escalated = await fetchOrbitScanFromXai(
                 { ...args, bookmarks, hybridLeftoverNotes: notes },
-                apiKey
+                apiKey,
+                options
               );
               return {
                 overview: escalated.plan.overview,
@@ -303,12 +311,16 @@ export function buildOrbitXaiResponsesRequestBody(args: {
   };
 }
 
+/** Full Grok tagging call when no per-call budget is given. */
+const ORBIT_GROK_SCAN_TIMEOUT_MS = 180_000;
+
 async function fetchOrbitScanFromXai(
   args: Omit<
     Parameters<typeof scanOrbitBookmarksWithXai>[0],
     "userId"
   >,
-  apiKey: string
+  apiKey: string,
+  options?: Partial<OrbitGrokCallOptions>
 ): Promise<OrbitScanResponsePayload> {
   const runtimeStatus = getOrbitXaiRuntimeStatus();
   const baseUrl = runtimeStatus.baseUrl;
@@ -331,7 +343,7 @@ async function fetchOrbitScanFromXai(
           reasoningEffort: resolveOrbitXaiReasoningEffort(args.bookmarks.length),
         })
       ),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(options?.timeoutMs ?? ORBIT_GROK_SCAN_TIMEOUT_MS),
     });
   } catch {
     throw new OrbitScanError(
@@ -384,6 +396,7 @@ async function fetchOrbitScanFromXai(
   }
 
   const payload = await response.json().catch(() => null);
+  options?.onUsage?.(readXaiResponsesUsage(payload));
   if (payload && typeof payload === "object") {
     const status = (payload as { status?: unknown }).status;
     if (status === "incomplete") {
