@@ -5,7 +5,7 @@ Orbit can list tags already on bookmarks and propose a removal or a swap. Nothin
 ## Sub-features
 
 - `tag-audit-list` shows the seeded removal and the seeded swap.
-- `tag-audit-uncheck` clears one checkbox and keeps it cleared after reload.
+- `tag-audit-uncheck` clears one checkbox in the session. A reload checks it again, because the choice is not stored.
 
 ## How to get to it (user POV)
 
@@ -19,9 +19,9 @@ Preconditions:
 - The seed includes an open tag audit. Do not choose `Review tags` or `Review again`. Those buttons call Jev and Grok.
 
 - **Open the review.** Run `node .cursor/skills/verify-markmaster/bin/drive.mjs --feature tag-audit --viewport desktop`. The heading is `Tag audit`. The page shows `Verify feed: tagged design note for card actions`, `Design is a weak match for this post.`, and `Design fits this post better than Research.`
-- **Uncheck the removal.** Clear the checkbox named `Remove Design`. Reload. The same checkbox is unchecked.
+- **Uncheck the removal.** Clear the checkbox named `Remove Design`. It is unchecked immediately. Reload. The same checkbox is checked again.
 - **Mobile.** Repeat with `--viewport mobile-375`. `measure.json` has `ok: true`.
-- **Proof.** `tag-audit.png` shows the list after the checkbox stays off. Console, network, and measure files are written beside it.
+- **Proof.** `tag-audit.png` shows the list with the removal unchecked. Console, network, and measure files are written beside it.
 
 ## Gotchas
 

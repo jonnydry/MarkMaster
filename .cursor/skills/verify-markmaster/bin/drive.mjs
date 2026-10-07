@@ -403,22 +403,18 @@ async function driveTagAudit(page, origin, dir) {
     throw new Error("The seeded removal was not checked.");
   }
   await removeBox.click();
-  const uncheckedAt = Date.now() + 10_000;
-  while (await removeBox.isChecked()) {
-    if (Date.now() > uncheckedAt) {
-      throw new Error("The removal checkbox stayed checked.");
-    }
-    await page.waitForTimeout(100);
+  if (await removeBox.isChecked()) {
+    throw new Error("The removal checkbox stayed checked.");
   }
+  await page.screenshot({ path: path.join(dir, "tag-audit.png") });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Tag audit" }).waitFor();
   const after = page.getByRole("checkbox", { name: `Remove ${TAG_DESIGN}` });
   await after.waitFor();
-  if (await after.isChecked()) {
-    throw new Error("Unchecking the removal did not survive reload.");
+  if (!(await after.isChecked())) {
+    throw new Error("A reload kept a checkbox the server does not store.");
   }
-  await page.screenshot({ path: path.join(dir, "tag-audit.png") });
-  return "The audit lists a removal and a swap, and an unchecked row stays unchecked after reload.";
+  return "The audit lists a removal and a swap. Unchecking is local, and a reload checks the row again.";
 }
 
 async function driveBookmarkCard(page, origin, dir) {

@@ -105,7 +105,7 @@ export {
   buildOrbitScanSummary,
 } from "@/lib/orbit-grok-parse";
 
-function parseRetryAfterSeconds(value: string | null): number | undefined {
+export function parseRetryAfterSeconds(value: string | null): number | undefined {
   if (!value) return undefined;
 
   const seconds = Number(value);
@@ -142,7 +142,7 @@ function buildScanCacheKey(args: {
   );
 }
 
-function extractXaiErrorMessage(body: unknown, fallback: string): string {
+export function extractXaiErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object" || !("error" in body)) {
     return fallback;
   }
@@ -154,6 +154,48 @@ function extractXaiErrorMessage(body: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+export async function throwMappedXaiHttpError(response: Response): Promise<never> {
+  const body = await response.json().catch(() => null);
+  const message = extractXaiErrorMessage(
+    body,
+    `xAI request failed with status ${response.status}`
+  );
+
+  if (response.status === 401 || response.status === 403) {
+    throw new OrbitScanError(
+      "xAI rejected the request. Confirm your API key and model access.",
+      502,
+      "xai_auth"
+    );
+  }
+
+  if (
+    response.status === 404 ||
+    (response.status === 400 && /model/i.test(message))
+  ) {
+    throw new OrbitScanError(
+      "xAI could not find the configured Grok model.",
+      502,
+      "xai_model"
+    );
+  }
+
+  if (response.status === 429) {
+    throw new OrbitScanError(
+      "xAI rate limit reached. Try the scan again in a moment.",
+      429,
+      "xai_rate_limited",
+      {
+        retryAfterSeconds: parseRetryAfterSeconds(
+          response.headers.get("retry-after")
+        ),
+      }
+    );
+  }
+
+  throw new OrbitScanError(message, 502, "xai_unavailable");
 }
 
 export async function scanOrbitBookmarksWithXai(args: {
@@ -354,45 +396,7 @@ async function fetchOrbitScanFromXai(
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    const message = extractXaiErrorMessage(
-      body,
-      `xAI request failed with status ${response.status}`
-    );
-
-    if (response.status === 401 || response.status === 403) {
-      throw new OrbitScanError(
-        "xAI rejected the request. Confirm your API key and model access.",
-        502,
-        "xai_auth"
-      );
-    }
-
-    if (
-      response.status === 404 ||
-      (response.status === 400 && /model/i.test(message))
-    ) {
-      throw new OrbitScanError(
-        "xAI could not find the configured Grok model.",
-        502,
-        "xai_model"
-      );
-    }
-
-    if (response.status === 429) {
-      throw new OrbitScanError(
-        "xAI rate limit reached. Try the scan again in a moment.",
-        429,
-        "xai_rate_limited",
-        {
-          retryAfterSeconds: parseRetryAfterSeconds(
-            response.headers.get("retry-after")
-          ),
-        }
-      );
-    }
-
-    throw new OrbitScanError(message, 502, "xai_unavailable");
+    await throwMappedXaiHttpError(response);
   }
 
   const payload = await response.json().catch(() => null);

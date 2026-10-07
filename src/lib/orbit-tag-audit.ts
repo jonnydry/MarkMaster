@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { noul, type EntryType } from "@typesafe-ai/sdk";
+import { noul } from "@typesafe-ai/sdk";
 
 import {
   ORBIT_JEV_ASSIGN_CONCURRENCY,
@@ -15,6 +15,7 @@ import {
   recordOrbitDecisionEvents,
 } from "@/lib/orbit-decision-events";
 import { buildBookmarkPayload, truncateText } from "@/lib/orbit-grok-normalize";
+import { throwMappedXaiHttpError } from "@/lib/orbit-grok";
 import { extractXaiResponsesOutputText } from "@/lib/orbit-grok-parse";
 import {
   ORBIT_XAI_REASONING_EFFORT,
@@ -26,6 +27,7 @@ import {
 import {
   mapJevScoreToConfidence,
   shortlistOrbitTagsForJev,
+  toJsonState,
   type OrbitLabelPoolItem,
 } from "@/lib/orbit-jev-assign";
 import { loadOrbitLabelExamples } from "@/lib/orbit-label-examples";
@@ -89,8 +91,6 @@ const VERDICT_SCHEMA = {
   },
 } as const;
 
-export type OutstandingUndoChoice = "release" | "block";
-
 export type TagAuditSuggestion =
   | { kind: "remove" }
   | { kind: "swap"; tagId: string; name: string; color: string };
@@ -103,7 +103,6 @@ export type TagAuditProposalView = {
   currentTag: { id: string; name: string; color: string };
   suggestion: TagAuditSuggestion;
   reason: string;
-  checked: boolean;
 };
 
 export type TagAuditCoverage = {
@@ -118,7 +117,7 @@ export type TagAuditView = {
   auditId: string;
   phase: TagAuditPhase;
   coverage: TagAuditCoverage;
-  /** True only when phase is applied and the snapshot is neither restored nor released. */
+  /** True only when phase is applied and the undo has not been restored. */
   undoAvailable: boolean;
   proposals: TagAuditProposalView[];
 };
@@ -128,7 +127,6 @@ export type TagAuditApplyResult = {
   phase: "open" | "applied";
   appliedProposalIds: string[];
   skippedProposalIds: string[];
-  rejectionsRecorded: number;
   alreadyApplied: boolean;
 };
 
@@ -140,13 +138,7 @@ export type TagAuditUndoResult = {
 
 export class OrbitTagAuditError extends Error {
   readonly status: number;
-  readonly code:
-    | "not_configured"
-    | "not_found"
-    | "closed"
-    | "undo_outstanding"
-    | "undo_unavailable"
-    | "undo_tag_missing";
+  readonly code: "not_configured" | "not_found" | "closed" | "undo_unavailable";
 
   constructor(
     message: string,
@@ -189,14 +181,17 @@ type ParsedProposal = {
   suggestion: { kind: "remove" } | { kind: "swap"; tagId: string };
   reason: string;
   currentScore: number;
-  checked: boolean;
   rank: number;
 };
 
+type UndoDelta = {
+  removes: PairRef[];
+  adds: PairRef[];
+};
+
 type ParsedUndo = {
-  joins: Array<{ bookmarkId: string; tagIds: string[] }>;
+  delta: UndoDelta;
   restoredAt: string | null;
-  releasedAt: string | null;
 };
 
 type ParsedAudit = {
@@ -204,9 +199,7 @@ type ParsedAudit = {
   phase: TagAuditPhase;
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
-  vetoedPairKeys: string[];
   outcome: ApplyOutcome | null;
-  rejectionsRecorded: boolean;
   appliedAt: Date | null;
   undo: ParsedUndo | null;
   proposals: ParsedProposal[];
@@ -235,14 +228,11 @@ type AuditRow = {
   phase: string;
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
-  vetoedPairKeys: unknown;
   outcome: unknown;
-  rejectionsRecorded: boolean;
   appliedAt: Date | null;
   undo: {
     joins: unknown;
     restoredAt: Date | null;
-    releasedAt: Date | null;
   } | null;
   proposals: Array<{
     id: string;
@@ -252,7 +242,6 @@ type AuditRow = {
     swapTagId: string | null;
     reason: string;
     currentScore: number;
-    checked: boolean;
     rank: number;
   }>;
 };
@@ -288,7 +277,7 @@ export function tagAuditCoverageSentence(coverage: TagAuditCoverage): string {
   if (coverage.taggedBookmarkCount === 0) return "No tagged bookmarks.";
   const targeted = Math.min(coverage.taggedBookmarkCount, coverage.bookmarkCap);
   if (coverage.judgedBookmarkCount < targeted) {
-    return `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks before the time budget ran out.`;
+    return `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
   }
   if (coverage.taggedBookmarkCount > coverage.bookmarkCap) {
     return `Reviewed the newest ${coverage.bookmarkCap} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
@@ -421,40 +410,30 @@ function rankFlaggedPairs(pairs: readonly FlaggedPair[]): FlaggedPair[] {
   });
 }
 
-function selectPairsForGrok(
-  ranked: readonly FlaggedPair[],
-  vetoedPairKeys: ReadonlySet<string>,
-): FlaggedPair[] {
-  const fresh = ranked.filter((pair) => !vetoedPairKeys.has(pair.pairKey));
-  const pool = fresh.length > 0 ? fresh : ranked;
-  return pool.slice(0, ORBIT_TAG_AUDIT_GROK_CAP);
+function selectPairsForGrok(ranked: readonly FlaggedPair[]): FlaggedPair[] {
+  return ranked.slice(0, ORBIT_TAG_AUDIT_GROK_CAP);
 }
 
 function mergeOpinions(
   sent: readonly FlaggedPair[],
   verdicts: ReadonlyMap<string, { agree: boolean; reason: string }>,
-): { proposals: FlaggedPair[]; vetoedPairKeys: string[] } {
+): FlaggedPair[] {
   const proposals: FlaggedPair[] = [];
-  const vetoedPairKeys: string[] = [];
   for (const pair of sent) {
     const verdict = verdicts.get(pair.pairKey);
-    if (!verdict?.agree) {
-      vetoedPairKeys.push(pair.pairKey);
-      continue;
-    }
+    if (!verdict?.agree) continue;
     const reason = oneLineReason(verdict.reason, pair.reason);
     proposals.push(reason === pair.reason ? pair : { ...pair, reason });
   }
-  return { proposals, vetoedPairKeys };
+  return proposals;
 }
 
-function checkedFlags(
+function checkedIdsFor(
   proposalIds: readonly string[],
   checkedProposalIds: readonly string[],
-): Map<string, boolean> {
+): Set<string> {
   assertCheckedIds(proposalIds, checkedProposalIds);
-  const wanted = new Set(checkedProposalIds);
-  return new Map(proposalIds.map((id) => [id, wanted.has(id)]));
+  return new Set(checkedProposalIds);
 }
 
 function assertCheckedIds(
@@ -483,6 +462,7 @@ function sameTagSet(left: ReadonlySet<string>, right: ReadonlySet<string>): bool
 
 function compileJoinDelta(args: {
   proposals: readonly ParsedProposal[];
+  checkedIds: ReadonlySet<string>;
   joinsByBookmark: ReadonlyMap<string, ReadonlySet<string>>;
   liveTagIds: ReadonlySet<string>;
 }): ApplyPlan {
@@ -495,7 +475,7 @@ function compileJoinDelta(args: {
   const skippedProposalIds: string[] = [];
 
   for (const proposal of args.proposals) {
-    if (!proposal.checked) continue;
+    if (!args.checkedIds.has(proposal.id)) continue;
     const had = args.joinsByBookmark.get(proposal.bookmarkId);
     if (!had || !had.has(proposal.tagId)) {
       skippedProposalIds.push(proposal.id);
@@ -568,14 +548,8 @@ function compileJoinDelta(args: {
   };
 }
 
-function snapshotTagSets(
-  touchedBookmarkIds: readonly string[],
-  joinsByBookmark: ReadonlyMap<string, ReadonlySet<string>>,
-): Array<{ bookmarkId: string; tagIds: string[] }> {
-  return touchedBookmarkIds.map((bookmarkId) => ({
-    bookmarkId,
-    tagIds: [...(joinsByBookmark.get(bookmarkId) ?? [])].sort(),
-  }));
+function emptyUndoDelta(): UndoDelta {
+  return { removes: [], adds: [] };
 }
 
 function buildTagAuditRejection(args: {
@@ -619,15 +593,9 @@ function parseGrokVerdicts(
   raw: unknown,
   expectedKeys: ReadonlySet<string>,
 ): Map<string, { agree: boolean; reason: string }> {
-  if (!isRecord(raw) || !Array.isArray(raw.verdicts)) {
-    throw new OrbitScanError(
-      "Tag audit second opinion returned no verdicts.",
-      502,
-      "xai_response",
-    );
-  }
+  const list = isRecord(raw) && Array.isArray(raw.verdicts) ? raw.verdicts : [];
   const verdicts = new Map<string, { agree: boolean; reason: string }>();
-  for (const item of raw.verdicts) {
+  for (const item of list) {
     if (!isRecord(item)) continue;
     if (typeof item.pairKey !== "string" || !expectedKeys.has(item.pairKey)) {
       continue;
@@ -642,155 +610,73 @@ function parseGrokVerdicts(
   return verdicts;
 }
 
-function parseSuggestion(kind: unknown, swapTagId: unknown): ParsedProposal["suggestion"] {
-  if (kind === "remove" && (swapTagId === null || swapTagId === undefined)) {
-    return { kind: "remove" };
-  }
-  if (kind === "swap" && typeof swapTagId === "string" && swapTagId.length > 0) {
-    return { kind: "swap", tagId: swapTagId };
-  }
-  throw new OrbitTagAuditError(
-    "Tag audit proposal kind does not match its swap tag.",
-    500,
-    "closed",
-  );
+function suggestionFromRow(
+  kind: string,
+  swapTagId: string | null,
+): ParsedProposal["suggestion"] {
+  if (kind === "swap" && swapTagId) return { kind: "swap", tagId: swapTagId };
+  return { kind: "remove" };
 }
 
-function parseAuditRow(row: AuditRow): ParsedAudit {
-  if (row.phase !== "open" && row.phase !== "applied" && row.phase !== "undone") {
-    throw new OrbitTagAuditError("Tag audit phase is unknown.", 500, "closed");
-  }
-  const vetoedPairKeys = parseStringList(row.vetoedPairKeys, "Tag audit veto list");
-  const outcome = parseOutcome(row.outcome);
-  if (row.phase === "applied" && !outcome) {
-    throw new OrbitTagAuditError(
-      "An applied tag audit is missing its outcome.",
-      500,
-      "closed",
-    );
-  }
-  if (row.phase === "applied" && !row.undo) {
-    throw new OrbitTagAuditError(
-      "An applied tag audit is missing its undo snapshot.",
-      500,
-      "closed",
-    );
-  }
-  if (row.phase !== "applied" && outcome) {
-    throw new OrbitTagAuditError(
-      "Only an applied tag audit stores an outcome.",
-      500,
-      "closed",
-    );
-  }
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
 
+function pairList(value: unknown): PairRef[] {
+  if (!Array.isArray(value)) return [];
+  const pairs: PairRef[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    if (typeof item.bookmarkId !== "string" || typeof item.tagId !== "string") continue;
+    pairs.push({ bookmarkId: item.bookmarkId, tagId: item.tagId });
+  }
+  return pairs;
+}
+
+function readUndoDelta(value: unknown): UndoDelta {
+  if (!isRecord(value)) return emptyUndoDelta();
+  return { removes: pairList(value.removes), adds: pairList(value.adds) };
+}
+
+function readOutcome(value: unknown): ApplyOutcome | null {
+  if (!isRecord(value)) return null;
   return {
-    id: row.id,
-    phase: row.phase,
-    taggedBookmarkCount: row.taggedBookmarkCount,
-    judgedBookmarkCount: row.judgedBookmarkCount,
-    vetoedPairKeys,
-    outcome,
-    rejectionsRecorded: row.rejectionsRecorded,
-    appliedAt: row.appliedAt,
-    undo: row.undo
-      ? {
-          joins: parseJoins(row.undo.joins),
-          restoredAt: row.undo.restoredAt?.toISOString() ?? null,
-          releasedAt: row.undo.releasedAt?.toISOString() ?? null,
-        }
-      : null,
-    proposals: row.proposals.map((proposal) => {
-      if (proposal.reason.trim().length === 0 || proposal.reason.length > REASON_MAX) {
-        throw new OrbitTagAuditError(
-          "Tag audit reason is outside 1 to 180 characters.",
-          500,
-          "closed",
-        );
-      }
-      if (
-        !Number.isFinite(proposal.currentScore) ||
-        proposal.currentScore < 0 ||
-        proposal.currentScore > 1
-      ) {
-        throw new OrbitTagAuditError(
-          "Tag audit score is outside 0 to 1.",
-          500,
-          "closed",
-        );
-      }
-      return {
-        id: proposal.id,
-        bookmarkId: proposal.bookmarkId,
-        tagId: proposal.tagId,
-        suggestion: parseSuggestion(proposal.kind, proposal.swapTagId),
-        reason: proposal.reason,
-        currentScore: proposal.currentScore,
-        checked: proposal.checked,
-        rank: proposal.rank,
-      };
-    }),
+    appliedProposalIds: stringList(value.appliedProposalIds),
+    skippedProposalIds: stringList(value.skippedProposalIds),
   };
 }
 
-function parseOutcome(value: unknown): ApplyOutcome | null {
-  if (value === null || value === undefined) return null;
-  if (!isRecord(value)) {
-    throw new OrbitTagAuditError("Tag audit outcome is unreadable.", 500, "closed");
-  }
-  const applied = stringArray(value.appliedProposalIds);
-  const skipped = stringArray(value.skippedProposalIds);
-  if (!applied || !skipped) {
-    throw new OrbitTagAuditError("Tag audit outcome is unreadable.", 500, "closed");
-  }
-  return { appliedProposalIds: applied, skippedProposalIds: skipped };
-}
-
-function parseJoins(value: unknown): Array<{ bookmarkId: string; tagIds: string[] }> {
-  if (!Array.isArray(value)) {
-    throw new OrbitTagAuditError("Tag audit undo snapshot is unreadable.", 500, "closed");
-  }
-  return value.map((entry) => {
-    if (!isRecord(entry) || typeof entry.bookmarkId !== "string") {
-      throw new OrbitTagAuditError(
-        "Tag audit undo snapshot is unreadable.",
-        500,
-        "closed",
-      );
-    }
-    const tagIds = stringArray(entry.tagIds);
-    if (!tagIds) {
-      throw new OrbitTagAuditError(
-        "Tag audit undo snapshot is unreadable.",
-        500,
-        "closed",
-      );
-    }
-    return { bookmarkId: entry.bookmarkId, tagIds: [...tagIds].sort() };
-  });
-}
-
-function parseStringList(value: unknown, label: string): string[] {
-  const parsed = stringArray(value);
-  if (!parsed) {
-    throw new OrbitTagAuditError(`${label} is unreadable.`, 500, "closed");
-  }
-  return parsed;
-}
-
-function stringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  if (!value.every((item) => typeof item === "string")) return null;
-  return value;
+function parseAuditRow(row: AuditRow): ParsedAudit {
+  const phase: TagAuditPhase =
+    row.phase === "applied" || row.phase === "undone" ? row.phase : "open";
+  return {
+    id: row.id,
+    phase,
+    taggedBookmarkCount: row.taggedBookmarkCount,
+    judgedBookmarkCount: row.judgedBookmarkCount,
+    outcome: readOutcome(row.outcome),
+    appliedAt: row.appliedAt,
+    undo: row.undo
+      ? {
+          delta: readUndoDelta(row.undo.joins),
+          restoredAt: row.undo.restoredAt?.toISOString() ?? null,
+        }
+      : null,
+    proposals: row.proposals.map((proposal) => ({
+      id: proposal.id,
+      bookmarkId: proposal.bookmarkId,
+      tagId: proposal.tagId,
+      suggestion: suggestionFromRow(proposal.kind, proposal.swapTagId),
+      reason: proposal.reason,
+      currentScore: proposal.currentScore,
+      rank: proposal.rank,
+    })),
+  };
 }
 
 function undoAvailable(audit: ParsedAudit): boolean {
-  return (
-    audit.phase === "applied" &&
-    audit.undo !== null &&
-    audit.undo.restoredAt === null &&
-    audit.undo.releasedAt === null
-  );
+  return audit.phase === "applied" && audit.undo !== null && audit.undo.restoredAt === null;
 }
 
 function toTagAuditView(
@@ -823,7 +709,6 @@ function toTagAuditView(
           color: cssHexColor(swap.color),
         },
         reason: proposal.reason,
-        checked: proposal.checked,
       });
       continue;
     }
@@ -839,7 +724,6 @@ function toTagAuditView(
       },
       suggestion: { kind: "remove" },
       reason: proposal.reason,
-      checked: proposal.checked,
     });
   }
 
@@ -895,30 +779,6 @@ function readNoul(answer: unknown): number | null {
   const value = answer.noul;
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return value;
-}
-
-function toJsonState(value: unknown): EntryType {
-  return JSON.parse(JSON.stringify(value)) as EntryType;
-}
-
-function parseRetryAfterSeconds(value: string | null): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds);
-  const resetTime = Date.parse(value);
-  if (!Number.isNaN(resetTime)) {
-    const resetSeconds = Math.ceil((resetTime - Date.now()) / 1000);
-    return resetSeconds > 0 ? resetSeconds : undefined;
-  }
-  return undefined;
-}
-
-function extractXaiErrorMessage(body: unknown, fallback: string): string {
-  if (!isRecord(body) || !("error" in body)) return fallback;
-  const error = body.error;
-  if (typeof error === "string") return error;
-  if (isRecord(error) && "message" in error) return String(error.message);
-  return fallback;
 }
 
 function auditInclude() {
@@ -977,18 +837,6 @@ async function viewFromAudit(userId: string, audit: ParsedAudit): Promise<TagAud
   );
 }
 
-async function readyUndo(db: Db, userId: string) {
-  return db.orbitTagAuditUndo.findFirst({
-    where: {
-      userId,
-      restoredAt: null,
-      releasedAt: null,
-      audit: { userId, phase: "applied" },
-    },
-    select: { auditId: true },
-  });
-}
-
 async function lockOrbitApply(db: Prisma.TransactionClient, userId: string) {
   await db.$executeRaw(Prisma.sql`
     SELECT pg_advisory_xact_lock(hashtext(${`orbit-apply:${userId}`}))
@@ -1023,9 +871,9 @@ async function scoreBookmark(args: {
   rivals: readonly LibraryTag[];
   payload: ReturnType<typeof buildBookmarkPayload>;
   signal?: AbortSignal;
-}): Promise<FlaggedPair[]> {
+}): Promise<{ ok: true; pairs: FlaggedPair[] } | { ok: false }> {
   const askable = args.current.filter((tag) => canRecordRejectionName(tag.name));
-  if (askable.length === 0) return [];
+  if (askable.length === 0) return { ok: true, pairs: [] };
 
   const questions: Record<string, ReturnType<typeof noul>> = {};
   for (const [index, tag] of askable.entries()) {
@@ -1051,13 +899,13 @@ async function scoreBookmark(args: {
     );
     answers = response.answers ?? {};
   } catch {
-    return [];
+    return { ok: false };
   }
 
   const currentScores: ScoredLabel[] = [];
   for (const [index, tag] of askable.entries()) {
     const noulScore = readNoul(answers[`current_${index}`]);
-    if (noulScore === null) return [];
+    if (noulScore === null) return { ok: true, pairs: [] };
     currentScores.push({
       tagId: tag.id,
       name: tag.name,
@@ -1080,7 +928,7 @@ async function scoreBookmark(args: {
     });
     if (pair) flagged.push(pair);
   }
-  return flagged;
+  return { ok: true, pairs: flagged };
 }
 
 async function weighWithGrok(
@@ -1132,41 +980,7 @@ async function weighWithGrok(
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    const message = extractXaiErrorMessage(
-      body,
-      `xAI request failed with status ${response.status}`,
-    );
-    if (response.status === 401 || response.status === 403) {
-      throw new OrbitScanError(
-        "xAI rejected the request. Confirm your API key and model access.",
-        502,
-        "xai_auth",
-      );
-    }
-    if (
-      response.status === 404 ||
-      (response.status === 400 && /model/i.test(message))
-    ) {
-      throw new OrbitScanError(
-        "xAI could not find the configured Grok model.",
-        502,
-        "xai_model",
-      );
-    }
-    if (response.status === 429) {
-      throw new OrbitScanError(
-        "xAI rate limit reached. Try the scan again in a moment.",
-        429,
-        "xai_rate_limited",
-        {
-          retryAfterSeconds: parseRetryAfterSeconds(
-            response.headers.get("retry-after"),
-          ),
-        },
-      );
-    }
-    throw new OrbitScanError(message, 502, "xai_unavailable");
+    await throwMappedXaiHttpError(response);
   }
 
   const payload = await response.json().catch(() => null);
@@ -1250,7 +1064,7 @@ async function judgeSlice(args: {
         learningHint: args.learningByBookmark.get(row.id),
       });
       const rivals = pickRivals(args.library, currentIds, payload);
-      const pairs = await scoreBookmark({
+      const scored = await scoreBookmark({
         bookmark,
         current: current.map((tag) => ({
           ...tag,
@@ -1259,7 +1073,8 @@ async function judgeSlice(args: {
         rivals,
         payload,
       });
-      flagged.push(...pairs);
+      if (!scored.ok) continue;
+      flagged.push(...scored.pairs);
       judged += 1;
     }
   }
@@ -1271,34 +1086,12 @@ async function judgeSlice(args: {
 
 async function persistOpenAudit(args: {
   userId: string;
-  outstandingUndo: OutstandingUndoChoice;
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
   proposals: readonly FlaggedPair[];
-  vetoedPairKeys: readonly string[];
 }) {
   await prisma.$transaction(async (tx) => {
     await lockOrbitApply(tx, args.userId);
-    if (args.outstandingUndo === "block") {
-      const ready = await readyUndo(tx, args.userId);
-      if (ready) {
-        throw new OrbitTagAuditError(
-          "Undo is still available for the last tag audit.",
-          409,
-          "undo_outstanding",
-        );
-      }
-    } else {
-      await tx.orbitTagAuditUndo.updateMany({
-        where: {
-          userId: args.userId,
-          restoredAt: null,
-          releasedAt: null,
-          audit: { userId: args.userId, phase: "applied" },
-        },
-        data: { releasedAt: new Date() },
-      });
-    }
     await tx.orbitTagAudit.deleteMany({
       where: { userId: args.userId, phase: "open" },
     });
@@ -1309,8 +1102,6 @@ async function persistOpenAudit(args: {
         phase: "open",
         taggedBookmarkCount: args.taggedBookmarkCount,
         judgedBookmarkCount: args.judgedBookmarkCount,
-        vetoedPairKeys: [...args.vetoedPairKeys],
-        rejectionsRecorded: false,
         proposals: {
           create: args.proposals.map((pair, rank) => ({
             id: randomUUID(),
@@ -1320,7 +1111,6 @@ async function persistOpenAudit(args: {
             swapTagId: pair.suggestion.kind === "swap" ? pair.suggestion.tagId : null,
             reason: pair.reason,
             currentScore: pair.currentScore,
-            checked: true,
             rank,
           })),
         },
@@ -1329,128 +1119,51 @@ async function persistOpenAudit(args: {
   });
 }
 
-function tagNameFromSuggestion(value: unknown): string | null {
-  if (!isRecord(value) || !Array.isArray(value.tags)) return null;
-  const first = value.tags[0];
-  if (!isRecord(first) || typeof first.name !== "string") return null;
-  return first.name;
-}
-
-async function recordAppliedRejections(args: {
-  userId: string;
-  auditId: string;
-  appliedAt: Date | null;
-  items: Array<{
-    bookmarkId: string;
-    tagId: string;
-    reason: string;
-    currentScore: number;
-  }>;
-}): Promise<number> {
+async function writeAppliedRejections(
+  db: Db,
+  args: {
+    userId: string;
+    proposals: readonly ParsedProposal[];
+    appliedIds: readonly string[];
+  },
+) {
+  const wanted = new Set(args.appliedIds);
+  const items = args.proposals.filter((proposal) => wanted.has(proposal.id));
   const tags =
-    args.items.length === 0
+    items.length === 0
       ? []
-      : await prisma.tag.findMany({
+      : await db.tag.findMany({
           where: {
             userId: args.userId,
-            id: { in: [...new Set(args.items.map((item) => item.tagId))] },
+            id: { in: [...new Set(items.map((item) => item.tagId))] },
           },
           select: { id: true, name: true, color: true },
         });
   const tagById = new Map(tags.map((tag) => [tag.id, tag]));
-  const seen = new Set<string>();
-  if (args.appliedAt && args.items.length > 0) {
-    const existing = await prisma.orbitDecisionEvent.findMany({
-      where: {
-        userId: args.userId,
-        action: "rejected",
-        source: TAG_AUDIT_SOURCE,
-        createdAt: { gte: args.appliedAt },
-        bookmarkId: { in: [...new Set(args.items.map((item) => item.bookmarkId))] },
-      },
-      select: { bookmarkId: true, originalSuggestion: true },
-    });
-    for (const event of existing) {
-      const name = tagNameFromSuggestion(event.originalSuggestion);
-      if (!name) continue;
-      seen.add(`${event.bookmarkId}\u0000${name}`);
-    }
-  }
-
   const events: OrbitDecisionEventPayload[] = [];
-  for (const item of args.items) {
+  for (const item of items) {
     const tag = tagById.get(item.tagId);
     if (!tag || !canRecordRejectionName(tag.name)) continue;
-    const name = tag.name.trim();
-    if (seen.has(`${item.bookmarkId}\u0000${name}`)) continue;
     events.push(
       buildTagAuditRejection({
         bookmarkId: item.bookmarkId,
-        tagName: name,
+        tagName: tag.name.trim(),
         tagColor: tag.color,
         reason: item.reason,
         currentScore: item.currentScore,
       }),
     );
   }
-
-  const result =
-    events.length === 0
-      ? { count: 0 }
-      : await recordOrbitDecisionEvents({ userId: args.userId, events });
-  await prisma.orbitTagAudit.update({
-    where: { id: args.auditId },
-    data: { rejectionsRecorded: true },
-  });
-  return result.count;
-}
-
-function rejectionItems(audit: ParsedAudit, appliedIds: readonly string[]) {
-  const wanted = new Set(appliedIds);
-  return audit.proposals
-    .filter((proposal) => wanted.has(proposal.id))
-    .sort((left, right) => left.rank - right.rank)
-    .map((proposal) => ({
-      bookmarkId: proposal.bookmarkId,
-      tagId: proposal.tagId,
-      reason: proposal.reason,
-      currentScore: proposal.currentScore,
-    }));
-}
-
-function applyResultFromOutcome(
-  audit: ParsedAudit,
-  rejectionsRecorded: number,
-  alreadyApplied: boolean,
-): TagAuditApplyResult {
-  return {
-    auditId: audit.id,
-    phase: "applied",
-    appliedProposalIds: audit.outcome?.appliedProposalIds ?? [],
-    skippedProposalIds: audit.outcome?.skippedProposalIds ?? [],
-    rejectionsRecorded,
-    alreadyApplied,
-  };
+  if (events.length === 0) return;
+  await recordOrbitDecisionEvents({ userId: args.userId, events, db });
 }
 
 export async function runOrbitTagAudit(args: {
   userId: string;
-  outstandingUndo: OutstandingUndoChoice;
   deadlineMs: number;
 }): Promise<TagAuditView> {
-  if (args.outstandingUndo === "block") {
-    const ready = await readyUndo(prisma, args.userId);
-    if (ready) {
-      throw new OrbitTagAuditError(
-        "Undo is still available for the last tag audit.",
-        409,
-        "undo_outstanding",
-      );
-    }
-  }
-
   const taggedWhere = { userId: args.userId, tags: { some: {} } };
-  const [taggedBookmarkCount, rows, tagRows, previous] = await Promise.all([
+  const [taggedBookmarkCount, rows, tagRows] = await Promise.all([
     prisma.bookmark.count({ where: taggedWhere }),
     prisma.bookmark.findMany({
       where: taggedWhere,
@@ -1470,20 +1183,10 @@ export async function runOrbitTagAudit(args: {
       where: { userId: args.userId },
       select: { id: true, name: true, color: true },
     }),
-    prisma.orbitTagAudit.findFirst({
-      where: { userId: args.userId },
-      orderBy: { createdAt: "desc" },
-      select: { vetoedPairKeys: true },
-    }),
   ]);
-
-  const previousVetoes = previous
-    ? parseStringList(previous.vetoedPairKeys, "Tag audit veto list")
-    : [];
 
   let judgedBookmarkCount = 0;
   let proposals: FlaggedPair[] = [];
-  let vetoedPairKeys: string[] = [];
 
   if (rows.length > 0) {
     requireApiKey("TYPESAFE_API_KEY");
@@ -1527,8 +1230,7 @@ export async function runOrbitTagAudit(args: {
       stopAt: args.deadlineMs - ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS,
     });
     judgedBookmarkCount = judged.judged;
-    const ranked = rankFlaggedPairs(judged.flagged);
-    const selected = selectPairsForGrok(ranked, new Set(previousVetoes));
+    const selected = selectPairsForGrok(rankFlaggedPairs(judged.flagged));
     if (selected.length > 0) {
       const excerpts = new Map(
         folded.map((bookmark) => [
@@ -1536,20 +1238,15 @@ export async function runOrbitTagAudit(args: {
           truncateText(bookmark.tweetText, EXCERPT_MAX) ?? "",
         ]),
       );
-      const verdicts = await weighWithGrok(selected, excerpts);
-      const merged = mergeOpinions(selected, verdicts);
-      proposals = merged.proposals;
-      vetoedPairKeys = merged.vetoedPairKeys;
+      proposals = mergeOpinions(selected, await weighWithGrok(selected, excerpts));
     }
   }
 
   await persistOpenAudit({
     userId: args.userId,
-    outstandingUndo: args.outstandingUndo,
     taggedBookmarkCount,
     judgedBookmarkCount,
     proposals,
-    vetoedPairKeys,
   });
 
   const view = await readOrbitTagAudit({ userId: args.userId });
@@ -1565,38 +1262,6 @@ export async function readOrbitTagAudit(args: {
   const row = await findAuditRow(prisma, args.userId);
   if (!row) return null;
   return viewFromAudit(args.userId, parseAuditRow(row));
-}
-
-export async function setOrbitTagAuditChecked(args: {
-  userId: string;
-  auditId: string;
-  checkedProposalIds: readonly string[];
-}): Promise<TagAuditView> {
-  const row = await findAuditRow(prisma, args.userId, args.auditId);
-  if (!row) {
-    throw new OrbitTagAuditError("Tag audit was not found.", 404, "not_found");
-  }
-  const audit = parseAuditRow(row);
-  if (audit.phase !== "open") {
-    throw new OrbitTagAuditError("This tag audit is no longer open.", 409, "closed");
-  }
-  const flags = checkedFlags(
-    audit.proposals.map((proposal) => proposal.id),
-    args.checkedProposalIds,
-  );
-  await prisma.$transaction(async (tx) => {
-    for (const [id, checked] of flags) {
-      await tx.orbitTagAuditProposal.update({
-        where: { id },
-        data: { checked },
-      });
-    }
-  });
-  const next = await findAuditRow(prisma, args.userId, args.auditId);
-  if (!next) {
-    throw new OrbitTagAuditError("Tag audit was not found.", 404, "not_found");
-  }
-  return viewFromAudit(args.userId, parseAuditRow(next));
 }
 
 async function readJoins(
@@ -1627,7 +1292,7 @@ export async function applyOrbitTagAudit(args: {
   auditId: string;
   checkedProposalIds: readonly string[];
 }): Promise<TagAuditApplyResult> {
-  const planned = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await lockOrbitApply(tx, args.userId);
     const row = await findAuditRow(tx, args.userId, args.auditId);
     if (!row) {
@@ -1638,27 +1303,23 @@ export async function applyOrbitTagAudit(args: {
       throw new OrbitTagAuditError("This tag audit is already undone.", 409, "closed");
     }
     if (audit.phase === "applied") {
-      return { kind: "applied" as const, audit };
+      return {
+        auditId: audit.id,
+        phase: "applied" as const,
+        appliedProposalIds: audit.outcome?.appliedProposalIds ?? [],
+        skippedProposalIds: audit.outcome?.skippedProposalIds ?? [],
+        alreadyApplied: true,
+      };
     }
 
-    const flags = checkedFlags(
+    const checkedIds = checkedIdsFor(
       audit.proposals.map((proposal) => proposal.id),
       args.checkedProposalIds,
     );
-    for (const [id, checked] of flags) {
-      await tx.orbitTagAuditProposal.update({
-        where: { id },
-        data: { checked },
-      });
-    }
-    const proposals = audit.proposals.map((proposal) => ({
-      ...proposal,
-      checked: flags.get(proposal.id) ?? false,
-    }));
-    const bookmarkIds = [...new Set(proposals.map((proposal) => proposal.bookmarkId))];
+    const bookmarkIds = [...new Set(audit.proposals.map((proposal) => proposal.bookmarkId))];
     const referencedTagIds = new Set<string>();
-    for (const proposal of proposals) {
-      if (!proposal.checked) continue;
+    for (const proposal of audit.proposals) {
+      if (!checkedIds.has(proposal.id)) continue;
       referencedTagIds.add(proposal.tagId);
       if (proposal.suggestion.kind === "swap") {
         referencedTagIds.add(proposal.suggestion.tagId);
@@ -1674,25 +1335,27 @@ export async function applyOrbitTagAudit(args: {
           }),
     ]);
     const plan = compileJoinDelta({
-      proposals,
+      proposals: audit.proposals,
+      checkedIds,
       joinsByBookmark,
       liveTagIds: new Set(liveTags.map((tag) => tag.id)),
     });
     if (plan.appliedProposalIds.length === 0) {
       return {
-        kind: "open" as const,
         auditId: audit.id,
+        phase: "open" as const,
+        appliedProposalIds: [],
         skippedProposalIds: plan.skippedProposalIds,
+        alreadyApplied: false,
       };
     }
 
-    const snapshot = snapshotTagSets(plan.touchedBookmarkIds, joinsByBookmark);
     const appliedAt = new Date();
     await tx.orbitTagAuditUndo.create({
       data: {
         auditId: audit.id,
         userId: args.userId,
-        joins: snapshot,
+        joins: { removes: plan.deletes, adds: plan.inserts },
       },
     });
     if (plan.deletes.length > 0) {
@@ -1711,67 +1374,30 @@ export async function applyOrbitTagAudit(args: {
         skipDuplicates: true,
       });
     }
-    const outcome: ApplyOutcome = {
-      appliedProposalIds: plan.appliedProposalIds,
-      skippedProposalIds: plan.skippedProposalIds,
-    };
     await tx.orbitTagAudit.update({
       where: { id: audit.id },
       data: {
         phase: "applied",
         appliedAt,
-        outcome,
+        outcome: {
+          appliedProposalIds: plan.appliedProposalIds,
+          skippedProposalIds: plan.skippedProposalIds,
+        },
       },
     });
+    await writeAppliedRejections(tx, {
+      userId: args.userId,
+      proposals: audit.proposals,
+      appliedIds: plan.appliedProposalIds,
+    });
     return {
-      kind: "wrote" as const,
-      audit,
-      outcome,
-      appliedAt,
-    };
-  });
-
-  if (planned.kind === "open") {
-    return {
-      auditId: planned.auditId,
-      phase: "open",
-      appliedProposalIds: [],
-      skippedProposalIds: planned.skippedProposalIds,
-      rejectionsRecorded: 0,
+      auditId: audit.id,
+      phase: "applied" as const,
+      appliedProposalIds: plan.appliedProposalIds,
+      skippedProposalIds: plan.skippedProposalIds,
       alreadyApplied: false,
     };
-  }
-
-  if (planned.kind === "applied") {
-    if (planned.audit.rejectionsRecorded) {
-      return applyResultFromOutcome(planned.audit, 0, true);
-    }
-    const count = await recordAppliedRejections({
-      userId: args.userId,
-      auditId: planned.audit.id,
-      appliedAt: planned.audit.appliedAt,
-      items: rejectionItems(
-        planned.audit,
-        planned.audit.outcome?.appliedProposalIds ?? [],
-      ),
-    });
-    return applyResultFromOutcome(planned.audit, count, true);
-  }
-
-  const count = await recordAppliedRejections({
-    userId: args.userId,
-    auditId: planned.audit.id,
-    appliedAt: planned.appliedAt,
-    items: rejectionItems(planned.audit, planned.outcome.appliedProposalIds),
   });
-  return {
-    auditId: planned.audit.id,
-    phase: "applied",
-    appliedProposalIds: planned.outcome.appliedProposalIds,
-    skippedProposalIds: planned.outcome.skippedProposalIds,
-    rejectionsRecorded: count,
-    alreadyApplied: false,
-  };
 }
 
 export async function undoOrbitTagAudit(args: {
@@ -1785,14 +1411,22 @@ export async function undoOrbitTagAudit(args: {
       throw new OrbitTagAuditError("Tag audit was not found.", 404, "not_found");
     }
     const audit = parseAuditRow(row);
+    const bookmarkIds = audit.undo
+      ? [
+          ...new Set([
+            ...audit.undo.delta.removes.map((pair) => pair.bookmarkId),
+            ...audit.undo.delta.adds.map((pair) => pair.bookmarkId),
+          ]),
+        ]
+      : [];
     if (audit.undo?.restoredAt) {
       return {
         auditId: audit.id,
-        restoredBookmarkIds: audit.undo.joins.map((join) => join.bookmarkId),
+        restoredBookmarkIds: bookmarkIds,
         alreadyUndone: true,
       };
     }
-    if (!audit.undo || audit.phase !== "applied" || audit.undo.releasedAt) {
+    if (!audit.undo || audit.phase !== "applied") {
       throw new OrbitTagAuditError(
         "This tag audit cannot be undone.",
         409,
@@ -1800,43 +1434,53 @@ export async function undoOrbitTagAudit(args: {
       );
     }
 
-    const neededTagIds = [
-      ...new Set(audit.undo.joins.flatMap((join) => join.tagIds)),
-    ];
-    if (neededTagIds.length > 0) {
-      const liveTags = await tx.tag.findMany({
-        where: { userId: args.userId, id: { in: neededTagIds } },
-        select: { id: true },
-      });
-      if (liveTags.length !== neededTagIds.length) {
-        throw new OrbitTagAuditError(
-          "A tag from the undo snapshot no longer exists.",
-          409,
-          "undo_tag_missing",
-        );
-      }
-    }
-
-    const snapshotIds = audit.undo.joins.map((join) => join.bookmarkId);
     const liveBookmarks =
-      snapshotIds.length === 0
+      bookmarkIds.length === 0
         ? []
         : await tx.bookmark.findMany({
-            where: { userId: args.userId, id: { in: snapshotIds } },
+            where: { userId: args.userId, id: { in: bookmarkIds } },
             select: { id: true },
           });
-    const liveIds = new Set(liveBookmarks.map((bookmark) => bookmark.id));
-    const remaining = audit.undo.joins.filter((join) => liveIds.has(join.bookmarkId));
-    if (remaining.length > 0) {
+    const liveBookmarkIds = new Set(liveBookmarks.map((bookmark) => bookmark.id));
+    const removeTagIds = [
+      ...new Set(audit.undo.delta.removes.map((pair) => pair.tagId)),
+    ];
+    const liveTags =
+      removeTagIds.length === 0
+        ? []
+        : await tx.tag.findMany({
+            where: { userId: args.userId, id: { in: removeTagIds } },
+            select: { id: true },
+          });
+    const liveTagIds = new Set(liveTags.map((tag) => tag.id));
+    const drop = audit.undo.delta.adds.filter((pair) =>
+      liveBookmarkIds.has(pair.bookmarkId),
+    );
+    const readd = audit.undo.delta.removes.filter(
+      (pair) => liveBookmarkIds.has(pair.bookmarkId) && liveTagIds.has(pair.tagId),
+    );
+    if (drop.length > 0) {
       await tx.bookmarkTag.deleteMany({
-        where: { bookmarkId: { in: remaining.map((join) => join.bookmarkId) } },
+        where: {
+          OR: drop.map((pair) => ({
+            bookmarkId: pair.bookmarkId,
+            tagId: pair.tagId,
+          })),
+        },
       });
-      const data = remaining.flatMap((join) =>
-        join.tagIds.map((tagId) => ({ bookmarkId: join.bookmarkId, tagId })),
-      );
-      if (data.length > 0) {
-        await tx.bookmarkTag.createMany({ data, skipDuplicates: true });
-      }
+    }
+    if (readd.length > 0) {
+      await tx.bookmarkTag.createMany({ data: readd, skipDuplicates: true });
+    }
+    if (audit.appliedAt && bookmarkIds.length > 0) {
+      await tx.orbitDecisionEvent.deleteMany({
+        where: {
+          userId: args.userId,
+          source: TAG_AUDIT_SOURCE,
+          createdAt: { gte: audit.appliedAt },
+          bookmarkId: { in: bookmarkIds },
+        },
+      });
     }
     await tx.orbitTagAuditUndo.update({
       where: { auditId: audit.id },
@@ -1848,7 +1492,9 @@ export async function undoOrbitTagAudit(args: {
     });
     return {
       auditId: audit.id,
-      restoredBookmarkIds: remaining.map((join) => join.bookmarkId),
+      restoredBookmarkIds: bookmarkIds.filter((bookmarkId) =>
+        liveBookmarkIds.has(bookmarkId),
+      ),
       alreadyUndone: false,
     };
   });

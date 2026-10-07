@@ -286,9 +286,7 @@ model OrbitTagAudit {
   phase               String
   taggedBookmarkCount Int
   judgedBookmarkCount Int
-  vetoedPairKeys      Json
   outcome             Json?
-  rejectionsRecorded  Boolean   @default(false)
   appliedAt           DateTime?
   createdAt           DateTime  @default(now())
 
@@ -308,7 +306,6 @@ model OrbitTagAuditProposal {
   swapTagId    String?
   reason       String
   currentScore Float
-  checked      Boolean @default(true)
   rank         Int
 
   audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
@@ -323,7 +320,6 @@ model OrbitTagAuditUndo {
   joins      Json
   createdAt  DateTime  @default(now())
   restoredAt DateTime?
-  releasedAt DateTime?
 
   audit OrbitTagAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }

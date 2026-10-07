@@ -4,9 +4,7 @@ CREATE TABLE "OrbitTagAudit" (
     "phase" TEXT NOT NULL,
     "taggedBookmarkCount" INTEGER NOT NULL,
     "judgedBookmarkCount" INTEGER NOT NULL,
-    "vetoedPairKeys" JSONB NOT NULL,
     "outcome" JSONB,
-    "rejectionsRecorded" BOOLEAN NOT NULL DEFAULT false,
     "appliedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -26,7 +24,6 @@ CREATE TABLE "OrbitTagAuditProposal" (
     "swapTagId" TEXT,
     "reason" TEXT NOT NULL,
     "currentScore" DOUBLE PRECISION NOT NULL,
-    "checked" BOOLEAN NOT NULL DEFAULT true,
     "rank" INTEGER NOT NULL,
 
     CONSTRAINT "OrbitTagAuditProposal_pkey" PRIMARY KEY ("id")
@@ -44,7 +41,6 @@ CREATE TABLE "OrbitTagAuditUndo" (
     "joins" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "restoredAt" TIMESTAMP(3),
-    "releasedAt" TIMESTAMP(3),
 
     CONSTRAINT "OrbitTagAuditUndo_pkey" PRIMARY KEY ("auditId")
 );

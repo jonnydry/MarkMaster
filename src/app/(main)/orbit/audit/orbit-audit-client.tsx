@@ -19,8 +19,6 @@ import { useCollectionsQuery, useTagsQuery } from "@/hooks/use-library-data";
 import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
 import { FetchJsonError, fetchJson, sendJson } from "@/lib/fetch-json";
 
-type OutstandingUndoChoice = "release" | "block";
-
 type TagAuditSuggestion =
   | { kind: "remove" }
   | { kind: "swap"; tagId: string; name: string; color: string };
@@ -33,7 +31,6 @@ type TagAuditProposal = {
   currentTag: { id: string; name: string; color: string };
   suggestion: TagAuditSuggestion;
   reason: string;
-  checked: boolean;
 };
 
 type TagAuditResponse = {
@@ -52,15 +49,6 @@ function errorMessage(error: unknown): string {
   return "Tag audit failed.";
 }
 
-function errorCode(error: unknown): string | undefined {
-  if (!(error instanceof FetchJsonError)) return undefined;
-  if (!error.body || typeof error.body !== "object" || !("code" in error.body)) {
-    return undefined;
-  }
-  const code = error.body.code;
-  return typeof code === "string" ? code : undefined;
-}
-
 function suggestionLabel(suggestion: TagAuditSuggestion): string {
   if (suggestion.kind === "remove") return "Remove";
   return `Swap to ${suggestion.name}`;
@@ -73,9 +61,9 @@ export default function OrbitAuditClient() {
   const { data: collections = [] } = useCollectionsQuery();
   const [status, setStatus] = useState<PageStatus>("loading");
   const [view, setView] = useState<TagAuditResponse | null>(null);
+  const [unchecked, setUnchecked] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
-  const [releasePrompt, setReleasePrompt] = useState(false);
-  const [busy, setBusy] = useState<"apply" | "undo" | "check" | null>(null);
+  const [busy, setBusy] = useState<"apply" | "undo" | null>(null);
   const requestId = useRef(0);
 
   const load = useCallback(async () => {
@@ -108,69 +96,39 @@ export default function OrbitAuditClient() {
       });
   }, []);
 
-  const run = useCallback(
-    async (outstandingUndo: OutstandingUndoChoice) => {
-      const id = ++requestId.current;
-      setStatus("running");
-      setError(null);
-      setReleasePrompt(false);
-      try {
-        const next = await sendJson<TagAuditResponse>("/api/orbit/tag-audit", {
-          method: "POST",
-          body: { outstandingUndo },
-        });
-        if (id !== requestId.current) return;
-        setView(next);
-        setStatus("ready");
-      } catch (caught) {
-        if (id !== requestId.current) return;
-        if (errorCode(caught) === "undo_outstanding") {
-          setReleasePrompt(true);
-          setStatus("ready");
-          setError("Undo is still available. Keep the last changes to review again.");
-          return;
-        }
-        setError(errorMessage(caught));
-        setStatus(view ? "ready" : "error");
-      }
-    },
-    [view],
-  );
-
-  const onReview = () => {
-    if (view?.undoAvailable) {
-      setReleasePrompt(true);
-      return;
-    }
-    void run("block");
-  };
-
-  const onToggle = async (proposalId: string, checked: boolean) => {
-    if (!view || view.phase !== "open") return;
-    const checkedProposalIds = view.proposals
-      .filter((proposal) =>
-        proposal.id === proposalId ? checked : proposal.checked,
-      )
-      .map((proposal) => proposal.id);
-    setBusy("check");
+  const run = useCallback(async () => {
+    const id = ++requestId.current;
+    setStatus("running");
     setError(null);
     try {
       const next = await sendJson<TagAuditResponse>("/api/orbit/tag-audit", {
-        method: "PATCH",
-        body: { auditId: view.auditId, checkedProposalIds },
+        method: "POST",
+        body: {},
       });
+      if (id !== requestId.current) return;
+      setUnchecked(new Set());
       setView(next);
+      setStatus("ready");
     } catch (caught) {
+      if (id !== requestId.current) return;
       setError(errorMessage(caught));
-    } finally {
-      setBusy(null);
+      setStatus(view ? "ready" : "error");
     }
+  }, [view]);
+
+  const onToggle = (proposalId: string, checked: boolean) => {
+    setUnchecked((current) => {
+      const next = new Set(current);
+      if (checked) next.delete(proposalId);
+      else next.add(proposalId);
+      return next;
+    });
   };
 
   const onApply = async () => {
     if (!view) return;
     const checkedProposalIds = view.proposals
-      .filter((proposal) => proposal.checked)
+      .filter((proposal) => !unchecked.has(proposal.id))
       .map((proposal) => proposal.id);
     setBusy("apply");
     setError(null);
@@ -204,7 +162,8 @@ export default function OrbitAuditClient() {
     }
   };
 
-  const checkedCount = view?.proposals.filter((proposal) => proposal.checked).length ?? 0;
+  const checkedCount =
+    view?.proposals.filter((proposal) => !unchecked.has(proposal.id)).length ?? 0;
   const canApply = view?.phase === "open" && checkedCount > 0 && busy === null;
 
   return (
@@ -243,7 +202,7 @@ export default function OrbitAuditClient() {
               variant="outline"
               size="sm"
               disabled={status === "loading" || status === "running" || busy !== null}
-              onClick={onReview}
+              onClick={() => void run()}
             >
               {view ? "Review again" : "Review tags"}
             </Button>
@@ -268,30 +227,6 @@ export default function OrbitAuditClient() {
           </p>
         ) : null}
 
-        {releasePrompt ? (
-          <div className="flex flex-wrap items-center gap-2 border-b border-hairline-soft px-4 py-3 sm:px-5">
-            <p className="min-w-0 flex-1 text-sm text-foreground">
-              Undo can still restore the last apply. Keep those tag changes and review again?
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              disabled={status === "running"}
-              onClick={() => void run("release")}
-            >
-              Keep changes and review again
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setReleasePrompt(false)}
-            >
-              Stay blocked
-            </Button>
-          </div>
-        ) : null}
-
         {status === "loading" || status === "running" ? (
           <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground sm:px-5" role="status">
             <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
@@ -308,7 +243,7 @@ export default function OrbitAuditClient() {
             title="No tag review yet"
             description="Score the tags already on your bookmarks. Nothing changes until you apply."
             action={
-              <Button type="button" size="sm" onClick={() => void run("block")}>
+              <Button type="button" size="sm" onClick={() => void run()}>
                 Review tags
               </Button>
             }
@@ -326,11 +261,11 @@ export default function OrbitAuditClient() {
                 <div className="flex items-start gap-3 px-4 py-3 sm:px-5">
                   <Checkbox
                     className="mt-1"
-                    checked={proposal.checked}
+                    checked={!unchecked.has(proposal.id)}
                     disabled={view.phase !== "open" || busy !== null}
                     aria-label={`${suggestionLabel(proposal.suggestion)} ${proposal.currentTag.name}`}
                     onCheckedChange={(checked) => {
-                      void onToggle(proposal.id, checked === true);
+                      onToggle(proposal.id, checked === true);
                     }}
                   />
                   <div className="min-w-0 flex-1">

@@ -45,7 +45,7 @@ import { logWarn } from "@/lib/logger";
 import { getTypeSafeClient, getTypeSafeModel } from "@/lib/typesafe";
 import type { OrbitScanConfidence, OrbitSuggestionOrigin } from "@/types";
 
-function toJsonState(value: unknown): EntryType {
+export function toJsonState(value: unknown): EntryType {
   return JSON.parse(JSON.stringify(value)) as EntryType;
 }
 

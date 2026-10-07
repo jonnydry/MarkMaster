@@ -31,16 +31,18 @@ type ProposalRow = {
   swapTagId: string | null;
   reason: string;
   currentScore: number;
-  checked: boolean;
   rank: number;
+};
+type UndoDelta = {
+  removes: Array<{ bookmarkId: string; tagId: string }>;
+  adds: Array<{ bookmarkId: string; tagId: string }>;
 };
 type UndoRow = {
   auditId: string;
   userId: string;
-  joins: Array<{ bookmarkId: string; tagIds: string[] }>;
+  joins: UndoDelta;
   createdAt: Date;
   restoredAt: Date | null;
-  releasedAt: Date | null;
 };
 type AuditRow = {
   id: string;
@@ -48,9 +50,7 @@ type AuditRow = {
   phase: string;
   taggedBookmarkCount: number;
   judgedBookmarkCount: number;
-  vetoedPairKeys: string[];
   outcome: { appliedProposalIds: string[]; skippedProposalIds: string[] } | null;
-  rejectionsRecorded: boolean;
   appliedAt: Date | null;
   createdAt: Date;
 };
@@ -75,6 +75,44 @@ const memory = vi.hoisted(() => {
     createMany.mockClear();
   }
 
+  function deleteTag(tagId: string) {
+    for (let index = tags.length - 1; index >= 0; index -= 1) {
+      if (tags[index]?.id === tagId) tags.splice(index, 1);
+    }
+  }
+
+  function addJoin(bookmarkId: string, tagId: string) {
+    joins.push({ bookmarkId, tagId });
+  }
+
+  function removeJoin(bookmarkId: string, tagId: string) {
+    for (let index = joins.length - 1; index >= 0; index -= 1) {
+      const join = joins[index];
+      if (join?.bookmarkId === bookmarkId && join.tagId === tagId) joins.splice(index, 1);
+    }
+  }
+
+  function snapshotMemory() {
+    return {
+      bookmarks: bookmarks.map((row) => ({ ...row })),
+      tags: tags.map((row) => ({ ...row })),
+      joins: joins.map((row) => ({ ...row })),
+      audits: audits.map((row) => ({ ...row })),
+      proposals: proposals.map((row) => ({ ...row })),
+      undos: undos.map((row) => ({ ...row, joins: structuredClone(row.joins) })),
+      events: events.map((row) => ({ ...row })),
+    };
+  }
+
+  function restoreMemory(saved: ReturnType<typeof snapshotMemory>) {
+    bookmarks.splice(0, bookmarks.length, ...saved.bookmarks);
+    tags.splice(0, tags.length, ...saved.tags);
+    joins.splice(0, joins.length, ...saved.joins);
+    audits.splice(0, audits.length, ...saved.audits);
+    proposals.splice(0, proposals.length, ...saved.proposals);
+    undos.splice(0, undos.length, ...saved.undos);
+    events.splice(0, events.length, ...saved.events);
+  }
   function tagIds(bookmarkId: string) {
     return joins
       .filter((join) => join.bookmarkId === bookmarkId)
@@ -216,7 +254,6 @@ const memory = vi.hoisted(() => {
         where?: { id?: string; userId?: string };
         orderBy?: { createdAt?: "asc" | "desc" };
         include?: { proposals?: unknown; undo?: boolean };
-        select?: { vetoedPairKeys?: boolean };
       }) {
         let rows = audits.filter((audit) => {
           if (args.where?.id && audit.id !== args.where.id) return false;
@@ -228,7 +265,6 @@ const memory = vi.hoisted(() => {
         }
         const audit = rows[0];
         if (!audit) return null;
-        if (args.select?.vetoedPairKeys) return { vetoedPairKeys: audit.vetoedPairKeys };
         return {
           ...audit,
           proposals: proposals
@@ -251,9 +287,7 @@ const memory = vi.hoisted(() => {
           phase: args.data.phase,
           taggedBookmarkCount: args.data.taggedBookmarkCount,
           judgedBookmarkCount: args.data.judgedBookmarkCount,
-          vetoedPairKeys: args.data.vetoedPairKeys,
           outcome: args.data.outcome ?? null,
-          rejectionsRecorded: args.data.rejectionsRecorded,
           appliedAt: args.data.appliedAt ?? null,
           createdAt: args.data.createdAt ?? new Date(),
         };
@@ -288,80 +322,23 @@ const memory = vi.hoisted(() => {
         return { count: removed.length };
       },
     },
-    orbitTagAuditProposal: {
-      async update(args: { where: { id: string }; data: { checked: boolean } }) {
-        const proposal = proposals.find((item) => item.id === args.where.id);
-        if (!proposal) throw new Error(`missing proposal ${args.where.id}`);
-        proposal.checked = args.data.checked;
-        return proposal;
-      },
-    },
     orbitTagAuditUndo: {
-      async findFirst(args: {
-        where?: {
-          userId?: string;
-          restoredAt?: null;
-          releasedAt?: null;
-          audit?: { userId?: string; phase?: string };
-        };
-        select?: { auditId?: boolean };
-      }) {
-        const undo = undos.find((item) => {
-          if (args.where?.userId && item.userId !== args.where.userId) return false;
-          if (args.where && "restoredAt" in args.where && args.where.restoredAt === null && item.restoredAt) {
-            return false;
-          }
-          if (args.where && "releasedAt" in args.where && args.where.releasedAt === null && item.releasedAt) {
-            return false;
-          }
-          if (args.where?.audit) {
-            const audit = audits.find((candidate) => candidate.id === item.auditId);
-            if (!audit) return false;
-            if (args.where.audit.userId && audit.userId !== args.where.audit.userId) return false;
-            if (args.where.audit.phase && audit.phase !== args.where.audit.phase) return false;
-          }
-          return true;
-        });
-        if (!undo) return null;
-        if (args.select?.auditId) return { auditId: undo.auditId };
-        return undo;
-      },
-      async create(args: { data: Omit<UndoRow, "createdAt" | "restoredAt" | "releasedAt"> & { createdAt?: Date } }) {
+      async create(args: { data: Omit<UndoRow, "createdAt" | "restoredAt"> & { createdAt?: Date } }) {
         const undo: UndoRow = {
           auditId: args.data.auditId,
           userId: args.data.userId,
           joins: args.data.joins,
           createdAt: args.data.createdAt ?? new Date(),
           restoredAt: null,
-          releasedAt: null,
         };
         undos.push(undo);
         return undo;
       },
-      async update(args: { where: { auditId: string }; data: { restoredAt?: Date; releasedAt?: Date } }) {
+      async update(args: { where: { auditId: string }; data: { restoredAt?: Date } }) {
         const undo = undos.find((item) => item.auditId === args.where.auditId);
         if (!undo) throw new Error(`missing undo ${args.where.auditId}`);
         Object.assign(undo, args.data);
         return undo;
-      },
-      async updateMany(args: {
-        where: {
-          userId: string;
-          restoredAt: null;
-          releasedAt: null;
-          audit: { userId: string; phase: string };
-        };
-        data: { releasedAt: Date };
-      }) {
-        let count = 0;
-        for (const undo of undos) {
-          if (undo.userId !== args.where.userId || undo.restoredAt || undo.releasedAt) continue;
-          const audit = audits.find((item) => item.id === undo.auditId);
-          if (!audit || audit.phase !== args.where.audit.phase) continue;
-          undo.releasedAt = args.data.releasedAt;
-          count += 1;
-        }
-        return { count };
       },
     },
     orbitDecisionEvent: {
@@ -391,6 +368,37 @@ const memory = vi.hoisted(() => {
           return true;
         });
       },
+      async deleteMany(args: {
+        where?: {
+          userId?: string;
+          source?: string;
+          createdAt?: { gte?: Date };
+          bookmarkId?: { in?: string[] };
+        };
+      }) {
+        const before = events.length;
+        for (let index = events.length - 1; index >= 0; index -= 1) {
+          const event = events[index];
+          if (!event) continue;
+          if (args.where?.userId && event.userId !== args.where.userId) continue;
+          if (args.where?.source && event.source !== args.where.source) continue;
+          if (
+            args.where?.bookmarkId?.in &&
+            !args.where.bookmarkId.in.includes(String(event.bookmarkId))
+          ) {
+            continue;
+          }
+          const createdAt = event.createdAt;
+          if (
+            args.where?.createdAt?.gte &&
+            (!(createdAt instanceof Date) || createdAt < args.where.createdAt.gte)
+          ) {
+            continue;
+          }
+          events.splice(index, 1);
+        }
+        return { count: before - events.length };
+      },
     },
     async $executeRaw() {
       return 1;
@@ -399,7 +407,13 @@ const memory = vi.hoisted(() => {
       return [];
     },
     async $transaction<T>(fn: (tx: unknown) => Promise<T>) {
-      return fn(prisma);
+      const saved = snapshotMemory();
+      try {
+        return await fn(prisma);
+      } catch (error) {
+        restoreMemory(saved);
+        throw error;
+      }
     },
   };
 
@@ -438,7 +452,7 @@ const memory = vi.hoisted(() => {
   function seedOpenAudit(args: {
     id: string;
     userId?: string;
-    proposals: Array<Omit<ProposalRow, "auditId" | "checked"> & { checked?: boolean }>;
+    proposals: Array<Omit<ProposalRow, "auditId">>;
   }) {
     audits.push({
       id: args.id,
@@ -446,22 +460,29 @@ const memory = vi.hoisted(() => {
       phase: "open",
       taggedBookmarkCount: 1,
       judgedBookmarkCount: 1,
-      vetoedPairKeys: [],
       outcome: null,
-      rejectionsRecorded: false,
       appliedAt: null,
       createdAt: new Date(),
     });
     for (const proposal of args.proposals) {
-      proposals.push({
-        checked: true,
-        ...proposal,
-        auditId: args.id,
-      });
+      proposals.push({ ...proposal, auditId: args.id });
     }
   }
 
-  return { prisma, reset, tagIds, seedTag, seedBookmark, seedOpenAudit, undos, createMany };
+  return {
+    prisma,
+    reset,
+    tagIds,
+    seedTag,
+    seedBookmark,
+    seedOpenAudit,
+    undos,
+    events,
+    createMany,
+    addJoin,
+    removeJoin,
+    deleteTag,
+  };
 });
 
 vi.mock("@/lib/prisma", () => ({ prisma: memory.prisma }));
@@ -578,7 +599,6 @@ describe("orbit tag audit", () => {
 
     const view = await runOrbitTagAudit({
       userId: "user-1",
-      outstandingUndo: "block",
       deadlineMs: Date.now() + 600_000,
     });
 
@@ -636,7 +656,6 @@ describe("orbit tag audit", () => {
 
     const view = await runOrbitTagAudit({
       userId: "user-1",
-      outstandingUndo: "block",
       deadlineMs: Date.now() + 600_000,
     });
 
@@ -662,7 +681,6 @@ describe("orbit tag audit", () => {
 
     const view = await runOrbitTagAudit({
       userId: "user-1",
-      outstandingUndo: "block",
       deadlineMs: Date.now() + 600_000,
     });
     const checked = view.proposals.find((proposal) => proposal.bookmarkId === "bm-one");
@@ -678,16 +696,15 @@ describe("orbit tag audit", () => {
     expect(memory.tagIds("bm-two")).toEqual(["tag-two"]);
   });
 
-  it("restores the snapshotted tag ids from the stored undo row, and a second undo does not write again", async () => {
+  it("undo puts back a removed tag, keeps a tag added later, and does not restore a tag deleted later", async () => {
     memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
     memory.seedTag({ id: "tag-other", userId: "user-1", name: "Other", color: "#222222" });
+    memory.seedTag({ id: "tag-later", userId: "user-1", name: "Later", color: "#333333" });
     memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose", "tag-other"] });
-    const before = memory.tagIds("bm-loose");
-    answerByName({ "bm-loose": { Loose: 0.2, Other: 0.9 } });
+    answerByName({ "bm-loose": { Loose: 0.2, Other: 0.9, Later: 0.1 } });
 
     const view = await runOrbitTagAudit({
       userId: "user-1",
-      outstandingUndo: "block",
       deadlineMs: Date.now() + 600_000,
     });
     await applyOrbitTagAudit({
@@ -695,18 +712,109 @@ describe("orbit tag audit", () => {
       auditId: view.auditId,
       checkedProposalIds: view.proposals.map((proposal) => proposal.id),
     });
-    expect(memory.tagIds("bm-loose")).not.toEqual(before);
-    expect(memory.undos.find((undo) => undo.auditId === view.auditId)?.joins).toEqual([
-      { bookmarkId: "bm-loose", tagIds: before },
-    ]);
+    expect(memory.tagIds("bm-loose")).toEqual(["tag-other"]);
+    memory.removeJoin("bm-loose", "tag-other");
+    memory.addJoin("bm-loose", "tag-later");
 
     const undone = await undoOrbitTagAudit({ userId: "user-1", auditId: view.auditId });
     expect(undone.alreadyUndone).toBe(false);
-    expect(memory.tagIds("bm-loose")).toEqual(before);
+    expect(memory.tagIds("bm-loose")).toEqual(["tag-later", "tag-loose"]);
 
     const second = await undoOrbitTagAudit({ userId: "user-1", auditId: view.auditId });
     expect(second.alreadyUndone).toBe(true);
-    expect(memory.tagIds("bm-loose")).toEqual(["tag-loose", "tag-other"]);
+    expect(memory.tagIds("bm-loose")).toEqual(["tag-later", "tag-loose"]);
+  });
+
+  it("undo skips a deleted tag instead of failing", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: view.auditId,
+      checkedProposalIds: view.proposals.map((proposal) => proposal.id),
+    });
+    memory.deleteTag("tag-loose");
+
+    const undone = await undoOrbitTagAudit({ userId: "user-1", auditId: view.auditId });
+    expect(undone.alreadyUndone).toBe(false);
+    expect(memory.tagIds("bm-loose")).toEqual([]);
+  });
+
+  it("undo deletes tag-audit rejections for the bookmarks it restores", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    await applyOrbitTagAudit({
+      userId: "user-1",
+      auditId: view.auditId,
+      checkedProposalIds: view.proposals.map((proposal) => proposal.id),
+    });
+    memory.events.push({
+      userId: "user-1",
+      bookmarkId: "bm-other",
+      action: "rejected",
+      source: "tag-audit",
+      createdAt: new Date(),
+    });
+    expect(memory.events.some((event) => event.bookmarkId === "bm-loose")).toBe(true);
+
+    await undoOrbitTagAudit({ userId: "user-1", auditId: view.auditId });
+    expect(memory.events.map((event) => event.bookmarkId)).toEqual(["bm-other"]);
+  });
+
+  it("rolls the apply back when the decision log write fails", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
+    answerByName({ "bm-loose": { Loose: 0.2 } });
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    memory.createMany.mockImplementationOnce(async () => {
+      throw new Error("decision log failed");
+    });
+
+    await expect(
+      applyOrbitTagAudit({
+        userId: "user-1",
+        auditId: view.auditId,
+        checkedProposalIds: view.proposals.map((proposal) => proposal.id),
+      }),
+    ).rejects.toThrow("decision log failed");
+    expect(memory.tagIds("bm-loose")).toEqual(["tag-loose"]);
+    expect(memory.undos).toEqual([]);
+    expect(memory.events).toEqual([]);
+  });
+
+  it("does not count a failed Jev call as reviewed", async () => {
+    memory.seedTag({ id: "tag-one", userId: "user-1", name: "One", color: "#111111" });
+    memory.seedTag({ id: "tag-two", userId: "user-1", name: "Two", color: "#222222" });
+    memory.seedBookmark({ id: "bm-one", tagIds: ["tag-one"], bookmarkedAt: new Date("2026-06-02T00:00:00.000Z") });
+    memory.seedBookmark({ id: "bm-two", tagIds: ["tag-two"], bookmarkedAt: new Date("2026-06-01T00:00:00.000Z") });
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      if (request.state.id === "bm-one") throw new Error("jev down");
+      return { answers: { current_0: { noul: 0.2 }, rival_0: { noul: 0.1 } } };
+    });
+
+    const view = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+
+    expect(view.coverage.judgedBookmarkCount).toBe(1);
+    expect(view.coverage.taggedBookmarkCount).toBe(2);
+    expect(view.proposals.map((proposal) => proposal.bookmarkId)).toEqual(["bm-two"]);
   });
 
   it("writes one rejected event whose original suggestion lists only the old tag", async () => {
@@ -716,7 +824,6 @@ describe("orbit tag audit", () => {
 
     const view = await runOrbitTagAudit({
       userId: "user-1",
-      outstandingUndo: "block",
       deadlineMs: Date.now() + 600_000,
     });
     await applyOrbitTagAudit({

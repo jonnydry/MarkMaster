@@ -223,7 +223,9 @@ function getCounts(bucket: Map<string, LabelCounts>, key: string) {
 export async function recordOrbitDecisionEvents(args: {
   userId: string;
   events: OrbitDecisionEventPayload[];
+  db?: Prisma.TransactionClient;
 }) {
+  const db = args.db ?? prisma;
   const events = args.events.slice(0, MAX_EVENTS_PER_WRITE).flatMap((event) => {
     const bookmarkId = truncate(event.bookmarkId, 128);
     const action = truncate(event.action, 40);
@@ -246,7 +248,7 @@ export async function recordOrbitDecisionEvents(args: {
   if (events.length === 0) return { count: 0 };
 
   const bookmarkIds = Array.from(new Set(events.map((event) => event.bookmarkId)));
-  const ownedBookmarks = await prisma.bookmark.findMany({
+  const ownedBookmarks = await db.bookmark.findMany({
     where: {
       userId: args.userId,
       id: { in: bookmarkIds },
@@ -258,7 +260,7 @@ export async function recordOrbitDecisionEvents(args: {
     throw new OrbitDecisionEventOwnershipError();
   }
 
-  const result = await prisma.orbitDecisionEvent.createMany({
+  const result = await db.orbitDecisionEvent.createMany({
     data: events,
   });
   return { count: result.count };

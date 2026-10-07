@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
@@ -9,7 +8,6 @@ import {
   OrbitTagAuditError,
   readOrbitTagAudit,
   runOrbitTagAudit,
-  setOrbitTagAuditChecked,
   tagAuditCoverageSentence,
   type TagAuditView,
 } from "@/lib/orbit-tag-audit";
@@ -19,15 +17,6 @@ import { readJsonBody } from "@/lib/request-body";
 export const maxDuration = 240;
 
 const RUN_BUDGET_MS = 240_000;
-
-const runBodySchema = z.object({
-  outstandingUndo: z.enum(["block", "release"]).default("block"),
-});
-
-const checkedBodySchema = z.object({
-  auditId: z.string().trim().min(1).max(128),
-  checkedProposalIds: z.array(z.string().trim().min(1).max(128)).max(100),
-});
 
 function viewJson(view: TagAuditView | null) {
   if (!view) return NextResponse.json(null);
@@ -74,13 +63,6 @@ export async function POST(req: NextRequest) {
   if (!body.ok) {
     return NextResponse.json({ error: body.error }, { status: body.status });
   }
-  const parsed = runBodySchema.safeParse(body.data);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
-      { status: 400 },
-    );
-  }
 
   const [rateLimitResult, globalResult] = await Promise.all([
     checkRateLimit("orbit", user.id),
@@ -92,38 +74,7 @@ export async function POST(req: NextRequest) {
   try {
     const view = await runOrbitTagAudit({
       userId: user.id,
-      outstandingUndo: parsed.data.outstandingUndo,
       deadlineMs,
-    });
-    return viewJson(view);
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
-
-export async function PATCH(req: NextRequest) {
-  const user = await getDbUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await readJsonBody(req);
-  if (!body.ok) {
-    return NextResponse.json({ error: body.error }, { status: body.status });
-  }
-  const parsed = checkedBodySchema.safeParse(body.data);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid request body", details: parsed.error.flatten().fieldErrors },
-      { status: 400 },
-    );
-  }
-
-  try {
-    const view = await setOrbitTagAuditChecked({
-      userId: user.id,
-      auditId: parsed.data.auditId,
-      checkedProposalIds: parsed.data.checkedProposalIds,
     });
     return viewJson(view);
   } catch (error) {
