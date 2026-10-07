@@ -15,7 +15,7 @@ import {
 import type { useOrbitScan } from "@/hooks/use-orbit-scan";
 import { addLikedHighlightId, getHighlightFeedback } from "@/lib/highlight-feedback";
 import { trackFlywheelEvent } from "@/lib/flywheel";
-import { sendJson, type JsonValue } from "@/lib/fetch-json";
+import { FetchJsonError, sendJson, type JsonValue } from "@/lib/fetch-json";
 import type {
   OrbitDecisionEventPayload,
   OrbitScanPlan,
@@ -24,23 +24,54 @@ import type {
 type OrbitScanApi = ReturnType<typeof useOrbitScan>;
 
 const DECISION_EVENT_RETRY_DELAYS_MS = [2_000, 8_000];
-const DECISION_EVENT_BATCH_SIZE = 20;
+const DECISION_EVENT_BATCH_MAX_EVENTS = 100;
+const DECISION_EVENT_BATCH_BYTE_BUDGET = 56 * 1024;
 
+function decisionEventBodyBytes(events: OrbitDecisionEventPayload[]) {
+  return new TextEncoder().encode(JSON.stringify({ events })).length;
+}
+
+function isRetryableDecisionEventError(err: unknown) {
+  if (!(err instanceof FetchJsonError)) return true;
+  return err.status === 429 || err.status >= 500;
+}
+
+/**
+ * Best-effort learning signal. Each failed batch retries in the background
+ * with backoff (3 attempts), then drops. Retries are serial, so the same
+ * events are never in flight twice. The server inserts blindly, which keeps
+ * the duplicate window to a response lost after commit. Anything still queued
+ * is lost if the tab closes.
+ */
 async function postDecisionEventsWithRetry(events: OrbitDecisionEventPayload[]) {
-  for (let offset = 0; offset < events.length; offset += DECISION_EVENT_BATCH_SIZE) {
-    const body = JSON.parse(
-      JSON.stringify({
-        events: events.slice(offset, offset + DECISION_EVENT_BATCH_SIZE),
-      })
-    ) as JsonValue;
+  let offset = 0;
+  while (offset < events.length) {
+    const batch: OrbitDecisionEventPayload[] = [];
+    while (
+      offset + batch.length < events.length &&
+      batch.length < DECISION_EVENT_BATCH_MAX_EVENTS
+    ) {
+      const next = events[offset + batch.length];
+      if (!next) break;
+      if (
+        batch.length > 0 &&
+        decisionEventBodyBytes(batch.concat(next)) >= DECISION_EVENT_BATCH_BYTE_BUDGET
+      ) {
+        break;
+      }
+      batch.push(next);
+    }
 
+    if (batch.length === 0) break;
+    offset += batch.length;
+    const body = JSON.parse(JSON.stringify({ events: batch })) as JsonValue;
     for (let attempt = 0; ; attempt += 1) {
       try {
         await sendJson("/api/orbit/decision-events", { method: "POST", body });
         break;
       } catch (err) {
         const delayMs = DECISION_EVENT_RETRY_DELAYS_MS[attempt];
-        if (delayMs === undefined) {
+        if (delayMs === undefined || !isRetryableDecisionEventError(err)) {
           console.warn("[orbit] decision event write failed after retries:", err);
           break;
         }

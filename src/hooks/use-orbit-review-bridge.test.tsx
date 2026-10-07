@@ -7,9 +7,12 @@ import type { OrbitDecisionEventPayload, OrbitScanPlan } from "@/types";
 
 const sendJson = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("@/lib/fetch-json", () => ({
-  sendJson,
-}));
+vi.mock("@/lib/fetch-json", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/fetch-json")>(
+    "@/lib/fetch-json"
+  );
+  return { ...actual, sendJson };
+});
 
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), message: vi.fn(), error: vi.fn() },
@@ -20,25 +23,30 @@ vi.mock("@/lib/flywheel", () => ({
 }));
 
 import { useOrbitReviewBridge } from "@/hooks/use-orbit-review-bridge";
+import { FetchJsonError } from "@/lib/fetch-json";
 
 const BODY_LIMIT_BYTES = 64 * 1024;
 const DECISION_EVENTS_PATH = "/api/orbit/decision-events";
+
+function cjk(length: number) {
+  return "書".repeat(length);
+}
 
 function suggestion(bookmarkId: string) {
   return {
     bookmarkId,
     confidence: "high" as const,
-    reasoning: "This post sits with the reader's saved threads on product design.",
-    tags: [0, 1, 2].map((index) => ({
-      name: `design-${index}`,
+    reasoning: cjk(240),
+    tags: Array.from({ length: 5 }, () => ({
+      name: cjk(50),
       color: "#336699",
-      reason: "Matches a tag this reader already uses on similar posts.",
+      reason: cjk(180),
       reuseExisting: true,
     })),
     collection: {
-      name: "Reading",
-      description: "Long-form posts worth a second pass.",
-      reason: "Fits the collection kept for essays.",
+      name: cjk(100),
+      description: cjk(240),
+      reason: cjk(180),
       reuseExisting: true,
     },
   };
@@ -46,12 +54,12 @@ function suggestion(bookmarkId: string) {
 
 function decisionEvents(count: number): OrbitDecisionEventPayload[] {
   return Array.from({ length: count }, (_, index) => {
-    const bookmarkId = `bookmark-${String(index).padStart(3, "0")}`;
+    const bookmarkId = `${cjk(125)}${String(index).padStart(3, "0")}`;
     return {
       bookmarkId,
-      action: "accepted",
-      source: "review",
-      mode: "deep",
+      action: "edited",
+      source: cjk(80),
+      mode: cjk(40),
       originalSuggestion: suggestion(bookmarkId),
       reviewedSuggestion: suggestion(bookmarkId),
     };
@@ -112,7 +120,7 @@ describe("decision event posts", () => {
     vi.useRealTimers();
   });
 
-  it("posts 72 three-tag events as multiple bodies under 64KB", async () => {
+  it("posts 72 max-length five-tag events as bodies under 64KB", async () => {
     const events = decisionEvents(72);
     expect(bodyBytes({ events })).toBeGreaterThan(BODY_LIMIT_BYTES);
 
@@ -175,5 +183,31 @@ describe("decision event posts", () => {
     expect(landedIds.length).toBeGreaterThan(0);
     expect(failedIds.length).toBeGreaterThan(0);
     expect(landedIds.length + failedIds.length).toBe(events.length);
+  });
+
+  it("does not retry a 413", async () => {
+    vi.useFakeTimers();
+    sendJson.mockRejectedValue(
+      new FetchJsonError("Request body is too large", 413, null)
+    );
+
+    await applyReviewed([{ bookmarkId: "bookmark-1", action: "kept" }]);
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(decisionPosts()).toHaveLength(1);
+  });
+
+  it("retries a 429", async () => {
+    vi.useFakeTimers();
+    sendJson.mockRejectedValue(new FetchJsonError("Rate limit exceeded", 429, null));
+
+    await applyReviewed([{ bookmarkId: "bookmark-1", action: "kept" }]);
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(decisionPosts()).toHaveLength(3);
   });
 });
