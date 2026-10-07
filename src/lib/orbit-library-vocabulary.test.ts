@@ -105,6 +105,15 @@ describe("requestLibraryGrowthTags", () => {
     expect(growth.map((tag) => tag.name)).toEqual(["Fermentation"]);
   });
 
+  it('keeps the first of "Agent" and "Agents" in one growth batch', async () => {
+    prismaMock.bookmark.findMany.mockResolvedValue(untagged(12));
+    fetchMock.mockResolvedValue(xaiReply(["Agent", "Agents", "Baking"]));
+
+    const growth = await requestLibraryGrowthTags("user-1", []);
+
+    expect(growth.map((tag) => tag.name)).toEqual(["Agent", "Baking"]);
+  });
+
   it("skips Grok when too few posts are left", async () => {
     prismaMock.bookmark.findMany.mockResolvedValue(untagged(2));
 
