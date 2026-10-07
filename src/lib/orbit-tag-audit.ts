@@ -146,6 +146,7 @@ export type TagAuditCoverage = {
   bookmarkCap: number;
   resumed?: boolean;
   wrapped?: boolean;
+  skippedBookmarkCount?: number;
 };
 
 export type TagAuditPhase = "open" | "applied" | "undone";
@@ -242,6 +243,7 @@ type AuditPage = {
   resumed: boolean;
   wrapped: boolean;
   failedIds: string[];
+  skippedBookmarkCount: number;
 };
 
 type ParsedAudit = {
@@ -325,21 +327,26 @@ type TaggedBookmarkRow = {
 };
 
 export function tagAuditCoverageSentence(coverage: TagAuditCoverage): string {
-  if (coverage.taggedBookmarkCount === 0) return "No tagged bookmarks.";
-  const targeted = Math.min(coverage.taggedBookmarkCount, coverage.bookmarkCap);
-  if (coverage.judgedBookmarkCount < targeted) {
-    return `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+  let sentence: string;
+  if (coverage.taggedBookmarkCount === 0) {
+    sentence = "No tagged bookmarks.";
+  } else {
+    const targeted = Math.min(coverage.taggedBookmarkCount, coverage.bookmarkCap);
+    if (coverage.judgedBookmarkCount < targeted) {
+      sentence = `Reviewed ${coverage.judgedBookmarkCount} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+    } else if (coverage.taggedBookmarkCount <= coverage.bookmarkCap) {
+      sentence = `Reviewed all ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+    } else if (coverage.wrapped) {
+      sentence = `Reviewed ${coverage.bookmarkCap} tagged bookmarks, wrapping back to the newest.`;
+    } else if (coverage.resumed) {
+      sentence = `Reviewed ${coverage.bookmarkCap} tagged bookmarks, continuing past the previous review.`;
+    } else {
+      sentence = `Reviewed the newest ${coverage.bookmarkCap} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+    }
   }
-  if (coverage.taggedBookmarkCount <= coverage.bookmarkCap) {
-    return `Reviewed all ${coverage.taggedBookmarkCount} tagged bookmarks.`;
-  }
-  if (coverage.wrapped) {
-    return `Reviewed ${coverage.bookmarkCap} tagged bookmarks, wrapping back to the newest.`;
-  }
-  if (coverage.resumed) {
-    return `Reviewed ${coverage.bookmarkCap} tagged bookmarks, continuing past the previous review.`;
-  }
-  return `Reviewed the newest ${coverage.bookmarkCap} of ${coverage.taggedBookmarkCount} tagged bookmarks.`;
+  const skipped = coverage.skippedBookmarkCount ?? 0;
+  if (skipped <= 0) return sentence;
+  return `${sentence} ${skipped} skipped after repeated failures.`;
 }
 
 function oneLineReason(value: string, fallback: string): string {
@@ -724,12 +731,17 @@ function readPage(value: unknown): AuditPage | null {
   const endBookmarkedAt = typeof page.endBookmarkedAt === "string" ? page.endBookmarkedAt : "";
   const endBookmarkId = typeof page.endBookmarkId === "string" ? page.endBookmarkId : "";
   if (!endBookmarkId && failedIds.length === 0) return null;
+  const skippedBookmarkCount = page.skippedBookmarkCount;
   return {
     endBookmarkedAt,
     endBookmarkId,
     resumed: page.resumed === true,
     wrapped: page.wrapped === true,
     failedIds,
+    skippedBookmarkCount:
+      typeof skippedBookmarkCount === "number" && skippedBookmarkCount > 0
+        ? skippedBookmarkCount
+        : 0,
   };
 }
 
@@ -836,6 +848,7 @@ function toTagAuditView(
       bookmarkCap: ORBIT_TAG_AUDIT_BOOKMARK_CAP,
       resumed: audit.page?.resumed ?? false,
       wrapped: audit.page?.wrapped ?? false,
+      skippedBookmarkCount: audit.page?.skippedBookmarkCount ?? 0,
     },
     proposals,
   };
@@ -1301,12 +1314,16 @@ function pageFromMarks(
 ): AuditPage | null {
   const previousFailed = new Set(previous?.failedIds ?? []);
   const failedIds = rows.flatMap((row, index) => (marks[index] === "failed" ? [row.id] : []));
+  const anyScored = marks.some((mark) => mark === "scored");
   let prefix = 0;
+  let skippedBookmarkCount = 0;
   while (prefix < rows.length) {
     const mark = marks[prefix];
     const row = rows[prefix];
-    const repeatedFailure = mark === "failed" && row !== undefined && previousFailed.has(row.id);
+    const repeatedFailure =
+      anyScored && mark === "failed" && row !== undefined && previousFailed.has(row.id);
     if (mark !== "scored" && !repeatedFailure) break;
+    if (repeatedFailure) skippedBookmarkCount += 1;
     prefix += 1;
   }
   if (prefix <= 0) {
@@ -1317,6 +1334,7 @@ function pageFromMarks(
       resumed: previous?.resumed ?? resumed,
       wrapped: previous?.wrapped ?? wrapped,
       failedIds,
+      skippedBookmarkCount: 0,
     };
   }
   const end = rows[prefix - 1];
@@ -1329,6 +1347,7 @@ function pageFromMarks(
     resumed,
     wrapped,
     failedIds,
+    skippedBookmarkCount,
   };
 }
 
