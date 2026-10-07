@@ -572,6 +572,7 @@ import {
   runOrbitTagAudit,
   tagAuditCoverageSentence,
   tagAuditGrokTimeoutMs,
+  tagAuditUndoLabel,
   undoOrbitTagAudit,
 } from "@/lib/orbit-tag-audit";
 
@@ -1222,6 +1223,10 @@ describe("orbit tag audit", () => {
   });
 
   it("names the undo by age and change count", async () => {
+    const now = Date.parse("2026-06-01T12:00:00.000Z");
+    expect(tagAuditUndoLabel(new Date(now - 2 * 60 * 60 * 1000), 12, now)).toBe(
+      "Undo review from 2h ago (12 changes)",
+    );
     memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
     memory.seedBookmark({ id: "bm-loose", tagIds: ["tag-loose"] });
     answerByName({ "bm-loose": { Loose: 0.2 } });

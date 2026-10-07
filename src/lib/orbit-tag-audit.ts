@@ -63,6 +63,27 @@ export function tagAuditJevStopAt(deadlineMs: number): number {
   return deadlineMs - ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS - TYPESAFE_TIMEOUT_MS;
 }
 
+const TAG_AUDIT_TX_OPTIONS = { maxWait: 5_000, timeout: 15_000 } as const;
+
+export function tagAuditUndoLabel(
+  appliedAt: Date | null,
+  changeCount: number,
+  now = Date.now(),
+): string {
+  const changes = changeCount === 1 ? "1 change" : `${changeCount} changes`;
+  return `Undo review from ${undoAge(appliedAt, now)} (${changes})`;
+}
+
+function undoAge(appliedAt: Date | null, now: number): string {
+  if (!appliedAt) return "earlier";
+  const minutes = Math.floor(Math.max(0, now - appliedAt.getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 const REASON_MAX = 180;
 const TAG_NAME_MAX = 50;
 const EXCERPT_MAX = 200;
@@ -137,6 +158,7 @@ export type TagAuditView = {
   undoAvailable: boolean;
   /** Applied audit whose undo is still available. Null when undo is not. */
   undoAuditId: string | null;
+  undoLabel: string | null;
   proposals: TagAuditProposalView[];
 };
 
@@ -580,10 +602,6 @@ function compileJoinDelta(args: {
   };
 }
 
-function emptyUndoDelta(): UndoDelta {
-  return { removes: [], adds: [] };
-}
-
 function buildTagAuditRejection(args: {
   auditId: string;
   bookmarkId: string;
@@ -658,20 +676,25 @@ function stringList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-function pairList(value: unknown): PairRef[] {
-  if (!Array.isArray(value)) return [];
+function readUndoPairs(value: unknown): PairRef[] {
+  if (!Array.isArray(value)) {
+    throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+  }
   const pairs: PairRef[] = [];
   for (const item of value) {
-    if (!isRecord(item)) continue;
-    if (typeof item.bookmarkId !== "string" || typeof item.tagId !== "string") continue;
+    if (!isRecord(item) || typeof item.bookmarkId !== "string" || typeof item.tagId !== "string") {
+      throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+    }
     pairs.push({ bookmarkId: item.bookmarkId, tagId: item.tagId });
   }
   return pairs;
 }
 
 function readUndoDelta(value: unknown): UndoDelta {
-  if (!isRecord(value)) return emptyUndoDelta();
-  return { removes: pairList(value.removes), adds: pairList(value.adds) };
+  if (!isRecord(value)) {
+    throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+  }
+  return { removes: readUndoPairs(value.removes), adds: readUndoPairs(value.adds) };
 }
 
 function readOutcome(value: unknown): ApplyOutcome | null {
@@ -792,6 +815,7 @@ function toTagAuditView(
     phase: audit.phase,
     undoAvailable: undoId !== null,
     undoAuditId: undoId,
+    undoLabel: null,
     coverage: {
       taggedBookmarkCount: audit.taggedBookmarkCount,
       judgedBookmarkCount: audit.judgedBookmarkCount,
@@ -1106,8 +1130,9 @@ async function judgeSlice(args: {
   >;
   stopAt: number;
   signal: AbortSignal;
-}): Promise<{ flagged: FlaggedPair[]; judged: number }> {
+}): Promise<{ flagged: FlaggedPair[]; judged: number; scoredPrefix: number }> {
   const flagged: FlaggedPair[] = [];
+  const scoredAt = new Array<boolean>(args.rows.length).fill(false);
   let judged = 0;
   let next = 0;
 
@@ -1140,6 +1165,7 @@ async function judgeSlice(args: {
         signal: args.signal,
       });
       if (!scored.ok) continue;
+      scoredAt[index] = true;
       flagged.push(...scored.pairs);
       judged += 1;
     }
@@ -1147,7 +1173,9 @@ async function judgeSlice(args: {
 
   const workers = Math.min(ORBIT_JEV_ASSIGN_CONCURRENCY, args.rows.length);
   await Promise.all(Array.from({ length: workers }, () => worker()));
-  return { flagged, judged };
+  let scoredPrefix = 0;
+  while (scoredPrefix < scoredAt.length && scoredAt[scoredPrefix]) scoredPrefix += 1;
+  return { flagged, judged, scoredPrefix };
 }
 
 async function persistOpenAudit(args: {
@@ -1242,13 +1270,16 @@ function taggedBookmarkInclude() {
   };
 }
 
-function pageFromRows(
+function pageFromScoredPrefix(
   rows: readonly TaggedBookmarkRow[],
+  scoredPrefix: number,
+  previous: AuditPage | null,
   resumed: boolean,
   wrapped: boolean,
 ): AuditPage | null {
-  const end = rows[rows.length - 1];
-  if (!end) return null;
+  if (scoredPrefix <= 0) return previous;
+  const end = rows[scoredPrefix - 1];
+  if (!end) return previous;
   const bookmarkedAt =
     end.bookmarkedAt instanceof Date ? end.bookmarkedAt : new Date(end.bookmarkedAt);
   return {
@@ -1305,7 +1336,10 @@ async function selectTaggedBookmarks(userId: string, cursor: AuditPage | null) {
   };
 }
 
-async function findUndoAuditId(db: Db, userId: string): Promise<string | null> {
+async function findUndoAudit(
+  db: Db,
+  userId: string,
+): Promise<{ id: string; label: string } | null> {
   const row = await db.orbitTagAudit.findFirst({
     where: {
       userId,
@@ -1313,9 +1347,14 @@ async function findUndoAuditId(db: Db, userId: string): Promise<string | null> {
       undo: { is: { restoredAt: null } },
     },
     orderBy: { appliedAt: "desc" },
-    select: { id: true },
+    include: { undo: true },
   });
-  return row?.id ?? null;
+  if (!row?.undo || row.undo.restoredAt) return null;
+  const delta = readUndoDelta(row.undo.joins);
+  return {
+    id: row.id,
+    label: tagAuditUndoLabel(row.appliedAt, delta.removes.length + delta.adds.length),
+  };
 }
 
 export async function runOrbitTagAudit(args: {
@@ -1334,10 +1373,10 @@ export async function runOrbitTagAudit(args: {
     }),
   ]);
   const rows = slice.rows;
-  const page = pageFromRows(rows, slice.resumed, slice.wrapped);
 
   let judgedBookmarkCount = 0;
   let proposals: FlaggedPair[] = [];
+  let page: AuditPage | null = null;
 
   if (rows.length > 0) {
     requireApiKey("TYPESAFE_API_KEY");
@@ -1383,6 +1422,13 @@ export async function runOrbitTagAudit(args: {
       signal: AbortSignal.timeout(Math.max(0, stopAt - Date.now())),
     });
     judgedBookmarkCount = judged.judged;
+    page = pageFromScoredPrefix(
+      rows,
+      judged.scoredPrefix,
+      cursor,
+      slice.resumed,
+      slice.wrapped,
+    );
     const selected = selectPairsForGrok(rankFlaggedPairs(judged.flagged));
     if (selected.length > 0) {
       const excerpts = new Map(
@@ -1416,16 +1462,17 @@ export async function runOrbitTagAudit(args: {
 export async function readOrbitTagAudit(args: {
   userId: string;
 }): Promise<TagAuditView | null> {
-  const [row, undoAuditId] = await Promise.all([
+  const [row, undoAudit] = await Promise.all([
     findAuditRow(prisma, args.userId),
-    findUndoAuditId(prisma, args.userId),
+    findUndoAudit(prisma, args.userId),
   ]);
   if (!row) return null;
   const view = await viewFromAudit(args.userId, parseAuditRow(row));
   return {
     ...view,
-    undoAvailable: undoAuditId !== null,
-    undoAuditId,
+    undoAvailable: undoAudit !== null,
+    undoAuditId: undoAudit?.id ?? null,
+    undoLabel: undoAudit?.label ?? null,
   };
 }
 
@@ -1564,7 +1611,7 @@ export async function applyOrbitTagAudit(args: {
       skippedProposalIds: plan.skippedProposalIds,
       alreadyApplied: false,
     };
-  });
+  }, TAG_AUDIT_TX_OPTIONS);
 }
 
 export async function undoOrbitTagAudit(args: {
@@ -1667,5 +1714,5 @@ export async function undoOrbitTagAudit(args: {
       ),
       alreadyUndone: false,
     };
-  });
+  }, TAG_AUDIT_TX_OPTIONS);
 }

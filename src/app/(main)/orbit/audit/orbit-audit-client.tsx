@@ -39,6 +39,7 @@ type TagAuditResponse = {
   coverageSentence: string;
   undoAvailable: boolean;
   undoAuditId: string | null;
+  undoLabel: string | null;
   proposals: TagAuditProposal[];
 };
 
@@ -196,7 +197,7 @@ export default function OrbitAuditClient() {
                 disabled={busy !== null || status === "running"}
                 onClick={() => void onUndo()}
               >
-                Undo
+                {view.undoLabel ?? "Undo"}
               </Button>
             ) : null}
             <Button
