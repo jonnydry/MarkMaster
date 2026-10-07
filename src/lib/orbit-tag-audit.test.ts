@@ -1345,4 +1345,70 @@ describe("orbit tag audit", () => {
       runOrbitTagAudit({ userId: "user-1", deadlineMs: Date.now() + 600_000 }),
     ).rejects.toMatchObject({ code: "P2028" });
   });
+
+  it("retries the same page when Jev fails every bookmark", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    for (let index = 0; index < 81; index += 1) {
+      memory.seedBookmark({
+        id: `bm-${String(index).padStart(3, "0")}`,
+        tagIds: ["tag-loose"],
+        bookmarkedAt: new Date(Date.UTC(2026, 0, 1) + index * 60_000),
+      });
+    }
+    const runs: string[][] = [];
+    for (let run = 0; run < 3; run += 1) {
+      const seen: string[] = [];
+      systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+        seen.push(request.state.id);
+        throw new Error("jev down");
+      });
+      const view = await runOrbitTagAudit({
+        userId: "user-1",
+        deadlineMs: Date.now() + 600_000,
+      });
+      runs.push(seen);
+      expect(tagAuditCoverageSentence(view.coverage)).not.toMatch(/skipped/);
+    }
+
+    for (const seen of runs) {
+      expect(seen).not.toContain("bm-000");
+      expect(new Set(seen).size).toBe(80);
+    }
+    expect(new Set(runs[1])).toEqual(new Set(runs[0]));
+    expect(new Set(runs[2])).toEqual(new Set(runs[0]));
+  });
+
+  it("mentions bookmarks skipped after a repeated failure", async () => {
+    memory.seedTag({ id: "tag-loose", userId: "user-1", name: "Loose", color: "#111111" });
+    memory.seedBookmark({
+      id: "bm-old",
+      tagIds: ["tag-loose"],
+      bookmarkedAt: new Date(Date.UTC(2026, 0, 1)),
+    });
+    memory.seedBookmark({
+      id: "bm-new",
+      tagIds: ["tag-loose"],
+      bookmarkedAt: new Date(Date.UTC(2026, 0, 2)),
+    });
+    systemOneMock.mockImplementation(async (request: { state: { id: string } }) => {
+      if (request.state.id === "bm-new") throw new Error("jev down");
+      return { answers: { current_0: { noul: 0.9 } } };
+    });
+
+    const first = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+    const second = await runOrbitTagAudit({
+      userId: "user-1",
+      deadlineMs: Date.now() + 600_000,
+    });
+
+    expect(tagAuditCoverageSentence(first.coverage)).toBe(
+      "Reviewed 1 of 2 tagged bookmarks.",
+    );
+    expect(tagAuditCoverageSentence(second.coverage)).toBe(
+      "Reviewed 1 of 2 tagged bookmarks. 1 skipped after repeated failures.",
+    );
+  });
 });
