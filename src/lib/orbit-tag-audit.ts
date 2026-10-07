@@ -39,16 +39,12 @@ import type { OrbitDecisionEventPayload } from "@/types";
 
 export const ORBIT_TAG_AUDIT_GROK_CAP = 24;
 
-/** Newest tagged bookmarks scored on one run. */
 export const ORBIT_TAG_AUDIT_BOOKMARK_CAP = 80;
 
-/** Challenger noul must beat the current tag by at least this much. */
 export const ORBIT_TAG_AUDIT_CLASH_MARGIN = 0.2;
 
-/** Existing tags asked as rivals. Current tags are a separate list and are not sliced. */
 export const ORBIT_TAG_AUDIT_RIVAL_CAP = 8;
 
-/** One second-opinion call. Single attempt. Not the scan timeout. */
 export const ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS = 60_000;
 
 const REASON_MAX = 180;
@@ -350,10 +346,6 @@ function labelState(tag: { name: string; examples?: string[] }): OrbitLabelPoolI
   };
 }
 
-/**
- * Only writer of suggestion kind. A strong challenger that clears the margin
- * becomes a swap. Else a below-include current tag becomes a removal.
- */
 function flagTagPair(args: {
   bookmarkId: string;
   current: ScoredLabel;
@@ -429,7 +421,6 @@ function rankFlaggedPairs(pairs: readonly FlaggedPair[]): FlaggedPair[] {
   });
 }
 
-/** Only slice. Falls back to the ranked head when the last run vetoed every flag. */
 function selectPairsForGrok(
   ranked: readonly FlaggedPair[],
   vetoedPairKeys: ReadonlySet<string>,
@@ -490,10 +481,6 @@ function sameTagSet(left: ReadonlySet<string>, right: ReadonlySet<string>): bool
   return true;
 }
 
-/**
- * Each checked proposal is judged against the original join set. A removal of
- * B wins over any swap that would add B, and rank does not change the result.
- */
 function compileJoinDelta(args: {
   proposals: readonly ParsedProposal[];
   joinsByBookmark: ReadonlyMap<string, ReadonlySet<string>>;
@@ -1030,11 +1017,6 @@ function pickRivals(
   return rivals;
 }
 
-/**
- * A missing or non-finite current noul flags nothing for the bookmark.
- * A partial score must not remove a tag Jev did not actually judge.
- * A missing rival noul is 0 and cannot win a swap.
- */
 async function scoreBookmark(args: {
   bookmark: OrbitBookmarkForScan;
   current: readonly LibraryTag[];

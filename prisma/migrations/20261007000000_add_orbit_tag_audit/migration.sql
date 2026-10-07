@@ -1,6 +1,3 @@
--- Tag-library audit. Phase is text, not a new enum. BookmarkTag is unchanged.
--- The undo row is a historical copy of tag ids taken before the join write.
-
 CREATE TABLE "OrbitTagAudit" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,

@@ -31,15 +31,10 @@ interface OrbitModeSwitchProps {
   queueHref?: string;
   /** Override the map destination (e.g. deep-link to a focused bookmark). */
   mapHref?: string;
-  /** Override the audit destination. */
   auditHref?: string;
   className?: string;
 }
 
-/**
- * Queue, map, and audit. Each option is a link, so the three Orbit surfaces
- * stay one navigation control.
- */
 export function OrbitModeSwitch({
   active,
   size = "sm",
