@@ -63,6 +63,27 @@ export function tagAuditJevStopAt(deadlineMs: number): number {
   return deadlineMs - ORBIT_TAG_AUDIT_GROK_TIMEOUT_MS - TYPESAFE_TIMEOUT_MS;
 }
 
+const TAG_AUDIT_TX_OPTIONS = { maxWait: 5_000, timeout: 15_000 } as const;
+
+export function tagAuditUndoLabel(
+  appliedAt: Date | null,
+  changeCount: number,
+  now = Date.now(),
+): string {
+  const changes = changeCount === 1 ? "1 change" : `${changeCount} changes`;
+  return `Undo review from ${undoAge(appliedAt, now)} (${changes})`;
+}
+
+function undoAge(appliedAt: Date | null, now: number): string {
+  if (!appliedAt) return "earlier";
+  const minutes = Math.floor(Math.max(0, now - appliedAt.getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 const REASON_MAX = 180;
 const TAG_NAME_MAX = 50;
 const EXCERPT_MAX = 200;
@@ -137,6 +158,7 @@ export type TagAuditView = {
   undoAvailable: boolean;
   /** Applied audit whose undo is still available. Null when undo is not. */
   undoAuditId: string | null;
+  undoLabel: string | null;
   proposals: TagAuditProposalView[];
 };
 
@@ -208,15 +230,18 @@ type UndoDelta = {
 };
 
 type ParsedUndo = {
-  delta: UndoDelta;
+  delta: UndoDelta | null;
   restoredAt: string | null;
 };
+
+type SliceMark = "scored" | "failed" | "pending";
 
 type AuditPage = {
   endBookmarkedAt: string;
   endBookmarkId: string;
   resumed: boolean;
   wrapped: boolean;
+  failedIds: string[];
 };
 
 type ParsedAudit = {
@@ -580,10 +605,6 @@ function compileJoinDelta(args: {
   };
 }
 
-function emptyUndoDelta(): UndoDelta {
-  return { removes: [], adds: [] };
-}
-
 function buildTagAuditRejection(args: {
   auditId: string;
   bookmarkId: string;
@@ -658,20 +679,34 @@ function stringList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-function pairList(value: unknown): PairRef[] {
-  if (!Array.isArray(value)) return [];
+function readUndoPairs(value: unknown): PairRef[] {
+  if (!Array.isArray(value)) {
+    throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+  }
   const pairs: PairRef[] = [];
   for (const item of value) {
-    if (!isRecord(item)) continue;
-    if (typeof item.bookmarkId !== "string" || typeof item.tagId !== "string") continue;
+    if (!isRecord(item) || typeof item.bookmarkId !== "string" || typeof item.tagId !== "string") {
+      throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+    }
     pairs.push({ bookmarkId: item.bookmarkId, tagId: item.tagId });
   }
   return pairs;
 }
 
 function readUndoDelta(value: unknown): UndoDelta {
-  if (!isRecord(value)) return emptyUndoDelta();
-  return { removes: pairList(value.removes), adds: pairList(value.adds) };
+  if (!isRecord(value)) {
+    throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+  }
+  return { removes: readUndoPairs(value.removes), adds: readUndoPairs(value.adds) };
+}
+
+function readUndoDeltaOrNull(value: unknown): UndoDelta | null {
+  try {
+    return readUndoDelta(value);
+  } catch (error) {
+    if (error instanceof OrbitTagAuditError) return null;
+    throw error;
+  }
 }
 
 function readOutcome(value: unknown): ApplyOutcome | null {
@@ -685,14 +720,16 @@ function readOutcome(value: unknown): ApplyOutcome | null {
 function readPage(value: unknown): AuditPage | null {
   if (!isRecord(value) || !isRecord(value.page)) return null;
   const page = value.page;
-  if (typeof page.endBookmarkedAt !== "string" || typeof page.endBookmarkId !== "string") {
-    return null;
-  }
+  const failedIds = stringList(page.failedIds);
+  const endBookmarkedAt = typeof page.endBookmarkedAt === "string" ? page.endBookmarkedAt : "";
+  const endBookmarkId = typeof page.endBookmarkId === "string" ? page.endBookmarkId : "";
+  if (!endBookmarkId && failedIds.length === 0) return null;
   return {
-    endBookmarkedAt: page.endBookmarkedAt,
-    endBookmarkId: page.endBookmarkId,
+    endBookmarkedAt,
+    endBookmarkId,
     resumed: page.resumed === true,
     wrapped: page.wrapped === true,
+    failedIds,
   };
 }
 
@@ -726,7 +763,7 @@ function parseAuditRow(row: AuditRow): ParsedAudit {
     appliedAt: row.appliedAt,
     undo: row.undo
       ? {
-          delta: readUndoDelta(row.undo.joins),
+          delta: readUndoDeltaOrNull(row.undo.joins),
           restoredAt: row.undo.restoredAt?.toISOString() ?? null,
         }
       : null,
@@ -792,6 +829,7 @@ function toTagAuditView(
     phase: audit.phase,
     undoAvailable: undoId !== null,
     undoAuditId: undoId,
+    undoLabel: null,
     coverage: {
       taggedBookmarkCount: audit.taggedBookmarkCount,
       judgedBookmarkCount: audit.judgedBookmarkCount,
@@ -1106,8 +1144,9 @@ async function judgeSlice(args: {
   >;
   stopAt: number;
   signal: AbortSignal;
-}): Promise<{ flagged: FlaggedPair[]; judged: number }> {
+}): Promise<{ flagged: FlaggedPair[]; judged: number; marks: SliceMark[] }> {
   const flagged: FlaggedPair[] = [];
+  const marks = new Array<SliceMark>(args.rows.length).fill("pending");
   let judged = 0;
   let next = 0;
 
@@ -1139,7 +1178,11 @@ async function judgeSlice(args: {
         payload,
         signal: args.signal,
       });
-      if (!scored.ok) continue;
+      if (!scored.ok) {
+        marks[index] = "failed";
+        continue;
+      }
+      marks[index] = "scored";
       flagged.push(...scored.pairs);
       judged += 1;
     }
@@ -1147,7 +1190,7 @@ async function judgeSlice(args: {
 
   const workers = Math.min(ORBIT_JEV_ASSIGN_CONCURRENCY, args.rows.length);
   await Promise.all(Array.from({ length: workers }, () => worker()));
-  return { flagged, judged };
+  return { flagged, judged, marks };
 }
 
 async function persistOpenAudit(args: {
@@ -1157,34 +1200,41 @@ async function persistOpenAudit(args: {
   proposals: readonly FlaggedPair[];
   page: AuditPage | null;
 }) {
-  await prisma.$transaction(async (tx) => {
-    await lockOrbitApply(tx, args.userId);
-    await tx.orbitTagAudit.deleteMany({
-      where: { userId: args.userId, phase: "open" },
-    });
-    await tx.orbitTagAudit.create({
-      data: {
-        id: randomUUID(),
-        userId: args.userId,
-        phase: "open",
-        taggedBookmarkCount: args.taggedBookmarkCount,
-        judgedBookmarkCount: args.judgedBookmarkCount,
-        outcome: args.page ? { page: args.page } : undefined,
-        proposals: {
-          create: args.proposals.map((pair, rank) => ({
-            id: randomUUID(),
-            bookmarkId: pair.bookmarkId,
-            tagId: pair.tagId,
-            kind: pair.suggestion.kind,
-            swapTagId: pair.suggestion.kind === "swap" ? pair.suggestion.tagId : null,
-            reason: pair.reason,
-            currentScore: pair.currentScore,
-            rank,
-          })),
+  const save = () =>
+    prisma.$transaction(async (tx) => {
+      await lockOrbitApply(tx, args.userId);
+      await tx.orbitTagAudit.deleteMany({
+        where: { userId: args.userId, phase: "open" },
+      });
+      await tx.orbitTagAudit.create({
+        data: {
+          id: randomUUID(),
+          userId: args.userId,
+          phase: "open",
+          taggedBookmarkCount: args.taggedBookmarkCount,
+          judgedBookmarkCount: args.judgedBookmarkCount,
+          outcome: args.page ? { page: args.page } : undefined,
+          proposals: {
+            create: args.proposals.map((pair, rank) => ({
+              id: randomUUID(),
+              bookmarkId: pair.bookmarkId,
+              tagId: pair.tagId,
+              kind: pair.suggestion.kind,
+              swapTagId: pair.suggestion.kind === "swap" ? pair.suggestion.tagId : null,
+              reason: pair.reason,
+              currentScore: pair.currentScore,
+              rank,
+            })),
+          },
         },
-      },
+      });
     });
-  });
+  try {
+    await save();
+  } catch (error) {
+    if (!isRecord(error) || error.code !== "P2028") throw error;
+    await save();
+  }
 }
 
 async function writeAppliedRejections(
@@ -1242,13 +1292,35 @@ function taggedBookmarkInclude() {
   };
 }
 
-function pageFromRows(
+function pageFromMarks(
   rows: readonly TaggedBookmarkRow[],
+  marks: readonly SliceMark[],
+  previous: AuditPage | null,
   resumed: boolean,
   wrapped: boolean,
 ): AuditPage | null {
-  const end = rows[rows.length - 1];
-  if (!end) return null;
+  const previousFailed = new Set(previous?.failedIds ?? []);
+  const failedIds = rows.flatMap((row, index) => (marks[index] === "failed" ? [row.id] : []));
+  let prefix = 0;
+  while (prefix < rows.length) {
+    const mark = marks[prefix];
+    const row = rows[prefix];
+    const repeatedFailure = mark === "failed" && row !== undefined && previousFailed.has(row.id);
+    if (mark !== "scored" && !repeatedFailure) break;
+    prefix += 1;
+  }
+  if (prefix <= 0) {
+    if (failedIds.length === 0) return previous;
+    return {
+      endBookmarkedAt: previous?.endBookmarkedAt ?? "",
+      endBookmarkId: previous?.endBookmarkId ?? "",
+      resumed: previous?.resumed ?? resumed,
+      wrapped: previous?.wrapped ?? wrapped,
+      failedIds,
+    };
+  }
+  const end = rows[prefix - 1];
+  if (!end) return previous;
   const bookmarkedAt =
     end.bookmarkedAt instanceof Date ? end.bookmarkedAt : new Date(end.bookmarkedAt);
   return {
@@ -1256,13 +1328,14 @@ function pageFromRows(
     endBookmarkId: end.id,
     resumed,
     wrapped,
+    failedIds,
   };
 }
 
 async function selectTaggedBookmarks(userId: string, cursor: AuditPage | null) {
   const taggedWhere = { userId, tags: { some: {} } };
   const include = taggedBookmarkInclude();
-  if (!cursor) {
+  if (!cursor?.endBookmarkId) {
     const rows = await prisma.bookmark.findMany({
       where: taggedWhere,
       orderBy: bookmarkOrder,
@@ -1305,7 +1378,10 @@ async function selectTaggedBookmarks(userId: string, cursor: AuditPage | null) {
   };
 }
 
-async function findUndoAuditId(db: Db, userId: string): Promise<string | null> {
+async function findUndoAudit(
+  db: Db,
+  userId: string,
+): Promise<{ id: string; label: string } | null> {
   const row = await db.orbitTagAudit.findFirst({
     where: {
       userId,
@@ -1313,9 +1389,16 @@ async function findUndoAuditId(db: Db, userId: string): Promise<string | null> {
       undo: { is: { restoredAt: null } },
     },
     orderBy: { appliedAt: "desc" },
-    select: { id: true },
+    include: { undo: true },
   });
-  return row?.id ?? null;
+  if (!row?.undo || row.undo.restoredAt) return null;
+  const delta = readUndoDeltaOrNull(row.undo.joins);
+  return {
+    id: row.id,
+    label: delta
+      ? tagAuditUndoLabel(row.appliedAt, delta.removes.length + delta.adds.length)
+      : "Undo",
+  };
 }
 
 export async function runOrbitTagAudit(args: {
@@ -1334,10 +1417,10 @@ export async function runOrbitTagAudit(args: {
     }),
   ]);
   const rows = slice.rows;
-  const page = pageFromRows(rows, slice.resumed, slice.wrapped);
 
   let judgedBookmarkCount = 0;
   let proposals: FlaggedPair[] = [];
+  let page: AuditPage | null = null;
 
   if (rows.length > 0) {
     requireApiKey("TYPESAFE_API_KEY");
@@ -1383,6 +1466,7 @@ export async function runOrbitTagAudit(args: {
       signal: AbortSignal.timeout(Math.max(0, stopAt - Date.now())),
     });
     judgedBookmarkCount = judged.judged;
+    page = pageFromMarks(rows, judged.marks, cursor, slice.resumed, slice.wrapped);
     const selected = selectPairsForGrok(rankFlaggedPairs(judged.flagged));
     if (selected.length > 0) {
       const excerpts = new Map(
@@ -1416,16 +1500,17 @@ export async function runOrbitTagAudit(args: {
 export async function readOrbitTagAudit(args: {
   userId: string;
 }): Promise<TagAuditView | null> {
-  const [row, undoAuditId] = await Promise.all([
+  const [row, undoAudit] = await Promise.all([
     findAuditRow(prisma, args.userId),
-    findUndoAuditId(prisma, args.userId),
+    findUndoAudit(prisma, args.userId),
   ]);
   if (!row) return null;
   const view = await viewFromAudit(args.userId, parseAuditRow(row));
   return {
     ...view,
-    undoAvailable: undoAuditId !== null,
-    undoAuditId,
+    undoAvailable: undoAudit !== null,
+    undoAuditId: undoAudit?.id ?? null,
+    undoLabel: undoAudit?.label ?? null,
   };
 }
 
@@ -1564,7 +1649,7 @@ export async function applyOrbitTagAudit(args: {
       skippedProposalIds: plan.skippedProposalIds,
       alreadyApplied: false,
     };
-  });
+  }, TAG_AUDIT_TX_OPTIONS);
 }
 
 export async function undoOrbitTagAudit(args: {
@@ -1578,28 +1663,39 @@ export async function undoOrbitTagAudit(args: {
       throw new OrbitTagAuditError("Tag audit was not found.", 404, "not_found");
     }
     const audit = parseAuditRow(row);
-    const bookmarkIds = audit.undo
-      ? [
-          ...new Set([
-            ...audit.undo.delta.removes.map((pair) => pair.bookmarkId),
-            ...audit.undo.delta.adds.map((pair) => pair.bookmarkId),
-          ]),
-        ]
-      : [];
     if (audit.undo?.restoredAt) {
+      const restored = audit.undo.delta;
+      const restoredBookmarkIds = restored
+        ? [
+            ...new Set([
+              ...restored.removes.map((pair) => pair.bookmarkId),
+              ...restored.adds.map((pair) => pair.bookmarkId),
+            ]),
+          ]
+        : [];
       return {
         auditId: audit.id,
-        restoredBookmarkIds: bookmarkIds,
+        restoredBookmarkIds,
         alreadyUndone: true,
       };
     }
-    if (!audit.undo || audit.phase !== "applied") {
+    if (audit.phase === "applied" && audit.undo && !audit.undo.delta) {
+      throw new OrbitTagAuditError("Tag audit undo data is unreadable.", 500, "closed");
+    }
+    if (!audit.undo?.delta || audit.phase !== "applied") {
       throw new OrbitTagAuditError(
         "This tag audit cannot be undone.",
         409,
         "undo_unavailable",
       );
     }
+    const delta = audit.undo.delta;
+    const bookmarkIds = [
+      ...new Set([
+        ...delta.removes.map((pair) => pair.bookmarkId),
+        ...delta.adds.map((pair) => pair.bookmarkId),
+      ]),
+    ];
 
     const liveBookmarks =
       bookmarkIds.length === 0
@@ -1609,9 +1705,7 @@ export async function undoOrbitTagAudit(args: {
             select: { id: true },
           });
     const liveBookmarkIds = new Set(liveBookmarks.map((bookmark) => bookmark.id));
-    const removeTagIds = [
-      ...new Set(audit.undo.delta.removes.map((pair) => pair.tagId)),
-    ];
+    const removeTagIds = [...new Set(delta.removes.map((pair) => pair.tagId))];
     const liveTags =
       removeTagIds.length === 0
         ? []
@@ -1620,10 +1714,8 @@ export async function undoOrbitTagAudit(args: {
             select: { id: true },
           });
     const liveTagIds = new Set(liveTags.map((tag) => tag.id));
-    const drop = audit.undo.delta.adds.filter((pair) =>
-      liveBookmarkIds.has(pair.bookmarkId),
-    );
-    const readd = audit.undo.delta.removes.filter(
+    const drop = delta.adds.filter((pair) => liveBookmarkIds.has(pair.bookmarkId));
+    const readd = delta.removes.filter(
       (pair) => liveBookmarkIds.has(pair.bookmarkId) && liveTagIds.has(pair.tagId),
     );
     if (drop.length > 0) {
@@ -1667,5 +1759,5 @@ export async function undoOrbitTagAudit(args: {
       ),
       alreadyUndone: false,
     };
-  });
+  }, TAG_AUDIT_TX_OPTIONS);
 }
