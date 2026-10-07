@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 
 import { isKeptRoute, KeptRoutes } from "@/components/kept-routes";
+import { OrbitMapChartingPlaceholder } from "@/components/orbit/orbit-map-charting-placeholder";
 import { noteVisiblePath, RoutePreviewProvider } from "@/components/route-preview";
 import { OrbitLibraryTagProvider } from "@/components/orbit-library-tag-provider";
 import { OrbitPageWatermark } from "@/components/orbit/orbit-page-watermark";
@@ -130,17 +131,20 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const shownPath = previewRoute ?? pathname;
   noteVisiblePath(shownPath);
   useEffect(() => {
-    if (!previewRoute) return;
+    // The map preview stays up until the route arrives. A short timeout would
+    // put the previous page back while the first map compile is still running.
+    if (!previewRoute || previewRoute === "/orbit/map") return;
     const timer = window.setTimeout(() => setPreviewRoute(null), 2000);
     return () => window.clearTimeout(timer);
   }, [pathname, previewRoute]);
   const showRoute = useCallback((href: string) => {
-    if (!isKeptRoute(href)) return;
-    if (href === pathname) {
+    const path = href.split("?")[0] || href;
+    if (path !== "/orbit/map" && !isKeptRoute(path)) return;
+    if (path === pathname) {
       setPreviewRoute(null);
       return;
     }
-    setPreviewRoute(href);
+    setPreviewRoute(path);
   }, [pathname]);
   const { createCollection } = useCreateCollection();
   const syncStatus = useSyncStatus();
@@ -216,12 +220,17 @@ export function AppFrame({ children }: { children: ReactNode }) {
       >
         {orbitRoute ? <OrbitPageWatermark /> : null}
         <div className={cn(appPageSidebarClassName, hideSidebar && "md:hidden")}>
-          <PersistentSidebar preferCollapsed={pathname === "/orbit/map"} />
+          <PersistentSidebar preferCollapsed={shownPath === "/orbit/map"} />
         </div>
         <div className={appPageMainClassName} aria-busy={syncActive || undefined}>
           {syncActive ? <ScrollingProgressBar className="relative z-50" /> : null}
           <KeptRoutes pathname={shownPath} />
-          {isKeptRoute(shownPath) ? null : children}
+          {isKeptRoute(shownPath) ? null : shownPath === "/orbit/map" &&
+            pathname !== "/orbit/map" ? (
+            <OrbitMapChartingPlaceholder className="min-h-0 flex-1" />
+          ) : (
+            children
+          )}
         </div>
       </div>
       <CreateCollectionDialog

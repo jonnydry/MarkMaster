@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { LayoutList, Waypoints } from "lucide-react";
 
+import { useRoutePreview } from "@/components/route-preview";
 import {
   highlightSegmentActiveClass,
 } from "@/lib/highlight-chrome";
+import { warmOrbitMap } from "@/lib/prefetch-app-route";
 import { orbitHairlineBorder } from "@/lib/orbit-route-chrome";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +49,9 @@ export function OrbitModeSwitch({
 }: OrbitModeSwitchProps) {
   const buttonHeight = size === "md" ? "h-8" : "h-7";
   const hrefByMode = { queue: queueHref, map: mapHref } as const;
+  const { showRoute } = useRoutePreview();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   return (
     <div
@@ -64,6 +71,13 @@ export function OrbitModeSwitch({
             key={key}
             href={hrefByMode[key]}
             aria-current={isActive ? "page" : undefined}
+            onClick={() => showRoute(hrefByMode[key])}
+            onMouseEnter={
+              key === "map" ? () => warmOrbitMap(router, queryClient) : undefined
+            }
+            onFocus={
+              key === "map" ? () => warmOrbitMap(router, queryClient) : undefined
+            }
             className={cn(
               "inline-flex items-center gap-1.5 rounded-sm px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/45",
               buttonHeight,

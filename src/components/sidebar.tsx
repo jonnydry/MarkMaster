@@ -25,6 +25,7 @@ import { useTypography } from "@/hooks/use-typography";
 import {
   prefetchAppRoute,
   prefetchAppRouteDocument,
+  warmOrbitMap,
 } from "@/lib/prefetch-app-route";
 import { useTagsQuery, useCollectionsQuery } from "@/hooks/use-library-data";
 
@@ -117,6 +118,10 @@ export function Sidebar({
   const queryClient = useQueryClient();
   const warmRoute = useCallback(
     (href: string) => {
+      if (href === "/orbit/map" || href.startsWith("/orbit/map?")) {
+        warmOrbitMap(router, queryClient);
+        return;
+      }
       prefetchAppRouteDocument(router, href);
       prefetchAppRoute(queryClient, href);
     },
