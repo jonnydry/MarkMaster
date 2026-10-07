@@ -182,6 +182,74 @@ describe("runOrbitLibraryInvocation", () => {
     expect(mocks.planLibraryAssignments.mock.calls[0]?.[0].examples).toBe(examples);
   });
 
+  it("skips the growth round when ORBIT_LIBRARY_GROWTH is false", async () => {
+    vi.stubEnv("XAI_API_KEY", "xai-key");
+    vi.stubEnv("ORBIT_LIBRARY_GROWTH", "false");
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(12));
+    mocks.planLibraryAssignments.mockResolvedValueOnce(planTagging(4));
+
+    await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
+      continued: false,
+    });
+
+    expect(mocks.requestLibraryGrowthTags).not.toHaveBeenCalled();
+    expect(writes().some((data) => data.round === 1)).toBe(false);
+    expect(writes().at(-1)).toMatchObject({
+      status: "COMPLETED",
+      errorMessage: null,
+    });
+  });
+
+  it("does not record a page aborted at the slice deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+      mocks.prisma.bookmark.findMany.mockResolvedValue(
+        page(ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE)
+      );
+      mocks.planLibraryAssignments.mockImplementation(
+        ({ signal }: { signal?: AbortSignal }) =>
+          new Promise((resolve) => {
+            const finish = () =>
+              resolve({
+                plan: {
+                  overview: {
+                    summary: "",
+                    taggingStrategy: "",
+                    collectionStrategy: "",
+                  },
+                  suggestions: [],
+                },
+                modelChecked: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
+                failed: 0,
+              });
+            if (signal?.aborted) finish();
+            else signal?.addEventListener("abort", finish, { once: true });
+          })
+      );
+
+      let finished = false;
+      const pending = runOrbitLibraryInvocation("run-1").finally(() => {
+        finished = true;
+      });
+      await vi.advanceTimersByTimeAsync(ORBIT_LIBRARY_INVOCATION_BUDGET_MS);
+
+      expect(finished).toBe(true);
+      await expect(pending).resolves.toEqual({ continued: true });
+      expect(
+        writes().some(
+          (data) =>
+            "processed" in data ||
+            "cursorId" in data ||
+            data.status === "FAILED"
+        )
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("starts a second round when Grok can name tags for what is left", async () => {
     vi.stubEnv("XAI_API_KEY", "xai-key");
     mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));

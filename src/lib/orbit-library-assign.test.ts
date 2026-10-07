@@ -143,8 +143,8 @@ describe("planLibraryAssignments", () => {
 
     expect(systemOneMock).toHaveBeenCalledTimes(1);
     expect(systemOneMock.mock.calls[0]?.[1]).toEqual({
-      timeout: 30_000,
-      retry: { maxRetries: 4 },
+      timeout: 20_000,
+      retry: { maxRetries: 1 },
     });
     expect(result.failed).toBe(0);
     expect(result.modelChecked).toBe(3);

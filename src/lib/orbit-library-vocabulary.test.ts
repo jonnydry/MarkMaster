@@ -93,6 +93,18 @@ describe("requestLibraryGrowthTags", () => {
     expect(prismaMock.tag.createMany).not.toHaveBeenCalled();
   });
 
+  it('treats "Startups" as taken when "Startup" exists', async () => {
+    prismaMock.bookmark.findMany.mockResolvedValue(untagged(12));
+    fetchMock.mockResolvedValue(xaiReply(["Startups", "Recipes", "Fermentation"]));
+
+    const growth = await requestLibraryGrowthTags("user-1", [
+      { name: "Startup", color: "#1d9bf0" },
+      { name: "Recipe", color: "#f97316" },
+    ]);
+
+    expect(growth.map((tag) => tag.name)).toEqual(["Fermentation"]);
+  });
+
   it("skips Grok when too few posts are left", async () => {
     prismaMock.bookmark.findMany.mockResolvedValue(untagged(2));
 
