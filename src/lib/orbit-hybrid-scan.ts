@@ -263,7 +263,8 @@ export function mergeOrbitScanPlans(
 function selectNarrowingTargets(
   bookmarks: OrbitBookmarkForScan[],
   assignments: OrbitJevAssignment[],
-  proposed: OrbitLabelPool
+  proposed: OrbitLabelPool,
+  skipIds: ReadonlySet<string>
 ) {
   const proposedNames = proposed.tags.map((tag) => tag.name);
   const placed = new Map(
@@ -272,6 +273,7 @@ function selectNarrowingTargets(
       .map((assignment) => [assignment.bookmarkId, assignment])
   );
   return bookmarks.filter((bookmark) => {
+    if (skipIds.has(bookmark.id)) return false;
     const assignment = placed.get(bookmark.id);
     if (!assignment) return false;
     return (
@@ -389,7 +391,12 @@ export async function refineOrbitJevLeftovers(args: {
   // placed under broader tags are asked about them too, as extra tags.
   let narrowed = 0;
   if (proposed.tags.length > 0 || proposed.collections.length > 0) {
-    const targets = selectNarrowingTargets(args.bookmarks, assignments, proposed);
+    const targets = selectNarrowingTargets(
+      args.bookmarks,
+      assignments,
+      proposed,
+      leftoverIds
+    );
     if (targets.length > 0) {
       const extra = await assignOrbitBookmarksWithJev({
         bookmarks: targets,
