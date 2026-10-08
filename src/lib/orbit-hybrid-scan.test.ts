@@ -953,4 +953,52 @@ describe("Grok and Jev interplay", () => {
     expect(pass).toBe(3);
     expect(assignSpy.mock.calls[2]?.[0].bookmarks.map((bookmark: { id: string }) => bookmark.id)).toEqual(["bm-1"]);
   });
+
+  it("does not ask a bookmark twice about the same tag", async () => {
+    let pass = 0;
+    assignSpy.mockImplementation(
+      async (call: { bookmarks: Array<{ id: string }> }) => {
+        pass += 1;
+        if (pass === 1) {
+          return [placedAssignment("bm-1", "AI", 0.95), abstainAssignment("bm-2")];
+        }
+        if (pass === 2) {
+          return [placedAssignment("bm-2", "Scaling Laws", 0.9)];
+        }
+        return call.bookmarks.map((bookmark) => abstainAssignment(bookmark.id));
+      }
+    );
+
+    await runHybridOrbitScan({
+      bookmarks: [scanBookmark("bm-1"), scanBookmark("bm-2")],
+      existingTags: [{ name: "AI", color: "#1d9bf0", bookmarkCount: 9 }],
+      existingCollections: [],
+      proposeLeftoverVocab: async () => ({
+        tags: [{ name: "Scaling Laws", existing: false }],
+        collections: [],
+      }),
+    });
+
+    const asks = new Map<string, number>();
+    for (const call of assignSpy.mock.calls.map((args) => args[0] as {
+      bookmarks: Array<{ id: string }>;
+      pool?: { tags?: Array<{ name: string }> };
+      batchVocabulary?: { tags?: string[] };
+    })) {
+      const names = new Set<string>();
+      for (const tag of call.pool?.tags ?? []) names.add(tag.name.trim().toLowerCase());
+      for (const name of call.batchVocabulary?.tags ?? []) names.add(name.trim().toLowerCase());
+      for (const bookmark of call.bookmarks) {
+        for (const name of names) {
+          const key = `${bookmark.id}\0${name}`;
+          asks.set(key, (asks.get(key) ?? 0) + 1);
+        }
+      }
+    }
+
+    const repeated = [...asks.entries()].filter(
+      ([key, count]) => count > 1 && key.endsWith("\0scaling laws")
+    );
+    expect(repeated).toEqual([]);
+  });
 });
