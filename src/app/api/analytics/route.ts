@@ -237,6 +237,7 @@ export async function GET(req: NextRequest) {
       FROM "OrbitDecisionEvent"
       WHERE "userId" = ${user.id}
         AND COALESCE("source", '') <> 'tag-audit'
+        AND COALESCE("source", '') <> 'auto-tag'
       ${fwTimeFilter}
       GROUP BY "action", COALESCE("originalSuggestion"->>'confidence', '')
     `;

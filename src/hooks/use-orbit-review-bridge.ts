@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
 
+import { chunkDecisionEvents } from "@/lib/orbit-decision-event-batch";
 import {
   buildNoOpApplyResult,
   countDecisionActions,
@@ -24,12 +25,6 @@ import type {
 type OrbitScanApi = ReturnType<typeof useOrbitScan>;
 
 const DECISION_EVENT_RETRY_DELAYS_MS = [2_000, 8_000];
-const DECISION_EVENT_BATCH_MAX_EVENTS = 100;
-const DECISION_EVENT_BATCH_BYTE_BUDGET = 56 * 1024;
-
-function decisionEventBodyBytes(events: OrbitDecisionEventPayload[]) {
-  return new TextEncoder().encode(JSON.stringify({ events })).length;
-}
 
 function isRetryableDecisionEventError(err: unknown) {
   if (!(err instanceof FetchJsonError)) return true;
@@ -44,26 +39,7 @@ function isRetryableDecisionEventError(err: unknown) {
  * is lost if the tab closes.
  */
 async function postDecisionEventsWithRetry(events: OrbitDecisionEventPayload[]) {
-  let offset = 0;
-  while (offset < events.length) {
-    const batch: OrbitDecisionEventPayload[] = [];
-    while (
-      offset + batch.length < events.length &&
-      batch.length < DECISION_EVENT_BATCH_MAX_EVENTS
-    ) {
-      const next = events[offset + batch.length];
-      if (!next) break;
-      if (
-        batch.length > 0 &&
-        decisionEventBodyBytes(batch.concat(next)) >= DECISION_EVENT_BATCH_BYTE_BUDGET
-      ) {
-        break;
-      }
-      batch.push(next);
-    }
-
-    if (batch.length === 0) break;
-    offset += batch.length;
+  for (const batch of chunkDecisionEvents(events)) {
     const body = JSON.parse(JSON.stringify({ events: batch })) as JsonValue;
     for (let attempt = 0; ; attempt += 1) {
       try {

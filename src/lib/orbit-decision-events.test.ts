@@ -102,6 +102,29 @@ describe("orbit decision events", () => {
     expect(mocks.prisma.orbitDecisionEvent.createMany).not.toHaveBeenCalled();
   });
 
+  it("leaves auto-tag events out of learning hints without dropping unscored sources", async () => {
+    mocks.prisma.orbitDecisionEvent.findMany.mockResolvedValue([]);
+
+    await getOrbitLearningHintsForScan({
+      userId: "user-1",
+      bookmarks: [
+        {
+          id: "bookmark-1",
+          authorUsername: "researcher",
+          urls: [{ expanded_url: "https://arxiv.org/abs/2" }],
+        },
+      ],
+    });
+
+    expect(mocks.prisma.orbitDecisionEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ source: null }, { source: { not: "auto-tag" } }],
+        }),
+      })
+    );
+  });
+
   it("derives positive and negative hints from recent matching decisions", async () => {
     mocks.prisma.orbitDecisionEvent.findMany.mockResolvedValue([
       {

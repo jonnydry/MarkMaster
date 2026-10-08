@@ -286,6 +286,7 @@ export async function getOrbitLearningHintsForScan(args: {
     where: {
       userId: args.userId,
       createdAt: { gte: new Date(Date.now() - LEARNING_LOOKBACK_DAYS * 86_400_000) },
+      OR: [{ source: null }, { source: { not: "auto-tag" } }],
     },
     orderBy: { createdAt: "desc" },
     take: MAX_RECENT_LEARNING_EVENTS,

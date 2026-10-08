@@ -207,6 +207,11 @@ export type OrbitTagOutcome = {
 };
 
 const ORIGINS = new Set<string>(["jev", "jev_new_name", "grok"]);
+const MACHINE_DECISION_SOURCES = new Set(["tag-audit", "auto-tag"]);
+
+export function isHumanOrbitDecision(event: { source?: string | null }) {
+  return event.source == null || event.source === "" || !MACHINE_DECISION_SOURCES.has(event.source);
+}
 
 /**
  * Per-tag verdicts from one review event. Accepted or edited: a suggested tag

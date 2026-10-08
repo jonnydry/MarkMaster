@@ -6,6 +6,7 @@ import { ORBIT_MAX_TAGS_PER_BOOKMARK } from "@/lib/orbit-config";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { DECISION_EVENT_BODY_LIMIT_BYTES } from "@/lib/orbit-decision-event-batch";
 import {
   recordOrbitDecisionEvents,
   OrbitDecisionEventOwnershipError,
@@ -16,8 +17,6 @@ import {
   orbitTagSuggestionSchema,
 } from "@/lib/orbit-grok";
 import type { OrbitDecisionEventPayload } from "@/types";
-
-const MAX_DECISION_EVENTS_BODY_BYTES = 64 * 1024;
 
 // Plans carry up to ORBIT_MAX_TAGS_PER_BOOKMARK tags; a lower cap here rejected
 // the whole event batch whenever one suggestion had more.
@@ -59,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await readJsonBody(req, MAX_DECISION_EVENTS_BODY_BYTES);
+  const body = await readJsonBody(req, DECISION_EVENT_BODY_LIMIT_BYTES);
   if (!body.ok) {
     return NextResponse.json({ error: body.error }, { status: body.status });
   }
