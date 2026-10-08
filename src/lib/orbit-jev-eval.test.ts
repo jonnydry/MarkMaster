@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrbitJevEvalCaseFromEvent,
   calibrateOrbitTagThresholds,
+  isHumanOrbitDecision,
   scoreOrbitJevEvalCase,
   summarizeOrbitJevEval,
   tagOutcomesFromEvent,
@@ -92,6 +93,16 @@ describe("orbit Jev eval harness", () => {
       abstainCorrect: 1,
       falsePositiveCount: 1,
     });
+  });
+});
+
+describe("isHumanOrbitDecision", () => {
+  it("keeps review events and drops auto-tag and tag-audit", () => {
+    expect(isHumanOrbitDecision({ source: "orbit-review" })).toBe(true);
+    expect(isHumanOrbitDecision({ source: null })).toBe(true);
+    expect(isHumanOrbitDecision({})).toBe(true);
+    expect(isHumanOrbitDecision({ source: "auto-tag" })).toBe(false);
+    expect(isHumanOrbitDecision({ source: "tag-audit" })).toBe(false);
   });
 });
 

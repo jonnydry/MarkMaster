@@ -12,9 +12,12 @@ import {
   ORBIT_LIBRARY_RUN_VISIBLE_AFTER_MS,
 } from "@/lib/orbit-config";
 import { isSafeAutoApplySuggestion } from "@/lib/orbit-decision";
+import { chunkDecisionEvents } from "@/lib/orbit-decision-event-batch";
+import { recordOrbitDecisionEvents } from "@/lib/orbit-decision-events";
 import { isVideoFormatTag } from "@/lib/orbit-video-tag";
 import { applyOrbitScanPlan, OrbitScanError } from "@/lib/orbit-grok";
 import {
+  buildLibraryAutoTagEvents,
   createPackLimiter,
   planLibraryAssignments,
   type LibraryAssignmentPlan,
@@ -315,16 +318,40 @@ async function planUntaggedLibraryPage(
   return planned;
 }
 
+async function recordAutoTagEvents(
+  userId: string,
+  planned: Pick<LibraryAssignmentPlan, "plan" | "scores">
+) {
+  try {
+    const events = buildLibraryAutoTagEvents({
+      suggestions: planned.plan.suggestions,
+      scores: planned.scores ?? new Map(),
+    });
+    if (events.length === 0) return;
+    for (const batch of chunkDecisionEvents(events)) {
+      await recordOrbitDecisionEvents({ userId, events: batch });
+    }
+  } catch (error) {
+    logWarn(
+      "OrbitLibrary",
+      "Auto-tag decision log failed; the page still applied.",
+      error instanceof Error ? error.message : error
+    );
+  }
+}
+
 /** Applies one planned page. Pages are applied strictly in queue order. */
 async function applyUntaggedLibraryPage(
   userId: string,
   bookmarks: LibraryPageBookmark[],
-  { plan, failed }: LibraryAssignmentPlan
+  planned: LibraryAssignmentPlan
 ): Promise<OrbitLibraryPageResult> {
+  const { plan, failed } = planned;
   if (plan.suggestions.length > 0) {
     await applyOrbitScanPlan({ userId, plan, createCollections: false });
     await invalidateUserResponseCache(userId);
   }
+  await recordAutoTagEvents(userId, planned);
   return {
     processed: bookmarks.length,
     applied: plan.suggestions.length,

@@ -31,10 +31,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
-vi.mock("@/lib/orbit-library-assign", () => ({
-  planLibraryAssignments: mocks.planLibraryAssignments,
-  createPackLimiter: () => <T>(task: () => Promise<T>) => task(),
-}));
+vi.mock("@/lib/orbit-library-assign", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/orbit-library-assign")>();
+  return {
+    ...actual,
+    planLibraryAssignments: mocks.planLibraryAssignments,
+    createPackLimiter: () => <T>(task: () => Promise<T>) => task(),
+  };
+});
 vi.mock("@/lib/orbit-grok", async () => {
   const { OrbitScanError } = await import("@/lib/orbit-grok-schemas");
   return { applyOrbitScanPlan: mocks.applyOrbitScanPlan, OrbitScanError };
@@ -119,6 +123,7 @@ function planTagging(count: number, failed = 0) {
     },
     modelChecked: ORBIT_LIBRARY_CLASSIFY_PAGE_SIZE,
     failed,
+    scores: new Map<string, Array<{ name: string; score: number }>>(),
   };
 }
 
@@ -225,6 +230,31 @@ describe("runOrbitLibraryInvocation", () => {
       expect.objectContaining({ name: "Cooking", score: 0.4, origin: "jev" }),
     ]);
     expect(writes().at(-1)).toMatchObject({ status: "COMPLETED", errorMessage: null });
+  });
+
+  it("writes auto-tag events in batches of at most 100", async () => {
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(1));
+    const scores = new Map(
+      Array.from({ length: 101 }, (_, index) => [
+        `bm-${index}`,
+        [{ name: "AI", score: 0.9 }],
+      ])
+    );
+    mocks.planLibraryAssignments.mockResolvedValueOnce({
+      ...planTagging(0),
+      scores,
+    });
+
+    await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
+      continued: false,
+    });
+
+    expect(
+      mocks.recordOrbitDecisionEvents.mock.calls.map(
+        (call) => (call[0].events as unknown[]).length
+      )
+    ).toEqual([100, 1]);
   });
 
   it("hands the tag list's examples to every page", async () => {

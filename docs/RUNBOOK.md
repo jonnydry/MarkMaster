@@ -149,8 +149,11 @@ ORBIT_REPLAY_USER_ID=<id> npm run eval:orbit-calibrate # one user
 
 Use it before moving `ORBIT_JEV_TAG_INCLUDE_THRESHOLD` (0.55, shown in
 review) or `ORBIT_JEV_TAG_STRONG_THRESHOLD` (0.8, applied by "Apply strong
-matches" and library auto-tag) in `src/lib/orbit-config.ts`. Only decisions
-recorded after scores were stored carry them; older ones count as unscored.
+matches" and library auto-tag) in `src/lib/orbit-config.ts`. The human table
+skips `auto-tag` and `tag-audit` rows. When auto-tag rows are present, a
+second table shows which of Jev's scores auto-tag applied. Those rows are
+not user verdicts. Only decisions recorded after scores were stored carry
+them; older ones count as unscored.
 
 Adding `RUN_LIVE_TYPESAFE_TESTS=1` with `ORBIT_REPLAY_USER_ID` also re-runs
 Jev on that user's 25 newest decisions against their current tags and

@@ -8,6 +8,7 @@ import {
 import {
   buildOrbitJevEvalCaseFromEvent,
   calibrateOrbitTagThresholds,
+  isHumanOrbitDecision,
   scoreOrbitJevEvalCase,
   summarizeOrbitJevEval,
   type OrbitJevEvalScore,
@@ -71,10 +72,12 @@ describe.skipIf(!REPLAY)("Orbit Jev replay over recorded review decisions", () =
 
   it("reports tag-score calibration from stored scores", async () => {
     const events = await loadEvents(EVENT_LIMIT);
-    const report = calibrateOrbitTagThresholds(events);
+    const human = events.filter(isHumanOrbitDecision);
+    const autoTag = events.filter((event) => event.source === "auto-tag");
+    const report = calibrateOrbitTagThresholds(human);
 
     console.log(
-      `\n${events.length} decisions · ${report.tagCount} suggested tags · ${report.scoredTagCount} with a Jev score`
+      `\n${human.length} human decisions · ${report.tagCount} suggested tags · ${report.scoredTagCount} with a Jev score`
     );
     console.table(
       report.rows.map((row) => ({
@@ -94,6 +97,22 @@ describe.skipIf(!REPLAY)("Orbit Jev replay over recorded review decisions", () =
       }))
     );
 
+    if (autoTag.length > 0) {
+      const autoReport = calibrateOrbitTagThresholds(autoTag);
+      console.log(
+        `\n${autoTag.length} auto-tag decisions (not human verdicts) · ${autoReport.scoredTagCount} with a Jev score`
+      );
+      console.table(
+        autoReport.rows.map((row) => ({
+          threshold: row.threshold,
+          suggested: row.suggested,
+          kept: row.kept,
+          precision: percent(row.precision),
+          recall: percent(row.recall),
+        }))
+      );
+    }
+
     expect(report.tagCount).toBeGreaterThanOrEqual(report.scoredTagCount);
   });
 
@@ -102,6 +121,7 @@ describe.skipIf(!REPLAY)("Orbit Jev replay over recorded review decisions", () =
     async () => {
       const userId = USER_ID!;
       const events = (await loadEvents(EVENT_LIMIT))
+        .filter(isHumanOrbitDecision)
         .filter((event) => event.originalSuggestion)
         .slice(0, LIVE_LIMIT);
 

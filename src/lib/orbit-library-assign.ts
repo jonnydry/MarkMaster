@@ -29,7 +29,12 @@ import {
 import { VIDEO_TAG_NAME, mediaIncludesVideo } from "@/lib/orbit-video-tag";
 import { logWarn } from "@/lib/logger";
 import { getTypeSafeClient, getTypeSafeModel } from "@/lib/typesafe";
-import type { OrbitBookmarkSuggestion, OrbitScanPlan } from "@/types";
+import type {
+  OrbitBookmarkSuggestion,
+  OrbitDecisionEventPayload,
+  OrbitScanPlan,
+  OrbitTagSuggestion,
+} from "@/types";
 
 export interface LibraryAssignBookmark {
   id: string;
@@ -107,6 +112,29 @@ export function tagsFromPackedNouls(args: {
     if (picked.length > 0) assigned.set(post.id, picked);
   }
   return assigned;
+}
+
+export type LibraryTagScore = { name: string; score: number };
+
+export function scoresFromPackedNouls(args: {
+  posts: Array<{ id: string }>;
+  tags: string[];
+  nouls: Record<string, number>;
+}): Map<string, LibraryTagScore[]> {
+  const scored = new Map<string, LibraryTagScore[]>();
+  for (const [postIndex, post] of args.posts.entries()) {
+    const rows: LibraryTagScore[] = [];
+    for (const [tagIndex, tag] of args.tags.entries()) {
+      const key = questionKey(postIndex, tagIndex);
+      if (!Object.prototype.hasOwnProperty.call(args.nouls, key)) continue;
+      const score = args.nouls[key];
+      if (typeof score !== "number" || !Number.isFinite(score)) continue;
+      rows.push({ name: tag, score });
+    }
+    rows.sort((left, right) => right.score - left.score);
+    if (rows.length > 0) scored.set(post.id, rows);
+  }
+  return scored;
 }
 
 function noteTweetUrls(xMetadata: unknown): unknown {
@@ -219,7 +247,10 @@ async function assignPack(
   tags: string[],
   examples: LibraryTagExamples | undefined,
   signal?: AbortSignal
-): Promise<Map<string, string[]>> {
+): Promise<{
+  applied: Map<string, string[]>;
+  scored: Map<string, LibraryTagScore[]>;
+}> {
   const client = getTypeSafeClient();
   const questions: Record<string, ReturnType<typeof noul>> = {};
   for (const [postIndex, post] of posts.entries()) {
@@ -266,7 +297,10 @@ async function assignPack(
   for (const [key, answer] of Object.entries(response.answers)) {
     nouls[key] = answer && "noul" in answer ? answer.noul : 0;
   }
-  return tagsFromPackedNouls({ posts, tags, nouls });
+  return {
+    applied: tagsFromPackedNouls({ posts, tags, nouls }),
+    scored: scoresFromPackedNouls({ posts, tags, nouls }),
+  };
 }
 
 /** Credential failures would fail every pack; stop the run instead of skipping the library. */
@@ -320,8 +354,13 @@ async function mapPacks(
     examples?: LibraryTagExamples;
     signal?: AbortSignal;
   }
-): Promise<{ assigned: Map<string, string[]>; failed: number }> {
+): Promise<{
+  assigned: Map<string, string[]>;
+  scored: Map<string, LibraryTagScore[]>;
+  failed: number;
+}> {
   const assigned = new Map<string, string[]>();
+  const scored = new Map<string, LibraryTagScore[]>();
   let failed = 0;
   let fatal: unknown = null;
 
@@ -344,7 +383,8 @@ async function mapPacks(
             options.examples,
             options.signal
           );
-          for (const [id, names] of packAssigned) assigned.set(id, names);
+          for (const [id, names] of packAssigned.applied) assigned.set(id, names);
+          for (const [id, rows] of packAssigned.scored) scored.set(id, rows);
         } catch (error) {
           // Cancelled with its page: nothing will read this result.
           if (options.signal?.aborted) return;
@@ -369,26 +409,31 @@ async function mapPacks(
       "typesafe_auth"
     );
   }
-  return { assigned, failed };
+  return { assigned, scored, failed };
 }
 
 function suggestion(
   bookmarkId: string,
   names: string[],
   vocabulary: LibraryVocabularyTag[],
-  reasoning: string
+  reasoning: string,
+  scoreFor?: Map<string, number>
 ): OrbitBookmarkSuggestion {
   const colorFor = new Map(vocabulary.map((tag) => [normalizeTagKey(tag.name), tag.color]));
   return {
     bookmarkId,
     confidence: "high",
     reasoning,
-    tags: names.map((name) => ({
-      name,
-      color: colorFor.get(normalizeTagKey(name)) ?? "#1d9bf0",
-      reason: reasoning,
-      reuseExisting: true,
-    })),
+    tags: names.map((name) => {
+      const score = scoreFor?.get(normalizeTagKey(name));
+      return {
+        name,
+        color: colorFor.get(normalizeTagKey(name)) ?? "#1d9bf0",
+        reason: reasoning,
+        reuseExisting: true,
+        ...(typeof score === "number" ? { score, origin: "jev" as const } : {}),
+      };
+    }),
     collection: null,
   };
 }
@@ -399,6 +444,8 @@ export type LibraryAssignmentPlan = {
   modelChecked: number;
   /** Of those, posts whose pack still failed after retries. */
   failed: number;
+  /** Tags Jev scored for each post, including scores that were not applied. */
+  scores?: Map<string, LibraryTagScore[]>;
 };
 
 export async function planLibraryAssignments(args: {
@@ -419,16 +466,22 @@ export async function planLibraryAssignments(args: {
   for (let index = 0; index < needsModel.length; index += ORBIT_LIBRARY_PACK_SIZE) {
     packs.push(needsModel.slice(index, index + ORBIT_LIBRARY_PACK_SIZE));
   }
-  const { assigned, failed } =
+  const { assigned, scored, failed } =
     tagNames.length > 0 && packs.length > 0
       ? await mapPacks(packs, tagNames, {
           limiter: args.limiter ?? createPackLimiter(),
           examples: args.examples,
           signal: args.signal,
         })
-      : { assigned: new Map<string, string[]>(), failed: 0 };
+      : {
+          assigned: new Map<string, string[]>(),
+          scored: new Map<string, LibraryTagScore[]>(),
+          failed: 0,
+        };
 
   for (const bookmark of needsModel) {
+    const rows = scored.get(bookmark.id) ?? [];
+    const scoreFor = new Map(rows.map((row) => [normalizeTagKey(row.name), row.score]));
     const names = dedupeTags([
       ...freeLibraryTags(bookmark, args.vocabulary),
       ...(assigned.get(bookmark.id) ?? []),
@@ -439,7 +492,8 @@ export async function planLibraryAssignments(args: {
         bookmark.id,
         names,
         args.vocabulary,
-        "Matched the tag list for this library."
+        "Matched the tag list for this library.",
+        scoreFor
       )
     );
   }
@@ -455,5 +509,93 @@ export async function planLibraryAssignments(args: {
     },
     modelChecked: tagNames.length > 0 ? needsModel.length : 0,
     failed,
+    scores: scored,
   };
+}
+
+const AUTO_TAG_REASON = "Scored against the library tag list.";
+
+function scoredTag(
+  name: string,
+  score: number | undefined,
+  color = "#1d9bf0"
+): OrbitTagSuggestion {
+  return {
+    name,
+    color,
+    reason: AUTO_TAG_REASON,
+    reuseExisting: true,
+    ...(typeof score === "number" ? { score, origin: "jev" as const } : {}),
+  };
+}
+
+export function buildLibraryAutoTagEvents(args: {
+  suggestions: OrbitBookmarkSuggestion[];
+  scores: Map<string, LibraryTagScore[]>;
+}): OrbitDecisionEventPayload[] {
+  const suggestionById = new Map(
+    args.suggestions.map((suggestion) => [suggestion.bookmarkId, suggestion])
+  );
+  const ids = new Set<string>([...suggestionById.keys(), ...args.scores.keys()]);
+  const events: OrbitDecisionEventPayload[] = [];
+
+  for (const bookmarkId of ids) {
+    const suggestion = suggestionById.get(bookmarkId);
+    const scored = args.scores.get(bookmarkId) ?? [];
+    const scoreByKey = new Map(
+      scored.map((row) => [normalizeTagKey(row.name), row.score])
+    );
+    const applied = suggestion?.tags ?? [];
+    if (applied.length === 0 && scored.length === 0) continue;
+
+    const colorFor = new Map(
+      applied.map((tag) => [normalizeTagKey(tag.name), tag.color])
+    );
+    const originalTags = scored.map((row) =>
+      scoredTag(
+        row.name,
+        row.score,
+        colorFor.get(normalizeTagKey(row.name)) ?? "#1d9bf0"
+      )
+    );
+    const originalKeys = new Set(originalTags.map((tag) => normalizeTagKey(tag.name)));
+    for (const tag of applied) {
+      const key = normalizeTagKey(tag.name);
+      if (!key || originalKeys.has(key)) continue;
+      originalKeys.add(key);
+      originalTags.push(tag);
+    }
+
+    const reviewedTags = applied.map((tag) => {
+      const score = scoreByKey.get(normalizeTagKey(tag.name));
+      return typeof score === "number"
+        ? { ...tag, score, origin: "jev" as const }
+        : tag;
+    });
+    const appliedAny = reviewedTags.length > 0;
+
+    events.push({
+      bookmarkId,
+      action: appliedAny ? "accepted" : "rejected",
+      source: "auto-tag",
+      originalSuggestion: {
+        bookmarkId,
+        confidence: suggestion?.confidence ?? "low",
+        reasoning: suggestion?.reasoning || AUTO_TAG_REASON,
+        collection: null,
+        tags: originalTags,
+      },
+      reviewedSuggestion: appliedAny
+        ? {
+            bookmarkId,
+            confidence: suggestion?.confidence ?? "high",
+            reasoning: suggestion?.reasoning || AUTO_TAG_REASON,
+            collection: suggestion?.collection ?? null,
+            tags: reviewedTags,
+          }
+        : null,
+    });
+  }
+
+  return events;
 }
