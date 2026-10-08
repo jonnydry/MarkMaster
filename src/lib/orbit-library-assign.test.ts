@@ -172,6 +172,24 @@ describe("planLibraryAssignments", () => {
     ]);
   });
 
+  it("leaves a missing Jev score off the record", async () => {
+    systemOneMock.mockImplementation(async (request: { questions: Record<string, unknown> }) => {
+      const answers: Record<string, { noul?: number }> = {};
+      for (const key of Object.keys(request.questions)) {
+        answers[key] = key.endsWith("t0") ? { noul: 0.95 } : {};
+      }
+      return { answers };
+    });
+
+    const result = await planLibraryAssignments({
+      bookmarks: posts(1),
+      vocabulary,
+    });
+
+    expect(result.scores?.get("bm-0")).toEqual([{ name: "AI", score: 0.95 }]);
+    expect(result.plan.suggestions[0]?.tags.map((tag) => tag.name)).toEqual(["AI"]);
+  });
+
   it("shows Jev each tag's examples and points questions at them", async () => {
     systemOneMock.mockImplementation(async (request) => strongFirstTag(request));
 

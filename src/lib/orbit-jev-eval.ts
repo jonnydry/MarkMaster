@@ -213,6 +213,18 @@ export function isHumanOrbitDecision(event: { source?: string | null }) {
   return event.source == null || event.source === "" || !MACHINE_DECISION_SOURCES.has(event.source);
 }
 
+export function humanCalibrationEventWhere(userId?: string) {
+  return {
+    ...(userId ? { userId } : {}),
+  };
+}
+
+export function autoTagCalibrationEventWhere(userId?: string) {
+  return {
+    ...(userId ? { userId } : {}),
+  };
+}
+
 /**
  * Per-tag verdicts from one review event. Accepted or edited: a suggested tag
  * was kept when it is still on the reviewed suggestion (an accept with no

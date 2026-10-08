@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildOrbitJevEvalCaseFromEvent,
+  autoTagCalibrationEventWhere,
   calibrateOrbitTagThresholds,
+  humanCalibrationEventWhere,
   isHumanOrbitDecision,
   scoreOrbitJevEvalCase,
   summarizeOrbitJevEval,
@@ -93,6 +95,50 @@ describe("orbit Jev eval harness", () => {
       abstainCorrect: 1,
       falsePositiveCount: 1,
     });
+  });
+});
+
+describe("calibration event queries", () => {
+  type Row = { source: string | null; createdAt: number };
+
+  function matches(row: Row, where: Record<string, unknown>): boolean {
+    if (Array.isArray(where.OR)) {
+      return where.OR.some((clause) => matches(row, clause as Record<string, unknown>));
+    }
+    if (!("source" in where)) return true;
+    const source = where.source as { notIn?: string[] } | string | null;
+    if (source && typeof source === "object" && source.notIn) {
+      return row.source != null && !source.notIn.includes(row.source);
+    }
+    return row.source === source;
+  }
+
+  function newest(rows: Row[], where: Record<string, unknown>, take: number) {
+    return [...rows]
+      .filter((row) => matches(row, where))
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, take);
+  }
+
+  it("still loads human rows when newer auto-tag rows fill the window", () => {
+    const rows: Row[] = [
+      ...Array.from({ length: 500 }, (_, index) => ({
+        source: "auto-tag",
+        createdAt: 1_000 + index,
+      })),
+      ...Array.from({ length: 70 }, (_, index) => ({
+        source: index % 2 === 0 ? "orbit-review" : null,
+        createdAt: index,
+      })),
+    ];
+
+    const human = newest(rows, humanCalibrationEventWhere() as Record<string, unknown>, 500);
+    const autoTag = newest(rows, autoTagCalibrationEventWhere() as Record<string, unknown>, 500);
+
+    expect(human).toHaveLength(70);
+    expect(human.some((row) => row.source === "auto-tag")).toBe(false);
+    expect(autoTag).toHaveLength(500);
+    expect(autoTag.every((row) => row.source === "auto-tag")).toBe(true);
   });
 });
 
