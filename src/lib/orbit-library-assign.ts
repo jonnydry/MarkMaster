@@ -295,7 +295,7 @@ async function assignPack(
 
   const nouls: Record<string, number> = {};
   for (const [key, answer] of Object.entries(response.answers)) {
-    nouls[key] = answer && "noul" in answer ? answer.noul : 0;
+    if (answer && "noul" in answer) nouls[key] = answer.noul;
   }
   return {
     applied: tagsFromPackedNouls({ posts, tags, nouls }),

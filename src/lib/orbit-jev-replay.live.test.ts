@@ -7,8 +7,9 @@ import {
 } from "@/lib/orbit-jev-assign";
 import {
   buildOrbitJevEvalCaseFromEvent,
+  autoTagCalibrationEventWhere,
   calibrateOrbitTagThresholds,
-  isHumanOrbitDecision,
+  humanCalibrationEventWhere,
   scoreOrbitJevEvalCase,
   summarizeOrbitJevEval,
   type OrbitJevEvalScore,
@@ -19,6 +20,8 @@ import {
   orbitScanBookmarkInclude,
   withOrbitFolderHints,
 } from "@/lib/orbit-scan-bookmarks";
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { isTypeSafeConfigured } from "@/lib/typesafe";
 import type { OrbitDecisionEventPayload } from "@/types";
@@ -48,9 +51,12 @@ function percent(value: number | null) {
   return value === null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-async function loadEvents(take: number): Promise<OrbitDecisionEventPayload[]> {
+async function loadEvents(
+  where: Prisma.OrbitDecisionEventWhereInput,
+  take: number
+): Promise<OrbitDecisionEventPayload[]> {
   const rows = await prisma.orbitDecisionEvent.findMany({
-    where: USER_ID ? { userId: USER_ID } : {},
+    where,
     orderBy: { createdAt: "desc" },
     take,
     select: {
@@ -71,9 +77,8 @@ describe.skipIf(!REPLAY)("Orbit Jev replay over recorded review decisions", () =
   });
 
   it("reports tag-score calibration from stored scores", async () => {
-    const events = await loadEvents(EVENT_LIMIT);
-    const human = events.filter(isHumanOrbitDecision);
-    const autoTag = events.filter((event) => event.source === "auto-tag");
+    const human = await loadEvents(humanCalibrationEventWhere(USER_ID), EVENT_LIMIT);
+    const autoTag = await loadEvents(autoTagCalibrationEventWhere(USER_ID), EVENT_LIMIT);
     const report = calibrateOrbitTagThresholds(human);
 
     console.log(
@@ -120,10 +125,9 @@ describe.skipIf(!REPLAY)("Orbit Jev replay over recorded review decisions", () =
     "re-runs Jev on recent decisions and reports shortlist misses",
     async () => {
       const userId = USER_ID!;
-      const events = (await loadEvents(EVENT_LIMIT))
-        .filter(isHumanOrbitDecision)
-        .filter((event) => event.originalSuggestion)
-        .slice(0, LIVE_LIMIT);
+      const events = (await loadEvents(humanCalibrationEventWhere(userId), LIVE_LIMIT)).filter(
+        (event) => event.originalSuggestion
+      );
 
       const [tags, collections] = await Promise.all([
         prisma.tag.findMany({
