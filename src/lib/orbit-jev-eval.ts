@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
+
 import { normalizeKey } from "@/lib/orbit-grok-normalize";
 import type {
   OrbitDecisionEventAction,
@@ -213,15 +215,25 @@ export function isHumanOrbitDecision(event: { source?: string | null }) {
   return event.source == null || event.source === "" || !MACHINE_DECISION_SOURCES.has(event.source);
 }
 
-export function humanCalibrationEventWhere(userId?: string) {
+export function humanCalibrationEventWhere(
+  userId?: string
+): Prisma.OrbitDecisionEventWhereInput {
   return {
     ...(userId ? { userId } : {}),
+    OR: [
+      { source: null },
+      { source: "" },
+      { source: { notIn: [...MACHINE_DECISION_SOURCES] } },
+    ],
   };
 }
 
-export function autoTagCalibrationEventWhere(userId?: string) {
+export function autoTagCalibrationEventWhere(
+  userId?: string
+): Prisma.OrbitDecisionEventWhereInput {
   return {
     ...(userId ? { userId } : {}),
+    source: "auto-tag" as const,
   };
 }
 

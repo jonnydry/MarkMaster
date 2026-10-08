@@ -143,7 +143,7 @@ threshold, how many scored tags clear it and how many of those users kept,
 plus the keep rate per origin:
 
 ```bash
-npm run eval:orbit-calibrate                           # all users, newest 500 decisions
+npm run eval:orbit-calibrate                           # all users, newest 500 human and 500 auto-tag
 ORBIT_REPLAY_USER_ID=<id> npm run eval:orbit-calibrate # one user
 ```
 
