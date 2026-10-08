@@ -155,6 +155,23 @@ describe("planLibraryAssignments", () => {
     ]);
   });
 
+  it("keeps Jev's score on an applied tag and a weaker score off the plan", async () => {
+    systemOneMock.mockImplementation(async (request) => strongFirstTag(request));
+
+    const result = await planLibraryAssignments({
+      bookmarks: posts(1),
+      vocabulary,
+    });
+
+    expect(result.plan.suggestions[0]?.tags).toEqual([
+      expect.objectContaining({ name: "AI", score: 0.95, origin: "jev" }),
+    ]);
+    expect(result.scores?.get("bm-0")).toEqual([
+      { name: "AI", score: 0.95 },
+      { name: "Cooking", score: 0.1 },
+    ]);
+  });
+
   it("shows Jev each tag's examples and points questions at them", async () => {
     systemOneMock.mockImplementation(async (request) => strongFirstTag(request));
 

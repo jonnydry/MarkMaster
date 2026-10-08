@@ -42,6 +42,7 @@ describe("/api/analytics", () => {
       .mock.calls.map((call) => sqlText(call[0]))
       .find((sql) => sql.includes('FROM "OrbitDecisionEvent"'));
     expect(decisionQuery).toContain("tag-audit");
+    expect(decisionQuery).toContain("auto-tag");
     expect(decisionQuery).toMatch(/source/);
   });
 });

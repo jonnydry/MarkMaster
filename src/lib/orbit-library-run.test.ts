@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   },
   planLibraryAssignments: vi.fn(),
   applyOrbitScanPlan: vi.fn(),
+  recordOrbitDecisionEvents: vi.fn(async () => ({ count: 0 })),
   ensureLibraryVocabulary: vi.fn(),
   requestLibraryGrowthTags: vi.fn(),
   loadOrbitTagExamplesByName: vi.fn(),
@@ -52,6 +53,9 @@ vi.mock("@/lib/upstash-cache", () => ({
   invalidateUserResponseCache: vi.fn(),
 }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn(), logWarn: vi.fn() }));
+vi.mock("@/lib/orbit-decision-events", () => ({
+  recordOrbitDecisionEvents: mocks.recordOrbitDecisionEvents,
+}));
 
 const {
   cancelOrbitLibraryRun,
@@ -167,6 +171,60 @@ describe("runOrbitLibraryInvocation", () => {
     expect(finish).toMatchObject({ status: "COMPLETED", errorMessage: null });
     // The second page continues after the first page's last bookmark.
     expect(mocks.prisma.bookmark.findMany.mock.calls[1]![0].where.OR).toBeDefined();
+  });
+
+  it("records auto-tag decisions with Jev scores and still finishes when the log fails", async () => {
+    mocks.prisma.orbitLibraryRun.findUnique.mockResolvedValue(runRow({ vocabulary }));
+    mocks.prisma.bookmark.findMany.mockResolvedValueOnce(page(3));
+    const planned = planTagging(1);
+    planned.scores = new Map([
+      [
+        "bm-0",
+        [
+          { name: "AI", score: 0.91 },
+          { name: "Cooking", score: 0.2 },
+        ],
+      ],
+      ["bm-1", [{ name: "Cooking", score: 0.4 }]],
+    ]);
+    mocks.planLibraryAssignments.mockResolvedValueOnce(planned);
+    mocks.recordOrbitDecisionEvents.mockRejectedValueOnce(new Error("db down"));
+
+    await expect(runOrbitLibraryInvocation("run-1")).resolves.toEqual({
+      continued: false,
+    });
+
+    const events = mocks.recordOrbitDecisionEvents.mock.calls.flatMap(
+      (call) => call[0].events as Array<{
+        bookmarkId: string;
+        action: string;
+        source: string;
+        originalSuggestion: { tags: Array<{ name: string; score?: number; origin?: string }> };
+        reviewedSuggestion: { tags: Array<{ name: string }> } | null;
+      }>
+    );
+    const applied = events.find((event) => event.bookmarkId === "bm-0");
+    const leftOut = events.find((event) => event.bookmarkId === "bm-1");
+    expect(applied).toMatchObject({
+      action: "accepted",
+      source: "auto-tag",
+    });
+    expect(applied?.originalSuggestion.tags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "AI", score: 0.91, origin: "jev" }),
+        expect.objectContaining({ name: "Cooking", score: 0.2, origin: "jev" }),
+      ])
+    );
+    expect(applied?.reviewedSuggestion?.tags.map((tag) => tag.name)).toEqual(["AI"]);
+    expect(leftOut).toMatchObject({
+      action: "rejected",
+      source: "auto-tag",
+      reviewedSuggestion: null,
+    });
+    expect(leftOut?.originalSuggestion.tags).toEqual([
+      expect.objectContaining({ name: "Cooking", score: 0.4, origin: "jev" }),
+    ]);
+    expect(writes().at(-1)).toMatchObject({ status: "COMPLETED", errorMessage: null });
   });
 
   it("hands the tag list's examples to every page", async () => {
