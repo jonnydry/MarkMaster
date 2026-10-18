@@ -35,7 +35,7 @@ Queries and stored vectors must use this same model and 768 dimensions.
 
 1. Embed the raw search string as a query (1.5s timeout). Repeat queries for the same model and text reuse an in-memory cache.
 2. Take the closest 50 stored vectors by pgvector cosine distance (`<=>`), with the current filters (user, tags, dates, collection, author, media, unaffiliated, raw).
-3. Take the keyword hits from the same ILIKE terms as today, ordered by the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`), capped at 200 rows. The default keyword list is not capped.
+3. Take the keyword hits from the same ILIKE terms as today, and keep the first 200 in the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`). Those 200 are the first rows in that sort order, not the best ILIKE matches: a later row is dropped even when its text matches more closely. The default keyword list is not capped.
 4. Score each id with Reciprocal Rank Fusion, k = 60: `1/(60+rank)` from each list, ranks starting at 1.
 5. Return that order, paged with `page` and `limit`.
 
@@ -92,15 +92,24 @@ When that output is the database you mean to change:
 npm run db:migrate
 ```
 
-To roll this migration back after it has been applied, drop the table by hand, then mark the migration rolled back. The `vector` extension can stay.
+To undo this migration after it has been applied, do not use `prisma migrate resolve --rolled-back`. That flag is only for a migration that failed partway. On an applied migration, Prisma 6.19 errors with "not in a failed state". Dropping the table and then running `--rolled-back` leaves `_prisma_migrations` recorded as applied, so a later deploy never recreates the table. The `vector` extension can stay.
+
+**Preferred.** Add a new forward migration whose SQL is:
 
 ```sql
 DROP TABLE "BookmarkEmbedding";
 ```
 
-```bash
-npx prisma migrate resolve --rolled-back 20261018000000_add_bookmark_embedding
+Apply it the normal way (`npm run db:migrate`, which is `prisma migrate deploy`) after confirming `DIRECT_URL`.
+
+**Manual.** Drop the table, then delete the applied migration row:
+
+```sql
+DROP TABLE "BookmarkEmbedding";
+DELETE FROM "_prisma_migrations" WHERE migration_name = '20261018000000_add_bookmark_embedding';
 ```
+
+A later `npm run db:migrate` will apply `20261018000000_add_bookmark_embedding` again.
 
 ### 4. Backfill
 

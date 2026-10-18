@@ -90,13 +90,15 @@ ALTER TABLE "SyncRun" ALTER COLUMN "status" SET DEFAULT 'PENDING';
 
 ### Recovering from a failed deploy
 
-If `migrate deploy` fails mid-way:
+`--rolled-back` is only for a migration that failed partway. If `migrate deploy` fails mid-way:
 
 ```bash
 npx prisma migrate resolve --rolled-back "<migration_name>"
 ```
 
 Fix the migration SQL (or split it), then run `npm run db:migrate` again.
+
+Prisma 6.19 errors with "not in a failed state" when that flag is used on a migration that already applied. It does not undo an applied migration. To remove something that already deployed, add a new forward migration and apply it with `npm run db:migrate`. Undoing `BookmarkEmbedding` is described in `docs/SMART_SEARCH.md`.
 
 ---
 

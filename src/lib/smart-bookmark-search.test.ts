@@ -100,6 +100,7 @@ describe("trySmartBookmarkSearch", () => {
   });
 
   it("caps keyword candidates at 200 before fusion", async () => {
+    expect(SMART_SEARCH_KEYWORD_LIMIT).toBe(200);
     const keywordMatches = Array.from({ length: SMART_SEARCH_KEYWORD_LIMIT + 50 }, (_, index) => ({
       id: `kw-${index}`,
     }));

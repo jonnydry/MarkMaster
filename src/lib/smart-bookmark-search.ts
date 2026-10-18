@@ -19,7 +19,11 @@ import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 /** Top vector neighbors blended with the keyword list. Exact scan, no ANN index. */
 export const SMART_SEARCH_VECTOR_LIMIT = 50;
 
-/** Keyword candidates fused with the vector list. The default list stays uncapped. */
+/**
+ * Keyword candidates fused with the vector list.
+ * The first 200 rows in the request's sort order, not a relevance ranking.
+ * The default keyword list stays uncapped.
+ */
 export const SMART_SEARCH_KEYWORD_LIMIT = 200;
 
 export type SmartSearchFallback =
