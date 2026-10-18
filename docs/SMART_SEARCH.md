@@ -35,7 +35,7 @@ Queries and stored vectors must use this same model and 768 dimensions.
 
 1. Embed the raw search string as a query (1.5s timeout). Repeat queries for the same model and text reuse an in-memory cache.
 2. Take the closest 50 stored vectors by pgvector cosine distance (`<=>`), with the current filters (user, tags, dates, collection, author, media, unaffiliated, raw).
-3. Take the keyword hits from the same ILIKE terms as today, ordered by the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`).
+3. Take the keyword hits from the same ILIKE terms as today, ordered by the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`), capped at 200 rows. The default keyword list is not capped.
 4. Score each id with Reciprocal Rank Fusion, k = 60: `1/(60+rank)` from each list, ranks starting at 1.
 5. Return that order, paged with `page` and `limit`.
 
@@ -90,6 +90,16 @@ When that output is the database you mean to change:
 
 ```bash
 npm run db:migrate
+```
+
+To roll this migration back after it has been applied, drop the table by hand, then mark the migration rolled back. The `vector` extension can stay.
+
+```sql
+DROP TABLE "BookmarkEmbedding";
+```
+
+```bash
+npx prisma migrate resolve --rolled-back 20261018000000_add_bookmark_embedding
 ```
 
 ### 4. Backfill

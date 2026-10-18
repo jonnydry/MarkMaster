@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearQueryEmbeddingCache, EmbeddingProviderError, EMBEDDING_DIMS } from "./embedding-provider";
 import { toPgVectorLiteral } from "./pg-vector";
-import { trySmartBookmarkSearch, type SmartBookmarkSearchInput } from "./smart-bookmark-search";
+import {
+  SMART_SEARCH_KEYWORD_LIMIT,
+  trySmartBookmarkSearch,
+  type SmartBookmarkSearchInput,
+} from "./smart-bookmark-search";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: { $queryRaw: vi.fn() },
@@ -93,6 +97,39 @@ describe("trySmartBookmarkSearch", () => {
     expect(keywordValues).toEqual(expect.arrayContaining(["user-1", "tag-1"]));
     expect(vectorValues.some((value) => typeof value === "string" && value.includes("%ada%"))).toBe(true);
     expect(embedder.embed).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps keyword candidates at 200 before fusion", async () => {
+    const keywordMatches = Array.from({ length: SMART_SEARCH_KEYWORD_LIMIT + 50 }, (_, index) => ({
+      id: `kw-${index}`,
+    }));
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes("<=>")) return [];
+      if (sql.includes('"tweetText" ILIKE')) {
+        const values = sqlValues(query);
+        const requested = values.at(-1);
+        const limit =
+          sql.includes("LIMIT") && typeof requested === "number" ? requested : keywordMatches.length;
+        return keywordMatches.slice(0, limit);
+      }
+      return [];
+    });
+
+    const result = await trySmartBookmarkSearch(input(), { provider: provider(), queryRaw });
+
+    expect(result.kind).toBe("ranked");
+    if (result.kind !== "ranked") return;
+    expect(result.metadata.keywordHits).toBe(SMART_SEARCH_KEYWORD_LIMIT);
+    expect(result.orderedIds).toEqual(keywordMatches.slice(0, SMART_SEARCH_KEYWORD_LIMIT).map((row) => row.id));
+    expect(result.orderedIds).not.toContain(`kw-${SMART_SEARCH_KEYWORD_LIMIT}`);
+
+    const keywordQuery = queryRaw.mock.calls
+      .map((call) => call[0])
+      .find((query) => sqlText(query).includes('"tweetText" ILIKE'));
+    expect(sqlText(keywordQuery)).toContain("LIMIT");
+    expect(sqlValues(keywordQuery).at(-1)).toBe(SMART_SEARCH_KEYWORD_LIMIT);
   });
 
   it("falls back when no embeddings are stored", async () => {

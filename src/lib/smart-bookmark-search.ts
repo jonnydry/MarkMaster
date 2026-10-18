@@ -19,6 +19,9 @@ import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 /** Top vector neighbors blended with the keyword list. Exact scan, no ANN index. */
 export const SMART_SEARCH_VECTOR_LIMIT = 50;
 
+/** Keyword candidates fused with the vector list. The default list stays uncapped. */
+export const SMART_SEARCH_KEYWORD_LIMIT = 200;
+
 export type SmartSearchFallback =
   | "timeout"
   | "provider_unavailable"
@@ -154,6 +157,7 @@ async function keywordHitIds(
     FROM "Bookmark" b
     ${whereSql}
     ORDER BY ${orderSql} ${directionSql}, b."id" ${directionSql}
+    LIMIT ${SMART_SEARCH_KEYWORD_LIMIT}
   `);
   return rows.map((row) => row.id);
 }

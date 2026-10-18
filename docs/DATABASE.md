@@ -42,7 +42,15 @@ Branches that added `directUrl` to `prisma/schema.prisma` require `DIRECT_URL` i
 
 ### Vercel / production
 
-Set **both** variables in the project environment. Deploy uses `npm run deploy:build`, which runs `npm run db:migrate` (`prisma migrate deploy`) before `next build`.
+Set **both** variables in the project environment.
+
+| Script | What it runs |
+| --- | --- |
+| `npm run db:migrate` | `prisma migrate deploy`. Applies pending migrations to the database in `DIRECT_URL`. |
+| `npm run build` | `next build`. `prebuild` checks required env vars. This script does not migrate. |
+| `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds. |
+
+> **Warning.** If a Vercel build command runs `npm run deploy:build`, it will apply pending migrations to production on deploy. The migration can apply even when the later `next build` fails. Previews and CI should run `npm run build` and apply migrations as a separate release step.
 
 ---
 
