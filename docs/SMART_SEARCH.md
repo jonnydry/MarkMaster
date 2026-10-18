@@ -100,7 +100,11 @@ To undo this migration after it has been applied, do not use `prisma migrate res
 DROP TABLE "BookmarkEmbedding";
 ```
 
-Apply it the normal way (`npm run db:migrate`, which is `prisma migrate deploy`) after confirming `DIRECT_URL`.
+In that same change, remove `model BookmarkEmbedding` and the `embeddings BookmarkEmbedding[]` relation on `Bookmark` from `prisma/schema.prisma`. CI's migrations job runs `prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code`. A dropped table with the model still in the schema fails that check.
+
+Prisma Client does not read this table (`embedding` is `Unsupported`, and nothing uses `prisma.bookmarkEmbedding`). `mode=smart` reads it with raw SQL in `src/lib/smart-bookmark-search.ts`. A missing table is caught and the handler falls back to the keyword list (`search.fallback` is `no_embeddings`). Default search does not query the table, so that file can stay. `npm run embeddings:backfill` (`src/lib/embedding-backfill-store.ts`) reads and writes the table with no fallback, so the command fails after the drop. The migrations job also runs `src/lib/bookmark-embedding.pgvector.test.ts` with `RUN_PGVECTOR_TESTS=1`, which inserts and selects the same table. Remove or disable the backfill script, the store, and that test in the same change, or the backfill command and the migrations job fail. `npm run embeddings:demo` does not use the database.
+
+Apply the migration the normal way (`npm run db:migrate`, which is `prisma migrate deploy`) after confirming `DIRECT_URL`.
 
 **Manual.** Drop the table, then delete the applied migration row:
 

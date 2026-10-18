@@ -98,7 +98,7 @@ npx prisma migrate resolve --rolled-back "<migration_name>"
 
 Fix the migration SQL (or split it), then run `npm run db:migrate` again.
 
-Prisma 6.19 errors with "not in a failed state" when that flag is used on a migration that already applied. It does not undo an applied migration. To remove something that already deployed, add a new forward migration and apply it with `npm run db:migrate`. Undoing `BookmarkEmbedding` is described in `docs/SMART_SEARCH.md`.
+Prisma 6.19 errors with "not in a failed state" when that flag is used on a migration that already applied. It does not undo an applied migration. To remove something that already deployed, add a new forward migration and apply it with `npm run db:migrate`. Undoing `BookmarkEmbedding` that way also removes `model BookmarkEmbedding` and the `embeddings` relation on `Bookmark` from `prisma/schema.prisma` in the same change, or CI's schema drift check fails. The backfill command and the pgvector integration test read the table and have to be removed or disabled with that change. `docs/SMART_SEARCH.md` has the steps.
 
 ---
 
