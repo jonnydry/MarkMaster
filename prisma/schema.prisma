@@ -79,6 +79,7 @@ model Bookmark {
   collectionItems     CollectionItem[]
   notes               Note[]
   orbitDecisionEvents OrbitDecisionEvent[]
+  embeddings          BookmarkEmbedding[]
 
   @@unique([userId, tweetId])
   @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
@@ -87,6 +88,23 @@ model Bookmark {
   @@index([tweetText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_tweetText_trgm_idx")
   @@index([authorUsername(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_authorUsername_trgm_idx")
   @@index([authorDisplayName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Bookmark_authorDisplayName_trgm_idx")
+}
+
+/// One local embedding per bookmark, model, and dimension.
+/// `embedding` is written with raw SQL. Prisma Client does not read Unsupported columns.
+/// No HNSW or IVFFlat index: at this library size an exact cosine scan is enough.
+model BookmarkEmbedding {
+  bookmarkId  String
+  model       String
+  dims        Int
+  embedding   Unsupported("vector(768)")
+  contentHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@id([bookmarkId, model, dims])
 }
 
 model Tag {

@@ -107,4 +107,4 @@ Related production env vars (see `.env.example`): `SYNC_WORKER_SECRET`, `CRON_SE
 
 ## CI
 
-GitHub Actions sets both URLs to the same local Postgres instance (see `.github/workflows/ci.yml`). No Neon-specific config in CI.
+GitHub Actions sets both URLs to the same local Postgres instance (see `.github/workflows/ci.yml`). The migrations job uses `pgvector/pgvector:pg16` so the smart-search migration can `CREATE EXTENSION vector`. No Neon-specific config in CI. Smart search setup is in `docs/SMART_SEARCH.md`.
