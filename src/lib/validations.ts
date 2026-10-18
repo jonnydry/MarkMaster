@@ -215,6 +215,8 @@ export const bookmarksQuerySchema = z
     cursor: z.string().trim().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().trim().max(MAX_BOOKMARK_QUERY_LENGTH).default(""),
+    // Opt-in. Absent keeps the keyword list exactly as it is today.
+    mode: z.enum(["smart"]).optional(),
     sortField: z
       .enum(["bookmarkedAt", "tweetCreatedAt", "likes", "retweets", "replies", "performance", "authorUsername"])
       .default("bookmarkedAt"),

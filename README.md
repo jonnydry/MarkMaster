@@ -175,18 +175,15 @@ from syncing your real X bookmarks, which requires the configured X OAuth app
 (step 4). After signing in, run a sync from the sidebar to populate your
 library — a fresh clone renders empty until then.
 
-**Production build** (migrations + build):
+**Build scripts:**
 
-```bash
-npm run deploy:build
-```
+| Script | What it runs |
+| --- | --- |
+| `npm run db:migrate` | `prisma migrate deploy`. Applies pending migrations to the database in `DIRECT_URL`. |
+| `npm run build` | `next build`. `prebuild` checks required env vars. This script does not migrate. |
+| `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds. |
 
-> **Warning — production only.** `deploy:build` runs `prisma migrate deploy`
-> against whatever `DIRECT_URL` points at before building. Never use it as a
-> preview/CI build command with production env vars: every preview would
-> migrate the production database, and a migration can apply even if the
-> subsequent build fails (schema ahead of code). Previews and CI should run
-> plain `npm run build`; apply migrations as a separate release step.
+> **Warning.** If a Vercel build command runs `npm run deploy:build`, it will apply pending migrations to production on deploy. The migration can apply even when the later `next build` fails. Previews and CI should run `npm run build` and apply migrations as a separate release step.
 
 ---
 
@@ -194,11 +191,12 @@ npm run deploy:build
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start dev server (checks DB migrations first) |
-| `npm run build` | Production build |
+| `npm run dev` | Start dev server (`predev` checks migration status; it does not apply migrations) |
+| `npm run build` | `next build`. Does not apply migrations |
+| `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds |
 | `npm run lint` | ESLint |
 | `npm run test` | Vitest unit tests |
-| `npm run db:migrate` | Apply Prisma migrations |
+| `npm run db:migrate` | `prisma migrate deploy` against `DIRECT_URL` |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run env:check` | Validate environment variables |
 

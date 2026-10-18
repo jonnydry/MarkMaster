@@ -21,7 +21,20 @@ import { bookmarkListQueryOptions } from "@/lib/bookmark-list-query";
 import { withBookmarkCardUrls } from "@/lib/bookmark-card-urls";
 import { readJsonBody } from "@/lib/request-body";
 import { invalidateUserResponseCache } from "@/lib/upstash-cache";
+import { trySmartBookmarkSearch, type SmartSearchMetadata } from "@/lib/smart-bookmark-search";
 import { bookmarksQuerySchema, deleteBookmarkSchema } from "@/lib/validations";
+
+const bookmarkListCacheHeaders = {
+  "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
+};
+
+function withSmartSearchMeta<T extends Record<string, unknown>>(
+  body: T,
+  meta: SmartSearchMetadata | null
+) {
+  if (!meta) return body;
+  return { ...body, search: meta };
+}
 
 function getPersonalBoostAuthors(userId: string, enabled: boolean) {
   if (!enabled) return Promise.resolve([] as string[]);
@@ -76,6 +89,7 @@ export async function GET(req: NextRequest) {
     unaffiliated,
     raw,
     personalBoost,
+    mode,
   } = parsed.data;
 
   const listSortField = sortField as BookmarkSortField;
@@ -142,6 +156,64 @@ export async function GET(req: NextRequest) {
     where.AND = relationFilters;
   }
 
+  const smartOutcome =
+    mode === "smart"
+      ? await trySmartBookmarkSearch({
+          userId: user.id,
+          search,
+          searchTerms,
+          authorFilter,
+          tagIds,
+          dateFrom,
+          dateTo,
+          collectionId,
+          bookmarkId,
+          mediaFilter,
+          unaffiliated,
+          raw,
+          sortField: listSortField,
+          sortDirection,
+        })
+      : null;
+
+  if (smartOutcome?.kind === "ranked") {
+    const pageOffset = (page - 1) * limit;
+    const pageIds = smartOutcome.orderedIds.slice(pageOffset, pageOffset + limit);
+    const total = smartOutcome.orderedIds.length;
+    const rankedBookmarks =
+      pageIds.length === 0
+        ? []
+        : await prisma.bookmark.findMany({
+            where: { id: { in: pageIds } },
+            ...bookmarkListQueryOptions({
+              includeDetailFields: Boolean(bookmarkId),
+              compact: !bookmarkId,
+            }),
+          });
+    const order = new Map(pageIds.map((id, index) => [id, index]));
+    rankedBookmarks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    const personalBoostAuthors = await getPersonalBoostAuthors(
+      user.id,
+      personalBoostEnabled
+    );
+
+    return NextResponse.json(
+      {
+        bookmarks: await withBookmarkCardUrls(rankedBookmarks),
+        page,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+        ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
+          ? { personalBoostAuthors, personalBoostTags }
+          : {}),
+        search: smartOutcome.metadata,
+      },
+      { headers: bookmarkListCacheHeaders }
+    );
+  }
+
+  const smartSearchMeta = smartOutcome?.kind === "fallback" ? smartOutcome.metadata : null;
+
   const needsSlowPath =
     hasTextSearch ||
     sortField === "likes" ||
@@ -184,16 +256,22 @@ export async function GET(req: NextRequest) {
       limit
     );
 
-    return NextResponse.json({
-      bookmarks,
-      page,
-      ...(total !== null
-        ? { total, totalPages: Math.ceil(total / limit) || 1 }
-        : {}),
-      ...(nextCursor ? { nextCursor } : {}),
-      // personalBoost never applies here: it requires the performance sort,
-      // which always routes to the slow path below.
-    }, { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } });
+    return NextResponse.json(
+      withSmartSearchMeta(
+        {
+          bookmarks,
+          page,
+          ...(total !== null
+            ? { total, totalPages: Math.ceil(total / limit) || 1 }
+            : {}),
+          ...(nextCursor ? { nextCursor } : {}),
+          // personalBoost never applies here: it requires the performance sort,
+          // which always routes to the slow path below.
+        },
+        smartSearchMeta
+      ),
+      { headers: bookmarkListCacheHeaders }
+    );
   }
 
   const slowWhereSql = buildSlowPathWhereSql({
@@ -259,17 +337,23 @@ export async function GET(req: NextRequest) {
     limit
   );
 
-  return NextResponse.json({
-    bookmarks: await withBookmarkCardUrls(bookmarks),
-    page,
-    ...(total !== null
-      ? { total, totalPages: Math.ceil(total / limit) || 1 }
-      : {}),
-    ...(nextCursor ? { nextCursor } : {}),
-    ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
-      ? { personalBoostAuthors, personalBoostTags }
-      : {}),
-  }, { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } });
+  return NextResponse.json(
+    withSmartSearchMeta(
+      {
+        bookmarks: await withBookmarkCardUrls(bookmarks),
+        page,
+        ...(total !== null
+          ? { total, totalPages: Math.ceil(total / limit) || 1 }
+          : {}),
+        ...(nextCursor ? { nextCursor } : {}),
+        ...(personalBoost && (personalBoostAuthors.length || personalBoostTags.length)
+          ? { personalBoostAuthors, personalBoostTags }
+          : {}),
+      },
+      smartSearchMeta
+    ),
+    { headers: bookmarkListCacheHeaders }
+  );
 }
 
 export async function DELETE(req: NextRequest) {

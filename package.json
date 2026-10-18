@@ -33,6 +33,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed:verify": "node scripts/seed-verify.mjs",
+    "embeddings:backfill": "tsx scripts/backfill-bookmark-embeddings.ts",
+    "embeddings:demo": "tsx scripts/smart-search-demo.ts",
     "env:check": "node scripts/check-env.mjs",
     "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts",
     "eval:orbit-calibrate": "RUN_ORBIT_JEV_REPLAY=1 vitest run src/lib/orbit-jev-replay.live.test.ts"
@@ -82,6 +84,7 @@
     "playwright": "^1.63.0",
     "shadcn": "^4.16.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^4.1.11"
   },

@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -104,3 +104,6 @@ jobs:
 
       - name: Verify schema matches migrations (no drift)
         run: npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
+
+      - name: pgvector smart-search integration
+        run: RUN_PGVECTOR_TESTS=1 npx vitest run src/lib/bookmark-embedding.pgvector.test.ts

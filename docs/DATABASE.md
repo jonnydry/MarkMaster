@@ -42,7 +42,15 @@ Branches that added `directUrl` to `prisma/schema.prisma` require `DIRECT_URL` i
 
 ### Vercel / production
 
-Set **both** variables in the project environment. Deploy uses `npm run deploy:build`, which runs `npm run db:migrate` (`prisma migrate deploy`) before `next build`.
+Set **both** variables in the project environment.
+
+| Script | What it runs |
+| --- | --- |
+| `npm run db:migrate` | `prisma migrate deploy`. Applies pending migrations to the database in `DIRECT_URL`. |
+| `npm run build` | `next build`. `prebuild` checks required env vars. This script does not migrate. |
+| `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds. |
+
+> **Warning.** If a Vercel build command runs `npm run deploy:build`, it will apply pending migrations to production on deploy. The migration can apply even when the later `next build` fails. Previews and CI should run `npm run build` and apply migrations as a separate release step.
 
 ---
 
@@ -82,13 +90,15 @@ ALTER TABLE "SyncRun" ALTER COLUMN "status" SET DEFAULT 'PENDING';
 
 ### Recovering from a failed deploy
 
-If `migrate deploy` fails mid-way:
+`--rolled-back` is only for a migration that failed partway. If `migrate deploy` fails mid-way:
 
 ```bash
 npx prisma migrate resolve --rolled-back "<migration_name>"
 ```
 
 Fix the migration SQL (or split it), then run `npm run db:migrate` again.
+
+Prisma 6.19 errors with "not in a failed state" when that flag is used on a migration that already applied. It does not undo an applied migration. To remove something that already deployed, add a new forward migration and apply it with `npm run db:migrate`. Undoing `BookmarkEmbedding` that way also removes `model BookmarkEmbedding` and the `embeddings` relation on `Bookmark` from `prisma/schema.prisma` in the same change, or CI's schema drift check fails. The backfill command and the pgvector integration test read the table and have to be removed or disabled with that change. `docs/SMART_SEARCH.md` has the steps.
 
 ---
 
@@ -107,4 +117,4 @@ Related production env vars (see `.env.example`): `SYNC_WORKER_SECRET`, `CRON_SE
 
 ## CI
 
-GitHub Actions sets both URLs to the same local Postgres instance (see `.github/workflows/ci.yml`). No Neon-specific config in CI.
+GitHub Actions sets both URLs to the same local Postgres instance (see `.github/workflows/ci.yml`). The migrations job uses `pgvector/pgvector:pg16` so the smart-search migration can `CREATE EXTENSION vector`. No Neon-specific config in CI. Smart search setup is in `docs/SMART_SEARCH.md`.
