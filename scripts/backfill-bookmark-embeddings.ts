@@ -1,3 +1,7 @@
+// The guard module must load first: it captures MARKMASTER_ALLOW_PROD from the
+// launch environment before dotenv/config reads .env.
+import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
+
 import "dotenv/config";
 
 import { backfillBookmarkEmbeddings } from "@/lib/embedding-backfill";
@@ -8,8 +12,6 @@ import {
 } from "@/lib/embedding-backfill-store";
 import { createEmbeddingProvider } from "@/lib/embedding-provider";
 import { prisma } from "@/lib/prisma";
-
-import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
 
 function redact(text: string): string {
   return text.replace(/postgres(?:ql)?:\/\/\S+/gi, "postgresql://[redacted]");

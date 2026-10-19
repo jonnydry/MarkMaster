@@ -62,16 +62,16 @@ MarkMaster's Neon project has two branches:
 | `production` | The real library. Migrations and backfills run here only on purpose, with the prod flag. |
 | `dev` | A copy-on-write child of `production` for experiments: migrations, backfills, other embedding models. Reset it from `production` whenever it gets messy. |
 
-On jdry, `DATABASE_URL` and `DIRECT_URL` point at `dev`. The prod URLs are not kept in the day-to-day env files.
+The target setup is that jdry's `DATABASE_URL` and `DIRECT_URL` point at `dev` and the prod URLs are not kept in the day-to-day env files. Until the one-time setup below is done, jdry still points at prod, and the guard refuses writes there.
 
 ### The prod guard
 
-`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). They run without a flag only when every URL they use is:
+`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). `db:migrate` resolves `DATABASE_URL` and `DIRECT_URL` the way Prisma does (shell environment first, then `.env`, then `prisma/.env`; a variable that is already set is never overridden), requires both, and starts Prisma with exactly the values it checked. They run without a flag only when every URL they use is:
 
 - a local Postgres (`localhost`, `127.0.0.1`, `::1`), or
 - a Neon host whose endpoint id is listed in `MARKMASTER_DEV_ENDPOINT_IDS`, **and** `MARKMASTER_PROD_ENDPOINT_ID` is set and is different.
 
-Everything else is refused and nothing is written: the prod endpoint, a Neon endpoint in neither list, any other remote host, an unparseable URL, a URL with `?host=`/`?hostaddr=`/`?port=`, or any Neon host while `MARKMASTER_PROD_ENDPOINT_ID` is unset. The refusal names hosts and endpoint ids only, never the URL or password.
+Everything else is refused and nothing is written: the prod endpoint, a missing URL, a Neon endpoint in neither list, any other remote host, an unparseable URL, a URL with `?host=`/`?hostaddr=`/`?port=` or `${...}`, or any Neon host while `MARKMASTER_PROD_ENDPOINT_ID` is unset. The refusal names hosts and endpoint ids only, never the URL or password.
 
 To write to prod on purpose:
 
@@ -82,7 +82,11 @@ npm run embeddings:backfill -- --prod
 MARKMASTER_ALLOW_PROD=1 npm run db:migrate
 ```
 
+`MARKMASTER_ALLOW_PROD` counts only when it is set in the shell or process that launches the script. It never goes in `.env`, `.env.local`, or `prisma/.env`: a value there is ignored, so it cannot become a permanent, silent override.
+
 The flag also overrides an unknown host, so use it only when you have checked the target. A Vercel build that runs `npm run deploy:build` against prod needs `MARKMASTER_ALLOW_PROD=1` in that environment, or the build stops before migrating.
+
+The guard is only as accurate as `MARKMASTER_PROD_ENDPOINT_ID` and `MARKMASTER_DEV_ENDPOINT_IDS`. If the prod id is wrong (a typo, or an id from another project) and the real prod endpoint is listed as dev, prod is treated as dev and writes go through. Copy both ids from the Neon console and re-check them after any branch or compute change.
 
 The guard covers the npm scripts above. Calling `npx prisma migrate deploy`, `prisma migrate reset`, or `prisma db push` directly skips it.
 
@@ -93,14 +97,14 @@ Endpoint ids are the first part of a Neon hostname, without `-pooler`: in `ep-ex
 1. Open https://console.neon.tech, pick the MarkMaster project, and click **Connect** on the project dashboard.
 2. In the connection dialog, set **Branch** to `dev`, keep the database (`neondb`) and role, and leave **Connection pooling** on. Copy the string. This is `DATABASE_URL`.
 3. Turn **Connection pooling** off and copy again. This is `DIRECT_URL` (same host without `-pooler`).
-4. Put both in `.env` in the repo on jdry, replacing the prod values. Prisma and the scripts read `.env`. If `.env.local` also exists, `next dev` reads it first, so set the same two dev values there or remove the database lines from it.
+4. Put both in `.env` in the repo on jdry, replacing the prod values. Prisma reads `.env` and then `prisma/.env` (the first file to set a variable wins), and the scripts read `.env`. If `prisma/.env` exists, remove its database lines. If `.env.local` also exists, `next dev` reads it first, so set the same two dev values there or remove the database lines from it.
 5. Add the endpoint ids to `.env`:
    - `MARKMASTER_DEV_ENDPOINT_IDS`: the `ep-...` id from the `dev` hostname you just copied.
    - `MARKMASTER_PROD_ENDPOINT_ID`: in the console, open **Branches** → `production` and copy the `ep-...` id of its compute (or switch the Connect dialog to `production` and read it off the hostname, without copying the password).
 6. Check the targets without printing a password:
 
    ```bash
-   node -e 'require("dotenv").config(); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = process.env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
+   node --input-type=module -e 'import { resolvePrismaEnv } from "./scripts/db-target-guard.mjs"; const { env, files } = resolvePrismaEnv(); console.log("files:", files.join(", ") || "none"); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
    ```
 
    Both lines should show the `dev` endpoint id.
@@ -147,7 +151,7 @@ EMBEDDING_MODEL=embeddinggemma-2:270m
 Run it only after you have confirmed that URL is the intended database, and on prod only with an explicit yes from the owner. Print the host and database name, not the password:
 
 ```bash
-node -e 'require("dotenv").config(); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = process.env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
+node --input-type=module -e 'import { resolvePrismaEnv } from "./scripts/db-target-guard.mjs"; const { env, files } = resolvePrismaEnv(); console.log("files:", files.join(", ") || "none"); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
 ```
 
 When that output is the database you mean to change:

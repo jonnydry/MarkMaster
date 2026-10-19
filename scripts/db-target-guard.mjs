@@ -1,3 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import dotenv from "dotenv";
+
 /**
  * Prod guard for scripts that write to the database (migrations, the
  * embedding backfill, one-off data fixes).
@@ -7,6 +12,13 @@
  * else fails closed: the configured prod endpoint, an unknown Neon endpoint,
  * any other remote host, an unparseable URL, or a missing prod endpoint id.
  * `--prod` or MARKMASTER_ALLOW_PROD=1 lets the write through on purpose.
+ * MARKMASTER_ALLOW_PROD is read from the environment the process was launched
+ * with (captured when this module loads), so a value in .env never counts.
+ * Import this module before anything that loads .env.
+ *
+ * The guard is only as accurate as MARKMASTER_PROD_ENDPOINT_ID and
+ * MARKMASTER_DEV_ENDPOINT_IDS: if the prod id is wrong and the real prod id
+ * is listed as dev, prod is treated as dev.
  *
  * Neon hostnames start with the compute endpoint id
  * (ep-adjective-noun-xxxxxxxx), optionally followed by "-pooler" or a
@@ -21,6 +33,9 @@ export const ALLOW_PROD_ENV = "MARKMASTER_ALLOW_PROD";
 export const PROD_ENDPOINT_ENV = "MARKMASTER_PROD_ENDPOINT_ID";
 export const DEV_ENDPOINTS_ENV = "MARKMASTER_DEV_ENDPOINT_IDS";
 export const PROD_FLAG = "--prod";
+
+/** MARKMASTER_ALLOW_PROD as launched, before any .env file is loaded. */
+export const LAUNCH_ALLOW_PROD = process.env[ALLOW_PROD_ENV];
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const ENDPOINT_ID = /^(ep-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+)(?:-[a-z0-9]+)*$/;
@@ -126,6 +141,10 @@ export function classifyDatabaseTarget(databaseUrl, config) {
   const hostname = url.hostname.toLowerCase();
   const label = hostname || "(empty host)";
 
+  if (String(databaseUrl).includes("${")) {
+    return { kind: "unknown", label, reason: "the URL contains ${...}, which Prisma expands from other variables" };
+  }
+
   for (const param of RETARGET_PARAMS) {
     if (url.searchParams.has(param)) {
       return { kind: "unknown", label, reason: `the URL sets ?${param}=, which can point it at another server` };
@@ -174,18 +193,25 @@ export function classifyDatabaseTarget(databaseUrl, config) {
 /**
  * Decide whether a write script may run against the given URLs.
  *
+ * `allowProdValue` is MARKMASTER_ALLOW_PROD from the launch environment; it is
+ * deliberately not read from `env`, which may include values from .env files.
+ * Every key in `urls` is required: a missing or empty URL is refused, because
+ * the tool that runs next may fill it from a file nobody checked.
+ *
  * @param {{
  *   urls: Record<string, string | undefined>,
  *   env: Record<string, string | undefined>,
  *   argv?: readonly string[],
+ *   allowProdValue?: string,
  *   action: string,
  * }} input
  * @returns {{ ok: boolean, allowProd: boolean, message: string }}
  */
-export function checkDatabaseWrite({ urls, env, argv = [], action }) {
-  const allowProd = argv.includes(PROD_FLAG) || env[ALLOW_PROD_ENV] === "1";
+export function checkDatabaseWrite({ urls, env, argv = [], allowProdValue, action }) {
+  const allowProd = argv.includes(PROD_FLAG) || allowProdValue === "1";
   const config = readGuardConfig(env);
   const entries = Object.entries(urls).filter(([, value]) => value?.trim());
+  const missing = Object.keys(urls).filter((key) => !urls[key]?.trim());
 
   const summary = entries
     .map(([key, value]) => {
@@ -206,8 +232,8 @@ export function checkDatabaseWrite({ urls, env, argv = [], action }) {
   }
 
   const problems = [];
-  if (entries.length === 0) {
-    problems.push(`no database URL is set (${Object.keys(urls).join(", ")})`);
+  if (missing.length > 0) {
+    problems.push(`${missing.join(" and ")} ${missing.length > 1 ? "are" : "is"} not set, so the target cannot be checked`);
   }
   for (const error of config.configErrors) problems.push(error);
 
@@ -238,12 +264,44 @@ export function checkDatabaseWrite({ urls, env, argv = [], action }) {
 }
 
 /**
+ * Resolve the environment the Prisma CLI will see when started from `cwd`:
+ * the launch environment wins, then `<cwd>/.env`, then `<cwd>/prisma/.env`.
+ * Prisma loads both files with dotenv without overriding variables that are
+ * already set, so the first file to define a variable wins. Neither file
+ * overrides the launch environment. DOTENV_CONFIG_PATH is ignored, as Prisma
+ * ignores it.
+ *
+ * @param {{ cwd?: string, launchEnv?: Record<string, string | undefined> }} [options]
+ * @returns {{ env: Record<string, string | undefined>, files: string[] }}
+ */
+export function resolvePrismaEnv({ cwd = process.cwd(), launchEnv = process.env } = {}) {
+  const files = [];
+  /** @type {Record<string, string | undefined>} */
+  const env = {};
+  for (const file of [path.join(cwd, "prisma", ".env"), path.join(cwd, ".env")]) {
+    if (!fs.existsSync(file)) continue;
+    files.unshift(path.relative(cwd, file));
+    Object.assign(env, dotenv.parse(fs.readFileSync(file)));
+  }
+  for (const [key, value] of Object.entries(launchEnv)) {
+    if (value !== undefined) env[key] = value;
+  }
+  return { env, files };
+}
+
+/**
  * CLI helper: print the decision and exit 1 when the write is refused.
  *
- * @param {{ urls: Record<string, string | undefined>, action: string, argv?: readonly string[], env?: Record<string, string | undefined> }} input
+ * @param {{ urls: Record<string, string | undefined>, action: string, argv?: readonly string[], env?: Record<string, string | undefined>, allowProdValue?: string }} input
  */
-export function enforceDatabaseWriteGuard({ urls, action, argv = process.argv.slice(2), env = process.env }) {
-  const decision = checkDatabaseWrite({ urls, env, argv, action });
+export function enforceDatabaseWriteGuard({
+  urls,
+  action,
+  argv = process.argv.slice(2),
+  env = process.env,
+  allowProdValue = LAUNCH_ALLOW_PROD,
+}) {
+  const decision = checkDatabaseWrite({ urls, env, argv, allowProdValue, action });
   if (!decision.ok) {
     console.error(decision.message);
     process.exit(1);

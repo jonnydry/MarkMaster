@@ -2,10 +2,12 @@
 // oldest one, moving items (skipping duplicates) and deleting the extras.
 // Usage: node scripts/merge-duplicate-gems.mjs [--apply] [--prod]
 // --apply writes, so it goes through the prod guard (scripts/db-target-guard.mjs).
+// The guard import comes first so it captures MARKMASTER_ALLOW_PROD before
+// dotenv reads .env.
+import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
+
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
-
-import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
 
 dotenv.config();
 
