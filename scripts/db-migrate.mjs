@@ -13,12 +13,13 @@
 // environment, so it cannot pick up a different value from a file.
 import { spawnSync } from "node:child_process";
 
-import {
-  PROD_FLAG,
-  enforceDatabaseWriteGuard,
-  findPrismaConfigProblems,
-  resolvePrismaEnv,
-} from "./db-target-guard.mjs";
+import { findPrismaConfigProblems } from "./prisma-config-check.mjs";
+
+// Kept in sync with PROD_FLAG in db-target-guard.mjs (a test checks this).
+// The guard module is imported only after the Prisma config check below:
+// it imports dotenv, and Node fails that import with ERR_INVALID_PACKAGE_CONFIG
+// when package.json is unparseable, before the check could explain why.
+const PROD_FLAG = "--prod";
 
 const argv = process.argv.slice(2);
 
@@ -52,6 +53,7 @@ if (configProblems.length > 0) {
   process.exit(1);
 }
 
+const { enforceDatabaseWriteGuard, resolvePrismaEnv } = await import("./db-target-guard.mjs");
 const { env } = resolvePrismaEnv();
 
 enforceDatabaseWriteGuard({
