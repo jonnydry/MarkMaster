@@ -66,7 +66,7 @@ The target setup is that jdry's `DATABASE_URL` and `DIRECT_URL` point at `dev` a
 
 ### The prod guard
 
-`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). `db:migrate` resolves `DATABASE_URL` and `DIRECT_URL` the way Prisma does (shell environment first, then `.env`, then `prisma/.env`; a variable that is already set is never overridden), requires both, and starts Prisma with exactly the values it checked. They run without a flag only when every URL they use is:
+`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). `db:migrate` resolves `DATABASE_URL` and `DIRECT_URL` the way Prisma does (shell environment first, then `.env`, then `prisma/.env`; a variable that is already set is never overridden), requires both, and starts Prisma with exactly the values it checked. It accepts no arguments except `--prod`: anything else, such as `--schema`, is refused, because it could make Prisma use a datasource the guard did not check. They run without a flag only when every URL they use is:
 
 - a local Postgres (`localhost`, `127.0.0.1`, `::1`), or
 - a Neon host whose endpoint id is listed in `MARKMASTER_DEV_ENDPOINT_IDS`, **and** `MARKMASTER_PROD_ENDPOINT_ID` is set and is different.

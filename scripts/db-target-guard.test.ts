@@ -188,6 +188,8 @@ describe("prod guard", () => {
 
 const REPO = path.resolve(__dirname, "..");
 const FAKE_PROD_URL = "postgresql://owner:" + SECRET + "@prod-target.invalid:5432/neondb";
+// Nothing listens on port 1, so even a broken wrapper could not migrate it.
+const UNREACHABLE_LOCAL_URL = "postgresql://postgres:postgres@localhost:1/markmaster";
 const FAKE_LOCAL_URL = "postgresql://postgres:postgres@localhost:5432/markmaster";
 
 /** Temp project dir with optional .env and prisma/.env files. */
@@ -211,8 +213,8 @@ function runScript(command: string, args: string[], cwd: string, env: Record<str
   });
 }
 
-function runMigrate(cwd: string, env: Record<string, string>) {
-  return runScript(process.execPath, [path.join(REPO, "scripts/db-migrate.mjs")], cwd, env);
+function runMigrate(cwd: string, env: Record<string, string>, args: string[] = []) {
+  return runScript(process.execPath, [path.join(REPO, "scripts/db-migrate.mjs"), ...args], cwd, env);
 }
 
 function expectRefused(result: ReturnType<typeof spawnSync>, text: string) {
@@ -262,6 +264,41 @@ describe("db:migrate wrapper", { timeout: 60_000 }, () => {
     expectRefused(result, "DIRECT_URL is not set");
   });
 
+  it("refuses --schema, which could point Prisma at an unchecked datasource", () => {
+    const dir = tempProject({});
+    fs.mkdirSync(path.join(dir, "alt"));
+    fs.writeFileSync(path.join(dir, "alt", ".env"), `ALT_DIRECT_URL="${FAKE_PROD_URL}"\n`);
+    const result = runMigrate(
+      dir,
+      { DATABASE_URL: UNREACHABLE_LOCAL_URL, DIRECT_URL: UNREACHABLE_LOCAL_URL, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
+      ["--schema", "alt/schema.prisma"]
+    );
+    expectRefused(result, "unsupported arguments --schema alt/schema.prisma");
+    expect(String(result.stdout)).not.toContain("Dry run");
+  });
+
+  it("refuses any other argument, even next to --prod", () => {
+    const result = runMigrate(
+      tempProject({}),
+      { DATABASE_URL: UNREACHABLE_LOCAL_URL, DIRECT_URL: UNREACHABLE_LOCAL_URL, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
+      ["--prod", "--skip-generate"]
+    );
+    expectRefused(result, "unsupported argument --skip-generate");
+    expect(String(result.stdout)).not.toContain("Dry run");
+  });
+
+  it("still accepts --prod for a prod target", () => {
+    const result = runMigrate(
+      tempProject({}),
+      { DATABASE_URL: neon(PROD_ID, true), DIRECT_URL: neon(PROD_ID), ...ENV, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
+      ["--prod"]
+    );
+    expect(result.status).toBe(0);
+    expect(String(result.stderr)).toContain("WARNING: prisma migrate deploy is running with the prod override");
+    expect(String(result.stdout)).toContain("Dry run: checks passed");
+    expect(`${result.stdout}${result.stderr}`).not.toContain(SECRET);
+  });
+
   it("does not accept MARKMASTER_ALLOW_PROD=1 from .env", () => {
     const dir = tempProject({ env: "MARKMASTER_ALLOW_PROD=1\n" });
     const result = runMigrate(dir, { DATABASE_URL: FAKE_PROD_URL, DIRECT_URL: FAKE_PROD_URL });
@@ -300,6 +337,18 @@ describe("other write scripts call the guard", { timeout: 60_000 }, () => {
       env
     );
     expectRefused(result, "Refusing to run embeddings:backfill");
+  });
+
+  it("merge-duplicate-gems --apply ignores MARKMASTER_ALLOW_PROD=1 from .env", () => {
+    const { DOTENV_CONFIG_PATH: _unused, ...env } = prodEnv;
+    void _unused;
+    const result = runScript(
+      process.execPath,
+      [path.join(REPO, "scripts/merge-duplicate-gems.mjs"), "--apply"],
+      tempProject({ env: "MARKMASTER_ALLOW_PROD=1\n" }),
+      env
+    );
+    expectRefused(result, "Refusing to run merge-duplicate-gems --apply");
   });
 
   it("merge-duplicate-gems --apply refuses a prod URL", () => {
