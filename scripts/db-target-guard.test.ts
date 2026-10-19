@@ -8,6 +8,7 @@ import {
   checkDatabaseWrite,
   classifyDatabaseTarget,
   neonEndpointId,
+  findPrismaConfigProblems,
   readGuardConfig,
   resolvePrismaEnv,
 } from "./db-target-guard.mjs";
@@ -342,19 +343,62 @@ describe("db:migrate wrapper", { timeout: 60_000 }, () => {
     expect(result.npxArgs).toEqual(PRISMA_ARGS);
   });
 
-  it.each(["prisma.config.ts", "prisma.config.mjs", ".config/prisma.ts"])("refuses when %s exists", (file) => {
+  // Every place Prisma 6.19.3 loads a config from (c12 name "prisma", suffixes
+  // "" and "/index"). `entry` is what the refusal names.
+  it.each([
+    { file: "prisma.config.ts", entry: "prisma.config.ts" },
+    { file: "prisma.config.mjs", entry: "prisma.config.mjs" },
+    { file: "prisma.config/index.ts", entry: "prisma.config" },
+    { file: ".config/prisma.ts", entry: ".config/prisma.ts" },
+    { file: ".config/prisma/index.ts", entry: ".config/prisma" },
+    { file: ".config/prisma.config.ts", entry: ".config/prisma.config.ts" },
+    { file: ".config/prisma.config/index.ts", entry: ".config/prisma.config" },
+  ])("refuses when $file exists", ({ file, entry }) => {
     const dir = tempProject({});
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), 'export default { schema: "alt/schema.prisma" };\n');
     const result = runMigrate(dir, LOCAL_TARGET);
-    expectRefused(result, `${file} exists`);
+    expectRefused(result, `  - ${entry} exists`);
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("refuses when package.json cannot be parsed", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(path.join(dir, "package.json"), "{ not json");
+    const result = runMigrate(dir, LOCAL_TARGET);
+    expectRefused(result, "package.json could not be read or parsed");
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("refuses when the nearest package.json above the working directory has a prisma key", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ prisma: { schema: "alt/schema.prisma" } }));
+    const sub = path.join(dir, "sub");
+    fs.mkdirSync(sub);
+    const result = runMigrate(sub, LOCAL_TARGET);
+    expectRefused(result, `${path.join("..", "package.json")} has a "prisma" key`);
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("refuses cleanly when .config is a file", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(path.join(dir, ".config"), "not a folder\n");
+    const result = runMigrate(dir, LOCAL_TARGET);
+    expectRefused(result, ".config is not a directory, so it cannot be checked for Prisma config");
+    expect(String(result.stderr)).not.toContain("ENOTDIR");
     expect(result.npxArgs).toBeNull();
   });
 
   it("checks the repo itself has no Prisma config the wrapper would refuse", () => {
+    expect(findPrismaConfigProblems(REPO)).toEqual([]);
     const pkg = JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8"));
     expect(Object.hasOwn(pkg, "prisma")).toBe(false);
-    expect(fs.readdirSync(REPO).filter((name) => name.startsWith("prisma.config."))).toEqual([]);
+    expect(fs.readdirSync(REPO).filter((name) => /^prisma\.config(\.|$)/i.test(name))).toEqual([]);
+    const dotConfig = path.join(REPO, ".config");
+    if (fs.existsSync(dotConfig)) {
+      expect(fs.statSync(dotConfig).isDirectory()).toBe(true);
+      expect(fs.readdirSync(dotConfig).filter((name) => /^prisma(\.|$)/i.test(name))).toEqual([]);
+    }
   });
 
   it("does not accept MARKMASTER_ALLOW_PROD=1 from .env", () => {

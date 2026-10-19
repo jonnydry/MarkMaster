@@ -2,20 +2,23 @@
 // Usage: npm run db:migrate [-- --prod]   (or MARKMASTER_ALLOW_PROD=1 in the shell)
 // No other arguments are accepted, and Prisma always gets
 // --schema prisma/schema.prisma, so the schema and its datasource env vars are
-// the ones the guard checked. A package.json "prisma" key or a prisma.config.*
-// file could also redirect Prisma (and a config file turns off its .env
-// loading), so the wrapper refuses to run while either exists. This repo uses
-// neither.
+// the ones the guard checked. A package.json "prisma" key or a Prisma config
+// file or folder could also redirect Prisma (a config can even replace the
+// datasource URLs), so the wrapper refuses to run while any exists
+// (findPrismaConfigProblems). This repo uses none.
 //
 // The guard checks the same DATABASE_URL and DIRECT_URL that Prisma will use:
 // launch environment first, then .env, then prisma/.env (resolvePrismaEnv).
 // Both must be set and pass. Prisma is then started with exactly that
 // environment, so it cannot pick up a different value from a file.
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
 
-import { PROD_FLAG, enforceDatabaseWriteGuard, resolvePrismaEnv } from "./db-target-guard.mjs";
+import {
+  PROD_FLAG,
+  enforceDatabaseWriteGuard,
+  findPrismaConfigProblems,
+  resolvePrismaEnv,
+} from "./db-target-guard.mjs";
 
 const argv = process.argv.slice(2);
 
@@ -35,28 +38,7 @@ if (unknownArgs.length > 0) {
 
 const SCHEMA_PATH = "prisma/schema.prisma";
 
-const cwd = process.cwd();
-const configProblems = [];
-const pkgPath = path.join(cwd, "package.json");
-if (fs.existsSync(pkgPath)) {
-  let pkg;
-  try {
-    pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-  } catch {
-    configProblems.push("package.json could not be parsed");
-  }
-  if (pkg && typeof pkg === "object" && Object.hasOwn(pkg, "prisma")) {
-    configProblems.push('package.json has a "prisma" key');
-  }
-}
-for (const dir of [cwd, path.join(cwd, ".config")]) {
-  if (!fs.existsSync(dir)) continue;
-  for (const name of fs.readdirSync(dir)) {
-    if (/^prisma\.config\./.test(name) || (dir !== cwd && /^prisma\./.test(name))) {
-      configProblems.push(`${path.relative(cwd, path.join(dir, name))} exists`);
-    }
-  }
-}
+const configProblems = findPrismaConfigProblems(process.cwd());
 if (configProblems.length > 0) {
   console.error(
     [
