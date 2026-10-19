@@ -1,3 +1,7 @@
+// The guard module must load first: it captures MARKMASTER_ALLOW_PROD from the
+// launch environment before dotenv/config reads .env.
+import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
+
 import "dotenv/config";
 
 import { backfillBookmarkEmbeddings } from "@/lib/embedding-backfill";
@@ -19,6 +23,13 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+
+  // Refuses prod, unknown Neon endpoints, and other remote hosts unless
+  // `--prod` or MARKMASTER_ALLOW_PROD=1 is passed. See docs/SMART_SEARCH.md.
+  enforceDatabaseWriteGuard({
+    action: "embeddings:backfill",
+    urls: { DATABASE_URL: process.env.DATABASE_URL },
+  });
 
   const counts = await backfillBookmarkEmbeddings({
     provider: createEmbeddingProvider(),

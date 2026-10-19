@@ -46,7 +46,7 @@ Set **both** variables in the project environment.
 
 | Script | What it runs |
 | --- | --- |
-| `npm run db:migrate` | `prisma migrate deploy`. Applies pending migrations to the database in `DIRECT_URL`. |
+| `npm run db:migrate` | `prisma migrate deploy` behind the prod guard (`scripts/db-migrate.mjs`). Applies pending migrations to the database in `DIRECT_URL`. Refuses the prod Neon branch and unknown hosts unless run with `-- --prod` or `MARKMASTER_ALLOW_PROD=1`; see [docs/SMART_SEARCH.md](SMART_SEARCH.md#two-databases-dev-and-prod). |
 | `npm run build` | `next build`. `prebuild` checks required env vars. This script does not migrate. |
 | `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds. |
 
@@ -58,7 +58,7 @@ Set **both** variables in the project environment.
 
 ```bash
 npm run db:status    # prisma migrate status — pending migrations?
-npm run db:migrate   # prisma migrate deploy — apply pending migrations
+npm run db:migrate   # prisma migrate deploy behind the prod guard — apply pending migrations
 npm run db:studio    # Prisma Studio
 npm run env:check    # required env vars (add DIRECT_URL manually if missing from check)
 ```

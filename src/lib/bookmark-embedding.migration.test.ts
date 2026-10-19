@@ -21,3 +21,16 @@ describe("bookmark embedding migration", () => {
     expect(statements).not.toContain("ivfflat");
   });
 });
+
+describe("bookmark embedding provenance columns", () => {
+  it("records model and dims on every row, as part of the key", () => {
+    const sql = readFileSync(
+      "prisma/migrations/20261018000000_add_bookmark_embedding/migration.sql",
+      "utf8"
+    );
+    expect(sql).toContain('"model" TEXT NOT NULL');
+    expect(sql).toContain('"dims" INTEGER NOT NULL');
+    const store = readFileSync("src/lib/embedding-backfill-store.ts", "utf8");
+    expect(store).toMatch(/WHERE "model" = \$\{model\}\s+AND "dims" = \$\{dims\}/);
+  });
+});

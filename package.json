@@ -30,7 +30,7 @@
     "db:up": "docker compose up -d",
     "db:status": "prisma migrate status",
     "db:check": "node scripts/check-db-migrations.mjs",
-    "db:migrate": "prisma migrate deploy",
+    "db:migrate": "node scripts/db-migrate.mjs",
     "db:studio": "prisma studio",
     "db:seed:verify": "node scripts/seed-verify.mjs",
     "embeddings:backfill": "tsx scripts/backfill-bookmark-embeddings.ts",

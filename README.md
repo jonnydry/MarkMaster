@@ -179,7 +179,7 @@ library — a fresh clone renders empty until then.
 
 | Script | What it runs |
 | --- | --- |
-| `npm run db:migrate` | `prisma migrate deploy`. Applies pending migrations to the database in `DIRECT_URL`. |
+| `npm run db:migrate` | `prisma migrate deploy` behind the prod guard (`scripts/db-migrate.mjs`). Applies pending migrations to the database in `DIRECT_URL`. Refuses the prod Neon branch and unknown hosts unless run with `-- --prod` or `MARKMASTER_ALLOW_PROD=1`; see [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#two-databases-dev-and-prod). |
 | `npm run build` | `next build`. `prebuild` checks required env vars. This script does not migrate. |
 | `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds. |
 
@@ -196,7 +196,7 @@ library — a fresh clone renders empty until then.
 | `npm run deploy:build` | `npm run db:migrate && npm run build`. Applies pending migrations, then builds |
 | `npm run lint` | ESLint |
 | `npm run test` | Vitest unit tests |
-| `npm run db:migrate` | `prisma migrate deploy` against `DIRECT_URL` |
+| `npm run db:migrate` | `prisma migrate deploy` against `DIRECT_URL`, refused on prod without `-- --prod` |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run env:check` | Validate environment variables |
 
