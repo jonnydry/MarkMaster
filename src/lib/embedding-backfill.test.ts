@@ -134,3 +134,23 @@ describe("backfillBookmarkEmbeddings", () => {
     ).rejects.toThrow(/different number of vectors/);
   });
 });
+
+describe("embedding provenance", () => {
+  it("stores the model and dimension on every row and re-embeds rows from another model", async () => {
+    const bookmarks = ["a", "b"].map((id) => bookmark(id));
+    const store = fakeStore(bookmarks);
+
+    await backfillBookmarkEmbeddings({ store, provider: fakeProvider() });
+    expect([...store.rows.values()].map((row) => [row.model, row.dims])).toEqual([
+      ["embeddinggemma-2:270m", EMBEDDING_DIMS],
+      ["embeddinggemma-2:270m", EMBEDDING_DIMS],
+    ]);
+
+    const swapped = { ...fakeProvider(), model: "some-other-embedder" };
+    const afterSwap = await backfillBookmarkEmbeddings({ store, provider: swapped });
+    expect(afterSwap).toMatchObject({ embedded: 2, skipped: 0, model: "some-other-embedder" });
+
+    const again = await backfillBookmarkEmbeddings({ store, provider: fakeProvider() });
+    expect(again).toMatchObject({ embedded: 0, skipped: 2 });
+  });
+});

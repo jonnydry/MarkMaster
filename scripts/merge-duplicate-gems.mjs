@@ -1,12 +1,21 @@
 // One-off: merge duplicate "This Week's Gems" collections per user into the
 // oldest one, moving items (skipping duplicates) and deleting the extras.
-// Usage: node scripts/merge-duplicate-gems.mjs [--apply]
+// Usage: node scripts/merge-duplicate-gems.mjs [--apply] [--prod]
+// --apply writes, so it goes through the prod guard (scripts/db-target-guard.mjs).
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
+
+import { enforceDatabaseWriteGuard } from "./db-target-guard.mjs";
 
 dotenv.config();
 
 const APPLY = process.argv.includes("--apply");
+if (APPLY) {
+  enforceDatabaseWriteGuard({
+    action: "merge-duplicate-gems --apply",
+    urls: { DATABASE_URL: process.env.DATABASE_URL },
+  });
+}
 const prisma = new PrismaClient();
 
 const normalize = (name) => name.replace(/[’‘]/g, "'").trim().toLowerCase();

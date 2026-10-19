@@ -53,6 +53,70 @@ New and edited bookmarks stay unembedded until the backfill runs again. The scri
 
 The migration creates `BookmarkEmbedding` and runs `CREATE EXTENSION IF NOT EXISTS vector`. It does not add an HNSW or IVFFlat index. Retrieval is an exact scan.
 
+## Two databases: dev and prod
+
+MarkMaster's Neon project has two branches:
+
+| Branch | Use |
+|---|---|
+| `production` | The real library. Migrations and backfills run here only on purpose, with the prod flag. |
+| `dev` | A copy-on-write child of `production` for experiments: migrations, backfills, other embedding models. Reset it from `production` whenever it gets messy. |
+
+On jdry, `DATABASE_URL` and `DIRECT_URL` point at `dev`. The prod URLs are not kept in the day-to-day env files.
+
+### The prod guard
+
+`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). They run without a flag only when every URL they use is:
+
+- a local Postgres (`localhost`, `127.0.0.1`, `::1`), or
+- a Neon host whose endpoint id is listed in `MARKMASTER_DEV_ENDPOINT_IDS`, **and** `MARKMASTER_PROD_ENDPOINT_ID` is set and is different.
+
+Everything else is refused and nothing is written: the prod endpoint, a Neon endpoint in neither list, any other remote host, an unparseable URL, a URL with `?host=`/`?hostaddr=`/`?port=`, or any Neon host while `MARKMASTER_PROD_ENDPOINT_ID` is unset. The refusal names hosts and endpoint ids only, never the URL or password.
+
+To write to prod on purpose:
+
+```bash
+npm run db:migrate -- --prod
+npm run embeddings:backfill -- --prod
+# or, for any of them:
+MARKMASTER_ALLOW_PROD=1 npm run db:migrate
+```
+
+The flag also overrides an unknown host, so use it only when you have checked the target. A Vercel build that runs `npm run deploy:build` against prod needs `MARKMASTER_ALLOW_PROD=1` in that environment, or the build stops before migrating.
+
+The guard covers the npm scripts above. Calling `npx prisma migrate deploy`, `prisma migrate reset`, or `prisma db push` directly skips it.
+
+Endpoint ids are the first part of a Neon hostname, without `-pooler`: in `ep-example-name-a1b2c3d4-pooler.c-6.us-east-1.aws.neon.tech` the id is `ep-example-name-a1b2c3d4`. They identify a branch's compute and are not credentials, but they stay in local env files rather than in the repo.
+
+### Set up jdry for dev (one time)
+
+1. Open https://console.neon.tech, pick the MarkMaster project, and click **Connect** on the project dashboard.
+2. In the connection dialog, set **Branch** to `dev`, keep the database (`neondb`) and role, and leave **Connection pooling** on. Copy the string. This is `DATABASE_URL`.
+3. Turn **Connection pooling** off and copy again. This is `DIRECT_URL` (same host without `-pooler`).
+4. Put both in `.env` in the repo on jdry, replacing the prod values. Prisma and the scripts read `.env`. If `.env.local` also exists, `next dev` reads it first, so set the same two dev values there or remove the database lines from it.
+5. Add the endpoint ids to `.env`:
+   - `MARKMASTER_DEV_ENDPOINT_IDS`: the `ep-...` id from the `dev` hostname you just copied.
+   - `MARKMASTER_PROD_ENDPOINT_ID`: in the console, open **Branches** → `production` and copy the `ep-...` id of its compute (or switch the Connect dialog to `production` and read it off the hostname, without copying the password).
+6. Check the targets without printing a password:
+
+   ```bash
+   node -e 'require("dotenv").config(); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = process.env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
+   ```
+
+   Both lines should show the `dev` endpoint id.
+
+Never paste a connection string into an issue, PR, chat, or commit. `.env*` is gitignored except `.env.example`.
+
+### Reset dev from production
+
+When an experiment leaves `dev` in a bad state, reset it to a fresh copy of `production`. This discards everything on `dev` (data and schema) and is instant; `production` is not touched, and the `dev` connection strings and endpoint id stay the same.
+
+- Console: **Branches** → `dev` → **Reset from parent**.
+- CLI: `neon branches reset dev --parent --project-id <project id>` (`neonctl` is the same CLI).
+- API: `POST /projects/{project_id}/branches/{dev_branch_id}/restore` with `{"source_branch_id": "<production branch id>"}`.
+
+After a reset, `dev` has prod's schema, so re-run `npm run db:migrate` and `npm run embeddings:backfill` there for any migration that is not on prod yet.
+
 ## Commands on this machine
 
 ### 1. Install Ollama and pull the model
@@ -67,7 +131,7 @@ Leave the Ollama server running (`ollama serve` if it is not already a service).
 
 ### 2. Environment
 
-In `.env`, alongside the existing database URLs:
+In `.env`, alongside the existing database URLs (pointing at `dev`, see "Two databases" above):
 
 ```bash
 OLLAMA_BASE_URL=http://127.0.0.1:11434
@@ -78,12 +142,12 @@ EMBEDDING_MODEL=embeddinggemma-2:270m
 
 ### 3. Migrate
 
-`npm run db:migrate` is `prisma migrate deploy`. It applies every pending migration, including `CREATE EXTENSION vector`, to the database in `DIRECT_URL`.
+`npm run db:migrate` runs `prisma migrate deploy` behind the prod guard. It applies every pending migration, including `CREATE EXTENSION vector`, to the database in `DIRECT_URL`, and refuses prod unless run with `-- --prod`.
 
-Run it only after you have confirmed that URL is the intended database, and only with an explicit yes from the owner. Print the host and database name, not the password:
+Run it only after you have confirmed that URL is the intended database, and on prod only with an explicit yes from the owner. Print the host and database name, not the password:
 
 ```bash
-node -e 'for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = process.env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
+node -e 'require("dotenv").config(); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = process.env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
 ```
 
 When that output is the database you mean to change:
@@ -117,13 +181,15 @@ A later `npm run db:migrate` will apply `20261018000000_add_bookmark_embedding` 
 
 ### 4. Backfill
 
-With Ollama running and `DATABASE_URL` pointing at the database you just migrated:
+With Ollama running and `DATABASE_URL` pointing at the database you just migrated (dev by default; add `-- --prod` for prod):
 
 ```bash
 npm run embeddings:backfill
 ```
 
-The script prints `embedded`, `skipped`, `model`, and `dims`. A second run skips rows whose hash still matches. It embeds every bookmark in that database, in batches of 16.
+The script prints `embedded`, `skipped`, `model`, and `dims`. A second run skips rows whose hash still matches.
+
+Every row records which model made it and its size: `BookmarkEmbedding` has `model` and `dims` columns, and `(bookmarkId, model, dims)` is the primary key. The backfill only reads rows for the configured `EMBEDDING_MODEL` and 768 dimensions, so after a model change it re-embeds every bookmark under the new model and leaves the old model's rows alone. Smart search reads only rows for the configured model and dims. The `embedding` column is `vector(768)`, so a model with a different dimension needs a schema migration first. It embeds every bookmark in that database, in batches of 16.
 
 ### 5. Try it
 
