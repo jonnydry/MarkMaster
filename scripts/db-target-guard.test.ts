@@ -9,6 +9,7 @@ import {
   classifyDatabaseTarget,
   neonEndpointId,
   findPrismaConfigProblems,
+  PROD_FLAG,
   readGuardConfig,
   resolvePrismaEnv,
 } from "./db-target-guard.mjs";
@@ -219,13 +220,18 @@ function runScript(command: string, args: string[], cwd: string, env: Record<str
  * its argv (one per line) to a log file and exits 0, so no test ever starts
  * real Prisma. `npxArgs` is null when the wrapper never spawned npx.
  */
-function runMigrate(cwd: string, env: Record<string, string>, args: string[] = []) {
+function runMigrate(
+  cwd: string,
+  env: Record<string, string>,
+  args: string[] = [],
+  script = path.join(REPO, "scripts/db-migrate.mjs")
+) {
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), "mm-fake-npx-"));
   const log = path.join(bin, "npx-args.log");
   fs.writeFileSync(path.join(bin, "npx"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${log}"\nexit 0\n`, {
     mode: 0o755,
   });
-  const result = spawnSync(process.execPath, [path.join(REPO, "scripts/db-migrate.mjs"), ...args], {
+  const result = spawnSync(process.execPath, [script, ...args], {
     cwd,
     encoding: "utf8",
     timeout: 60_000,
@@ -378,6 +384,52 @@ describe("db:migrate wrapper", { timeout: 60_000 }, () => {
     const result = runMigrate(sub, LOCAL_TARGET);
     expectRefused(result, `${path.join("..", "package.json")} has a "prisma" key`);
     expect(result.npxArgs).toBeNull();
+  });
+
+  it.each(["Prisma.config.ts", "PRISMA.CONFIG/index.ts", ".config/Prisma.ts", ".config/PRISMA/index.ts"])(
+    "refuses an uppercase config name: %s",
+    (file) => {
+      // A case-insensitive filesystem (macOS default) lets Prisma load these.
+      const dir = tempProject({});
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), 'export default { schema: "alt/schema.prisma" };\n');
+      const result = runMigrate(dir, LOCAL_TARGET);
+      expectRefused(result, "Prisma configuration outside prisma/schema.prisma was found");
+      expect(result.npxArgs).toBeNull();
+    }
+  );
+
+  it("stops the package.json walk-up at the nearest package.json", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ prisma: { schema: "alt/schema.prisma" } }));
+    const project = path.join(dir, "project");
+    fs.mkdirSync(project);
+    fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project" }));
+    const result = runMigrate(project, LOCAL_TARGET);
+    expect(String(result.stderr)).not.toContain('"prisma" key');
+    expect(result.status).toBe(0);
+    expect(result.npxArgs).toEqual(PRISMA_ARGS);
+  });
+
+  it("refuses cleanly when the wrapper's own root package.json is unparseable", () => {
+    // Node resolves the guard's bare imports (dotenv) through this file, so a
+    // static import would die with ERR_INVALID_PACKAGE_CONFIG first.
+    const dir = tempProject({});
+    fs.mkdirSync(path.join(dir, "scripts"));
+    for (const name of ["db-migrate.mjs", "db-target-guard.mjs", "prisma-config-check.mjs"]) {
+      fs.copyFileSync(path.join(REPO, "scripts", name), path.join(dir, "scripts", name));
+    }
+    fs.symlinkSync(path.join(REPO, "node_modules"), path.join(dir, "node_modules"), "dir");
+    fs.writeFileSync(path.join(dir, "package.json"), "{ not json");
+    const result = runMigrate(dir, LOCAL_TARGET, [], path.join(dir, "scripts", "db-migrate.mjs"));
+    expectRefused(result, "package.json could not be read or parsed");
+    expect(String(result.stderr)).not.toContain("ERR_INVALID_PACKAGE_CONFIG");
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("keeps the wrapper's --prod flag in sync with the guard", () => {
+    const wrapper = fs.readFileSync(path.join(REPO, "scripts/db-migrate.mjs"), "utf8");
+    expect(wrapper).toContain(`const PROD_FLAG = "${PROD_FLAG}";`);
   });
 
   it("refuses cleanly when .config is a file", () => {
