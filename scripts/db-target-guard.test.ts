@@ -213,9 +213,29 @@ function runScript(command: string, args: string[], cwd: string, env: Record<str
   });
 }
 
+/**
+ * Run the db:migrate wrapper with a fake `npx` first on PATH. The fake writes
+ * its argv (one per line) to a log file and exits 0, so no test ever starts
+ * real Prisma. `npxArgs` is null when the wrapper never spawned npx.
+ */
 function runMigrate(cwd: string, env: Record<string, string>, args: string[] = []) {
-  return runScript(process.execPath, [path.join(REPO, "scripts/db-migrate.mjs"), ...args], cwd, env);
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "mm-fake-npx-"));
+  const log = path.join(bin, "npx-args.log");
+  fs.writeFileSync(path.join(bin, "npx"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${log}"\nexit 0\n`, {
+    mode: 0o755,
+  });
+  const result = spawnSync(process.execPath, [path.join(REPO, "scripts/db-migrate.mjs"), ...args], {
+    cwd,
+    encoding: "utf8",
+    timeout: 60_000,
+    env: { ...env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
+  });
+  const npxArgs = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trimEnd().split("\n") : null;
+  return Object.assign(result, { npxArgs });
 }
+
+const LOCAL_TARGET = { DATABASE_URL: UNREACHABLE_LOCAL_URL, DIRECT_URL: UNREACHABLE_LOCAL_URL };
+const PRISMA_ARGS = ["prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"];
 
 function expectRefused(result: ReturnType<typeof spawnSync>, text: string) {
   expect(result.status).toBe(1);
@@ -268,35 +288,73 @@ describe("db:migrate wrapper", { timeout: 60_000 }, () => {
     const dir = tempProject({});
     fs.mkdirSync(path.join(dir, "alt"));
     fs.writeFileSync(path.join(dir, "alt", ".env"), `ALT_DIRECT_URL="${FAKE_PROD_URL}"\n`);
-    const result = runMigrate(
-      dir,
-      { DATABASE_URL: UNREACHABLE_LOCAL_URL, DIRECT_URL: UNREACHABLE_LOCAL_URL, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
-      ["--schema", "alt/schema.prisma"]
-    );
+    const result = runMigrate(dir, LOCAL_TARGET, ["--schema", "alt/schema.prisma"]);
     expectRefused(result, "unsupported arguments --schema alt/schema.prisma");
-    expect(String(result.stdout)).not.toContain("Dry run");
+    expect(result.npxArgs).toBeNull();
   });
 
   it("refuses any other argument, even next to --prod", () => {
-    const result = runMigrate(
-      tempProject({}),
-      { DATABASE_URL: UNREACHABLE_LOCAL_URL, DIRECT_URL: UNREACHABLE_LOCAL_URL, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
-      ["--prod", "--skip-generate"]
-    );
+    const result = runMigrate(tempProject({}), LOCAL_TARGET, ["--prod", "--skip-generate"]);
     expectRefused(result, "unsupported argument --skip-generate");
-    expect(String(result.stdout)).not.toContain("Dry run");
+    expect(result.npxArgs).toBeNull();
   });
 
-  it("still accepts --prod for a prod target", () => {
+  it("refuses --prod=1", () => {
+    const result = runMigrate(tempProject({}), LOCAL_TARGET, ["--prod=1"]);
+    expectRefused(result, "unsupported argument --prod=1");
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("runs exactly prisma migrate deploy --schema prisma/schema.prisma for a local target", () => {
+    const result = runMigrate(tempProject({}), LOCAL_TARGET);
+    expect(result.status).toBe(0);
+    expect(result.npxArgs).toEqual(PRISMA_ARGS);
+  });
+
+  it("still accepts --prod for a prod target, without passing it to Prisma", () => {
     const result = runMigrate(
       tempProject({}),
-      { DATABASE_URL: neon(PROD_ID, true), DIRECT_URL: neon(PROD_ID), ...ENV, MARKMASTER_DB_MIGRATE_DRY_RUN: "1" },
+      { DATABASE_URL: neon(PROD_ID, true), DIRECT_URL: neon(PROD_ID), ...ENV },
       ["--prod"]
     );
     expect(result.status).toBe(0);
     expect(String(result.stderr)).toContain("WARNING: prisma migrate deploy is running with the prod override");
-    expect(String(result.stdout)).toContain("Dry run: checks passed");
+    expect(result.npxArgs).toEqual(PRISMA_ARGS);
     expect(`${result.stdout}${result.stderr}`).not.toContain(SECRET);
+  });
+
+  it("refuses when package.json has a prisma key", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(
+      path.join(dir, "package.json"),
+      JSON.stringify({ name: "x", prisma: { schema: "alt/schema.prisma" } })
+    );
+    const result = runMigrate(dir, LOCAL_TARGET);
+    expectRefused(result, 'package.json has a "prisma" key');
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("accepts a package.json without a prisma key", () => {
+    const dir = tempProject({});
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "x", scripts: {} }));
+    const result = runMigrate(dir, LOCAL_TARGET);
+    expect(result.status).toBe(0);
+    expect(result.npxArgs).toEqual(PRISMA_ARGS);
+  });
+
+  it.each(["prisma.config.ts", "prisma.config.mjs", ".config/prisma.ts"])("refuses when %s exists", (file) => {
+    const dir = tempProject({});
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), 'export default { schema: "alt/schema.prisma" };\n');
+    const result = runMigrate(dir, LOCAL_TARGET);
+    expectRefused(result, `${file} exists`);
+    expect(result.npxArgs).toBeNull();
+  });
+
+  it("checks the repo itself has no Prisma config the wrapper would refuse", () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8"));
+    expect(Object.hasOwn(pkg, "prisma")).toBe(false);
+    expect(fs.readdirSync(REPO).filter((name) => name.startsWith("prisma.config."))).toEqual([]);
   });
 
   it("does not accept MARKMASTER_ALLOW_PROD=1 from .env", () => {
