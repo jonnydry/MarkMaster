@@ -34,6 +34,8 @@
     "db:studio": "prisma studio",
     "db:seed:verify": "node scripts/seed-verify.mjs",
     "embeddings:backfill": "tsx scripts/backfill-bookmark-embeddings.ts",
+    "embeddings:backfill-images": "tsx scripts/backfill-bookmark-image-embeddings.ts",
+    "embeddings:image-scores": "tsx scripts/print-image-search-scores.ts",
     "embeddings:demo": "tsx scripts/smart-search-demo.ts",
     "env:check": "node scripts/check-env.mjs",
     "eval:orbit-jev": "vitest run src/lib/orbit-jev-eval.test.ts",

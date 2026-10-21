@@ -192,6 +192,7 @@ export async function GET(req: NextRequest) {
           });
     const order = new Map(pageIds.map((id, index) => [id, index]));
     rankedBookmarks.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    const imageMatched = new Set(smartOutcome.metadata.imageMatchedIds ?? []);
     const personalBoostAuthors = await getPersonalBoostAuthors(
       user.id,
       personalBoostEnabled
@@ -199,7 +200,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(
       {
-        bookmarks: await withBookmarkCardUrls(rankedBookmarks),
+        bookmarks: (await withBookmarkCardUrls(rankedBookmarks)).map((bookmark) =>
+          imageMatched.has(bookmark.id) ? { ...bookmark, imageMatch: true } : bookmark
+        ),
         page,
         total,
         totalPages: Math.ceil(total / limit) || 1,

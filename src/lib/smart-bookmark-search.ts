@@ -8,12 +8,18 @@ import {
   EmbeddingProviderError,
   type EmbeddingProvider,
   createEmbeddingProvider,
+  createImageTextEmbeddingProvider,
   embedSearchQuery,
 } from "@/lib/embedding-provider";
 import { logWarn } from "@/lib/logger";
 import { toPgVectorLiteral } from "@/lib/pg-vector";
 import { prisma } from "@/lib/prisma";
 import { reciprocalRankFusion } from "@/lib/reciprocal-rank-fusion";
+import {
+  imageHitSimilarityCutoff,
+  mergeTextAndImageHits,
+  type ScoredHit,
+} from "@/lib/smart-search-merge";
 import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 
 /** Top vector neighbors blended with the keyword list. Exact scan, no ANN index. */
@@ -39,6 +45,10 @@ export type SmartSearchMetadata = {
   dims: number;
   vectorHits?: number;
   keywordHits?: number;
+  /** Bookmarks whose best image cleared the similarity cutoff. */
+  imageHits?: number;
+  imageModel?: string;
+  imageMatchedIds?: string[];
 };
 
 export type SmartSearchOutcome =
@@ -73,13 +83,20 @@ export type SmartBookmarkSearchInput = {
 
 type SmartSearchDeps = {
   provider: EmbeddingProvider;
+  imageProvider?: EmbeddingProvider;
   queryRaw: QueryRaw;
 };
 
 function metadata(
   provider: EmbeddingProvider,
   fallback: SmartSearchFallback | null,
-  hits?: { vectorHits: number; keywordHits: number }
+  hits?: {
+    vectorHits: number;
+    keywordHits: number;
+    imageHits?: number;
+    imageModel?: string;
+    imageMatchedIds?: string[];
+  }
 ): SmartSearchMetadata {
   return {
     mode: "smart",
@@ -127,25 +144,93 @@ async function embeddingsExist(
   return rows[0]?.present === true;
 }
 
-async function vectorHitIds(
+async function imageEmbeddingsExist(
+  queryRaw: QueryRaw,
+  userId: string,
+  provider: EmbeddingProvider
+): Promise<boolean> {
+  const rows = await queryRaw<{ imagePresent: boolean }[]>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM "BookmarkImageEmbedding" e
+      INNER JOIN "Bookmark" b ON b."id" = e."bookmarkId"
+      WHERE b."userId" = ${userId}
+        AND e."model" = ${provider.model}
+        AND e."dims" = ${provider.dims}
+    ) AS "imagePresent"
+  `);
+  return rows[0]?.imagePresent === true;
+}
+
+async function vectorHits(
   queryRaw: QueryRaw,
   input: SmartBookmarkSearchInput,
   provider: EmbeddingProvider,
   vectorLiteral: string
-): Promise<string[]> {
+): Promise<ScoredHit[]> {
   const whereSql = filterSql(input, []);
-  const rows = await queryRaw<{ id: string }[]>(Prisma.sql`
-    SELECT b."id"
+  const rows = await queryRaw<{ id: string; distance?: unknown }[]>(Prisma.sql`
+    SELECT b."id", (e."embedding" <=> ${vectorLiteral}::vector) AS "distance"
     FROM "Bookmark" b
     INNER JOIN "BookmarkEmbedding" e
       ON e."bookmarkId" = b."id"
      AND e."model" = ${provider.model}
      AND e."dims" = ${provider.dims}
     ${whereSql}
-    ORDER BY e."embedding" <=> ${vectorLiteral}::vector ASC, b."id" ASC
+    ORDER BY "distance" ASC, b."id" ASC
     LIMIT ${SMART_SEARCH_VECTOR_LIMIT}
   `);
-  return rows.map((row) => row.id);
+  return rowsToScoredHits(rows);
+}
+
+export async function searchImageEmbeddingHits(
+  queryRaw: QueryRaw,
+  input: SmartBookmarkSearchInput,
+  provider: EmbeddingProvider,
+  vectorLiteral: string
+): Promise<ScoredHit[]> {
+  const whereSql = filterSql(input, []);
+  const rows = await queryRaw<{ id: string; distance?: unknown }[]>(Prisma.sql`
+    SELECT ranked."id", ranked."distance"
+    FROM (
+      SELECT b."id" AS "id", MIN(e."embedding" <=> ${vectorLiteral}::vector) AS "distance"
+      FROM "Bookmark" b
+      INNER JOIN "BookmarkImageEmbedding" e
+        ON e."bookmarkId" = b."id"
+       AND e."model" = ${provider.model}
+       AND e."dims" = ${provider.dims}
+      ${whereSql}
+      GROUP BY b."id"
+    ) ranked
+    ORDER BY ranked."distance" ASC, ranked."id" ASC
+    LIMIT ${SMART_SEARCH_VECTOR_LIMIT}
+  `);
+  return rowsToScoredHits(rows);
+}
+
+function rowsToScoredHits(rows: Array<{ id: string; distance?: unknown }>): ScoredHit[] {
+  const hits: ScoredHit[] = [];
+  rows.forEach((row, index) => {
+    const distance = readDistance(row);
+    if (distance === null) return;
+    const similarity = distance === undefined ? 1 - index / 1_000_000 : 1 - distance;
+    hits.push({ id: row.id, similarity });
+  });
+  return hits;
+}
+
+/** `undefined` when the row has no distance column (older callers). `null` when it is unusable. */
+function readDistance(row: { distance?: unknown }): number | null | undefined {
+  if (!Object.prototype.hasOwnProperty.call(row, "distance") || row.distance === undefined) {
+    return undefined;
+  }
+  const value =
+    typeof row.distance === "number"
+      ? row.distance
+      : typeof row.distance === "string"
+        ? Number(row.distance)
+        : Number.NaN;
+  return Number.isFinite(value) ? value : null;
 }
 
 async function keywordHitIds(
@@ -178,57 +263,135 @@ export async function trySmartBookmarkSearch(
   }
 ): Promise<SmartSearchOutcome> {
   const { provider, queryRaw } = deps;
+  const imageProvider = deps.imageProvider ?? createImageTextEmbeddingProvider();
   const query = input.search.trim();
   if (!query) {
     return { kind: "fallback", metadata: metadata(provider, "empty_query") };
   }
 
-  let present = false;
+  let textPresent = false;
   try {
-    present = await embeddingsExist(queryRaw, input.userId, provider);
+    textPresent = await embeddingsExist(queryRaw, input.userId, provider);
   } catch (error) {
-    logWarn("smart-search", "Embedding lookup failed; using keyword search", error);
-    return { kind: "fallback", metadata: metadata(provider, "no_embeddings") };
+    logWarn("smart-search", "Text embedding lookup failed", error);
+    textPresent = false;
   }
 
-  if (!present) {
+  let imagePresent = false;
+  try {
+    imagePresent = await imageEmbeddingsExist(queryRaw, input.userId, imageProvider);
+  } catch (error) {
+    logWarn("smart-search", "Image embedding lookup failed", error);
+    imagePresent = false;
+  }
+
+  if (!textPresent && !imagePresent) {
     logWarn("smart-search", "No embeddings stored; using keyword search");
     return { kind: "fallback", metadata: metadata(provider, "no_embeddings") };
   }
 
-  let vector: number[];
-  try {
-    vector = await embedSearchQuery(provider, query);
-  } catch (error) {
-    const reason =
-      error instanceof EmbeddingProviderError ? error.reason : "provider_unavailable";
-    logWarn("smart-search", `Embedding provider fallback (${reason})`);
-    return { kind: "fallback", metadata: metadata(provider, reason) };
+  const embedded = await embedQuerySides(provider, imageProvider, query, textPresent, imagePresent);
+  if (!embedded.textVector && !embedded.imageVector) {
+    return { kind: "fallback", metadata: metadata(provider, embedded.reason) };
   }
 
-  let literal: string;
-  try {
-    literal = toPgVectorLiteral(vector, provider.dims);
-  } catch {
+  let textLiteral: string | null = null;
+  if (embedded.textVector) {
+    try {
+      textLiteral = toPgVectorLiteral(embedded.textVector, provider.dims);
+    } catch (error) {
+      logWarn("smart-search", "Text vector could not be serialized", error);
+    }
+  }
+
+  let imageLiteral: string | null = null;
+  if (embedded.imageVector) {
+    try {
+      imageLiteral = toPgVectorLiteral(embedded.imageVector, imageProvider.dims);
+    } catch (error) {
+      logWarn("smart-search", "Image vector could not be serialized", error);
+    }
+  }
+
+  if (!textLiteral && !imageLiteral) {
     return { kind: "fallback", metadata: metadata(provider, "provider_unavailable") };
   }
 
   try {
-    const [vectorIds, keywordIds] = await Promise.all([
-      vectorHitIds(queryRaw, input, provider, literal),
+    const [textScored, imageScored, keywordIds] = await Promise.all([
+      textLiteral ? vectorHits(queryRaw, input, provider, textLiteral) : Promise.resolve([]),
+      imageLiteral
+        ? searchImageEmbeddingHits(queryRaw, input, imageProvider, imageLiteral)
+        : Promise.resolve([]),
       keywordHitIds(queryRaw, input),
     ]);
-    const fused = reciprocalRankFusion([vectorIds, keywordIds]);
+    const merged = imageLiteral
+      ? mergeTextAndImageHits(textScored, imageScored, imageHitSimilarityCutoff())
+      : { orderedIds: textScored.map((hit) => hit.id), imageMatchedIds: [] as string[] };
+    const fused = reciprocalRankFusion([merged.orderedIds, keywordIds]);
     return {
       kind: "ranked",
       orderedIds: fused.map((row) => row.id),
       metadata: metadata(provider, null, {
-        vectorHits: vectorIds.length,
+        vectorHits: textScored.length,
         keywordHits: keywordIds.length,
+        ...(imageLiteral
+          ? {
+              imageHits: merged.imageMatchedIds.length,
+              imageModel: imageProvider.model,
+              imageMatchedIds: merged.imageMatchedIds,
+            }
+          : {}),
       }),
     };
   } catch (error) {
     logWarn("smart-search", "Vector search failed; using keyword search", error);
     return { kind: "fallback", metadata: metadata(provider, "no_embeddings") };
   }
+}
+
+async function embedQuerySides(
+  provider: EmbeddingProvider,
+  imageProvider: EmbeddingProvider,
+  query: string,
+  textPresent: boolean,
+  imagePresent: boolean
+): Promise<{ textVector: number[] | null; imageVector: number[] | null; reason: SmartSearchFallback }> {
+  let textVector: number[] | null = null;
+  let imageVector: number[] | null = null;
+  let textReason: SmartSearchFallback | null = null;
+  let imageReason: SmartSearchFallback | null = null;
+
+  await Promise.all([
+    textPresent
+      ? embedSearchQuery(provider, query)
+          .then((vector) => {
+            textVector = vector;
+          })
+          .catch((error: unknown) => {
+            textReason = embeddingFailureReason(error);
+            logWarn("smart-search", `Embedding provider fallback (${textReason})`);
+          })
+      : Promise.resolve(),
+    imagePresent
+      ? embedSearchQuery(imageProvider, query)
+          .then((vector) => {
+            imageVector = vector;
+          })
+          .catch((error: unknown) => {
+            imageReason = embeddingFailureReason(error);
+            logWarn("smart-search", `Image embedding provider fallback (${imageReason})`);
+          })
+      : Promise.resolve(),
+  ]);
+
+  return {
+    textVector,
+    imageVector,
+    reason: textReason ?? imageReason ?? "provider_unavailable",
+  };
+}
+
+function embeddingFailureReason(error: unknown): SmartSearchFallback {
+  return error instanceof EmbeddingProviderError ? error.reason : "provider_unavailable";
 }

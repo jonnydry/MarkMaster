@@ -20,6 +20,12 @@ export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 /** Text-only 270m tag. `embeddinggemma-2:latest` is the larger multimodal build. */
 export const DEFAULT_EMBEDDING_MODEL = "embeddinggemma-2:270m";
 
+/**
+ * Text-and-vision tag. Text queries and image bytes land in one 768-d space.
+ * Ollama runs this build on CPU on Linux.
+ */
+export const DEFAULT_IMAGE_EMBEDDING_MODEL = "embeddinggemma-2:440m-q8_0-text-vision";
+
 export const EMBEDDING_DIMS = 768;
 
 /** Search calls bail out quickly so keyword results can take over. */
@@ -59,6 +65,16 @@ export interface EmbeddingProvider {
   ): Promise<number[][]>;
 }
 
+/** Image side of the vision embedding model. Text queries use `EmbeddingProvider`. */
+export interface ImageEmbedder {
+  readonly model: string;
+  readonly dims: number;
+  embedImages(
+    images: readonly string[],
+    options?: { timeoutMs?: number }
+  ): Promise<number[][]>;
+}
+
 export function formatEmbeddingInput(text: string, kind: EmbeddingKind): string {
   const prefix = kind === "query" ? EMBEDDING_QUERY_PREFIX : EMBEDDING_DOCUMENT_PREFIX;
   return prefix + text;
@@ -68,65 +84,123 @@ export function createEmbeddingProvider(env: NodeJS.ProcessEnv = process.env): E
   return createOllamaEmbeddingProvider(env);
 }
 
+/** Text side of the vision model, so a query sits in the same space as stored images. */
+export function createImageTextEmbeddingProvider(
+  env: NodeJS.ProcessEnv = process.env
+): EmbeddingProvider {
+  const model = env.EMBEDDING_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_EMBEDDING_MODEL;
+  return createOllamaEmbeddingProvider({ ...env, EMBEDDING_MODEL: model });
+}
+
 export function createOllamaEmbeddingProvider(env: NodeJS.ProcessEnv = process.env): EmbeddingProvider {
   const model = env.EMBEDDING_MODEL?.trim() || DEFAULT_EMBEDDING_MODEL;
-  const baseUrl = (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
+  const baseUrl = ollamaBaseUrl(env);
 
   return {
     model,
     dims: EMBEDDING_DIMS,
     async embed(texts, kind, options) {
       if (texts.length === 0) return [];
-
-      const timeoutMs = options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-      try {
-        const response = await fetch(`${baseUrl}/api/embed`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            input: texts.map((text) => formatEmbeddingInput(text, kind)),
-          }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new EmbeddingProviderError("provider_unavailable");
-        }
-
-        const payload = (await response.json()) as { embeddings?: unknown };
-        const embeddings = payload.embeddings;
-        if (!Array.isArray(embeddings) || embeddings.length !== texts.length) {
-          throw new EmbeddingProviderError("provider_unavailable");
-        }
-
-        return embeddings.map((row) => {
-          if (!Array.isArray(row) || row.length !== EMBEDDING_DIMS) {
-            throw new EmbeddingProviderError("provider_unavailable");
-          }
-          const vector: number[] = [];
-          for (const value of row) {
-            if (typeof value !== "number" || !Number.isFinite(value)) {
-              throw new EmbeddingProviderError("provider_unavailable");
-            }
-            vector.push(value);
-          }
-          return vector;
-        });
-      } catch (error) {
-        if (error instanceof EmbeddingProviderError) throw error;
-        if (isTimeoutError(error) || controller.signal.aborted) {
-          throw new EmbeddingProviderError("timeout");
-        }
-        throw new EmbeddingProviderError("provider_unavailable");
-      } finally {
-        clearTimeout(timer);
-      }
+      return postOllamaEmbed(
+        baseUrl,
+        model,
+        texts.map((text) => formatEmbeddingInput(text, kind)),
+        texts.length,
+        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS
+      );
     },
   };
+}
+
+export function createOllamaImageEmbedder(env: NodeJS.ProcessEnv = process.env): ImageEmbedder {
+  const model = env.EMBEDDING_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_EMBEDDING_MODEL;
+  const baseUrl = ollamaBaseUrl(env);
+
+  return {
+    model,
+    dims: EMBEDDING_DIMS,
+    async embedImages(images, options) {
+      if (images.length === 0) return [];
+      const payloads = images.map(imageBase64Payload);
+      const input = payloads.length === 1 ? { image: payloads[0] } : payloads.map((image) => ({ image }));
+      return postOllamaEmbed(
+        baseUrl,
+        model,
+        input,
+        payloads.length,
+        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS
+      );
+    },
+  };
+}
+
+/** Raw base64, without a `data:` URL prefix. Ollama's `image` field is the bytes. */
+export function imageBase64Payload(value: string): string {
+  const trimmed = value.trim();
+  const comma = trimmed.indexOf(",");
+  if (trimmed.startsWith("data:") && comma !== -1) return trimmed.slice(comma + 1);
+  return trimmed;
+}
+
+function ollamaBaseUrl(env: NodeJS.ProcessEnv): string {
+  return (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
+}
+
+type OllamaEmbedInput = string | { image: string };
+
+async function postOllamaEmbed(
+  baseUrl: string,
+  model: string,
+  input: OllamaEmbedInput | readonly OllamaEmbedInput[],
+  expected: number,
+  timeoutMs: number
+): Promise<number[][]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}/api/embed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, input }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new EmbeddingProviderError("provider_unavailable");
+    }
+
+    const payload = (await response.json()) as { embeddings?: unknown };
+    return parseOllamaEmbeddings(payload.embeddings, expected);
+  } catch (error) {
+    if (error instanceof EmbeddingProviderError) throw error;
+    if (isTimeoutError(error) || controller.signal.aborted) {
+      throw new EmbeddingProviderError("timeout");
+    }
+    throw new EmbeddingProviderError("provider_unavailable");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseOllamaEmbeddings(embeddings: unknown, expected: number): number[][] {
+  if (!Array.isArray(embeddings) || embeddings.length !== expected) {
+    throw new EmbeddingProviderError("provider_unavailable");
+  }
+
+  return embeddings.map((row) => {
+    if (!Array.isArray(row) || row.length !== EMBEDDING_DIMS) {
+      throw new EmbeddingProviderError("provider_unavailable");
+    }
+    const vector: number[] = [];
+    for (const value of row) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new EmbeddingProviderError("provider_unavailable");
+      }
+      vector.push(value);
+    }
+    return vector;
+  });
 }
 
 function isTimeoutError(error: unknown): boolean {

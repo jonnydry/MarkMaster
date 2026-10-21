@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearQueryEmbeddingCache,
+  createImageTextEmbeddingProvider,
   createOllamaEmbeddingProvider,
+  createOllamaImageEmbedder,
   DEFAULT_EMBEDDING_MODEL,
+  DEFAULT_IMAGE_EMBEDDING_MODEL,
   DEFAULT_OLLAMA_BASE_URL,
   EMBEDDING_DIMS,
   EMBEDDING_DOCUMENT_PREFIX,
@@ -127,6 +130,39 @@ describe("Ollama embedding provider", () => {
     expect(second).not.toBe(first);
     first[0] = 99;
     expect(second[0]).toBeCloseTo(0.25);
+  });
+
+  it("embeds a query on the vision model's text side and an image as base64", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ embeddings: [vector()] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const textSide = createImageTextEmbeddingProvider({
+      OLLAMA_BASE_URL: "http://127.0.0.1:11434/",
+      EMBEDDING_IMAGE_MODEL: "",
+    });
+    expect(textSide.model).toBe(DEFAULT_IMAGE_EMBEDDING_MODEL);
+    await textSide.embed(["red bicycle"], "query");
+
+    const imageSide = createOllamaImageEmbedder({
+      EMBEDDING_IMAGE_MODEL: "custom-vision",
+      OLLAMA_BASE_URL: "http://127.0.0.1:11434",
+    });
+    await imageSide.embedImages(["data:image/jpeg;base64,aaaa"]);
+
+    const first = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+    const second = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
+    expect((fetchMock.mock.calls[0] as [string])[0]).toBe(`${DEFAULT_OLLAMA_BASE_URL}/api/embed`);
+    expect(first).toEqual({
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+      input: [`${EMBEDDING_QUERY_PREFIX}red bicycle`],
+    });
+    expect(second).toEqual({
+      model: "custom-vision",
+      input: { image: "aaaa" },
+    });
   });
 
   it("returns an empty list without calling Ollama when there is no text", async () => {

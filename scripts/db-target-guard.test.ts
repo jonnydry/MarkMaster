@@ -480,6 +480,71 @@ describe("other write scripts call the guard", { timeout: 60_000 }, () => {
     expectRefused(result, "Refusing to run embeddings:backfill");
   });
 
+  it("embeddings:backfill-images refuses a prod URL", () => {
+    const tsx = path.join(REPO, "node_modules/.bin/tsx");
+    const result = runScript(
+      tsx,
+      [
+        "--tsconfig",
+        path.join(REPO, "tsconfig.json"),
+        path.join(REPO, "scripts/backfill-bookmark-image-embeddings.ts"),
+      ],
+      tempProject({}),
+      prodEnv
+    );
+    expectRefused(result, "Refusing to run embeddings:backfill-images");
+  });
+
+  it("embeddings:image-scores refuses a prod URL", () => {
+    const tsx = path.join(REPO, "node_modules/.bin/tsx");
+    const result = runScript(
+      tsx,
+      [
+        "--tsconfig",
+        path.join(REPO, "tsconfig.json"),
+        path.join(REPO, "scripts/print-image-search-scores.ts"),
+      ],
+      tempProject({}),
+      prodEnv
+    );
+    expectRefused(result, "Refusing to run embeddings:image-scores");
+  });
+
+  it("embeddings:image-scores ignores MARKMASTER_ALLOW_PROD=1 from .env", () => {
+    const tsx = path.join(REPO, "node_modules/.bin/tsx");
+    const { DOTENV_CONFIG_PATH: _unused, ...env } = prodEnv;
+    void _unused;
+    const result = runScript(
+      tsx,
+      [
+        "--tsconfig",
+        path.join(REPO, "tsconfig.json"),
+        path.join(REPO, "scripts/print-image-search-scores.ts"),
+        "rust ownership",
+      ],
+      tempProject({ env: "MARKMASTER_ALLOW_PROD=1\n" }),
+      env
+    );
+    expectRefused(result, "Refusing to run embeddings:image-scores");
+  });
+
+  it("embeddings:backfill-images ignores MARKMASTER_ALLOW_PROD=1 from .env", () => {
+    const tsx = path.join(REPO, "node_modules/.bin/tsx");
+    const { DOTENV_CONFIG_PATH: _unused, ...env } = prodEnv;
+    void _unused;
+    const result = runScript(
+      tsx,
+      [
+        "--tsconfig",
+        path.join(REPO, "tsconfig.json"),
+        path.join(REPO, "scripts/backfill-bookmark-image-embeddings.ts"),
+      ],
+      tempProject({ env: "MARKMASTER_ALLOW_PROD=1\n" }),
+      env
+    );
+    expectRefused(result, "Refusing to run embeddings:backfill-images");
+  });
+
   it("embeddings:backfill ignores MARKMASTER_ALLOW_PROD=1 from .env", () => {
     const tsx = path.join(REPO, "node_modules/.bin/tsx");
     const { DOTENV_CONFIG_PATH: _unused, ...env } = prodEnv;

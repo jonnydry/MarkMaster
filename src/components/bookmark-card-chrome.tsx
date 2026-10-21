@@ -72,6 +72,11 @@ export function BookmarkCardActionButton({
   );
 }
 
+/** Shown on a smart-search row that matched by image. */
+export function ImageMatchLabel() {
+  return <span className="text-xs font-medium text-muted-foreground">Image match</span>;
+}
+
 export function BookmarkTagChip({
   name,
   color,

@@ -19,6 +19,8 @@ Checked against the Ollama library and the EmbeddingGemma 2 model card on 2026-1
 
 `embeddinggemma-2:latest` on the same page is the larger multimodal build (about 1.3GB). The default `EMBEDDING_MODEL` is the 270m tag.
 
+Image search uses a second tag, `embeddinggemma-2:440m-q8_0-text-vision`. It embeds text and images into the same 768-dimensional space. The text index stays on the 270m tag. See [Image search](#5-image-search) below.
+
 The prefixes are the search pair published on the model card and in the sentence-transformers prompt table (`Retrieval-query` / `SearchQuery`, and `Retrieval-document` / `Document`):
 
 - https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2
@@ -33,17 +35,30 @@ Queries and stored vectors must use this same model and 768 dimensions.
 
 `GET /api/bookmarks?search=...&mode=smart`
 
-1. Embed the raw search string as a query (1.5s timeout). Repeat queries for the same model and text reuse an in-memory cache.
-2. Take the closest 50 stored vectors by pgvector cosine distance (`<=>`), with the current filters (user, tags, dates, collection, author, media, unaffiliated, raw).
-3. Take the keyword hits from the same ILIKE terms as today, and keep the first 200 in the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`). Those 200 are the first rows in that sort order, not the best ILIKE matches: a later row is dropped even when its text matches more closely. The default keyword list is not capped.
-4. Score each id with Reciprocal Rank Fusion, k = 60: `1/(60+rank)` from each list, ranks starting at 1.
-5. Return that order, paged with `page` and `limit`.
+1. Embed the raw search string as a query with the text model (1.5s timeout). When this user has image embeddings, also embed that same string with the vision model's text side. Repeat queries for the same model and text reuse an in-memory cache.
+2. Take the closest 50 stored text vectors by pgvector cosine distance (`<=>`), with the current filters (user, tags, dates, collection, author, media, unaffiliated, raw).
+3. Take the closest 50 image vectors the same way. Each bookmark keeps its best image. Drop an image hit whose cosine similarity is below the cutoff (default `IMAGE_HIT_SIMILARITY_CUTOFF`, 0.65, in `src/lib/smart-search-merge.ts`). Set `IMAGE_HIT_SIMILARITY_CUTOFF` in the environment to override it; a non-finite value or a value outside `[0, 1)` is ignored. Text scores stay as cosine similarity, so the weakest text hit is not forced to 0. An image hit adds `IMAGE_HIT_SCORE_WEIGHT` (0.5) times how far it clears the cutoff: `clamp((similarity - cutoff) / (1 - cutoff), 0, 1)`. The two scores are added. A lone image just above the cutoff cannot outrank a strong text hit.
+4. Take the keyword hits from the same ILIKE terms as today, and keep the first 200 in the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`). Those 200 are the first rows in that sort order, not the best ILIKE matches: a later row is dropped even when its text matches more closely. The default keyword list is not capped.
+5. Score the merged vector list and the keyword list with Reciprocal Rank Fusion, k = 60: `1/(60+rank)` from each list, ranks starting at 1.
+6. Return that order, paged with `page` and `limit`. Bookmarks that cleared the image cutoff include `imageMatch: true`. The feed, compact, and grid cards show "Image match" on those rows. There is no setting for it.
 
 The response adds:
 
 ```json
-"search": { "mode": "smart", "fallback": null, "model": "embeddinggemma-2:270m", "dims": 768, "vectorHits": 50, "keywordHits": 12 }
+"search": {
+  "mode": "smart",
+  "fallback": null,
+  "model": "embeddinggemma-2:270m",
+  "dims": 768,
+  "vectorHits": 50,
+  "imageHits": 12,
+  "imageModel": "embeddinggemma-2:440m-q8_0-text-vision",
+  "imageMatchedIds": ["bookmark id"],
+  "keywordHits": 12
+}
 ```
+
+`imageHits`, `imageModel`, and `imageMatchedIds` are present when image embeddings were searched. A library with only text embeddings omits them. If the vision model times out and the text model succeeds, the text list is used on its own.
 
 If Ollama is unreachable, the call times out, or this user has no rows for the configured model and dimensions, the handler returns today's keyword list and sets `search.fallback` to `provider_unavailable`, `timeout`, or `no_embeddings`. An empty search sets `empty_query` and returns the normal list.
 
@@ -66,7 +81,7 @@ The target setup is that jdry's `DATABASE_URL` and `DIRECT_URL` point at `dev` a
 
 ### The prod guard
 
-`npm run db:migrate`, `npm run embeddings:backfill`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). `db:migrate` resolves `DATABASE_URL` and `DIRECT_URL` the way Prisma does (shell environment first, then `.env`, then `prisma/.env`; a variable that is already set is never overridden), requires both, and starts Prisma with exactly the values it checked. It accepts no arguments except `--prod`: anything else, such as `--schema`, is refused, because it could make Prisma use a datasource the guard did not check. It always runs `prisma migrate deploy --schema prisma/schema.prisma`, and refuses to run while the nearest `package.json` has a `prisma` key or any Prisma config exists in the places Prisma 6 looks: `prisma.config.<ext>` or `prisma.config/index.<ext>` at the repo root, and `prisma.<ext>`, `prisma/index.<ext>`, `prisma.config.<ext>` or `prisma.config/index.<ext>` under `.config/`. A config can redirect the schema, replace the datasource URLs, or stop Prisma loading `.env`. The repo uses none of these. They run without a flag only when every URL they use is:
+`npm run db:migrate`, `npm run embeddings:backfill`, `npm run embeddings:backfill-images`, `npm run embeddings:image-scores`, and `node scripts/merge-duplicate-gems.mjs --apply` check their connection URLs before they connect (`scripts/db-target-guard.mjs`). `embeddings:image-scores` only runs `SELECT`; the guard still refuses a prod URL so a score print does not run against prod by accident. `db:migrate` resolves `DATABASE_URL` and `DIRECT_URL` the way Prisma does (shell environment first, then `.env`, then `prisma/.env`; a variable that is already set is never overridden), requires both, and starts Prisma with exactly the values it checked. It accepts no arguments except `--prod`: anything else, such as `--schema`, is refused, because it could make Prisma use a datasource the guard did not check. It always runs `prisma migrate deploy --schema prisma/schema.prisma`, and refuses to run while the nearest `package.json` has a `prisma` key or any Prisma config exists in the places Prisma 6 looks: `prisma.config.<ext>` or `prisma.config/index.<ext>` at the repo root, and `prisma.<ext>`, `prisma/index.<ext>`, `prisma.config.<ext>` or `prisma.config/index.<ext>` under `.config/`. A config can redirect the schema, replace the datasource URLs, or stop Prisma loading `.env`. The repo uses none of these. They run without a flag only when every URL they use is:
 
 - a local Postgres (`localhost`, `127.0.0.1`, `::1`), or
 - a Neon host whose endpoint id is listed in `MARKMASTER_DEV_ENDPOINT_IDS`, **and** `MARKMASTER_PROD_ENDPOINT_ID` is set and is different.
@@ -78,6 +93,8 @@ To write to prod on purpose:
 ```bash
 npm run db:migrate -- --prod
 npm run embeddings:backfill -- --prod
+npm run embeddings:backfill-images -- --prod
+npm run embeddings:image-scores -- --prod "your query"
 # or, for any of them:
 MARKMASTER_ALLOW_PROD=1 npm run db:migrate
 ```
@@ -119,7 +136,7 @@ When an experiment leaves `dev` in a bad state, reset it to a fresh copy of `pro
 - CLI: `neon branches reset dev --parent --project-id <project id>` (`neonctl` is the same CLI).
 - API: `POST /projects/{project_id}/branches/{dev_branch_id}/restore` with `{"source_branch_id": "<production branch id>"}`.
 
-After a reset, `dev` has prod's schema, so re-run `npm run db:migrate` and `npm run embeddings:backfill` there for any migration that is not on prod yet.
+After a reset, `dev` has prod's schema, so re-run `npm run db:migrate`, `npm run embeddings:backfill`, and `npm run embeddings:backfill-images` there for any migration that is not on prod yet.
 
 ## Commands on this machine
 
@@ -195,7 +212,57 @@ The script prints `embedded`, `skipped`, `model`, and `dims`. A second run skips
 
 Every row records which model made it and its size: `BookmarkEmbedding` has `model` and `dims` columns, and `(bookmarkId, model, dims)` is the primary key. The backfill only reads rows for the configured `EMBEDDING_MODEL` and 768 dimensions, so after a model change it re-embeds every bookmark under the new model and leaves the old model's rows alone. Smart search reads only rows for the configured model and dims. The `embedding` column is `vector(768)`, so a model with a different dimension needs a schema migration first. It embeds every bookmark in that database, in batches of 16.
 
-### 5. Try it
+### 5. Image search
+
+Image rows live in `BookmarkImageEmbedding`, keyed by bookmark, image URL (`mediaKey`), model, and dims. Photos use the media URL. Videos and GIFs use the thumbnail (`preview_image_url`, otherwise a non-video `url`), never the MP4. Link-card images on `urls` are included only when the URL is on the fetch allowlist below. Each row stores `model` and `dims` the same way text rows do. The backfill skips a row whose content hash is already stored for that model and dimension, deletes rows for images that are no longer on the bookmark, and leaves a different model's rows alone.
+
+The fetcher allows only `https://pbs.twimg.com`, `https://video.twimg.com`, and `https://ton.twimg.com` (exact host, no userinfo, no other port, no IP literal). It uses `redirect: "manual"` and checks every hop against that same list, following at most 3 redirects. A redirect to loopback or any other host is refused and not fetched. Images on other hosts, including link-card images, are dropped before the backfill and are not fetched.
+
+`OLLAMA_BASE_URL` is the same variable as text search (default `http://127.0.0.1:11434`). The new variable is `EMBEDDING_IMAGE_MODEL` (default `embeddinggemma-2:440m-q8_0-text-vision`).
+
+The vision model runs on CPU on Linux. Pull it before the backfill. On Jonny's Linux machine, with `DATABASE_URL` and `DIRECT_URL` pointed at the dev Neon branch (see "Set up jdry for dev" above):
+
+```bash
+ollama pull embeddinggemma-2:440m-q8_0-text-vision
+ollama list
+```
+
+Confirm the host is the dev branch. This prints the hostname and database name, not the password:
+
+```bash
+node --input-type=module -e 'import { resolvePrismaEnv } from "./scripts/db-target-guard.mjs"; const { env, files } = resolvePrismaEnv(); console.log("files:", files.join(", ") || "none"); for (const key of ["DATABASE_URL","DIRECT_URL"]) { const value = env[key]; if (!value) { console.log(key, "MISSING"); continue; } const url = new URL(value); console.log(key, url.hostname + url.pathname); }'
+```
+
+When both lines show the dev endpoint id:
+
+```bash
+npm run db:migrate
+npm run embeddings:backfill-images
+```
+
+`npm run db:migrate` applies pending migrations, including `prisma/migrations/20261021000000_add_bookmark_image_embedding/migration.sql` (`BookmarkImageEmbedding` and `BookmarkImageEmbedFailure`). The image backfill fetches each allowlisted image (15s timeout), skips a dead URL or a non-image response, and logs that URL and status only (`image-embedding skip <url> <status>`). A failure is stored on `BookmarkImageEmbedFailure` (`failCount`, `lastError`, `lastFailedAt`). `lastError` is a short status token, not a response body. The next run skips that URL until `IMAGE_EMBED_FAILURE_RETRY_DAYS` (7) have passed, then tries again. A success removes the failure row. A different model has its own rows. A second run also skips images already embedded with the same model. It refuses the prod host unless you pass `-- --prod` or `MARKMASTER_ALLOW_PROD=1` in the shell. Do not put that flag in an env file.
+
+Optional, in `.env` on that machine:
+
+```bash
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+EMBEDDING_IMAGE_MODEL=embeddinggemma-2:440m-q8_0-text-vision
+IMAGE_HIT_SIMILARITY_CUTOFF=0.65
+```
+
+The backfill prints `embedded`, `skipped`, `failed`, `deferred`, `removed`, `model`, and `dims`. `failed` is the number of URLs recorded this run. `deferred` is a recent failure left until the 7-day retry.
+
+To record raw cosine similarities for a list of queries (no writes), after the backfill:
+
+```bash
+npm run embeddings:image-scores -- "rust ownership" "sourdough starter"
+```
+
+Pass every query as its own argument. The command prints the cutoff, `IMAGE_HIT_SCORE_WEIGHT` (0.5), and the top 10 text rows and top 10 image rows as `similarity = 1 - distance`. It only runs `SELECT`. It refuses a prod URL the same way the backfill does.
+
+To undo the image tables later, add a forward migration whose SQL drops `BookmarkImageEmbedFailure` and `BookmarkImageEmbedding`, and remove both models plus the `imageEmbeddings` and `imageEmbedFailures` relations from `prisma/schema.prisma` in that same change. The text table is separate.
+
+### 6. Try it
 
 Start the app (`npm run dev`) and sign in, then request:
 
