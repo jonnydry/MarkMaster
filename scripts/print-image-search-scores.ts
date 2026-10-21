@@ -7,13 +7,20 @@ import "dotenv/config";
 import { Prisma } from "@prisma/client";
 
 import {
+  IMAGE_SCORE_EMBED_TIMEOUT_MS,
   createEmbeddingProvider,
   createImageTextEmbeddingProvider,
   embedSearchQuery,
+  smartSearchEmbedTimeoutMs,
+  type EmbeddingProvider,
 } from "@/lib/embedding-provider";
 import { toPgVectorLiteral } from "@/lib/pg-vector";
 import { prisma } from "@/lib/prisma";
-import { IMAGE_HIT_SCORE_WEIGHT, imageHitSimilarityCutoff } from "@/lib/smart-search-merge";
+import {
+  DUAL_MATCH_SCORE_BONUS,
+  IMAGE_HIT_SCORE_OFFSET,
+  imageHitSimilarityCutoff,
+} from "@/lib/smart-search-merge";
 
 const TOP_SCORES = 10;
 
@@ -70,55 +77,101 @@ async function main() {
   const textProvider = createEmbeddingProvider();
   const imageProvider = createImageTextEmbeddingProvider();
   const cutoff = imageHitSimilarityCutoff();
-  const span = 1 - cutoff;
+  const timeoutMs = smartSearchEmbedTimeoutMs(process.env, IMAGE_SCORE_EMBED_TIMEOUT_MS);
   console.log(`text model: ${textProvider.model}`);
   console.log(`image model: ${imageProvider.model}`);
   console.log(`cutoff: ${cutoff}`);
-  console.log(`image weight: ${IMAGE_HIT_SCORE_WEIGHT}`);
+  console.log(`embed timeout ms: ${timeoutMs}`);
+  console.log(`image score = similarity - ${IMAGE_HIT_SCORE_OFFSET}`);
   console.log(
-    `image score = ${IMAGE_HIT_SCORE_WEIGHT} * clamp((similarity - ${cutoff}) / ${span}, 0, 1)`
+    `merged score = max(text cosine, image score) + ${DUAL_MATCH_SCORE_BONUS} when both match`
   );
   console.log("read-only: top raw cosine similarities");
 
-  for (const query of queries) {
+  // Embed every text query before any image query so Ollama loads each model once.
+  const textEmbeddings = await embedQueries(textProvider, queries, timeoutMs);
+  const imageEmbeddings = await embedQueries(imageProvider, queries, timeoutMs);
+
+  for (let index = 0; index < queries.length; index += 1) {
+    const query = queries[index] ?? "";
     const safeQuery = query.replace(/[\u0000-\u001f\u007f]/g, "");
     console.log(`query: ${safeQuery}`);
+    await printTextScores(textProvider, textEmbeddings[index]);
+    await printImageScores(imageProvider, imageEmbeddings[index]);
+  }
+}
 
-    try {
-      const textVector = await embedSearchQuery(textProvider, query);
-      const literal = toPgVectorLiteral(textVector, textProvider.dims);
-      const rows = await prisma.$queryRaw<ScoreRow[]>(Prisma.sql`
-        SELECT b."id" AS "id", (e."embedding" <=> ${literal}::vector) AS "distance"
-        FROM "BookmarkEmbedding" e
-        INNER JOIN "Bookmark" b ON b."id" = e."bookmarkId"
-        WHERE e."model" = ${textProvider.model}
-          AND e."dims" = ${textProvider.dims}
-        ORDER BY "distance" ASC, b."id" ASC
-        LIMIT ${TOP_SCORES}
-      `);
-      printScores("text", rows);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "text embed failed";
-      console.log(`text: skipped (${redact(message)})`);
-    }
+type EmbeddedQuery = { vector: number[] | null; error: string | null };
 
+async function embedQueries(
+  provider: EmbeddingProvider,
+  queries: readonly string[],
+  timeoutMs: number
+): Promise<EmbeddedQuery[]> {
+  const embedded: EmbeddedQuery[] = [];
+  for (const query of queries) {
     try {
-      const imageVector = await embedSearchQuery(imageProvider, query);
-      const literal = toPgVectorLiteral(imageVector, imageProvider.dims);
-      const rows = await prisma.$queryRaw<Array<ScoreRow & { mediaKey: string }>>(Prisma.sql`
-        SELECT b."id" AS "id", e."mediaKey" AS "mediaKey", (e."embedding" <=> ${literal}::vector) AS "distance"
-        FROM "BookmarkImageEmbedding" e
-        INNER JOIN "Bookmark" b ON b."id" = e."bookmarkId"
-        WHERE e."model" = ${imageProvider.model}
-          AND e."dims" = ${imageProvider.dims}
-        ORDER BY "distance" ASC, b."id" ASC, e."mediaKey" ASC
-        LIMIT ${TOP_SCORES}
-      `);
-      printScores("image", rows);
+      embedded.push({
+        vector: await embedSearchQuery(provider, query, timeoutMs),
+        error: null,
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "image embed failed";
-      console.log(`image: skipped (${redact(message)})`);
+      const message = error instanceof Error ? error.message : "embed failed";
+      embedded.push({ vector: null, error: message });
     }
+  }
+  return embedded;
+}
+
+async function printTextScores(
+  provider: EmbeddingProvider,
+  embedded: EmbeddedQuery | undefined
+): Promise<void> {
+  if (!embedded?.vector) {
+    console.log(`text: skipped (${redact(embedded?.error ?? "text embed failed")})`);
+    return;
+  }
+  try {
+    const literal = toPgVectorLiteral(embedded.vector, provider.dims);
+    const rows = await prisma.$queryRaw<ScoreRow[]>(Prisma.sql`
+      SELECT b."id" AS "id", (e."embedding" <=> ${literal}::vector) AS "distance"
+      FROM "BookmarkEmbedding" e
+      INNER JOIN "Bookmark" b ON b."id" = e."bookmarkId"
+      WHERE e."model" = ${provider.model}
+        AND e."dims" = ${provider.dims}
+      ORDER BY "distance" ASC, b."id" ASC
+      LIMIT ${TOP_SCORES}
+    `);
+    printScores("text", rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "text embed failed";
+    console.log(`text: skipped (${redact(message)})`);
+  }
+}
+
+async function printImageScores(
+  provider: EmbeddingProvider,
+  embedded: EmbeddedQuery | undefined
+): Promise<void> {
+  if (!embedded?.vector) {
+    console.log(`image: skipped (${redact(embedded?.error ?? "image embed failed")})`);
+    return;
+  }
+  try {
+    const literal = toPgVectorLiteral(embedded.vector, provider.dims);
+    const rows = await prisma.$queryRaw<Array<ScoreRow & { mediaKey: string }>>(Prisma.sql`
+      SELECT b."id" AS "id", e."mediaKey" AS "mediaKey", (e."embedding" <=> ${literal}::vector) AS "distance"
+      FROM "BookmarkImageEmbedding" e
+      INNER JOIN "Bookmark" b ON b."id" = e."bookmarkId"
+      WHERE e."model" = ${provider.model}
+        AND e."dims" = ${provider.dims}
+      ORDER BY "distance" ASC, b."id" ASC, e."mediaKey" ASC
+      LIMIT ${TOP_SCORES}
+    `);
+    printScores("image", rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "image embed failed";
+    console.log(`image: skipped (${redact(message)})`);
   }
 }
 

@@ -9,6 +9,7 @@ import {
   type EmbeddingProvider,
   createEmbeddingProvider,
   createImageTextEmbeddingProvider,
+  cachedQueryEmbedding,
   embedSearchQuery,
 } from "@/lib/embedding-provider";
 import { logWarn } from "@/lib/logger";
@@ -26,6 +27,31 @@ import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 export const SMART_SEARCH_VECTOR_LIMIT = 50;
 
 /**
+ * After one side's query embed times out, skip that side for this long.
+ * A text timeout skips text-vector search. An image timeout skips image search.
+ * The other side still runs. In-process only. There is no environment variable.
+ */
+export const QUERY_EMBED_CIRCUIT_OPEN_MS = 60_000;
+
+let textQueryEmbedCircuitOpenUntil = 0;
+let imageQueryEmbedCircuitOpenUntil = 0;
+
+export function resetQueryEmbedCircuit(): void {
+  textQueryEmbedCircuitOpenUntil = 0;
+  imageQueryEmbedCircuitOpenUntil = 0;
+}
+
+function queryEmbedCircuitOpen(openUntil: number, now = Date.now()): boolean {
+  return now < openUntil;
+}
+
+function tripQueryEmbedCircuit(side: "text" | "image", now = Date.now()): void {
+  const openUntil = now + QUERY_EMBED_CIRCUIT_OPEN_MS;
+  if (side === "text") textQueryEmbedCircuitOpenUntil = openUntil;
+  else imageQueryEmbedCircuitOpenUntil = openUntil;
+}
+
+/**
  * Keyword candidates fused with the vector list.
  * The first 200 rows in the request's sort order, not a relevance ranking.
  * The default keyword list stays uncapped.
@@ -34,6 +60,7 @@ export const SMART_SEARCH_KEYWORD_LIMIT = 200;
 
 export type SmartSearchFallback =
   | "timeout"
+  | "circuit_open"
   | "provider_unavailable"
   | "no_embeddings"
   | "empty_query";
@@ -291,6 +318,8 @@ export async function trySmartBookmarkSearch(
   }
 
   const embedded = await embedQuerySides(provider, imageProvider, query, textPresent, imagePresent);
+  if (embedded.textTimedOut) tripQueryEmbedCircuit("text");
+  if (embedded.imageTimedOut) tripQueryEmbedCircuit("image");
   if (!embedded.textVector && !embedded.imageVector) {
     return { kind: "fallback", metadata: metadata(provider, embedded.reason) };
   }
@@ -356,40 +385,62 @@ async function embedQuerySides(
   query: string,
   textPresent: boolean,
   imagePresent: boolean
-): Promise<{ textVector: number[] | null; imageVector: number[] | null; reason: SmartSearchFallback }> {
-  let textVector: number[] | null = null;
-  let imageVector: number[] | null = null;
-  let textReason: SmartSearchFallback | null = null;
-  let imageReason: SmartSearchFallback | null = null;
-
-  await Promise.all([
-    textPresent
-      ? embedSearchQuery(provider, query)
-          .then((vector) => {
-            textVector = vector;
-          })
-          .catch((error: unknown) => {
-            textReason = embeddingFailureReason(error);
-            logWarn("smart-search", `Embedding provider fallback (${textReason})`);
-          })
-      : Promise.resolve(),
-    imagePresent
-      ? embedSearchQuery(imageProvider, query)
-          .then((vector) => {
-            imageVector = vector;
-          })
-          .catch((error: unknown) => {
-            imageReason = embeddingFailureReason(error);
-            logWarn("smart-search", `Image embedding provider fallback (${imageReason})`);
-          })
-      : Promise.resolve(),
+): Promise<{
+  textVector: number[] | null;
+  imageVector: number[] | null;
+  reason: SmartSearchFallback;
+  textTimedOut: boolean;
+  imageTimedOut: boolean;
+}> {
+  const textOpen = queryEmbedCircuitOpen(textQueryEmbedCircuitOpenUntil);
+  const imageOpen = queryEmbedCircuitOpen(imageQueryEmbedCircuitOpenUntil);
+  const [textSide, imageSide] = await Promise.all([
+    embedQuerySide(provider, query, textPresent, textOpen, "Text"),
+    embedQuerySide(imageProvider, query, imagePresent, imageOpen, "Image"),
   ]);
 
   return {
-    textVector,
-    imageVector,
-    reason: textReason ?? imageReason ?? "provider_unavailable",
+    textVector: textSide.vector,
+    imageVector: imageSide.vector,
+    reason: combinedEmbedReason(textSide.reason, imageSide.reason),
+    textTimedOut: textSide.timedOut,
+    imageTimedOut: imageSide.timedOut,
   };
+}
+
+async function embedQuerySide(
+  provider: EmbeddingProvider,
+  query: string,
+  present: boolean,
+  circuitOpen: boolean,
+  label: string
+): Promise<{ vector: number[] | null; reason: SmartSearchFallback | null; timedOut: boolean }> {
+  if (!present) return { vector: null, reason: null, timedOut: false };
+  const cached = cachedQueryEmbedding(provider, query);
+  if (cached) return { vector: cached, reason: null, timedOut: false };
+  if (circuitOpen) {
+    logWarn("smart-search", `${label} query embed circuit open; skipping that embed`);
+    return { vector: null, reason: "circuit_open", timedOut: false };
+  }
+  try {
+    return { vector: await embedSearchQuery(provider, query), reason: null, timedOut: false };
+  } catch (error) {
+    const reason = embeddingFailureReason(error);
+    logWarn("smart-search", `${label} embedding provider fallback (${reason})`);
+    return { vector: null, reason, timedOut: reason === "timeout" };
+  }
+}
+
+function combinedEmbedReason(
+  textReason: SmartSearchFallback | null,
+  imageReason: SmartSearchFallback | null
+): SmartSearchFallback {
+  if (textReason === "timeout" || imageReason === "timeout") return "timeout";
+  if (textReason === "provider_unavailable" || imageReason === "provider_unavailable") {
+    return "provider_unavailable";
+  }
+  if (textReason === "circuit_open" || imageReason === "circuit_open") return "circuit_open";
+  return "provider_unavailable";
 }
 
 function embeddingFailureReason(error: unknown): SmartSearchFallback {

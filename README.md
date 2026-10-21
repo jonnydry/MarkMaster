@@ -138,7 +138,9 @@ npm run env:check
 | `OLLAMA_BASE_URL` | No | Ollama base URL for smart search (default `http://127.0.0.1:11434`). Text and image embeddings share it |
 | `EMBEDDING_MODEL` | No | Text embedding tag (default `embeddinggemma-2:270m`) |
 | `EMBEDDING_IMAGE_MODEL` | No | Image embedding tag (default `embeddinggemma-2:440m-q8_0-text-vision`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
-| `IMAGE_HIT_SIMILARITY_CUTOFF` | No | Cosine cutoff for image hits (default `0.65`, must be in `[0, 1)`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
+| `IMAGE_HIT_SIMILARITY_CUTOFF` | No | Cosine cutoff for image hits (default `0.68`, must be in `[0.3, 1)`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
+| `SMART_SEARCH_EMBED_TIMEOUT_MS` | No | Cap in milliseconds for a query embed (default `4000`, clamped to 100–30000). The image-score script uses `30000` when this is unset |
+| `OLLAMA_EMBED_KEEP_ALIVE` | No | Duration sent as Ollama `keep_alive` on embed calls (default `30m`, one unit from 1s to 24h). `-1` and `1h30m` fall back to `30m` |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 

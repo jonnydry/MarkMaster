@@ -45,5 +45,11 @@ describe("image score printer", () => {
     expect(source).toContain("embeddings:image-scores");
     expect(source).toContain('FROM "BookmarkImageEmbedding"');
     expect(source).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
+    const textEmbeds = source.indexOf("embedQueries(textProvider");
+    const imageEmbeds = source.indexOf("embedQueries(imageProvider");
+    expect(textEmbeds).toBeGreaterThan(-1);
+    expect(imageEmbeds).toBeGreaterThan(textEmbeds);
+    expect(source).toContain("IMAGE_SCORE_EMBED_TIMEOUT_MS");
+    expect(source).not.toContain("IMAGE_HIT_SCORE_WEIGHT");
   });
 });

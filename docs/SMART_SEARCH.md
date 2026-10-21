@@ -35,9 +35,9 @@ Queries and stored vectors must use this same model and 768 dimensions.
 
 `GET /api/bookmarks?search=...&mode=smart`
 
-1. Embed the raw search string as a query with the text model (1.5s timeout). When this user has image embeddings, also embed that same string with the vision model's text side. Repeat queries for the same model and text reuse an in-memory cache.
+1. Embed the raw search string as a query with the text model. The wait is a cap (`SMART_SEARCH_EMBED_TIMEOUT_MS`, default 4000 milliseconds, in `src/lib/embedding-provider.ts`). The call returns when Ollama responds, and aborts only if it is still running at the cap. Set `SMART_SEARCH_EMBED_TIMEOUT_MS` to a positive number of milliseconds to override it. A blank, non-finite, or non-positive value is ignored, and any accepted value is clamped to 100–30000 milliseconds. When this user has image embeddings, also embed that same string with the vision model's text side, under the same cap. Each embed request sends `keep_alive` from `OLLAMA_EMBED_KEEP_ALIVE` (default `30m`, one unit from 1s to 24h, such as `5m` or `90s`). `-1`, `0`, a compound duration such as `1h30m`, and anything outside that range fall back to `30m`, so the app never pins a model until restart. That value overrides the server's `OLLAMA_KEEP_ALIVE` for the request. After a text embed times out, text-vector search is skipped for 60 seconds. After an image embed times out, only image search is skipped for that long. The other side still runs. A cached query embedding is still used while that side is paused. If the remaining side is also paused, or this user has no embeddings on it, the handler serves the keyword list and sets `search.fallback` to `circuit_open`. There is no setting for that pause. On the Ollama server, set `OLLAMA_MAX_LOADED_MODELS` to at least 2. With one loaded model, switching between `embeddinggemma-2:270m` and `embeddinggemma-2:440m-q8_0-text-vision` costs about 1.4–1.7 seconds, and a warm call is about 45 milliseconds, so a 1.5 second cap failed every query that had to swap. Repeat queries for the same model and text reuse an in-memory cache.
 2. Take the closest 50 stored text vectors by pgvector cosine distance (`<=>`), with the current filters (user, tags, dates, collection, author, media, unaffiliated, raw).
-3. Take the closest 50 image vectors the same way. Each bookmark keeps its best image. Drop an image hit whose cosine similarity is below the cutoff (default `IMAGE_HIT_SIMILARITY_CUTOFF`, 0.65, in `src/lib/smart-search-merge.ts`). Set `IMAGE_HIT_SIMILARITY_CUTOFF` in the environment to override it; a non-finite value or a value outside `[0, 1)` is ignored. Text scores stay as cosine similarity, so the weakest text hit is not forced to 0. An image hit adds `IMAGE_HIT_SCORE_WEIGHT` (0.5) times how far it clears the cutoff: `clamp((similarity - cutoff) / (1 - cutoff), 0, 1)`. The two scores are added. A lone image just above the cutoff cannot outrank a strong text hit.
+3. Take the closest 50 image vectors the same way. Each bookmark keeps its best image. Drop an image hit whose cosine similarity is below the cutoff (default `IMAGE_HIT_SIMILARITY_CUTOFF`, 0.68, in `src/lib/smart-search-merge.ts`). Set `IMAGE_HIT_SIMILARITY_CUTOFF` in the environment to override it; a non-finite value, a value below 0.3, or a value of 1 or more is ignored. An image hit that clears the cutoff scores `similarity - IMAGE_HIT_SCORE_OFFSET` (`IMAGE_HIT_SCORE_OFFSET` is 0.03). The bookmark's merged score is the higher of its text cosine and that image score. When the bookmark is on both lists, add `DUAL_MATCH_SCORE_BONUS` (0.02). A text-only bookmark keeps its cosine, with nothing subtracted. Keyword hits are not part of this merge; they are fused in the next step.
 4. Take the keyword hits from the same ILIKE terms as today, and keep the first 200 in the request's `sortField` / `sortDirection` (default `bookmarkedAt desc`). Those 200 are the first rows in that sort order, not the best ILIKE matches: a later row is dropped even when its text matches more closely. The default keyword list is not capped.
 5. Score the merged vector list and the keyword list with Reciprocal Rank Fusion, k = 60: `1/(60+rank)` from each list, ranks starting at 1.
 6. Return that order, paged with `page` and `limit`. Bookmarks that cleared the image cutoff include `imageMatch: true`. The feed, compact, and grid cards show "Image match" on those rows. There is no setting for it.
@@ -58,9 +58,9 @@ The response adds:
 }
 ```
 
-`imageHits`, `imageModel`, and `imageMatchedIds` are present when image embeddings were searched. A library with only text embeddings omits them. If the vision model times out and the text model succeeds, the text list is used on its own.
+`imageHits`, `imageModel`, and `imageMatchedIds` are present when image embeddings were searched. A library with only text embeddings omits them. If the vision embed hits the cap and the text embed succeeds, the text list is fused with the keyword list and those bookmarks are still returned. Image search is then skipped for 60 seconds; text search is not. A text embed that hits the cap skips only text-vector search for 60 seconds, and image search still runs. If every query embed hits the cap on a side this user has no other embeddings for, the handler returns today's keyword list.
 
-If Ollama is unreachable, the call times out, or this user has no rows for the configured model and dimensions, the handler returns today's keyword list and sets `search.fallback` to `provider_unavailable`, `timeout`, or `no_embeddings`. An empty search sets `empty_query` and returns the normal list.
+If Ollama is unreachable, the call times out, or this user has no rows for the configured model and dimensions, the handler returns today's keyword list and sets `search.fallback` to `provider_unavailable`, `timeout`, or `no_embeddings`. While a side's 60-second pause is the reason that search cannot embed, the fallback is `circuit_open`. An empty search sets `empty_query` and returns the normal list.
 
 There is no library toggle. Pagination for a fused result uses `page` and `limit`. The keyset `cursor` is for the default list.
 
@@ -148,7 +148,7 @@ ollama pull embeddinggemma-2:270m
 ollama list
 ```
 
-Leave the Ollama server running (`ollama serve` if it is not already a service).
+Leave the Ollama server running (`ollama serve` if it is not already a service). Set `OLLAMA_MAX_LOADED_MODELS` to at least 2 in that server's environment so the text model and the vision model can stay loaded together. With one slot, each switch costs about 1.4–1.7 seconds. Embed calls send `keep_alive` of `30m` by default (`OLLAMA_EMBED_KEEP_ALIVE`), so a loaded model stays resident for half an hour instead of Ollama's five-minute default, and is not pinned until restart.
 
 ### 2. Environment
 
@@ -247,10 +247,24 @@ Optional, in `.env` on that machine:
 ```bash
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 EMBEDDING_IMAGE_MODEL=embeddinggemma-2:440m-q8_0-text-vision
-IMAGE_HIT_SIMILARITY_CUTOFF=0.65
+SMART_SEARCH_EMBED_TIMEOUT_MS=4000
+IMAGE_HIT_SIMILARITY_CUTOFF=0.68
+OLLAMA_EMBED_KEEP_ALIVE=30m
 ```
 
+`SMART_SEARCH_EMBED_TIMEOUT_MS` is the query-embed cap in milliseconds (default 4000, clamped to 100–30000). `npm run embeddings:image-scores` uses 30000 when the variable is unset. `IMAGE_HIT_SIMILARITY_CUTOFF` must be in `[0.3, 1)`; `0`, `1`, and a value below 0.3 such as `1e-300` fall back to 0.68. `OLLAMA_EMBED_KEEP_ALIVE` is the duration sent as `keep_alive` (default `30m`). It accepts one unit (`ms` is too short; `s`, `m`, or `h` from 1s to 24h) or a whole number of seconds. A compound duration such as `1h30m`, a duration outside 1s–24h, `-1`, and `0` fall back to `30m`. `IMAGE_HIT_SCORE_OFFSET` (0.03) and `DUAL_MATCH_SCORE_BONUS` (0.02) are code constants in `src/lib/smart-search-merge.ts`, not environment variables. The 60-second pause is per side (text or image) and has no environment variable. `OLLAMA_MAX_LOADED_MODELS` is set on the Ollama process, not in this app's env.
+
 The backfill prints `embedded`, `skipped`, `failed`, `deferred`, `removed`, `model`, and `dims`. `failed` is the number of URLs recorded this run. `deferred` is a recent failure left until the 7-day retry.
+
+### Calibration
+
+Checked on the dev library on 2026-10-21. 1,317 image embeddings from `embeddinggemma-2:440m-q8_0-text-vision`. Text embeddings are `embeddinggemma-2:270m`. 16 real queries and 2 controls. Figures below are aggregates; individual queries are not listed.
+
+Image cosine. The two control queries topped out at 0.647 and 0.630 (99th percentile 0.61 and 0.58). Real queries' best image hit was 0.659–0.804 (median 0.744). On review, a score of 0.70 or higher was nearly always the right bookmark, 0.65–0.68 was mixed, and a score under 0.65 was nearly always wrong.
+
+Text cosine. The top hit was 0.639–0.782. The 10th hit was 0.590–0.718 (median about 0.64). The median bookmark for a query was 0.52–0.63, so a text cosine near 0.60 is close to the noise.
+
+The previous cutoff of 0.65 and `IMAGE_HIT_SCORE_WEIGHT` of 0.5 never put an image-only bookmark in the top 10 for those real queries. The cutoff is now 0.68, above the controls and the mixed band under 0.68. The 0.03 offset is fitted from that library so an image cosine can be compared with a text cosine; the two models do not share a scale. A 0.74 image scores 0.71 and ranks above a 0.64 text hit, a 0.85 image scores 0.82 and ranks above a 0.60 text hit, and a 0.70 image scores 0.67 and loses to a 0.92 text hit. A 0.651 image hit is below the cutoff and is dropped.
 
 To record raw cosine similarities for a list of queries (no writes), after the backfill:
 
@@ -258,7 +272,7 @@ To record raw cosine similarities for a list of queries (no writes), after the b
 npm run embeddings:image-scores -- "rust ownership" "sourdough starter"
 ```
 
-Pass every query as its own argument. The command prints the cutoff, `IMAGE_HIT_SCORE_WEIGHT` (0.5), and the top 10 text rows and top 10 image rows as `similarity = 1 - distance`. It only runs `SELECT`. It refuses a prod URL the same way the backfill does.
+Pass every query as its own argument. The command embeds every text query first, then every image query, so each model loads once. It prints the cutoff, the image score offset (`IMAGE_HIT_SCORE_OFFSET`, 0.03), and the top 10 text rows and top 10 image rows as `similarity = 1 - distance`. Its embed cap defaults to 30000 milliseconds and uses `SMART_SEARCH_EMBED_TIMEOUT_MS` when that variable is set. It only runs `SELECT`. It refuses a prod URL the same way the backfill does.
 
 To undo the image tables later, add a forward migration whose SQL drops `BookmarkImageEmbedFailure` and `BookmarkImageEmbedding`, and remove both models plus the `imageEmbeddings` and `imageEmbedFailures` relations from `prisma/schema.prisma` in that same change. The text table is separate.
 
