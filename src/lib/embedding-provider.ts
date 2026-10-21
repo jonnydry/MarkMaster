@@ -35,8 +35,15 @@ export const EMBEDDING_DIMS = 768;
  */
 export const SMART_SEARCH_EMBED_TIMEOUT_MS = 4_000;
 
-/** Override for {@link SMART_SEARCH_EMBED_TIMEOUT_MS}. A non-positive or non-finite value is ignored. */
+/**
+ * Override for {@link SMART_SEARCH_EMBED_TIMEOUT_MS}.
+ * Clamped to 1–30000 ms. A blank, non-finite, or non-positive value is ignored.
+ */
 export const SMART_SEARCH_EMBED_TIMEOUT_ENV = "SMART_SEARCH_EMBED_TIMEOUT_MS";
+
+/** Node timers misbehave above 2^31-1 ms. The embed cap stays well under that. */
+export const MIN_SMART_SEARCH_EMBED_TIMEOUT_MS = 1;
+export const MAX_SMART_SEARCH_EMBED_TIMEOUT_MS = 30_000;
 
 /**
  * Embed cap for `npm run embeddings:image-scores` when
@@ -45,10 +52,23 @@ export const SMART_SEARCH_EMBED_TIMEOUT_ENV = "SMART_SEARCH_EMBED_TIMEOUT_MS";
 export const IMAGE_SCORE_EMBED_TIMEOUT_MS = 30_000;
 
 /**
- * Ollama unloads a model after 5 minutes by default.
- * A negative keep_alive leaves it loaded until the server evicts it.
+ * How long Ollama keeps a model loaded after an embed call.
+ * A per-request value, so it overrides the server's `OLLAMA_KEEP_ALIVE`.
+ * `30m` is the default. `-1` is never sent: that would pin both models until restart.
  */
-export const OLLAMA_EMBED_KEEP_ALIVE = -1;
+export const DEFAULT_OLLAMA_EMBED_KEEP_ALIVE = "30m";
+
+/** Override for {@link DEFAULT_OLLAMA_EMBED_KEEP_ALIVE}. A duration from 1s to 24h. */
+export const OLLAMA_EMBED_KEEP_ALIVE_ENV = "OLLAMA_EMBED_KEEP_ALIVE";
+
+const MIN_OLLAMA_EMBED_KEEP_ALIVE_MS = 1_000;
+const MAX_OLLAMA_EMBED_KEEP_ALIVE_MS = 24 * 60 * 60 * 1_000;
+const KEEP_ALIVE_UNIT_MS: Record<string, number> = {
+  ms: 1,
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+};
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 30_000;
 const QUERY_EMBEDDING_CACHE_LIMIT = 128;
@@ -125,7 +145,8 @@ export function createOllamaEmbeddingProvider(env: NodeJS.ProcessEnv = process.e
         model,
         texts.map((text) => formatEmbeddingInput(text, kind)),
         texts.length,
-        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS
+        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS,
+        ollamaEmbedKeepAlive(env)
       );
     },
   };
@@ -147,7 +168,8 @@ export function createOllamaImageEmbedder(env: NodeJS.ProcessEnv = process.env):
         model,
         input,
         payloads.length,
-        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS
+        options?.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS,
+        ollamaEmbedKeepAlive(env)
       );
     },
   };
@@ -165,16 +187,51 @@ function ollamaBaseUrl(env: NodeJS.ProcessEnv): string {
   return (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
 }
 
-/** Positive finite milliseconds from the env, otherwise `fallback`. */
+/** Milliseconds in [1, 30000]. Blank, non-finite, or non-positive values use `fallback`. */
 export function smartSearchEmbedTimeoutMs(
   env: NodeJS.ProcessEnv = process.env,
   fallback = SMART_SEARCH_EMBED_TIMEOUT_MS
 ): number {
+  const boundedFallback = clampEmbedTimeout(fallback);
   const raw = env[SMART_SEARCH_EMBED_TIMEOUT_ENV];
-  if (raw === undefined || raw.trim() === "") return fallback;
+  if (raw === undefined || raw.trim() === "") return boundedFallback;
   const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0) return fallback;
+  if (!Number.isFinite(value) || value <= 0) return boundedFallback;
+  return clampEmbedTimeout(value);
+}
+
+function clampEmbedTimeout(value: number): number {
+  if (value < MIN_SMART_SEARCH_EMBED_TIMEOUT_MS) return MIN_SMART_SEARCH_EMBED_TIMEOUT_MS;
+  if (value > MAX_SMART_SEARCH_EMBED_TIMEOUT_MS) return MAX_SMART_SEARCH_EMBED_TIMEOUT_MS;
   return value;
+}
+
+/**
+ * Duration sent as Ollama `keep_alive`. Default `30m`.
+ * `-1`, `0`, and anything outside 1s–24h are ignored so a model is not pinned indefinitely.
+ */
+export function ollamaEmbedKeepAlive(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env[OLLAMA_EMBED_KEEP_ALIVE_ENV]?.trim() ?? "";
+  if (!raw || raw === "-1" || raw.startsWith("-")) return DEFAULT_OLLAMA_EMBED_KEEP_ALIVE;
+  const parsed = parseKeepAlive(raw);
+  return parsed ?? DEFAULT_OLLAMA_EMBED_KEEP_ALIVE;
+}
+
+function parseKeepAlive(raw: string): string | null {
+  const unit = /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(raw);
+  if (unit) {
+    const ms = Number(unit[1]) * KEEP_ALIVE_UNIT_MS[unit[2]];
+    if (!Number.isFinite(ms) || ms < MIN_OLLAMA_EMBED_KEEP_ALIVE_MS || ms > MAX_OLLAMA_EMBED_KEEP_ALIVE_MS) {
+      return null;
+    }
+    return raw;
+  }
+  if (/^\d+$/.test(raw)) {
+    const ms = Number(raw) * 1_000;
+    if (ms < MIN_OLLAMA_EMBED_KEEP_ALIVE_MS || ms > MAX_OLLAMA_EMBED_KEEP_ALIVE_MS) return null;
+    return `${raw}s`;
+  }
+  return null;
 }
 
 type OllamaEmbedInput = string | { image: string };
@@ -184,7 +241,8 @@ async function postOllamaEmbed(
   model: string,
   input: OllamaEmbedInput | readonly OllamaEmbedInput[],
   expected: number,
-  timeoutMs: number
+  timeoutMs: number,
+  keepAlive: string
 ): Promise<number[][]> {
   // Cap, not a delay: a response that arrives first is returned, and the timer is cleared.
   // The timer aborts the request only when it is still pending.
@@ -195,7 +253,7 @@ async function postOllamaEmbed(
     const response = await fetch(`${baseUrl}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, input, keep_alive: OLLAMA_EMBED_KEEP_ALIVE }),
+      body: JSON.stringify({ model, input, keep_alive: keepAlive }),
       signal: controller.signal,
     });
 

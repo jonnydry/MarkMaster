@@ -26,6 +26,26 @@ import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 export const SMART_SEARCH_VECTOR_LIMIT = 50;
 
 /**
+ * After a query embed times out, skip embeds and serve the keyword list for this long.
+ * In-process only. There is no environment variable for it.
+ */
+export const QUERY_EMBED_CIRCUIT_OPEN_MS = 60_000;
+
+let queryEmbedCircuitOpenUntil = 0;
+
+export function resetQueryEmbedCircuit(): void {
+  queryEmbedCircuitOpenUntil = 0;
+}
+
+function queryEmbedCircuitOpen(now = Date.now()): boolean {
+  return now < queryEmbedCircuitOpenUntil;
+}
+
+function tripQueryEmbedCircuit(now = Date.now()): void {
+  queryEmbedCircuitOpenUntil = now + QUERY_EMBED_CIRCUIT_OPEN_MS;
+}
+
+/**
  * Keyword candidates fused with the vector list.
  * The first 200 rows in the request's sort order, not a relevance ranking.
  * The default keyword list stays uncapped.
@@ -290,7 +310,13 @@ export async function trySmartBookmarkSearch(
     return { kind: "fallback", metadata: metadata(provider, "no_embeddings") };
   }
 
+  if (queryEmbedCircuitOpen()) {
+    logWarn("smart-search", "Query embed circuit open; using keyword search");
+    return { kind: "fallback", metadata: metadata(provider, "timeout") };
+  }
+
   const embedded = await embedQuerySides(provider, imageProvider, query, textPresent, imagePresent);
+  if (embedded.timedOut) tripQueryEmbedCircuit();
   if (!embedded.textVector && !embedded.imageVector) {
     return { kind: "fallback", metadata: metadata(provider, embedded.reason) };
   }
@@ -356,7 +382,12 @@ async function embedQuerySides(
   query: string,
   textPresent: boolean,
   imagePresent: boolean
-): Promise<{ textVector: number[] | null; imageVector: number[] | null; reason: SmartSearchFallback }> {
+): Promise<{
+  textVector: number[] | null;
+  imageVector: number[] | null;
+  reason: SmartSearchFallback;
+  timedOut: boolean;
+}> {
   let textVector: number[] | null = null;
   let imageVector: number[] | null = null;
   let textReason: SmartSearchFallback | null = null;
@@ -389,6 +420,7 @@ async function embedQuerySides(
     textVector,
     imageVector,
     reason: textReason ?? imageReason ?? "provider_unavailable",
+    timedOut: textReason === "timeout" || imageReason === "timeout",
   };
 }
 

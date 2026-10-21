@@ -3,13 +3,14 @@ export const IMAGE_HIT_SIMILARITY_CUTOFF = 0.68;
 
 /**
  * Override for {@link IMAGE_HIT_SIMILARITY_CUTOFF}.
- * A non-finite value, or a value outside [0, 1), is ignored.
+ * A non-finite value, or a value outside (0, 1), is ignored.
  */
 export const IMAGE_HIT_SIMILARITY_CUTOFF_ENV = "IMAGE_HIT_SIMILARITY_CUTOFF";
 
 /**
- * Subtracted from an image cosine so it sits on the same scale as a text cosine.
- * A 0.74 image scores 0.71 and can outrank a mid text hit; a 0.70 image scores 0.67.
+ * Subtracted from an image cosine before it is compared with a text cosine.
+ * The text and image vectors come from different models. 0.03 is fitted from
+ * the dev library, not a claim that the two spaces share a scale.
  */
 export const IMAGE_HIT_SCORE_OFFSET = 0.03;
 
@@ -30,11 +31,11 @@ export function imageHitSimilarityCutoff(env: NodeJS.ProcessEnv = process.env): 
   const raw = env[IMAGE_HIT_SIMILARITY_CUTOFF_ENV];
   if (raw === undefined || raw.trim() === "") return IMAGE_HIT_SIMILARITY_CUTOFF;
   const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0 || value >= 1) return IMAGE_HIT_SIMILARITY_CUTOFF;
+  if (!Number.isFinite(value) || value <= 0 || value >= 1) return IMAGE_HIT_SIMILARITY_CUTOFF;
   return value;
 }
 
-/** Image cosine shifted onto the text scale. Only call this for a hit that cleared the cutoff. */
+/** Image cosine minus the fitted offset. Only call this for a hit that cleared the cutoff. */
 export function imageHitScore(similarity: number, offset = IMAGE_HIT_SCORE_OFFSET): number {
   return similarity - offset;
 }

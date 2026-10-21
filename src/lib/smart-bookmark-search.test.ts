@@ -9,7 +9,9 @@ import {
 } from "./embedding-provider";
 import { toPgVectorLiteral } from "./pg-vector";
 import {
+  QUERY_EMBED_CIRCUIT_OPEN_MS,
   SMART_SEARCH_KEYWORD_LIMIT,
+  resetQueryEmbedCircuit,
   trySmartBookmarkSearch,
   type SmartBookmarkSearchInput,
 } from "./smart-bookmark-search";
@@ -59,6 +61,7 @@ type Embedding = {
 describe("trySmartBookmarkSearch", () => {
   beforeEach(() => {
     clearQueryEmbeddingCache();
+    resetQueryEmbedCircuit();
   });
 
   it("fuses vector hits and keyword hits and keeps filters on both queries", async () => {
@@ -294,6 +297,40 @@ describe("trySmartBookmarkSearch", () => {
     const queries = queryRaw.mock.calls.map((call) => sqlText(call[0]));
     expect(queries.some((sql) => sql.includes("GROUP BY b.\"id\""))).toBe(false);
     expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(true);
+  });
+
+  it("skips query embeds for 60s after a timeout, then tries again", async () => {
+    vi.useFakeTimers();
+    try {
+      const embedder = provider(async () => {
+        throw new EmbeddingProviderError("timeout");
+      });
+      const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+        if (sqlText(query).includes('AS "present"')) return [{ present: true }];
+        return [];
+      });
+
+      const first = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+      expect(first).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(embedder.embed).toHaveBeenCalledTimes(1);
+
+      const during = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+      expect(during).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(embedder.embed).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(QUERY_EMBED_CIRCUIT_OPEN_MS - 1);
+      const stillOpen = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+      expect(stillOpen).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(embedder.embed).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      const again = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+      expect(again).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(embedder.embed).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+      resetQueryEmbedCircuit();
+    }
   });
 
   it("reuses the cached query embedding", async () => {

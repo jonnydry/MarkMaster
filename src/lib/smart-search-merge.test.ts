@@ -50,6 +50,55 @@ describe("mergeTextAndImageHits", () => {
     expect(merged.orderedIds).toEqual(["image", "text"]);
   });
 
+  it("ranks a 0.69 text hit above a 0.71 image hit", () => {
+    expect(imageHitScore(0.71)).toBeCloseTo(0.68, 10);
+    const merged = mergeTextAndImageHits(
+      [{ id: "text", similarity: 0.69 }],
+      [{ id: "image", similarity: 0.71 }]
+    );
+    expect(merged.orderedIds).toEqual(["text", "image"]);
+  });
+
+  it("lets a 0.83 text-only hit beat a dual match of 0.80 and 0.80", () => {
+    const merged = mergeTextAndImageHits(
+      [
+        { id: "dual", similarity: 0.8 },
+        { id: "text-only", similarity: 0.83 },
+      ],
+      [{ id: "dual", similarity: 0.8 }]
+    );
+    expect(merged.orderedIds).toEqual(["text-only", "dual"]);
+  });
+
+  it("uses the text cosine when both match and text is higher", () => {
+    const merged = mergeTextAndImageHits(
+      [
+        { id: "dual", similarity: 0.9 },
+        { id: "text-only", similarity: 0.91 },
+      ],
+      [{ id: "dual", similarity: 0.7 }]
+    );
+    expect(merged.orderedIds).toEqual(["dual", "text-only"]);
+  });
+
+  it("scores a below-cutoff image as text only, with no dual-match bonus", () => {
+    const merged = mergeTextAndImageHits(
+      [
+        { id: "dual", similarity: 0.75 },
+        { id: "text-only", similarity: 0.76 },
+      ],
+      [{ id: "dual", similarity: 0.6 }]
+    );
+    expect(merged.orderedIds).toEqual(["text-only", "dual"]);
+    expect(merged.imageMatchedIds).toEqual([]);
+  });
+
+  it("drops an image hit at 0.6799", () => {
+    const merged = mergeTextAndImageHits([], [{ id: "low", similarity: 0.6799 }]);
+    expect(merged.orderedIds).toEqual([]);
+    expect(merged.imageMatchedIds).toEqual([]);
+  });
+
   it("does not penalise text-only bookmarks", () => {
     const textOnly = mergeTextAndImageHits(
       [
@@ -126,10 +175,11 @@ describe("mergeTextAndImageHits", () => {
 });
 
 describe("imageHitSimilarityCutoff", () => {
-  it("reads a cutoff in [0, 1) and ignores anything else", () => {
+  it("reads a cutoff in (0, 1) and ignores anything else", () => {
     expect(imageHitSimilarityCutoff({})).toBe(IMAGE_HIT_SIMILARITY_CUTOFF);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.5" })).toBe(0.5);
-    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0" })).toBe(0);
+    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0" })).toBe(0.68);
+    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.0" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "1" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "-0.1" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "nope" })).toBe(0.68);

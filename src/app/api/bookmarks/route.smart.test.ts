@@ -27,6 +27,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { clearQueryEmbeddingCache, EMBEDDING_DIMS, SMART_SEARCH_EMBED_TIMEOUT_MS } from "@/lib/embedding-provider";
+import { resetQueryEmbedCircuit } from "@/lib/smart-bookmark-search";
 
 function sqlText(query: unknown): string {
   if (!query || typeof query !== "object" || !("strings" in query)) return "";
@@ -46,6 +47,7 @@ describe("smart bookmark search mode", () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     clearQueryEmbeddingCache();
+    resetQueryEmbedCircuit();
   });
 
   it("keeps the default search response free of smart-search metadata", async () => {
