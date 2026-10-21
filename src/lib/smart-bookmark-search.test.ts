@@ -216,7 +216,7 @@ describe("trySmartBookmarkSearch", () => {
 
     expect(result.kind).toBe("ranked");
     if (result.kind !== "ranked") return;
-    expect(result.orderedIds).toEqual(["note", "pic"]);
+    expect(result.orderedIds).toEqual(["pic", "note"]);
     expect(result.metadata).toMatchObject({
       vectorHits: 2,
       imageHits: 1,
@@ -234,6 +234,66 @@ describe("trySmartBookmarkSearch", () => {
     expect(sqlValues(imageQuery)).toEqual(
       expect.arrayContaining(["user-1", DEFAULT_IMAGE_EMBEDDING_MODEL, 768, "tag-1"])
     );
+  });
+
+  it("searches images when the text vector cannot be serialized", async () => {
+    const textEmbedder = provider(async () => [[0.1]]);
+    const imageEmbedder = {
+      ...provider(),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes("GROUP BY b.\"id\"")) return [{ id: "pic", distance: 0.1 }];
+      if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }];
+      return [];
+    });
+
+    const result = await trySmartBookmarkSearch(input({ searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+
+    expect(result.kind).toBe("ranked");
+    if (result.kind !== "ranked") return;
+    expect(result.orderedIds).toEqual(["pic"]);
+    expect(result.metadata.imageMatchedIds).toEqual(["pic"]);
+    const queries = queryRaw.mock.calls.map((call) => sqlText(call[0]));
+    expect(queries.some((sql) => sql.includes("GROUP BY b.\"id\""))).toBe(true);
+    expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(false);
+  });
+
+  it("searches text when the image vector cannot be serialized", async () => {
+    const textEmbedder = provider();
+    const imageEmbedder = {
+      ...provider(async () => [[0.1]]),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes("GROUP BY b.\"id\"")) return [{ id: "pic", distance: 0.1 }];
+      if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }];
+      return [];
+    });
+
+    const result = await trySmartBookmarkSearch(input({ searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+
+    expect(result.kind).toBe("ranked");
+    if (result.kind !== "ranked") return;
+    expect(result.orderedIds).toEqual(["note"]);
+    expect(result.metadata.imageHits).toBeUndefined();
+    const queries = queryRaw.mock.calls.map((call) => sqlText(call[0]));
+    expect(queries.some((sql) => sql.includes("GROUP BY b.\"id\""))).toBe(false);
+    expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(true);
   });
 
   it("reuses the cached query embedding", async () => {

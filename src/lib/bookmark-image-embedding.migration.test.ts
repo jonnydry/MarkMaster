@@ -13,6 +13,10 @@ describe("bookmark image embedding migration", () => {
     expect(sql).toContain('"model" TEXT NOT NULL');
     expect(sql).toContain('"dims" INTEGER NOT NULL');
     expect(sql).toContain('PRIMARY KEY ("bookmarkId","mediaKey","model","dims")');
+    expect(sql).toContain('CREATE TABLE "BookmarkImageEmbedFailure"');
+    expect(sql).toContain('"failCount" INTEGER NOT NULL');
+    expect(sql).toContain('"lastError" TEXT NOT NULL');
+    expect(sql).toContain('"lastFailedAt" TIMESTAMP(3) NOT NULL');
     expect(sql).toContain("ON DELETE CASCADE ON UPDATE CASCADE");
     const statements = sql
       .split("\n")
@@ -30,5 +34,16 @@ describe("image embedding store provenance", () => {
     expect(store).toMatch(/WHERE "model" = \$\{model\}\s+AND "dims" = \$\{dims\}/);
     expect(store).toContain('"mediaKey"');
     expect(store).toContain('ON CONFLICT ("bookmarkId", "mediaKey", "model", "dims")');
+    expect(store).toContain('FROM "BookmarkImageEmbedFailure"');
+    expect(store).toContain('"failCount" = "BookmarkImageEmbedFailure"."failCount" + 1');
+  });
+});
+
+describe("image score printer", () => {
+  it("only reads cosine distances", () => {
+    const source = readFileSync("scripts/print-image-search-scores.ts", "utf8");
+    expect(source).toContain("embeddings:image-scores");
+    expect(source).toContain('FROM "BookmarkImageEmbedding"');
+    expect(source).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b/);
   });
 });

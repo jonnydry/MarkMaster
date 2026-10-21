@@ -1,10 +1,15 @@
-import { isIP } from "node:net";
-
 import { EmbeddingProviderError, type ImageEmbedder } from "@/lib/embedding-provider";
+import {
+  IMAGE_FETCH_MAX_REDIRECTS,
+  isAllowlistedImageUrl,
+} from "@/lib/image-fetch-allowlist";
 
 export const IMAGE_FETCH_TIMEOUT_MS = 15_000;
 export const IMAGE_EMBED_TIMEOUT_MS = 120_000;
 export const IMAGE_BYTE_LIMIT = 8 * 1024 * 1024;
+
+/** A recorded image failure is retried after this many days, not on the next run. */
+export const IMAGE_EMBED_FAILURE_RETRY_DAYS = 7;
 
 export type ImageBackfillTarget = {
   bookmarkId: string;
@@ -39,7 +44,31 @@ export interface ImageEmbeddingBackfillStore {
     keep: Array<{ bookmarkId: string; mediaKey: string }>
   ): Promise<number>;
   upsert(rows: StoredImageEmbedding[]): Promise<void>;
+  listFailures(model: string, dims: number): Promise<ImageEmbedFailure[]>;
+  recordFailure(row: ImageEmbedFailureWrite): Promise<void>;
+  clearFailure(bookmarkId: string, mediaKey: string, model: string, dims: number): Promise<void>;
+  deleteAbsentFailures(
+    model: string,
+    dims: number,
+    keep: Array<{ bookmarkId: string; mediaKey: string }>
+  ): Promise<number>;
 }
+
+export type ImageEmbedFailure = {
+  bookmarkId: string;
+  mediaKey: string;
+  failCount: number;
+  lastFailedAt: Date;
+};
+
+export type ImageEmbedFailureWrite = {
+  bookmarkId: string;
+  mediaKey: string;
+  model: string;
+  dims: number;
+  status: string;
+  failedAt: Date;
+};
 
 export type ImageFetchSuccess = { ok: true; base64: string };
 export type ImageFetchFailure = { ok: false; url: string; status: string };
@@ -51,6 +80,8 @@ export type ImageBackfillCounts = {
   embedded: number;
   skipped: number;
   failed: number;
+  /** Recent failures left untouched until {@link IMAGE_EMBED_FAILURE_RETRY_DAYS}. */
+  deferred: number;
   removed: number;
   model: string;
   dims: number;
@@ -82,7 +113,7 @@ function imageRowKey(bookmarkId: string, mediaKey: string): string {
 /**
  * Embed media images that are missing or whose hash changed.
  * A second run with the same model skips rows already stored for that model.
- * Dead URLs and non-image responses are logged and left unstored, so a later run retries them.
+ * A failed URL is recorded and left alone until {@link IMAGE_EMBED_FAILURE_RETRY_DAYS} have passed.
  */
 export async function backfillBookmarkImageEmbeddings(options: {
   store: ImageEmbeddingBackfillStore;
@@ -90,31 +121,51 @@ export async function backfillBookmarkImageEmbeddings(options: {
   fetchImage?: ImageFetcher;
   timeoutMs?: number;
   fetchTimeoutMs?: number;
+  now?: () => Date;
   onSkip?: (event: { url: string; status: string }) => void;
 }): Promise<ImageBackfillCounts> {
   const fetchImage = options.fetchImage ?? fetchImageAsBase64;
   const timeoutMs = options.timeoutMs ?? IMAGE_EMBED_TIMEOUT_MS;
   const fetchTimeoutMs = options.fetchTimeoutMs ?? IMAGE_FETCH_TIMEOUT_MS;
+  const now = options.now ?? (() => new Date());
+  const retryMs = IMAGE_EMBED_FAILURE_RETRY_DAYS * 24 * 60 * 60 * 1000;
   const { embedder, store, onSkip } = options;
 
   const bookmarks = await store.listBookmarks();
   const targets = bookmarks.flatMap((bookmark) =>
     bookmark.images.map((image) => ({ bookmarkId: bookmark.bookmarkId, ...image }))
   );
-  const removed = await store.deleteAbsent(
-    embedder.model,
-    embedder.dims,
-    targets.map((target) => ({ bookmarkId: target.bookmarkId, mediaKey: target.mediaKey }))
-  );
+  const keep = targets.map((target) => ({ bookmarkId: target.bookmarkId, mediaKey: target.mediaKey }));
+  const removed = await store.deleteAbsent(embedder.model, embedder.dims, keep);
+  await store.deleteAbsentFailures(embedder.model, embedder.dims, keep);
   const existing = await store.listExisting(embedder.model, embedder.dims);
   const { stale, skipped } = selectStaleImageEmbeddings(targets, existing);
+  const failures = await store.listFailures(embedder.model, embedder.dims);
+  const failureByKey = new Map(
+    failures.map((row) => [imageRowKey(row.bookmarkId, row.mediaKey), row])
+  );
 
   let embedded = 0;
   let failed = 0;
+  let deferred = 0;
   for (const target of stale) {
+    const prior = failureByKey.get(imageRowKey(target.bookmarkId, target.mediaKey));
+    if (prior && failureStillCooling(prior.lastFailedAt, now(), retryMs)) {
+      deferred += 1;
+      continue;
+    }
+
     const fetched = await fetchImage(target.url, fetchTimeoutMs);
     if (!fetched.ok) {
       failed += 1;
+      await store.recordFailure({
+        bookmarkId: target.bookmarkId,
+        mediaKey: target.mediaKey,
+        model: embedder.model,
+        dims: embedder.dims,
+        status: fetched.status,
+        failedAt: now(),
+      });
       onSkip?.({ url: fetched.url, status: fetched.status });
       continue;
     }
@@ -135,10 +186,19 @@ export async function backfillBookmarkImageEmbeddings(options: {
           contentHash: target.contentHash,
         },
       ]);
+      await store.clearFailure(target.bookmarkId, target.mediaKey, embedder.model, embedder.dims);
       embedded += 1;
     } catch (error) {
       if (!(error instanceof EmbeddingProviderError) || error.reason === "timeout") throw error;
       failed += 1;
+      await store.recordFailure({
+        bookmarkId: target.bookmarkId,
+        mediaKey: target.mediaKey,
+        model: embedder.model,
+        dims: embedder.dims,
+        status: "embed-failed",
+        failedAt: now(),
+      });
       onSkip?.({ url: target.url, status: "embed-failed" });
     }
   }
@@ -147,10 +207,16 @@ export async function backfillBookmarkImageEmbeddings(options: {
     embedded,
     skipped,
     failed,
+    deferred,
     removed,
     model: embedder.model,
     dims: embedder.dims,
   };
+}
+
+function failureStillCooling(lastFailedAt: Date, now: Date, retryMs: number): boolean {
+  const failedAt = lastFailedAt instanceof Date ? lastFailedAt.getTime() : new Date(lastFailedAt).getTime();
+  return Number.isFinite(failedAt) && now.getTime() - failedAt < retryMs;
 }
 
 export async function fetchImageAsBase64(
@@ -158,40 +224,38 @@ export async function fetchImageAsBase64(
   timeoutMs = IMAGE_FETCH_TIMEOUT_MS
 ): Promise<ImageFetchOutcome> {
   const loggedUrl = loggableUrl(url);
-  if (!isFetchableImageUrl(url)) {
-    return { ok: false, url: loggedUrl, status: "unsupported" };
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif",
-        "User-Agent": "MarkMaster/image-embedding",
-      },
-    });
+    let current = url;
+    for (let redirectsFollowed = 0; ; ) {
+      if (!isAllowlistedImageUrl(current)) {
+        return { ok: false, url: loggedUrl, status: "unsupported" };
+      }
 
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined);
-      return { ok: false, url: loggedUrl, status: String(response.status) };
-    }
+      const response = await fetch(current, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif",
+          "User-Agent": "MarkMaster/image-embedding",
+        },
+      });
 
-    const declared = Number.parseInt(response.headers.get("content-length") ?? "", 10);
-    if (Number.isFinite(declared) && declared > IMAGE_BYTE_LIMIT) {
-      await response.body?.cancel().catch(() => undefined);
-      return { ok: false, url: loggedUrl, status: "too-large" };
-    }
+      if (isRedirectStatus(response.status)) {
+        const next = redirectTarget(current, response.headers.get("location"));
+        await response.body?.cancel().catch(() => undefined);
+        if (!next || redirectsFollowed >= IMAGE_FETCH_MAX_REDIRECTS) {
+          return { ok: false, url: loggedUrl, status: "unsupported" };
+        }
+        current = next;
+        redirectsFollowed += 1;
+        continue;
+      }
 
-    const bytes = await readCappedBytes(response, IMAGE_BYTE_LIMIT);
-    if (!bytes) return { ok: false, url: loggedUrl, status: "too-large" };
-    if (!isImagePayload(response.headers.get("content-type"), bytes)) {
-      return { ok: false, url: loggedUrl, status: "non-image" };
+      return await readFetchedImage(response, loggedUrl);
     }
-    return { ok: true, base64: Buffer.from(bytes).toString("base64") };
   } catch (error) {
     if (isTimeoutError(error) || controller.signal.aborted) {
       return { ok: false, url: loggedUrl, status: "timeout" };
@@ -200,6 +264,39 @@ export async function fetchImageAsBase64(
   } finally {
     clearTimeout(timer);
   }
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function redirectTarget(current: string, location: string | null): string | null {
+  if (!location) return null;
+  try {
+    return new URL(location, current).toString();
+  } catch {
+    return null;
+  }
+}
+
+async function readFetchedImage(response: Response, loggedUrl: string): Promise<ImageFetchOutcome> {
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    return { ok: false, url: loggedUrl, status: String(response.status) };
+  }
+
+  const declared = Number.parseInt(response.headers.get("content-length") ?? "", 10);
+  if (Number.isFinite(declared) && declared > IMAGE_BYTE_LIMIT) {
+    await response.body?.cancel().catch(() => undefined);
+    return { ok: false, url: loggedUrl, status: "too-large" };
+  }
+
+  const bytes = await readCappedBytes(response, IMAGE_BYTE_LIMIT);
+  if (!bytes) return { ok: false, url: loggedUrl, status: "too-large" };
+  if (!isImagePayload(response.headers.get("content-type"), bytes)) {
+    return { ok: false, url: loggedUrl, status: "non-image" };
+  }
+  return { ok: true, base64: Buffer.from(bytes).toString("base64") };
 }
 
 export function loggableUrl(raw: string): string {
@@ -212,53 +309,6 @@ export function loggableUrl(raw: string): string {
   } catch {
     return flattened;
   }
-}
-
-function isFetchableImageUrl(raw: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
-  if (url.username || url.password) return false;
-  return !isBlockedHost(url.hostname);
-}
-
-function isBlockedHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, "").replace(/^\[|\]$/g, "");
-  if (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal")
-  ) {
-    return true;
-  }
-  if (isIP(host) === 0) return false;
-  return isPrivateOrUnroutableIp(host);
-}
-
-function isPrivateOrUnroutableIp(host: string): boolean {
-  const lower = host.toLowerCase();
-  if (lower === "::1" || lower === "::") return true;
-  if (lower.startsWith("fc") || lower.startsWith("fd") || lower.startsWith("fe80")) return true;
-
-  const v4 = lower.startsWith("::ffff:") ? lower.slice("::ffff:".length) : lower;
-  const parts = v4.split(".");
-  if (parts.length !== 4) return false;
-  const numbers = parts.map((part) => Number(part));
-  if (numbers.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
-  const a = numbers[0] ?? 0;
-  const b = numbers[1] ?? 0;
-  if (a === 0 || a === 10 || a === 127) return true;
-  if (a === 169 && b === 254) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  if (a >= 224) return true;
-  return false;
 }
 
 function isImagePayload(contentType: string | null, bytes: Uint8Array): boolean {

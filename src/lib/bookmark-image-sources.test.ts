@@ -43,4 +43,30 @@ describe("selectBookmarkImageSources", () => {
     });
     expect(sources.map((source) => source.url)).toEqual(["https://pbs.twimg.com/poster.jpg"]);
   });
+
+  it("drops images that are not on the fetch allowlist", () => {
+    const sources = selectBookmarkImageSources({
+      media: [
+        { type: "photo", url: "https://example.com/photo.jpg" },
+        { type: "photo", url: "http://pbs.twimg.com/plain.jpg" },
+        {
+          type: "video",
+          preview_image_url: "https://example.com/thumb.jpg",
+          url: "https://pbs.twimg.com/poster.jpg",
+        },
+      ],
+      urls: [
+        {
+          images: [
+            { url: "https://example.com/card.jpg" },
+            { url: "https://ton.twimg.com/card.jpg" },
+          ],
+        },
+      ],
+    });
+    expect(sources.map((source) => source.url)).toEqual([
+      "https://pbs.twimg.com/poster.jpg",
+      "https://ton.twimg.com/card.jpg",
+    ]);
+  });
 });

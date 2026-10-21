@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { isVideoLikeMediaType, type BookmarkMediaJson } from "@/lib/bookmark-media";
+import { isAllowlistedImageUrl } from "@/lib/image-fetch-allowlist";
 
 /** Bump to re-embed the same URL after the image recipe changes. */
 export const IMAGE_SOURCE_HASH_VERSION = "image-v1";
@@ -18,7 +19,8 @@ export function imageContentHash(url: string): string {
 
 /**
  * Photos use the image URL. Videos and GIFs use the thumbnail, never the MP4.
- * Link-card images on `urls` are included. The same URL is kept once.
+ * Link-card images on `urls` are included when they are on the image-fetch allowlist.
+ * The same URL is kept once. Other hosts are dropped and never fetched.
  */
 export function selectBookmarkImageSources(bookmark: {
   media?: unknown;
@@ -28,7 +30,7 @@ export function selectBookmarkImageSources(bookmark: {
   const sources: BookmarkImageSource[] = [];
 
   const push = (candidate: string | undefined) => {
-    if (!candidate || seen.has(candidate) || !isHttpUrl(candidate)) return;
+    if (!candidate || seen.has(candidate) || !isAllowlistedImageUrl(candidate)) return;
     seen.add(candidate);
     sources.push({
       mediaKey: candidate,
@@ -61,7 +63,7 @@ function imageUrlForMediaItem(item: BookmarkMediaJson): string | undefined {
 
 function firstImageUrl(candidates: Array<string | undefined>, video: boolean): string | undefined {
   for (const candidate of candidates) {
-    if (!candidate || !isHttpUrl(candidate)) continue;
+    if (!candidate || !isAllowlistedImageUrl(candidate)) continue;
     if (video && isVideoFileUrl(candidate)) continue;
     return candidate;
   }
@@ -71,16 +73,6 @@ function firstImageUrl(candidates: Array<string | undefined>, video: boolean): s
 function isVideoFileUrl(value: string): boolean {
   try {
     return /\.(mp4|m3u8|webm|mov)$/i.test(new URL(value).pathname);
-  } catch {
-    return false;
-  }
-}
-
-function isHttpUrl(value: string): boolean {
-  if (value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
   }

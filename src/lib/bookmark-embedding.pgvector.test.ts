@@ -275,4 +275,124 @@ describe.skipIf(!enabled)("bookmark embeddings on local pgvector", () => {
       await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
     }
   });
+
+  it("runs the image search query once per bookmark and leaves a far hit below the cutoff", async () => {
+    assertLocalDatabase(process.env.DATABASE_URL);
+    const { prisma } = await import("@/lib/prisma");
+    const { upsertBookmarkImageEmbeddings } = await import("@/lib/image-embedding-backfill-store");
+    const { DEFAULT_IMAGE_EMBEDDING_MODEL } = await import("@/lib/embedding-provider");
+    const { searchImageEmbeddingHits } = await import("@/lib/smart-bookmark-search");
+    const { mergeTextAndImageHits } = await import("@/lib/smart-search-merge");
+
+    const userId = `pgv_q_${randomUUID()}`;
+    const otherUserId = `pgv_o_${randomUUID()}`;
+    const nearId = `near_${randomUUID()}`;
+    const farId = `far_${randomUUID()}`;
+    const leakedId = `aaa_${randomUUID()}`;
+    const model = DEFAULT_IMAGE_EMBEDDING_MODEL;
+
+    async function makeUser(id: string) {
+      await prisma.user.create({
+        data: {
+          id,
+          xId: id,
+          username: id,
+          displayName: "pgv",
+          accessToken: "local-test",
+          refreshToken: "local-test",
+        },
+      });
+    }
+
+    function makeBookmark(id: string, ownerId: string, text: string) {
+      return {
+        id,
+        userId: ownerId,
+        tweetId: id,
+        authorId: "author",
+        authorUsername: "ada",
+        authorDisplayName: "Ada",
+        tweetText: text,
+        tweetCreatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      };
+    }
+
+    await makeUser(userId);
+    await makeUser(otherUserId);
+
+    try {
+      await prisma.bookmark.createMany({
+        data: [
+          makeBookmark(nearId, userId, "near"),
+          makeBookmark(farId, userId, "far"),
+          makeBookmark(leakedId, otherUserId, "leak"),
+        ],
+      });
+
+      await upsertBookmarkImageEmbeddings([
+        {
+          bookmarkId: nearId,
+          mediaKey: "https://pbs.twimg.com/near.jpg",
+          model,
+          dims: EMBEDDING_DIMS,
+          embedding: axis(0),
+          contentHash: "near",
+        },
+        {
+          bookmarkId: nearId,
+          mediaKey: "https://pbs.twimg.com/near-thumb.jpg",
+          model,
+          dims: EMBEDDING_DIMS,
+          embedding: axis(2),
+          contentHash: "thumb",
+        },
+        {
+          bookmarkId: farId,
+          mediaKey: "https://pbs.twimg.com/far.jpg",
+          model,
+          dims: EMBEDDING_DIMS,
+          embedding: axis(1),
+          contentHash: "far",
+        },
+        {
+          bookmarkId: leakedId,
+          mediaKey: "https://pbs.twimg.com/leaked.jpg",
+          model,
+          dims: EMBEDDING_DIMS,
+          embedding: axis(0),
+          contentHash: "leak",
+        },
+      ]);
+
+      const hits = await searchImageEmbeddingHits(
+        prisma.$queryRaw.bind(prisma),
+        {
+          userId,
+          search: "axis",
+          searchTerms: [],
+          authorFilter: "",
+          tagIds: [],
+          mediaFilter: "all",
+          unaffiliated: false,
+          raw: false,
+          sortField: "bookmarkedAt",
+          sortDirection: "desc",
+        },
+        { model, dims: EMBEDDING_DIMS, embed: async () => [] },
+        toPgVectorLiteral(axis(0), EMBEDDING_DIMS)
+      );
+
+      expect(hits.map((hit) => hit.id)).toEqual([nearId, farId]);
+      expect(hits.filter((hit) => hit.id === nearId)).toHaveLength(1);
+      expect(hits[0]?.similarity).toBeCloseTo(1, 5);
+      expect(hits[1]?.similarity).toBeCloseTo(0, 5);
+
+      const merged = mergeTextAndImageHits([], hits);
+      expect(merged.orderedIds).toEqual([nearId]);
+      expect(merged.imageMatchedIds).toEqual([nearId]);
+    } finally {
+      await prisma.user.delete({ where: { id: userId } }).catch(() => undefined);
+      await prisma.user.delete({ where: { id: otherUserId } }).catch(() => undefined);
+    }
+  });
 });

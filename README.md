@@ -138,6 +138,7 @@ npm run env:check
 | `OLLAMA_BASE_URL` | No | Ollama base URL for smart search (default `http://127.0.0.1:11434`). Text and image embeddings share it |
 | `EMBEDDING_MODEL` | No | Text embedding tag (default `embeddinggemma-2:270m`) |
 | `EMBEDDING_IMAGE_MODEL` | No | Image embedding tag (default `embeddinggemma-2:440m-q8_0-text-vision`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
+| `IMAGE_HIT_SIMILARITY_CUTOFF` | No | Cosine cutoff for image hits (default `0.65`, must be in `[0, 1)`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 
@@ -202,6 +203,7 @@ library — a fresh clone renders empty until then.
 | `npm run db:migrate` | `prisma migrate deploy` against `DIRECT_URL`, refused on prod without `-- --prod` |
 | `npm run embeddings:backfill` | Embed bookmark text with the local Ollama text model. Refuses prod without `-- --prod` |
 | `npm run embeddings:backfill-images` | Embed bookmark images with `EMBEDDING_IMAGE_MODEL`. Refuses prod without `-- --prod`. See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
+| `npm run embeddings:image-scores` | Print top raw cosine scores for the queries you pass. Read-only. Refuses prod without `-- --prod`. See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run env:check` | Validate environment variables |
 

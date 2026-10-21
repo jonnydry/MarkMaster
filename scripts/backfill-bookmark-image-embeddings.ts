@@ -7,9 +7,13 @@ import "dotenv/config";
 import { createOllamaImageEmbedder } from "@/lib/embedding-provider";
 import { backfillBookmarkImageEmbeddings } from "@/lib/image-embedding-backfill";
 import {
+  clearImageEmbedFailure,
+  deleteAbsentImageEmbedFailures,
   deleteAbsentImageEmbeddings,
   listBookmarksForImageEmbedding,
   listExistingImageEmbeddings,
+  listImageEmbedFailures,
+  recordImageEmbedFailure,
   upsertBookmarkImageEmbeddings,
 } from "@/lib/image-embedding-backfill-store";
 import { prisma } from "@/lib/prisma";
@@ -45,6 +49,10 @@ async function main() {
       listExisting: listExistingImageEmbeddings,
       deleteAbsent: deleteAbsentImageEmbeddings,
       upsert: upsertBookmarkImageEmbeddings,
+      listFailures: listImageEmbedFailures,
+      recordFailure: recordImageEmbedFailure,
+      clearFailure: clearImageEmbedFailure,
+      deleteAbsentFailures: deleteAbsentImageEmbedFailures,
     },
     onSkip: ({ url, status }) => logSkip(url, status),
   });
@@ -52,6 +60,7 @@ async function main() {
   console.log(`embedded: ${counts.embedded}`);
   console.log(`skipped: ${counts.skipped}`);
   console.log(`failed: ${counts.failed}`);
+  console.log(`deferred: ${counts.deferred}`);
   console.log(`removed: ${counts.removed}`);
   console.log(`model: ${counts.model}`);
   console.log(`dims: ${counts.dims}`);

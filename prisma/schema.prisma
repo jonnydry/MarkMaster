@@ -81,6 +81,7 @@ model Bookmark {
   orbitDecisionEvents OrbitDecisionEvent[]
   embeddings          BookmarkEmbedding[]
   imageEmbeddings     BookmarkImageEmbedding[]
+  imageEmbedFailures  BookmarkImageEmbedFailure[]
 
   @@unique([userId, tweetId])
   @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
@@ -121,6 +122,22 @@ model BookmarkImageEmbedding {
   contentHash String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@id([bookmarkId, mediaKey, model, dims])
+}
+
+/// A failed image fetch or embed. The backfill skips the URL until the retry window.
+/// `lastError` is a short status token, never a response body.
+model BookmarkImageEmbedFailure {
+  bookmarkId   String
+  mediaKey     String
+  model        String
+  dims         Int
+  failCount    Int
+  lastError    String
+  lastFailedAt DateTime
 
   bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
 

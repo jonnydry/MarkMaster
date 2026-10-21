@@ -15,7 +15,11 @@ import { logWarn } from "@/lib/logger";
 import { toPgVectorLiteral } from "@/lib/pg-vector";
 import { prisma } from "@/lib/prisma";
 import { reciprocalRankFusion } from "@/lib/reciprocal-rank-fusion";
-import { mergeTextAndImageHits, type ScoredHit } from "@/lib/smart-search-merge";
+import {
+  imageHitSimilarityCutoff,
+  mergeTextAndImageHits,
+  type ScoredHit,
+} from "@/lib/smart-search-merge";
 import type { BookmarkSortField } from "@/lib/bookmark-keyset";
 
 /** Top vector neighbors blended with the keyword list. Exact scan, no ANN index. */
@@ -179,7 +183,7 @@ async function vectorHits(
   return rowsToScoredHits(rows);
 }
 
-async function imageHits(
+export async function searchImageEmbeddingHits(
   queryRaw: QueryRaw,
   input: SmartBookmarkSearchInput,
   provider: EmbeddingProvider,
@@ -292,24 +296,37 @@ export async function trySmartBookmarkSearch(
   }
 
   let textLiteral: string | null = null;
-  let imageLiteral: string | null = null;
-  try {
-    if (embedded.textVector) textLiteral = toPgVectorLiteral(embedded.textVector, provider.dims);
-    if (embedded.imageVector) imageLiteral = toPgVectorLiteral(embedded.imageVector, imageProvider.dims);
-  } catch {
-    if (!textLiteral && !imageLiteral) {
-      return { kind: "fallback", metadata: metadata(provider, "provider_unavailable") };
+  if (embedded.textVector) {
+    try {
+      textLiteral = toPgVectorLiteral(embedded.textVector, provider.dims);
+    } catch (error) {
+      logWarn("smart-search", "Text vector could not be serialized", error);
     }
+  }
+
+  let imageLiteral: string | null = null;
+  if (embedded.imageVector) {
+    try {
+      imageLiteral = toPgVectorLiteral(embedded.imageVector, imageProvider.dims);
+    } catch (error) {
+      logWarn("smart-search", "Image vector could not be serialized", error);
+    }
+  }
+
+  if (!textLiteral && !imageLiteral) {
+    return { kind: "fallback", metadata: metadata(provider, "provider_unavailable") };
   }
 
   try {
     const [textScored, imageScored, keywordIds] = await Promise.all([
       textLiteral ? vectorHits(queryRaw, input, provider, textLiteral) : Promise.resolve([]),
-      imageLiteral ? imageHits(queryRaw, input, imageProvider, imageLiteral) : Promise.resolve([]),
+      imageLiteral
+        ? searchImageEmbeddingHits(queryRaw, input, imageProvider, imageLiteral)
+        : Promise.resolve([]),
       keywordHitIds(queryRaw, input),
     ]);
     const merged = imageLiteral
-      ? mergeTextAndImageHits(textScored, imageScored)
+      ? mergeTextAndImageHits(textScored, imageScored, imageHitSimilarityCutoff())
       : { orderedIds: textScored.map((hit) => hit.id), imageMatchedIds: [] as string[] };
     const fused = reciprocalRankFusion([merged.orderedIds, keywordIds]);
     return {
