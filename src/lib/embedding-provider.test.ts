@@ -225,9 +225,11 @@ describe("Ollama embedding provider", () => {
     expect(
       smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "2500" }, IMAGE_SCORE_EMBED_TIMEOUT_MS)
     ).toBe(2_500);
-    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "1" })).toBe(1);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "1" })).toBe(100);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "99" })).toBe(100);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "100" })).toBe(100);
     expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "30000" })).toBe(30_000);
-    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "0.4" })).toBe(1);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "0.4" })).toBe(100);
     expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "1e9" })).toBe(30_000);
     expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "3000000000" })).toBe(30_000);
     expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "1e309" })).toBe(4_000);
@@ -258,6 +260,7 @@ describe("Ollama embedding provider", () => {
     expect(ollamaEmbedKeepAlive({ OLLAMA_EMBED_KEEP_ALIVE: "5m" })).toBe("5m");
     expect(ollamaEmbedKeepAlive({ OLLAMA_EMBED_KEEP_ALIVE: "24h" })).toBe("24h");
     expect(ollamaEmbedKeepAlive({ OLLAMA_EMBED_KEEP_ALIVE: "90" })).toBe("90s");
+    expect(ollamaEmbedKeepAlive({ OLLAMA_EMBED_KEEP_ALIVE: "1h30m" })).toBe("30m");
 
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -275,6 +278,26 @@ describe("Ollama embedding provider", () => {
     expect(first.keep_alive).toBe("30m");
     expect(first.keep_alive).not.toBe(-1);
     expect(second.keep_alive).toBe("5m");
+  });
+
+  it("sends OLLAMA_EMBED_KEEP_ALIVE on the image embed path", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ embeddings: [vector()] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const imageSide = createOllamaImageEmbedder({
+      OLLAMA_EMBED_KEEP_ALIVE: "5m",
+      OLLAMA_BASE_URL: "http://127.0.0.1:11434",
+    });
+    await imageSide.embedImages(["aaaa"]);
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+    expect(body.keep_alive).toBe("5m");
+    expect(body.keep_alive).not.toBe(-1);
+    expect(body.model).toBe(DEFAULT_IMAGE_EMBEDDING_MODEL);
+    expect(body.input).toEqual({ image: "aaaa" });
   });
 
   it("returns an empty list without calling Ollama when there is no text", async () => {

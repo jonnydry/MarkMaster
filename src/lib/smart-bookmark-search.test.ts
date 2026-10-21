@@ -30,6 +30,17 @@ function sqlValues(query: unknown): unknown[] {
   return [...(query as { values: unknown[] }).values];
 }
 
+function bothSidesQueryRaw() {
+  return vi.fn(async (query: Prisma.Sql) => {
+    const sql = sqlText(query);
+    if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+    if (sql.includes('AS "present"')) return [{ present: true }];
+    if (sql.includes('GROUP BY b."id"')) return [{ id: "pic", distance: 0.1 }];
+    if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }];
+    return [];
+  });
+}
+
 function input(overrides: Partial<SmartBookmarkSearchInput> = {}): SmartBookmarkSearchInput {
   return {
     userId: "user-1",
@@ -299,7 +310,7 @@ describe("trySmartBookmarkSearch", () => {
     expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(true);
   });
 
-  it("skips query embeds for 60s after a timeout, then tries again", async () => {
+  it("keeps the text breaker open for exactly 60s after a text timeout", async () => {
     vi.useFakeTimers();
     try {
       const embedder = provider(async () => {
@@ -315,12 +326,12 @@ describe("trySmartBookmarkSearch", () => {
       expect(embedder.embed).toHaveBeenCalledTimes(1);
 
       const during = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
-      expect(during).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(during).toMatchObject({ kind: "fallback", metadata: { fallback: "circuit_open" } });
       expect(embedder.embed).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(QUERY_EMBED_CIRCUIT_OPEN_MS - 1);
       const stillOpen = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
-      expect(stillOpen).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+      expect(stillOpen).toMatchObject({ kind: "fallback", metadata: { fallback: "circuit_open" } });
       expect(embedder.embed).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(1);
@@ -331,6 +342,135 @@ describe("trySmartBookmarkSearch", () => {
       vi.useRealTimers();
       resetQueryEmbedCircuit();
     }
+  });
+
+  it("an image-only timeout trips only the image side", async () => {
+    const textEmbedder = provider();
+    const imageEmbedder = {
+      ...provider(async () => {
+        throw new EmbeddingProviderError("timeout");
+      }),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = bothSidesQueryRaw();
+
+    const first = await trySmartBookmarkSearch(input({ searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(first.kind).toBe("ranked");
+    if (first.kind !== "ranked") return;
+    expect(first.orderedIds).toEqual(["note"]);
+    expect(first.metadata.imageHits).toBeUndefined();
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    const second = await trySmartBookmarkSearch(input({ search: "second query", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(second.kind).toBe("ranked");
+    if (second.kind !== "ranked") return;
+    expect(second.metadata.fallback).toBeNull();
+    expect(second.orderedIds).toEqual(["note"]);
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(2);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(queryRaw.mock.calls.map((call) => sqlText(call[0])).some((sql) => sql.includes('GROUP BY b."id"'))).toBe(
+      false
+    );
+  });
+
+  it("a text-only timeout trips only the text side", async () => {
+    const textEmbedder = provider(async () => {
+      throw new EmbeddingProviderError("timeout");
+    });
+    const imageEmbedder = {
+      ...provider(),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = bothSidesQueryRaw();
+
+    const first = await trySmartBookmarkSearch(input({ searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(first.kind).toBe("ranked");
+    if (first.kind !== "ranked") return;
+    expect(first.orderedIds).toEqual(["pic"]);
+    expect(first.metadata.imageHits).toBe(1);
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    const second = await trySmartBookmarkSearch(input({ search: "second query", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(second.kind).toBe("ranked");
+    if (second.kind !== "ranked") return;
+    expect(second.orderedIds).toEqual(["pic"]);
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(2);
+    const queries = queryRaw.mock.calls.map((call) => sqlText(call[0]));
+    expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(false);
+    expect(queries.filter((sql) => sql.includes('GROUP BY b."id"'))).toHaveLength(2);
+  });
+
+  it("leaves the breaker closed when the embed error is not a timeout", async () => {
+    const embedder = provider(async () => {
+      throw new EmbeddingProviderError("provider_unavailable");
+    });
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      if (sqlText(query).includes('AS "present"')) return [{ present: true }];
+      return [];
+    });
+
+    const first = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+    expect(first).toMatchObject({ kind: "fallback", metadata: { fallback: "provider_unavailable" } });
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
+
+    const second = await trySmartBookmarkSearch(input(), { provider: embedder, queryRaw });
+    expect(second).toMatchObject({ kind: "fallback", metadata: { fallback: "provider_unavailable" } });
+    expect(embedder.embed).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a cached query embedding while that side's circuit is open", async () => {
+    const embedder = provider(async (texts) => {
+      if (texts[0] === "cold") throw new EmbeddingProviderError("timeout");
+      return [Array.from({ length: EMBEDDING_DIMS }, () => 0.1)];
+    });
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }];
+      return [];
+    });
+
+    const warm = await trySmartBookmarkSearch(input({ search: "warm", searchTerms: [] }), {
+      provider: embedder,
+      queryRaw,
+    });
+    expect(warm.kind).toBe("ranked");
+    expect(embedder.embed).toHaveBeenCalledTimes(1);
+
+    const cold = await trySmartBookmarkSearch(input({ search: "cold", searchTerms: [] }), {
+      provider: embedder,
+      queryRaw,
+    });
+    expect(cold).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+    expect(embedder.embed).toHaveBeenCalledTimes(2);
+
+    const again = await trySmartBookmarkSearch(input({ search: "warm", searchTerms: [] }), {
+      provider: embedder,
+      queryRaw,
+    });
+    expect(again.kind).toBe("ranked");
+    if (again.kind !== "ranked") return;
+    expect(again.orderedIds).toEqual(["note"]);
+    expect(embedder.embed).toHaveBeenCalledTimes(2);
   });
 
   it("reuses the cached query embedding", async () => {

@@ -3,9 +3,12 @@ export const IMAGE_HIT_SIMILARITY_CUTOFF = 0.68;
 
 /**
  * Override for {@link IMAGE_HIT_SIMILARITY_CUTOFF}.
- * A non-finite value, or a value outside (0, 1), is ignored.
+ * A non-finite value, a value below {@link MIN_IMAGE_HIT_SIMILARITY_CUTOFF}, or a value of 1 or more, is ignored.
  */
 export const IMAGE_HIT_SIMILARITY_CUTOFF_ENV = "IMAGE_HIT_SIMILARITY_CUTOFF";
+
+/** Overrides below this are noise and fall back to {@link IMAGE_HIT_SIMILARITY_CUTOFF}. */
+export const MIN_IMAGE_HIT_SIMILARITY_CUTOFF = 0.3;
 
 /**
  * Subtracted from an image cosine before it is compared with a text cosine.
@@ -31,7 +34,9 @@ export function imageHitSimilarityCutoff(env: NodeJS.ProcessEnv = process.env): 
   const raw = env[IMAGE_HIT_SIMILARITY_CUTOFF_ENV];
   if (raw === undefined || raw.trim() === "") return IMAGE_HIT_SIMILARITY_CUTOFF;
   const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0 || value >= 1) return IMAGE_HIT_SIMILARITY_CUTOFF;
+  if (!Number.isFinite(value) || value < MIN_IMAGE_HIT_SIMILARITY_CUTOFF || value >= 1) {
+    return IMAGE_HIT_SIMILARITY_CUTOFF;
+  }
   return value;
 }
 

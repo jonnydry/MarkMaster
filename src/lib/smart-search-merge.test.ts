@@ -6,6 +6,7 @@ import {
   IMAGE_HIT_SIMILARITY_CUTOFF,
   imageHitScore,
   imageHitSimilarityCutoff,
+  MIN_IMAGE_HIT_SIMILARITY_CUTOFF,
   mergeTextAndImageHits,
 } from "./smart-search-merge";
 
@@ -175,9 +176,13 @@ describe("mergeTextAndImageHits", () => {
 });
 
 describe("imageHitSimilarityCutoff", () => {
-  it("reads a cutoff in (0, 1) and ignores anything else", () => {
+  it("reads a cutoff in [0.3, 1) and ignores anything else", () => {
+    expect(MIN_IMAGE_HIT_SIMILARITY_CUTOFF).toBe(0.3);
     expect(imageHitSimilarityCutoff({})).toBe(IMAGE_HIT_SIMILARITY_CUTOFF);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.5" })).toBe(0.5);
+    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.3" })).toBe(0.3);
+    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.29" })).toBe(0.68);
+    expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "1e-300" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "0.0" })).toBe(0.68);
     expect(imageHitSimilarityCutoff({ IMAGE_HIT_SIMILARITY_CUTOFF: "1" })).toBe(0.68);

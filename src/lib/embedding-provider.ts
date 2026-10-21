@@ -37,12 +37,12 @@ export const SMART_SEARCH_EMBED_TIMEOUT_MS = 4_000;
 
 /**
  * Override for {@link SMART_SEARCH_EMBED_TIMEOUT_MS}.
- * Clamped to 1–30000 ms. A blank, non-finite, or non-positive value is ignored.
+ * Clamped to 100–30000 ms. A blank, non-finite, or non-positive value is ignored.
  */
 export const SMART_SEARCH_EMBED_TIMEOUT_ENV = "SMART_SEARCH_EMBED_TIMEOUT_MS";
 
 /** Node timers misbehave above 2^31-1 ms. The embed cap stays well under that. */
-export const MIN_SMART_SEARCH_EMBED_TIMEOUT_MS = 1;
+export const MIN_SMART_SEARCH_EMBED_TIMEOUT_MS = 100;
 export const MAX_SMART_SEARCH_EMBED_TIMEOUT_MS = 30_000;
 
 /**
@@ -187,7 +187,7 @@ function ollamaBaseUrl(env: NodeJS.ProcessEnv): string {
   return (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
 }
 
-/** Milliseconds in [1, 30000]. Blank, non-finite, or non-positive values use `fallback`. */
+/** Milliseconds in [100, 30000]. Blank, non-finite, or non-positive values use `fallback`. */
 export function smartSearchEmbedTimeoutMs(
   env: NodeJS.ProcessEnv = process.env,
   fallback = SMART_SEARCH_EMBED_TIMEOUT_MS
@@ -208,7 +208,7 @@ function clampEmbedTimeout(value: number): number {
 
 /**
  * Duration sent as Ollama `keep_alive`. Default `30m`.
- * `-1`, `0`, and anything outside 1s–24h are ignored so a model is not pinned indefinitely.
+ * `-1`, `0`, a compound duration such as `1h30m`, and anything outside 1s–24h are ignored.
  */
 export function ollamaEmbedKeepAlive(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env[OLLAMA_EMBED_KEEP_ALIVE_ENV]?.trim() ?? "";
@@ -318,6 +318,22 @@ function rememberQueryEmbedding(key: string, vector: number[]): void {
   }
 }
 
+function queryEmbeddingCacheKey(provider: Pick<EmbeddingProvider, "model" | "dims">, text: string): string {
+  return `${provider.model}\0${provider.dims}\0${text}`;
+}
+
+/** A stored query vector, or null. Does not call the provider. */
+export function cachedQueryEmbedding(
+  provider: Pick<EmbeddingProvider, "model" | "dims">,
+  text: string
+): number[] | null {
+  const key = queryEmbeddingCacheKey(provider, text);
+  const cached = queryEmbeddingCache.get(key);
+  if (!cached) return null;
+  rememberQueryEmbedding(key, cached);
+  return cached.slice();
+}
+
 /**
  * Embed one search query, reusing an in-memory vector for the same model and text.
  * `timeoutMs` is a cap passed to the provider. A fast embed returns immediately.
@@ -327,7 +343,7 @@ export async function embedSearchQuery(
   text: string,
   timeoutMs = smartSearchEmbedTimeoutMs()
 ): Promise<number[]> {
-  const key = `${provider.model}\0${provider.dims}\0${text}`;
+  const key = queryEmbeddingCacheKey(provider, text);
   const cached = queryEmbeddingCache.get(key);
   if (cached) {
     rememberQueryEmbedding(key, cached);
