@@ -28,8 +28,27 @@ export const DEFAULT_IMAGE_EMBEDDING_MODEL = "embeddinggemma-2:440m-q8_0-text-vi
 
 export const EMBEDDING_DIMS = 768;
 
-/** Search calls bail out quickly so keyword results can take over. */
-export const SMART_SEARCH_EMBED_TIMEOUT_MS = 1_500;
+/**
+ * Cap for one query embed. The call returns when Ollama responds.
+ * It aborts only if the request is still running at this limit.
+ * A model swap on a one-model Ollama is about 1.4–1.7s; a warm call is about 45ms.
+ */
+export const SMART_SEARCH_EMBED_TIMEOUT_MS = 4_000;
+
+/** Override for {@link SMART_SEARCH_EMBED_TIMEOUT_MS}. A non-positive or non-finite value is ignored. */
+export const SMART_SEARCH_EMBED_TIMEOUT_ENV = "SMART_SEARCH_EMBED_TIMEOUT_MS";
+
+/**
+ * Embed cap for `npm run embeddings:image-scores` when
+ * {@link SMART_SEARCH_EMBED_TIMEOUT_ENV} is unset. Long enough for a cold model load.
+ */
+export const IMAGE_SCORE_EMBED_TIMEOUT_MS = 30_000;
+
+/**
+ * Ollama unloads a model after 5 minutes by default.
+ * A negative keep_alive leaves it loaded until the server evicts it.
+ */
+export const OLLAMA_EMBED_KEEP_ALIVE = -1;
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 30_000;
 const QUERY_EMBEDDING_CACHE_LIMIT = 128;
@@ -146,6 +165,18 @@ function ollamaBaseUrl(env: NodeJS.ProcessEnv): string {
   return (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
 }
 
+/** Positive finite milliseconds from the env, otherwise `fallback`. */
+export function smartSearchEmbedTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+  fallback = SMART_SEARCH_EMBED_TIMEOUT_MS
+): number {
+  const raw = env[SMART_SEARCH_EMBED_TIMEOUT_ENV];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return value;
+}
+
 type OllamaEmbedInput = string | { image: string };
 
 async function postOllamaEmbed(
@@ -155,6 +186,8 @@ async function postOllamaEmbed(
   expected: number,
   timeoutMs: number
 ): Promise<number[][]> {
+  // Cap, not a delay: a response that arrives first is returned, and the timer is cleared.
+  // The timer aborts the request only when it is still pending.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -162,7 +195,7 @@ async function postOllamaEmbed(
     const response = await fetch(`${baseUrl}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, input }),
+      body: JSON.stringify({ model, input, keep_alive: OLLAMA_EMBED_KEEP_ALIVE }),
       signal: controller.signal,
     });
 
@@ -227,11 +260,14 @@ function rememberQueryEmbedding(key: string, vector: number[]): void {
   }
 }
 
-/** Embed one search query, reusing an in-memory vector for the same model and text. */
+/**
+ * Embed one search query, reusing an in-memory vector for the same model and text.
+ * `timeoutMs` is a cap passed to the provider. A fast embed returns immediately.
+ */
 export async function embedSearchQuery(
   provider: EmbeddingProvider,
   text: string,
-  timeoutMs = SMART_SEARCH_EMBED_TIMEOUT_MS
+  timeoutMs = smartSearchEmbedTimeoutMs()
 ): Promise<number[]> {
   const key = `${provider.model}\0${provider.dims}\0${text}`;
   const cached = queryEmbeddingCache.get(key);

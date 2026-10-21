@@ -26,7 +26,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-import { clearQueryEmbeddingCache, EMBEDDING_DIMS } from "@/lib/embedding-provider";
+import { clearQueryEmbeddingCache, EMBEDDING_DIMS, SMART_SEARCH_EMBED_TIMEOUT_MS } from "@/lib/embedding-provider";
 
 function sqlText(query: unknown): string {
   if (!query || typeof query !== "object" || !("strings" in query)) return "";
@@ -35,6 +35,10 @@ function sqlText(query: unknown): string {
 
 function vector(): number[] {
   return Array.from({ length: EMBEDDING_DIMS }, () => 0.2);
+}
+
+async function flushMicrotasks(turns = 60): Promise<void> {
+  for (let i = 0; i < turns; i += 1) await Promise.resolve();
 }
 
 describe("smart bookmark search mode", () => {
@@ -204,5 +208,193 @@ describe("smart bookmark search mode", () => {
     expect(body.bookmarks.find((bookmark: { id: string }) => bookmark.id === "both")?.imageMatch).toBeUndefined();
     expect(body.search.imageHits).toBe(1);
     expect(body.search.imageModel).toBe("embeddinggemma-2:440m-q8_0-text-vision");
+  });
+
+  it("returns ranked bookmarks as soon as the embed resolves", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("SMART_SEARCH_EMBED_TIMEOUT_MS", String(SMART_SEARCH_EMBED_TIMEOUT_MS));
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const { GET } = await import("./route");
+      let resolveEmbed: (value: { ok: boolean; json: () => Promise<{ embeddings: number[][] }> }) => void =
+        () => {};
+      vi.stubGlobal(
+        "fetch",
+        () =>
+          new Promise((resolve) => {
+            resolveEmbed = resolve;
+          })
+      );
+      vi.mocked(prisma.$queryRaw).mockImplementation(async (query: unknown) => {
+        const sql = sqlText(query);
+        if (sql.includes('AS "imagePresent"')) return [{ imagePresent: false }];
+        if (sql.includes('AS "present"')) return [{ present: true }];
+        if (sql.includes("<=>")) return [{ id: "v1", distance: 0.2 }, { id: "both", distance: 0.3 }];
+        if (sql.includes("ILIKE")) return [{ id: "both" }, { id: "k1" }];
+        return [];
+      });
+      vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+        { id: "k1", media: null, urls: null },
+        { id: "v1", media: null, urls: null },
+        { id: "both", media: null, urls: null },
+      ] as never);
+
+      const started = Date.now();
+      let settled = false;
+      const pending = GET(new NextRequest("http://localhost/api/bookmarks?search=rust&mode=smart")).then(
+        (response) => {
+          settled = true;
+          return response;
+        }
+      );
+
+      await flushMicrotasks();
+      expect(settled).toBe(false);
+
+      resolveEmbed({
+        ok: true,
+        json: async () => ({ embeddings: [vector()] }),
+      });
+      await flushMicrotasks();
+
+      expect(settled).toBe(true);
+      expect(Date.now()).toBe(started);
+      expect(vi.getTimerCount()).toBe(0);
+      const response = await pending;
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.bookmarks.map((bookmark: { id: string }) => bookmark.id)).toEqual(["both", "v1", "k1"]);
+      expect(body.search).toMatchObject({ mode: "smart", fallback: null });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("returns keyword bookmarks when the embed exceeds the timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("SMART_SEARCH_EMBED_TIMEOUT_MS", String(SMART_SEARCH_EMBED_TIMEOUT_MS));
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const { GET } = await import("./route");
+      vi.stubGlobal(
+        "fetch",
+        (_url: string, init: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+            });
+          })
+      );
+      vi.mocked(prisma.$queryRaw).mockImplementation(async (query: unknown) => {
+        const sql = sqlText(query);
+        if (sql.includes('AS "imagePresent"')) return [{ imagePresent: false }];
+        if (sql.includes('AS "present"')) return [{ present: true }];
+        if (sql.includes("COUNT")) return [{ count: 1n }];
+        if (sql.includes("ILIKE")) return [{ id: "kw-1" }];
+        return [];
+      });
+      vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+        { id: "kw-1", media: null, urls: null },
+      ] as never);
+
+      let settled = false;
+      const pending = GET(new NextRequest("http://localhost/api/bookmarks?search=rust&mode=smart")).then(
+        (response) => {
+          settled = true;
+          return response;
+        }
+      );
+
+      await flushMicrotasks();
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(SMART_SEARCH_EMBED_TIMEOUT_MS - 1);
+      await flushMicrotasks();
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await flushMicrotasks();
+      expect(settled).toBe(true);
+
+      const response = await pending;
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.bookmarks.map((bookmark: { id: string }) => bookmark.id)).toEqual(["kw-1"]);
+      expect(body.search).toMatchObject({ mode: "smart", fallback: "timeout" });
+      const statements = vi.mocked(prisma.$queryRaw).mock.calls.map((call) => sqlText(call[0]));
+      expect(statements.some((sql) => sql.includes('"tweetText" ILIKE'))).toBe(true);
+      expect(statements.some((sql) => sql.includes("<=>"))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("returns text and keyword bookmarks when the image embed exceeds the timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("SMART_SEARCH_EMBED_TIMEOUT_MS", String(SMART_SEARCH_EMBED_TIMEOUT_MS));
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const { GET } = await import("./route");
+      vi.stubGlobal("fetch", (_url: string, init: { body?: BodyInit | null; signal?: AbortSignal }) => {
+        const model = JSON.parse(String(init.body)).model as string;
+        if (!String(model).includes("text-vision")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ embeddings: [vector()] }),
+          });
+        }
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          });
+        });
+      });
+      vi.mocked(prisma.$queryRaw).mockImplementation(async (query: unknown) => {
+        const sql = sqlText(query);
+        if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+        if (sql.includes('AS "present"')) return [{ present: true }];
+        if (sql.includes("BookmarkImageEmbedding")) return [{ id: "pic", distance: 0.1 }];
+        if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }];
+        if (sql.includes("ILIKE")) return [{ id: "note" }, { id: "kw-1" }];
+        return [];
+      });
+      vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+        { id: "note", media: null, urls: null },
+        { id: "kw-1", media: null, urls: null },
+      ] as never);
+
+      let settled = false;
+      const pending = GET(new NextRequest("http://localhost/api/bookmarks?search=rust&mode=smart")).then(
+        (response) => {
+          settled = true;
+          return response;
+        }
+      );
+
+      await flushMicrotasks();
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(SMART_SEARCH_EMBED_TIMEOUT_MS);
+      await flushMicrotasks();
+      expect(settled).toBe(true);
+
+      const response = await pending;
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.bookmarks.map((bookmark: { id: string }) => bookmark.id)).toEqual(["note", "kw-1"]);
+      expect(body.search).toMatchObject({ mode: "smart", fallback: null, vectorHits: 1 });
+      expect(body.search.imageHits).toBeUndefined();
+      expect(body.bookmarks.every((bookmark: { imageMatch?: boolean }) => bookmark.imageMatch !== true)).toBe(
+        true
+      );
+      const statements = vi.mocked(prisma.$queryRaw).mock.calls.map((call) => sqlText(call[0]));
+      expect(statements.some((sql) => sql.includes("BookmarkImageEmbedding") && sql.includes("<=>"))).toBe(
+        false
+      );
+      expect(statements.some((sql) => sql.includes('"tweetText" ILIKE'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
   });
 });

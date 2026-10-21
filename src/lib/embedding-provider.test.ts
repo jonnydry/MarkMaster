@@ -12,7 +12,11 @@ import {
   EMBEDDING_DOCUMENT_PREFIX,
   EMBEDDING_QUERY_PREFIX,
   EmbeddingProviderError,
+  IMAGE_SCORE_EMBED_TIMEOUT_MS,
+  OLLAMA_EMBED_KEEP_ALIVE,
+  SMART_SEARCH_EMBED_TIMEOUT_MS,
   embedSearchQuery,
+  smartSearchEmbedTimeoutMs,
 } from "./embedding-provider";
 
 function vector(length = EMBEDDING_DIMS, fill = 0.25): number[] {
@@ -53,6 +57,7 @@ describe("Ollama embedding provider", () => {
         `${EMBEDDING_DOCUMENT_PREFIX}ownership`,
         `${EMBEDDING_DOCUMENT_PREFIX}notes`,
       ],
+      keep_alive: OLLAMA_EMBED_KEEP_ALIVE,
     });
   });
 
@@ -76,18 +81,34 @@ describe("Ollama embedding provider", () => {
   it("reports a timeout and an unreachable provider separately", async () => {
     const provider = createOllamaEmbeddingProvider({});
 
-    vi.stubGlobal(
-      "fetch",
-      (_url: string, init: { signal: AbortSignal }) =>
-        new Promise((_resolve, reject) => {
-          init.signal.addEventListener("abort", () => {
-            reject(Object.assign(new Error("aborted"), { name: "TimeoutError" }));
-          });
-        })
-    );
-    await expect(provider.embed(["q"], "query", { timeoutMs: 20 })).rejects.toMatchObject({
-      reason: "timeout",
-    });
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        (_url: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener("abort", () => {
+              reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+            });
+          })
+      );
+      let reason: unknown;
+      const pending = provider.embed(["q"], "query", { timeoutMs: 4_000 }).then(
+        () => {
+          throw new Error("resolved");
+        },
+        (error: unknown) => {
+          reason = error;
+        }
+      );
+      await vi.advanceTimersByTimeAsync(3_999);
+      expect(reason).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(reason).toMatchObject({ reason: "timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
 
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("fetch failed");
@@ -158,11 +179,55 @@ describe("Ollama embedding provider", () => {
     expect(first).toEqual({
       model: DEFAULT_IMAGE_EMBEDDING_MODEL,
       input: [`${EMBEDDING_QUERY_PREFIX}red bicycle`],
+      keep_alive: OLLAMA_EMBED_KEEP_ALIVE,
     });
     expect(second).toEqual({
       model: "custom-vision",
       input: { image: "aaaa" },
+      keep_alive: OLLAMA_EMBED_KEEP_ALIVE,
     });
+  });
+
+  it("returns a fast embed without waiting out the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", async () => ({
+        ok: true,
+        json: async () => ({ embeddings: [vector()] }),
+      }));
+      const provider = createOllamaEmbeddingProvider({});
+      const started = Date.now();
+      let settled = false;
+      const pending = provider.embed(["q"], "query", { timeoutMs: SMART_SEARCH_EMBED_TIMEOUT_MS }).then(
+        (rows) => {
+          settled = true;
+          return rows;
+        }
+      );
+      for (let turn = 0; turn < 20 && !settled; turn += 1) await Promise.resolve();
+      expect(settled).toBe(true);
+      expect(Date.now()).toBe(started);
+      expect(vi.getTimerCount()).toBe(0);
+      await expect(pending).resolves.toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads a positive embed timeout and otherwise uses the fallback", () => {
+    expect(SMART_SEARCH_EMBED_TIMEOUT_MS).toBe(4_000);
+    expect(IMAGE_SCORE_EMBED_TIMEOUT_MS).toBe(30_000);
+    expect(OLLAMA_EMBED_KEEP_ALIVE).toBe(-1);
+    expect(smartSearchEmbedTimeoutMs({})).toBe(4_000);
+    expect(smartSearchEmbedTimeoutMs({}, IMAGE_SCORE_EMBED_TIMEOUT_MS)).toBe(30_000);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "2500" })).toBe(2_500);
+    expect(
+      smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "2500" }, IMAGE_SCORE_EMBED_TIMEOUT_MS)
+    ).toBe(2_500);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "0" })).toBe(4_000);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "-5" }, 30_000)).toBe(30_000);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "nope" })).toBe(4_000);
+    expect(smartSearchEmbedTimeoutMs({ SMART_SEARCH_EMBED_TIMEOUT_MS: "  " })).toBe(4_000);
   });
 
   it("returns an empty list without calling Ollama when there is no text", async () => {
