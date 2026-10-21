@@ -16,6 +16,7 @@ import {
   BookmarkCardActionButton,
   BookmarkCardSelectionToggle,
   BookmarkTagChip,
+  ImageMatchLabel,
 } from "@/components/bookmark-card-chrome";
 import { BookmarkThumbnail } from "@/components/bookmark-thumbnail";
 import type { BookmarkMediaJson } from "@/lib/bookmark-media";
@@ -261,8 +262,9 @@ export const GridBookmarkCard = memo(function GridBookmarkCard({
           {highlightedText}
         </p>
 
-        {(primaryTag || hasCollection || hasNote) && (
+        {(primaryTag || hasCollection || hasNote || bookmark.imageMatch) && (
           <div className="mt-2 flex flex-wrap items-center gap-1">
+            {bookmark.imageMatch ? <ImageMatchLabel /> : null}
             {primaryTag ? (
               <BookmarkTagChip
                 name={primaryTag.name}

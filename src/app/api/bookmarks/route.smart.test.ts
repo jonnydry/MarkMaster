@@ -166,5 +166,43 @@ describe("smart bookmark search mode", () => {
     expect(body.search).toMatchObject({ mode: "smart", fallback: null, vectorHits: 2, keywordHits: 2 });
     expect(body.nextCursor).toBeUndefined();
     expect(body.total).toBe(3);
+    expect(body.bookmarks.every((bookmark: { imageMatch?: boolean }) => bookmark.imageMatch !== true)).toBe(
+      true
+    );
+  });
+
+  it("marks bookmarks that matched by image", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const { GET } = await import("./route");
+
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      json: async () => ({ embeddings: [vector()] }),
+    }));
+    vi.mocked(prisma.$queryRaw).mockImplementation(async (query: unknown) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes("BookmarkImageEmbedding")) return [{ id: "v1", distance: 0.1 }];
+      if (sql.includes("<=>")) return [{ id: "both", distance: 0.2 }];
+      if (sql.includes("ILIKE")) return [{ id: "both" }];
+      return [];
+    });
+    vi.mocked(prisma.bookmark.findMany).mockResolvedValue([
+      { id: "v1", media: null, urls: null },
+      { id: "both", media: null, urls: null },
+    ] as never);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/bookmarks?search=rust&mode=smart")
+    );
+    const body = await response.json();
+
+    expect(body.bookmarks.find((bookmark: { id: string }) => bookmark.id === "v1")?.imageMatch).toBe(
+      true
+    );
+    expect(body.bookmarks.find((bookmark: { id: string }) => bookmark.id === "both")?.imageMatch).toBeUndefined();
+    expect(body.search.imageHits).toBe(1);
+    expect(body.search.imageModel).toBe("embeddinggemma-2:440m-q8_0-text-vision");
   });
 });

@@ -1,7 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearQueryEmbeddingCache, EmbeddingProviderError, EMBEDDING_DIMS } from "./embedding-provider";
+import {
+  clearQueryEmbeddingCache,
+  DEFAULT_IMAGE_EMBEDDING_MODEL,
+  EmbeddingProviderError,
+  EMBEDDING_DIMS,
+} from "./embedding-provider";
 import { toPgVectorLiteral } from "./pg-vector";
 import {
   SMART_SEARCH_KEYWORD_LIMIT,
@@ -180,6 +185,55 @@ describe("trySmartBookmarkSearch", () => {
     expect(result).toMatchObject({ kind: "fallback", metadata: { fallback: "empty_query" } });
     expect(queryRaw).not.toHaveBeenCalled();
     expect(embedder.embed).not.toHaveBeenCalled();
+  });
+
+  it("merges image hits above the cutoff with text hits and keeps filters", async () => {
+    const textEmbedder = provider();
+    const imageEmbedder = {
+      ...provider(),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = vi.fn(async (query: Prisma.Sql) => {
+      const sql = sqlText(query);
+      if (sql.includes('AS "imagePresent"')) return [{ imagePresent: true }];
+      if (sql.includes('AS "present"')) return [{ present: true }];
+      if (sql.includes('"BookmarkImageEmbedding"')) {
+        return [
+          { id: "pic", distance: 0.1 },
+          { id: "weak", distance: 0.4 },
+          { id: "pic", distance: 0.3 },
+        ];
+      }
+      if (sql.includes("<=>")) return [{ id: "note", distance: 0.2 }, { id: "pic", distance: 0.5 }];
+      return [];
+    });
+
+    const result = await trySmartBookmarkSearch(input({ searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+
+    expect(result.kind).toBe("ranked");
+    if (result.kind !== "ranked") return;
+    expect(result.orderedIds).toEqual(["note", "pic"]);
+    expect(result.metadata).toMatchObject({
+      vectorHits: 2,
+      imageHits: 1,
+      imageModel: DEFAULT_IMAGE_EMBEDDING_MODEL,
+      imageMatchedIds: ["pic"],
+      keywordHits: 0,
+    });
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    const imageQuery = queryRaw.mock.calls
+      .map((call) => call[0])
+      .find((query) => sqlText(query).includes("GROUP BY b.\"id\""));
+    expect(sqlText(imageQuery)).toContain('"authorUsername" ILIKE');
+    expect(sqlValues(imageQuery)).toEqual(
+      expect.arrayContaining(["user-1", DEFAULT_IMAGE_EMBEDDING_MODEL, 768, "tag-1"])
+    );
   });
 
   it("reuses the cached query embedding", async () => {

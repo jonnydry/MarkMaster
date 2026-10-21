@@ -22,6 +22,7 @@ import {
   BookmarkCardActionButton,
   BookmarkCardSelectionToggle,
   BookmarkTagChip,
+  ImageMatchLabel,
 } from "@/components/bookmark-card-chrome";
 import { openBookmarkOnX } from "@/lib/bookmark-url";
 import { cn } from "@/lib/utils";
@@ -204,8 +205,9 @@ export const BookmarkCard = memo(function BookmarkCard({
           <p className="text-sm text-foreground mt-0.5 line-clamp-1">
             {highlightedText}
           </p>
-          {bookmark.tags.length > 0 && (
-            <div className="mt-1.5 flex gap-1">
+          {(bookmark.tags.length > 0 || bookmark.imageMatch) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              {bookmark.imageMatch ? <ImageMatchLabel /> : null}
               {bookmark.tags.map(({ tag }) => (
                 <BookmarkTagChip
                   key={tag.id}
@@ -361,8 +363,9 @@ export const BookmarkCard = memo(function BookmarkCard({
             </div>
           )}
 
-          {bookmark.tags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+          {(bookmark.tags.length > 0 || bookmark.imageMatch) && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {bookmark.imageMatch ? <ImageMatchLabel /> : null}
               {bookmark.tags.map(({ tag }) => (
                 <BookmarkTagChip
                   key={tag.id}

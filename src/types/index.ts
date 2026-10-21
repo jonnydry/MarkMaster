@@ -88,6 +88,8 @@ export interface BookmarkWithRelations {
   collectionItems: Array<{
     collection: { id: string; name: string };
   }>;
+  /** Set on smart-search rows whose image embedding cleared the similarity cutoff. */
+  imageMatch?: boolean;
 }
 
 export type CollectionType = "x_folder" | "user_collection";

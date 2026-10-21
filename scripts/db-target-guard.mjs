@@ -7,7 +7,7 @@ export { findPrismaConfigProblems } from "./prisma-config-check.mjs";
 
 /**
  * Prod guard for scripts that write to the database (migrations, the
- * embedding backfill, one-off data fixes).
+ * embedding backfills, one-off data fixes).
  *
  * A write is allowed without a flag only when every URL the script uses is
  * either a local Postgres or a Neon endpoint listed as non-prod. Everything

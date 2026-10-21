@@ -80,6 +80,7 @@ model Bookmark {
   notes               Note[]
   orbitDecisionEvents OrbitDecisionEvent[]
   embeddings          BookmarkEmbedding[]
+  imageEmbeddings     BookmarkImageEmbedding[]
 
   @@unique([userId, tweetId])
   @@index([userId, bookmarkedAt(sort: Desc), id(sort: Desc)])
@@ -105,6 +106,25 @@ model BookmarkEmbedding {
   bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
 
   @@id([bookmarkId, model, dims])
+}
+
+/// One local image embedding per bookmark media item, model, and dimension.
+/// `embedding` is written with raw SQL. Prisma Client does not read Unsupported columns.
+/// Videos store the thumbnail. No HNSW or IVFFlat index: exact cosine scan.
+model BookmarkImageEmbedding {
+  bookmarkId  String
+  /// Image URL that was embedded (photo, video thumbnail, or link-card image).
+  mediaKey    String
+  model       String
+  dims        Int
+  embedding   Unsupported("vector(768)")
+  contentHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bookmark Bookmark @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@id([bookmarkId, mediaKey, model, dims])
 }
 
 model Tag {

@@ -135,6 +135,9 @@ npm run env:check
 | `XAI_API_BASE_URL` / `XAI_ORBIT_MODEL` | No | Override the xAI endpoint or Grok model for Orbit scans (default `grok-4.7`) |
 | `ORBIT_SCAN_ENRICHMENT` | No | Toggle the Orbit scan enrichment phase |
 | `SKIP_DB_MIGRATION_CHECK` | No (dev) | Skip the migration-status check `npm run dev` performs |
+| `OLLAMA_BASE_URL` | No | Ollama base URL for smart search (default `http://127.0.0.1:11434`). Text and image embeddings share it |
+| `EMBEDDING_MODEL` | No | Text embedding tag (default `embeddinggemma-2:270m`) |
+| `EMBEDDING_IMAGE_MODEL` | No | Image embedding tag (default `embeddinggemma-2:440m-q8_0-text-vision`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
 
 See [`.env.example`](.env.example) for the full list and production notes.
 
@@ -197,6 +200,8 @@ library — a fresh clone renders empty until then.
 | `npm run lint` | ESLint |
 | `npm run test` | Vitest unit tests |
 | `npm run db:migrate` | `prisma migrate deploy` against `DIRECT_URL`, refused on prod without `-- --prod` |
+| `npm run embeddings:backfill` | Embed bookmark text with the local Ollama text model. Refuses prod without `-- --prod` |
+| `npm run embeddings:backfill-images` | Embed bookmark images with `EMBEDDING_IMAGE_MODEL`. Refuses prod without `-- --prod`. See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run env:check` | Validate environment variables |
 
