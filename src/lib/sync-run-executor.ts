@@ -1,6 +1,7 @@
 import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { syncBookmarks } from "@/lib/sync";
+import { embedBookmarksAfterSync } from "@/lib/sync-embed";
 import { invalidateUserResponseCacheImmediate } from "@/lib/upstash-cache";
 
 /**
@@ -74,8 +75,20 @@ export async function executeSyncRun(
       );
     }
 
-    // Bookmarks were written either way — downstream caches must refresh.
+    // Bookmarks were written either way — downstream caches must refresh
+    // before the embed pass, so a client that sees COMPLETED refetches the
+    // new rows. Invalidate again after the pass so a list cached while
+    // embeddings were writing does not keep a copy from before the vectors.
     await invalidateUserResponseCacheImmediate(userId);
+
+    if (completed.count > 0) {
+      try {
+        await embedBookmarksAfterSync(userId);
+      } catch {
+        logError("SyncEmbed", "embedding pass failed");
+      }
+      await invalidateUserResponseCacheImmediate(userId);
+    }
   } catch (error) {
     if (error instanceof SyncRunSupersededError) {
       // The row is already FAILED (stale marker); bookmark writes so far are

@@ -310,6 +310,50 @@ describe("backfillBookmarkImageEmbeddings", () => {
       backfillBookmarkImageEmbeddings({ store, embedder: timingOut, now: () => later })
     ).rejects.toMatchObject({ reason: "timeout" });
   });
+
+  it("stops after the image limit and before the deadline", async () => {
+    const fetchTimeouts: number[] = [];
+    const fetchImage = vi.fn(async (_url: string, timeoutMs: number) => {
+      fetchTimeouts.push(timeoutMs);
+      return { ok: true as const, base64: Buffer.from(JPEG).toString("base64") };
+    });
+    const store = fakeStore([bookmark("a", [GOOD, SECOND])]);
+    const embedder = fakeEmbedder();
+
+    const capped = await backfillBookmarkImageEmbeddings({
+      store,
+      embedder,
+      fetchImage,
+      limit: 1,
+    });
+    expect(capped.embedded).toBe(1);
+    expect(embedder.calls).toHaveLength(1);
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+
+    const later = fakeStore([bookmark("a", [GOOD, SECOND])]);
+    const idle = fakeEmbedder();
+    const stopped = await backfillBookmarkImageEmbeddings({
+      store: later,
+      embedder: idle,
+      fetchImage,
+      deadlineAt: 0,
+    });
+    expect(stopped.embedded).toBe(0);
+    expect(idle.calls).toHaveLength(0);
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+
+    fetchTimeouts.length = 0;
+    await backfillBookmarkImageEmbeddings({
+      store: fakeStore([bookmark("b", [GOOD])]),
+      embedder: fakeEmbedder(),
+      fetchImage,
+      fetchTimeoutMs: 15_000,
+      deadlineAt: Date.now() + 2_000,
+    });
+    expect(fetchTimeouts).toHaveLength(1);
+    expect(fetchTimeouts[0]).toBeGreaterThan(200);
+    expect(fetchTimeouts[0]).toBeLessThanOrEqual(2_000);
+  });
 });
 
 describe("fetchImageAsBase64", () => {

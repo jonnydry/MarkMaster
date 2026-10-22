@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const queryRaw = vi.fn();
 const executeRaw = vi.fn();
+const findMany = vi.fn(async () => []);
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: (...args: unknown[]) => queryRaw(...args),
     $executeRaw: (...args: unknown[]) => executeRaw(...args),
-    bookmark: { findMany: vi.fn(async () => []) },
+    bookmark: { findMany: (...args: unknown[]) => findMany(...args) },
   },
 }));
 
@@ -20,6 +21,8 @@ describe("image embed failure store", () => {
   beforeEach(() => {
     queryRaw.mockReset();
     executeRaw.mockReset();
+    findMany.mockReset();
+    findMany.mockResolvedValue([]);
   });
 
   it("records a short status and reads failures for one model", async () => {
@@ -78,5 +81,59 @@ describe("image embed failure store", () => {
 
     await clearImageEmbedFailure("b", "https://pbs.twimg.com/a.jpg", "vision", 768);
     expect(sqlText(executeRaw.mock.calls[2]?.[0])).toContain('"bookmarkId"');
+  });
+
+  it("limits bookmark reads and deletes to one user", async () => {
+    const {
+      deleteAbsentImageEmbeddings,
+      deleteAbsentImageEmbedFailures,
+      listBookmarksForImageEmbedding,
+      listExistingImageEmbeddings,
+      listImageEmbedFailures,
+    } = await import("./image-embedding-backfill-store");
+
+    await listBookmarksForImageEmbedding();
+    expect(findMany.mock.calls[0]?.[0]).not.toHaveProperty("where");
+    await listBookmarksForImageEmbedding("user-1");
+    expect(findMany.mock.calls[1]?.[0].where).toEqual({ userId: "user-1" });
+
+    queryRaw.mockResolvedValue([]);
+    await listExistingImageEmbeddings("vision", 768);
+    expect(sqlText(queryRaw.mock.calls[0]?.[0])).not.toContain('"userId"');
+    await listExistingImageEmbeddings("vision", 768, "user-1");
+    const scopedList = queryRaw.mock.calls[1]?.[0] as { values: unknown[] };
+    expect(sqlText(scopedList)).toContain('"userId"');
+    expect(scopedList.values).toContain("user-1");
+
+    await listImageEmbedFailures("vision", 768, "user-1");
+    const scopedFailures = queryRaw.mock.calls[2]?.[0] as { values: unknown[] };
+    expect(sqlText(scopedFailures)).toContain('"BookmarkImageEmbedFailure"');
+    expect(scopedFailures.values).toContain("user-1");
+
+    executeRaw.mockResolvedValue(0);
+    await deleteAbsentImageEmbeddings("vision", 768, []);
+    expect(sqlText(executeRaw.mock.calls[0]?.[0])).not.toContain('"userId"');
+
+    await deleteAbsentImageEmbeddings("vision", 768, [], "user-1");
+    const scopedDelete = executeRaw.mock.calls[1]?.[0] as { values: unknown[] };
+    const deleteSql = sqlText(scopedDelete);
+    expect(deleteSql).toContain('"BookmarkImageEmbedding"');
+    expect(deleteSql).toContain('"userId"');
+    expect(scopedDelete.values).toContain("user-1");
+    expect(deleteSql).not.toContain("unnest");
+
+    await deleteAbsentImageEmbedFailures(
+      "vision",
+      768,
+      [{ bookmarkId: "b", mediaKey: "https://pbs.twimg.com/a.jpg" }],
+      "user-1"
+    );
+    const scopedFailureDelete = executeRaw.mock.calls[2]?.[0] as { values: unknown[] };
+    const failureSql = sqlText(scopedFailureDelete);
+    expect(failureSql).toContain('"BookmarkImageEmbedFailure"');
+    expect(failureSql).toContain('"userId"');
+    expect(failureSql).toContain("unnest");
+    expect(scopedFailureDelete.values).toContain("user-1");
+    expect(scopedFailureDelete.values).not.toContain("other-user");
   });
 });

@@ -7,8 +7,9 @@ import type {
 import { toPgVectorLiteral } from "@/lib/pg-vector";
 import { prisma } from "@/lib/prisma";
 
-export async function listBookmarksForEmbedding(): Promise<EmbeddingBackfillBookmark[]> {
+export async function listBookmarksForEmbedding(userId?: string): Promise<EmbeddingBackfillBookmark[]> {
   const rows = await prisma.bookmark.findMany({
+    ...(userId ? { where: { userId } } : {}),
     orderBy: { id: "asc" },
     select: {
       id: true,
@@ -36,13 +37,26 @@ export async function listBookmarksForEmbedding(): Promise<EmbeddingBackfillBook
 
 export async function listExistingEmbeddingHashes(
   model: string,
-  dims: number
+  dims: number,
+  userId?: string
 ): Promise<Array<{ bookmarkId: string; contentHash: string }>> {
+  if (!userId) {
+    return prisma.$queryRaw<{ bookmarkId: string; contentHash: string }[]>(Prisma.sql`
+      SELECT "bookmarkId", "contentHash"
+      FROM "BookmarkEmbedding"
+      WHERE "model" = ${model}
+        AND "dims" = ${dims}
+    `);
+  }
+
   return prisma.$queryRaw<{ bookmarkId: string; contentHash: string }[]>(Prisma.sql`
-    SELECT "bookmarkId", "contentHash"
-    FROM "BookmarkEmbedding"
-    WHERE "model" = ${model}
-      AND "dims" = ${dims}
+    SELECT e."bookmarkId", e."contentHash"
+    FROM "BookmarkEmbedding" AS e
+    WHERE e."model" = ${model}
+      AND e."dims" = ${dims}
+      AND e."bookmarkId" IN (
+        SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+      )
   `);
 }
 

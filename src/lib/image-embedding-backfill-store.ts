@@ -10,8 +10,9 @@ import type {
 import { toPgVectorLiteral } from "@/lib/pg-vector";
 import { prisma } from "@/lib/prisma";
 
-export async function listBookmarksForImageEmbedding(): Promise<ImageBackfillBookmark[]> {
+export async function listBookmarksForImageEmbedding(userId?: string): Promise<ImageBackfillBookmark[]> {
   const rows = await prisma.bookmark.findMany({
+    ...(userId ? { where: { userId } } : {}),
     orderBy: { id: "asc" },
     select: { id: true, media: true, urls: true },
   });
@@ -24,21 +25,44 @@ export async function listBookmarksForImageEmbedding(): Promise<ImageBackfillBoo
 
 export async function listExistingImageEmbeddings(
   model: string,
-  dims: number
+  dims: number,
+  userId?: string
 ): Promise<Array<{ bookmarkId: string; mediaKey: string; contentHash: string }>> {
+  if (!userId) {
+    return prisma.$queryRaw(Prisma.sql`
+      SELECT "bookmarkId", "mediaKey", "contentHash"
+      FROM "BookmarkImageEmbedding"
+      WHERE "model" = ${model}
+        AND "dims" = ${dims}
+    `);
+  }
+
   return prisma.$queryRaw(Prisma.sql`
-    SELECT "bookmarkId", "mediaKey", "contentHash"
-    FROM "BookmarkImageEmbedding"
-    WHERE "model" = ${model}
-      AND "dims" = ${dims}
+    SELECT e."bookmarkId", e."mediaKey", e."contentHash"
+    FROM "BookmarkImageEmbedding" AS e
+    WHERE e."model" = ${model}
+      AND e."dims" = ${dims}
+      AND e."bookmarkId" IN (
+        SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+      )
   `);
 }
 
+/**
+ * Drop image rows whose media item is gone.
+ * Pass `userId` to limit the delete to that user's bookmarks. The manual
+ * script omits it and cleans the whole library.
+ */
 export async function deleteAbsentImageEmbeddings(
   model: string,
   dims: number,
-  keep: Array<{ bookmarkId: string; mediaKey: string }>
+  keep: Array<{ bookmarkId: string; mediaKey: string }>,
+  userId?: string
 ): Promise<number> {
+  if (userId) {
+    return deleteAbsentForUser("BookmarkImageEmbedding", model, dims, keep, userId);
+  }
+
   if (keep.length === 0) {
     return prisma.$executeRaw(Prisma.sql`
       DELETE FROM "BookmarkImageEmbedding"
@@ -98,15 +122,31 @@ export async function upsertBookmarkImageEmbeddings(rows: StoredImageEmbedding[]
   `);
 }
 
-export async function listImageEmbedFailures(model: string, dims: number): Promise<ImageEmbedFailure[]> {
+export async function listImageEmbedFailures(
+  model: string,
+  dims: number,
+  userId?: string
+): Promise<ImageEmbedFailure[]> {
   const rows = await prisma.$queryRaw<
     Array<{ bookmarkId: string; mediaKey: string; failCount: number | bigint; lastFailedAt: Date | string }>
-  >(Prisma.sql`
-    SELECT "bookmarkId", "mediaKey", "failCount", "lastFailedAt"
-    FROM "BookmarkImageEmbedFailure"
-    WHERE "model" = ${model}
-      AND "dims" = ${dims}
-  `);
+  >(
+    userId
+      ? Prisma.sql`
+          SELECT e."bookmarkId", e."mediaKey", e."failCount", e."lastFailedAt"
+          FROM "BookmarkImageEmbedFailure" AS e
+          WHERE e."model" = ${model}
+            AND e."dims" = ${dims}
+            AND e."bookmarkId" IN (
+              SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+            )
+        `
+      : Prisma.sql`
+          SELECT "bookmarkId", "mediaKey", "failCount", "lastFailedAt"
+          FROM "BookmarkImageEmbedFailure"
+          WHERE "model" = ${model}
+            AND "dims" = ${dims}
+        `
+  );
   return rows.map((row) => ({
     bookmarkId: row.bookmarkId,
     mediaKey: row.mediaKey,
@@ -161,8 +201,13 @@ export async function clearImageEmbedFailure(
 export async function deleteAbsentImageEmbedFailures(
   model: string,
   dims: number,
-  keep: Array<{ bookmarkId: string; mediaKey: string }>
+  keep: Array<{ bookmarkId: string; mediaKey: string }>,
+  userId?: string
 ): Promise<number> {
+  if (userId) {
+    return deleteAbsentForUser("BookmarkImageEmbedFailure", model, dims, keep, userId);
+  }
+
   if (keep.length === 0) {
     return prisma.$executeRaw(Prisma.sql`
       DELETE FROM "BookmarkImageEmbedFailure"
@@ -177,6 +222,69 @@ export async function deleteAbsentImageEmbedFailures(
     DELETE FROM "BookmarkImageEmbedFailure" AS e
     WHERE e."model" = ${model}
       AND e."dims" = ${dims}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(${bookmarkIds}::text[], ${mediaKeys}::text[]) AS keep("bookmarkId", "mediaKey")
+        WHERE keep."bookmarkId" = e."bookmarkId"
+          AND keep."mediaKey" = e."mediaKey"
+      )
+  `);
+}
+
+function deleteAbsentForUser(
+  table: "BookmarkImageEmbedding" | "BookmarkImageEmbedFailure",
+  model: string,
+  dims: number,
+  keep: Array<{ bookmarkId: string; mediaKey: string }>,
+  userId: string
+): Promise<number> {
+  const bookmarkIds = keep.map((row) => row.bookmarkId);
+  const mediaKeys = keep.map((row) => row.mediaKey);
+
+  if (table === "BookmarkImageEmbedding") {
+    if (keep.length === 0) {
+      return prisma.$executeRaw(Prisma.sql`
+        DELETE FROM "BookmarkImageEmbedding" AS e
+        WHERE e."model" = ${model}
+          AND e."dims" = ${dims}
+          AND e."bookmarkId" IN (
+            SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+          )
+      `);
+    }
+    return prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "BookmarkImageEmbedding" AS e
+      WHERE e."model" = ${model}
+        AND e."dims" = ${dims}
+        AND e."bookmarkId" IN (
+          SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(${bookmarkIds}::text[], ${mediaKeys}::text[]) AS keep("bookmarkId", "mediaKey")
+          WHERE keep."bookmarkId" = e."bookmarkId"
+            AND keep."mediaKey" = e."mediaKey"
+        )
+    `);
+  }
+
+  if (keep.length === 0) {
+    return prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "BookmarkImageEmbedFailure" AS e
+      WHERE e."model" = ${model}
+        AND e."dims" = ${dims}
+        AND e."bookmarkId" IN (
+          SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+        )
+    `);
+  }
+  return prisma.$executeRaw(Prisma.sql`
+    DELETE FROM "BookmarkImageEmbedFailure" AS e
+    WHERE e."model" = ${model}
+      AND e."dims" = ${dims}
+      AND e."bookmarkId" IN (
+        SELECT "id" FROM "Bookmark" WHERE "userId" = ${userId}
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM unnest(${bookmarkIds}::text[], ${mediaKeys}::text[]) AS keep("bookmarkId", "mediaKey")
