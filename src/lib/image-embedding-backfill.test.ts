@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EMBEDDING_DIMS, EmbeddingProviderError, type ImageEmbedder } from "./embedding-provider";
@@ -339,6 +341,7 @@ describe("backfillBookmarkImageEmbeddings", () => {
       deadlineAt: 0,
     });
     expect(stopped.embedded).toBe(0);
+    expect(stopped.budgetStopped).toBe(true);
     expect(idle.calls).toHaveLength(0);
     expect(fetchImage).toHaveBeenCalledTimes(1);
 
@@ -353,6 +356,88 @@ describe("backfillBookmarkImageEmbeddings", () => {
     expect(fetchTimeouts).toHaveLength(1);
     expect(fetchTimeouts[0]).toBeGreaterThan(200);
     expect(fetchTimeouts[0]).toBeLessThanOrEqual(2_000);
+  });
+
+  it("re-embeds a previous hash version in place and keeps the stored key", async () => {
+    const url = "https://pbs.twimg.com/media/abc.jpg";
+    const store = fakeStore([bookmark("a", [url])]);
+    const embedder = fakeEmbedder();
+    const oldHash = createHash("sha256").update(`image-v1\0${url}`).digest("hex");
+    store.rows.set(`a\0${url}\0${embedder.model}\0${embedder.dims}`, {
+      bookmarkId: "a",
+      mediaKey: url,
+      model: embedder.model,
+      dims: embedder.dims,
+      embedding: [1],
+      contentHash: oldHash,
+    });
+    const fetchMock = vi.fn(async () => jpegResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const counts = await backfillBookmarkImageEmbeddings({ store, embedder });
+
+    expect(counts.removed).toBe(0);
+    expect(counts.embedded).toBe(1);
+    expect(counts.skipped).toBe(0);
+    expect(store.rows.size).toBe(1);
+    const row = [...store.rows.values()][0];
+    expect(row?.mediaKey).toBe(url);
+    expect(row?.contentHash).toBe(imageContentHash(url));
+    expect(row?.contentHash).not.toBe(oldHash);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://pbs.twimg.com/media/abc?format=jpg&name=small");
+  });
+
+  it("does not start an image embed when 1.5s or less of the deadline remains", async () => {
+    const fetchImage = vi.fn(async () => ({ ok: true as const, base64: "abc" }));
+    const tight = fakeEmbedder();
+    const stopped = await backfillBookmarkImageEmbeddings({
+      store: fakeStore([bookmark("a", [GOOD, SECOND])]),
+      embedder: tight,
+      fetchImage,
+      deadlineAt: Date.now() + 1_000,
+    });
+    expect(tight.calls).toHaveLength(0);
+    expect(fetchImage).not.toHaveBeenCalled();
+    expect(stopped.embedded).toBe(0);
+    expect(stopped.budgetStopped).toBe(true);
+
+    fetchImage.mockClear();
+    const roomy = fakeEmbedder();
+    const continued = await backfillBookmarkImageEmbeddings({
+      store: fakeStore([bookmark("a", [GOOD])]),
+      embedder: roomy,
+      fetchImage,
+      deadlineAt: Date.now() + 10_000,
+    });
+    expect(fetchImage).toHaveBeenCalledTimes(1);
+    expect(roomy.calls).toHaveLength(1);
+    expect(continued.embedded).toBe(1);
+    expect(continued.budgetStopped).toBe(false);
+  });
+
+  it("skips the embed when the fetch leaves 1.5s or less", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const start = Date.now();
+      vi.setSystemTime(start);
+      const fetchImage = vi.fn(async () => {
+        vi.setSystemTime(start + 800);
+        return { ok: true as const, base64: "abc" };
+      });
+      const embedder = fakeEmbedder();
+      const counts = await backfillBookmarkImageEmbeddings({
+        store: fakeStore([bookmark("a", [GOOD])]),
+        embedder,
+        fetchImage,
+        deadlineAt: start + 2_000,
+      });
+      expect(fetchImage).toHaveBeenCalledTimes(1);
+      expect(embedder.calls).toHaveLength(0);
+      expect(counts.embedded).toBe(0);
+      expect(counts.budgetStopped).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -462,6 +547,100 @@ describe("fetchImageAsBase64", () => {
       status: "unsupported",
     });
     expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it.each([
+    ["https://pbs.twimg.com/media/AbC123.jpg", "https://pbs.twimg.com/media/AbC123?format=jpg&name=small"],
+    ["https://pbs.twimg.com/media/AbC123.JPEG", "https://pbs.twimg.com/media/AbC123?format=jpg&name=small"],
+    [
+      "https://pbs.twimg.com/media/AbC123.png?format=png&name=large",
+      "https://pbs.twimg.com/media/AbC123?format=png&name=small",
+    ],
+    [
+      "https://pbs.twimg.com/media/AbC123.webp?name=orig",
+      "https://pbs.twimg.com/media/AbC123?format=webp&name=small",
+    ],
+  ])("fetches the small rendition of %s", async (original, small) => {
+    const fetchMock = vi.fn(async () => jpegResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchImageAsBase64(original, 1_000)).resolves.toMatchObject({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(small);
+  });
+
+  it.each([
+    "https://pbs.twimg.com/ext_tw_video_thumb/1/pu/img/abc.jpg",
+    "https://pbs.twimg.com/amplify_video_thumb/1/img/abc.jpg",
+    "https://pbs.twimg.com/card_img/abc.jpg",
+    "https://ton.twimg.com/card.jpg",
+    "https://video.twimg.com/ext_tw_video_thumb/1/pu/img/abc.jpg",
+  ])("fetches %s unchanged", async (url) => {
+    const fetchMock = vi.fn(async () => jpegResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchImageAsBase64(url, 1_000)).resolves.toMatchObject({ ok: true });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(url);
+  });
+
+  it.each([
+    {
+      label: "non-2xx",
+      respond: () => new Response("no", { status: 502 }),
+    },
+    {
+      label: "non-image",
+      respond: () => new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } }),
+    },
+    {
+      label: "network error",
+      respond: () => {
+        throw new Error("socket reset");
+      },
+    },
+  ])("falls back to the original URL when the small rendition is a $label", async ({ respond }) => {
+    const original = "https://pbs.twimg.com/media/abc.jpg";
+    const small = "https://pbs.twimg.com/media/abc?format=jpg&name=small";
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url) === small) return respond();
+      return jpegResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchImageAsBase64(original, 1_000)).resolves.toMatchObject({ ok: true });
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([small, original]);
+    const signals = fetchMock.mock.calls.map((call) => (call[1] as { signal?: AbortSignal } | undefined)?.signal);
+    expect(signals[0]).toBe(signals[1]);
+  });
+
+  it("reports the original media URL when the small rendition and the original both fail", async () => {
+    const original = "https://pbs.twimg.com/media/abc.jpg";
+    const fetchMock = vi.fn(async () => new Response("no", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchImageAsBase64(original, 1_000)).resolves.toEqual({
+      ok: false,
+      url: original,
+      status: "404",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not fetch the original when the small rendition times out", async () => {
+    const original = "https://pbs.twimg.com/media/abc.jpg";
+    const fetchMock = vi.fn(
+      (_url: string, init: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          });
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchImageAsBase64(original, 30)).resolves.toEqual({
+      ok: false,
+      url: original,
+      status: "timeout",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://pbs.twimg.com/media/abc?format=jpg&name=small");
   });
 });
 

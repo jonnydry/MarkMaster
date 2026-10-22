@@ -39,7 +39,14 @@ vi.mock("@/lib/image-embedding-backfill-store", () => ({
   deleteAbsentImageEmbedFailures: (...args: unknown[]) => deleteAbsentImageFailures(...args),
 }));
 
-import { embedBookmarksAfterSync, imageEmbeddingStoreForUser, textEmbeddingStoreForUser } from "./sync-embed";
+import {
+  embedBookmarksAfterSync,
+  imageEmbeddingStoreForUser,
+  SYNC_EMBED_BUDGET_MS,
+  SYNC_EMBED_IMAGE_LIMIT,
+  SYNC_EMBED_TEXT_LIMIT,
+  textEmbeddingStoreForUser,
+} from "./sync-embed";
 
 const GOOD = "https://pbs.twimg.com/photo.jpg";
 const SECOND = "https://video.twimg.com/second.jpg";
@@ -295,7 +302,56 @@ describe("embedBookmarksAfterSync", () => {
     });
     await expect(embedBookmarksAfterSync("user-1", timed)).resolves.toBeUndefined();
     expect(timed.log).toHaveBeenCalledTimes(1);
-    expect(timed.log).toHaveBeenCalledWith("error", "embedding pass timed out");
+    expect(timed.log).toHaveBeenCalledWith("warn", "stopped at budget: text 0, images 0");
+  });
+
+  it("pins the sync embed budget defaults", () => {
+    expect(SYNC_EMBED_BUDGET_MS).toBe(60_000);
+    expect(SYNC_EMBED_TEXT_LIMIT).toBe(128);
+    expect(SYNC_EMBED_IMAGE_LIMIT).toBe(16);
+  });
+
+  it("warns with counts when a later embed times out", async () => {
+    const embedder = imageEmbedder();
+    let imageCalls = 0;
+    embedder.embedImages = async (images) => {
+      imageCalls += 1;
+      if (imageCalls === 2) throw new EmbeddingProviderError("timeout");
+      return images.map(() => Array.from({ length: EMBEDDING_DIMS }, () => 0.2));
+    };
+    const options = ready({
+      textStore: textStore([textBookmark("a")]),
+      imageStore: imageStore([imageBookmark("a", [GOOD, SECOND])]),
+      textProvider: textProvider(),
+      imageEmbedder: embedder,
+    });
+
+    await embedBookmarksAfterSync("user-1", options);
+
+    expect(options.log).toHaveBeenCalledTimes(1);
+    expect(options.log).toHaveBeenCalledWith("warn", "stopped at budget: text 1, images 1");
+  });
+
+  it("does not start an image embed in the last 1.5s and counts it as a budget stop", async () => {
+    const provider = textProvider();
+    const embedder = imageEmbedder();
+    const fetchImage = vi.fn(async () => ({ ok: true as const, base64: "aGVsbG8=" }));
+    const options = ready({
+      textStore: textStore([textBookmark("late")]),
+      imageStore: imageStore([imageBookmark("late", [GOOD])]),
+      textProvider: provider,
+      imageEmbedder: embedder,
+      fetchImage,
+      deadlineAt: Date.now() + 1_000,
+    });
+
+    await embedBookmarksAfterSync("user-1", options);
+
+    expect(provider.calls).toHaveLength(1);
+    expect(embedder.calls).toBe(0);
+    expect(fetchImage).not.toHaveBeenCalled();
+    expect(options.log).toHaveBeenCalledTimes(1);
+    expect(options.log).toHaveBeenCalledWith("warn", "stopped at budget: text 1, images 0");
   });
 
   it("skips the pass when OLLAMA_BASE_URL is not set", async () => {

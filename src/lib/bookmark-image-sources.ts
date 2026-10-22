@@ -4,7 +4,7 @@ import { isVideoLikeMediaType, type BookmarkMediaJson } from "@/lib/bookmark-med
 import { isAllowlistedImageUrl } from "@/lib/image-fetch-allowlist";
 
 /** Bump to re-embed the same URL after the image recipe changes. */
-export const IMAGE_SOURCE_HASH_VERSION = "image-v1";
+export const IMAGE_SOURCE_HASH_VERSION = "image-v2";
 
 export type BookmarkImageSource = {
   /** The image URL. One row per bookmark, URL, model, and dimension. */

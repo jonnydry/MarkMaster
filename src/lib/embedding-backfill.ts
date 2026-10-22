@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from "@/lib/embedding-provider";
+import { EmbeddingProviderError, type EmbeddingProvider } from "@/lib/embedding-provider";
 import {
   bookmarkEmbeddingDocument,
   type BookmarkEmbeddingSource,
@@ -31,6 +31,8 @@ export interface EmbeddingBackfillStore {
 export type EmbeddingBackfillCounts = {
   embedded: number;
   skipped: number;
+  /** True when the loop stopped because the deadline had already passed. */
+  budgetStopped: boolean;
   model: string;
   dims: number;
 };
@@ -85,14 +87,26 @@ export async function backfillBookmarkEmbeddings(options: {
   const textById = new Map(documents.map((document) => [document.bookmarkId, document.text]));
 
   let embedded = 0;
+  let budgetStopped = false;
   let index = 0;
   while (index < stale.length && embedded < limit) {
     const callTimeout = timeoutWithinDeadline(timeoutMs, options.deadlineAt);
-    if (callTimeout === null) break;
+    if (callTimeout === null) {
+      budgetStopped = true;
+      break;
+    }
     const room = Math.min(batchSize, limit - embedded, stale.length - index);
     const batch = stale.slice(index, index + room);
     const texts = batch.map((row) => textById.get(row.bookmarkId) ?? "");
-    const vectors = await provider.embed(texts, "document", { timeoutMs: callTimeout });
+    let vectors: number[][];
+    try {
+      vectors = await provider.embed(texts, "document", { timeoutMs: callTimeout });
+    } catch (error) {
+      if (error instanceof EmbeddingProviderError && error.reason === "timeout") {
+        throw Object.assign(error, { embedded });
+      }
+      throw error;
+    }
     if (vectors.length !== batch.length) {
       throw new Error("Embedding provider returned a different number of vectors than texts");
     }
@@ -112,6 +126,7 @@ export async function backfillBookmarkEmbeddings(options: {
   return {
     embedded,
     skipped,
+    budgetStopped,
     model: provider.model,
     dims: provider.dims,
   };
