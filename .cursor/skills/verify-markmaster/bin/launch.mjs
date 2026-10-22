@@ -143,7 +143,7 @@ function startPostgres(runDir) {
       `POSTGRES_DB=${DB_NAME}`,
       "-p",
       `127.0.0.1:${PG_PORT}:5432`,
-      "postgres:16-alpine",
+      "pgvector/pgvector:pg16",
     ]);
     if (result.status !== 0) {
       throw new Error(result.stderr || "docker run failed");
