@@ -102,8 +102,13 @@ export async function backfillBookmarkEmbeddings(options: {
     try {
       vectors = await provider.embed(texts, "document", { timeoutMs: callTimeout });
     } catch (error) {
-      if (error instanceof EmbeddingProviderError && error.reason === "timeout") {
-        throw Object.assign(error, { embedded });
+      if (
+        error instanceof EmbeddingProviderError &&
+        error.reason === "timeout" &&
+        callTimeout < timeoutMs
+      ) {
+        budgetStopped = true;
+        break;
       }
       throw error;
     }

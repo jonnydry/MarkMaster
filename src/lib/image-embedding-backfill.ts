@@ -221,7 +221,11 @@ export async function backfillBookmarkImageEmbeddings(options: {
       embedded += 1;
     } catch (error) {
       if (error instanceof EmbeddingProviderError && error.reason === "timeout") {
-        throw Object.assign(error, { embedded });
+        if (embedBudget < timeoutMs) {
+          budgetStopped = true;
+          break;
+        }
+        throw error;
       }
       if (!(error instanceof EmbeddingProviderError)) throw error;
       failed += 1;

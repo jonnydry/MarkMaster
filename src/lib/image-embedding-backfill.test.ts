@@ -469,6 +469,7 @@ describe("fetchImageAsBase64", () => {
     "https://10.1.2.3/secret.jpg",
     "http://169.254.169.254/latest/meta-data",
     "https://cdn.example/photo.jpg",
+    "https://cdn.example/media/abc.jpg",
   ])("does not fetch %s", async (url) => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -573,7 +574,9 @@ describe("fetchImageAsBase64", () => {
     "https://pbs.twimg.com/amplify_video_thumb/1/img/abc.jpg",
     "https://pbs.twimg.com/card_img/abc.jpg",
     "https://ton.twimg.com/card.jpg",
+    "https://ton.twimg.com/media/abc.jpg",
     "https://video.twimg.com/ext_tw_video_thumb/1/pu/img/abc.jpg",
+    "https://video.twimg.com/media/abc.jpg",
   ])("fetches %s unchanged", async (url) => {
     const fetchMock = vi.fn(async () => jpegResponse());
     vi.stubGlobal("fetch", fetchMock);

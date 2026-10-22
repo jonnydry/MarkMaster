@@ -146,13 +146,7 @@ async function runSyncEmbed(userId: string, options: SyncEmbedOptions): Promise<
     textEmbedded = text.embedded;
     budgetStopped = text.budgetStopped;
   } catch (error) {
-    const label = embedFailureLabel(error);
-    if (label === "embedding pass timed out") {
-      budgetStopped = true;
-      textEmbedded = embeddedSoFar(error);
-    } else {
-      failure = label;
-    }
+    failure = embedFailureLabel(error);
   }
 
   try {
@@ -168,13 +162,7 @@ async function runSyncEmbed(userId: string, options: SyncEmbedOptions): Promise<
     imagesEmbedded = images.embedded;
     budgetStopped = budgetStopped || images.budgetStopped;
   } catch (error) {
-    const label = embedFailureLabel(error);
-    if (label === "embedding pass timed out") {
-      budgetStopped = true;
-      imagesEmbedded = embeddedSoFar(error);
-    } else {
-      failure ??= label;
-    }
+    failure ??= embedFailureLabel(error);
   }
 
   if (failure) report(options, "error", failure);
@@ -192,12 +180,6 @@ function embedFailureLabel(error: unknown): string {
     return error.reason === "timeout" ? "embedding pass timed out" : "embedding provider unavailable";
   }
   return "embedding pass failed";
-}
-
-function embeddedSoFar(error: unknown): number {
-  if (typeof error !== "object" || error === null || !("embedded" in error)) return 0;
-  const value = error.embedded;
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
 }
 
 function report(options: SyncEmbedOptions, level: "warn" | "error", message: string): void {

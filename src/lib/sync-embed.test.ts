@@ -302,7 +302,7 @@ describe("embedBookmarksAfterSync", () => {
     });
     await expect(embedBookmarksAfterSync("user-1", timed)).resolves.toBeUndefined();
     expect(timed.log).toHaveBeenCalledTimes(1);
-    expect(timed.log).toHaveBeenCalledWith("warn", "stopped at budget: text 0, images 0");
+    expect(timed.log).toHaveBeenCalledWith("error", "embedding pass timed out");
   });
 
   it("pins the sync embed budget defaults", () => {
@@ -311,11 +311,13 @@ describe("embedBookmarksAfterSync", () => {
     expect(SYNC_EMBED_IMAGE_LIMIT).toBe(16);
   });
 
-  it("warns with counts when a later embed times out", async () => {
+  it("warns with counts when a deadline-clamped embed times out", async () => {
     const embedder = imageEmbedder();
     let imageCalls = 0;
-    embedder.embedImages = async (images) => {
+    embedder.embedImages = async (images, options) => {
       imageCalls += 1;
+      expect(options?.timeoutMs).toBeLessThan(8_000);
+      expect(options?.timeoutMs).toBeGreaterThan(1_500);
       if (imageCalls === 2) throw new EmbeddingProviderError("timeout");
       return images.map(() => Array.from({ length: EMBEDDING_DIMS }, () => 0.2));
     };
@@ -324,12 +326,36 @@ describe("embedBookmarksAfterSync", () => {
       imageStore: imageStore([imageBookmark("a", [GOOD, SECOND])]),
       textProvider: textProvider(),
       imageEmbedder: embedder,
+      imageTimeoutMs: 8_000,
+      deadlineAt: Date.now() + 5_000,
+    });
+
+    await embedBookmarksAfterSync("user-1", options);
+
+    expect(imageCalls).toBe(2);
+    expect(options.log).toHaveBeenCalledTimes(1);
+    expect(options.log).toHaveBeenCalledWith("warn", "stopped at budget: text 1, images 1");
+  });
+
+  it("reports a provider timeout as an error when the deadline did not clamp the call", async () => {
+    const provider = textProvider();
+    provider.embed = vi.fn(async (_texts, _kind, options) => {
+      expect(options?.timeoutMs).toBe(8_000);
+      throw new EmbeddingProviderError("timeout");
+    });
+    const options = ready({
+      textStore: textStore([textBookmark("slow")]),
+      imageStore: imageStore([]),
+      textProvider: provider,
+      imageEmbedder: imageEmbedder(),
+      textTimeoutMs: 8_000,
+      deadlineAt: Date.now() + 60_000,
     });
 
     await embedBookmarksAfterSync("user-1", options);
 
     expect(options.log).toHaveBeenCalledTimes(1);
-    expect(options.log).toHaveBeenCalledWith("warn", "stopped at budget: text 1, images 1");
+    expect(options.log).toHaveBeenCalledWith("error", "embedding pass timed out");
   });
 
   it("does not start an image embed in the last 1.5s and counts it as a budget stop", async () => {
