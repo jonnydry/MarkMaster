@@ -311,6 +311,7 @@ describe("trySmartBookmarkSearch", () => {
   });
 
   it("keeps the text breaker open for exactly 60s after a text timeout", async () => {
+    expect(QUERY_EMBED_CIRCUIT_OPEN_MS).toBe(60_000);
     vi.useFakeTimers();
     try {
       const embedder = provider(async () => {
@@ -417,6 +418,89 @@ describe("trySmartBookmarkSearch", () => {
     const queries = queryRaw.mock.calls.map((call) => sqlText(call[0]));
     expect(queries.some((sql) => sql.includes("BookmarkEmbedding") && sql.includes("<=>"))).toBe(false);
     expect(queries.filter((sql) => sql.includes('GROUP BY b."id"'))).toHaveLength(2);
+  });
+
+  it("reports timeout when one breaker is open and the other side times out", async () => {
+    const textEmbedder = provider(async () => {
+      throw new EmbeddingProviderError("timeout");
+    });
+    const imageEmbedder = {
+      ...provider(async (texts) => {
+        if (texts[0] === "text-already-open") {
+          return [Array.from({ length: EMBEDDING_DIMS }, () => 0.1)];
+        }
+        throw new EmbeddingProviderError("timeout");
+      }),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = bothSidesQueryRaw();
+
+    const primed = await trySmartBookmarkSearch(input({ search: "text-already-open", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(primed.kind).toBe("ranked");
+    if (primed.kind !== "ranked") return;
+    expect(primed.orderedIds).toEqual(["pic"]);
+    expect(primed.metadata.imageHits).toBe(1);
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    const mixed = await trySmartBookmarkSearch(input({ search: "image-times-out-live", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(mixed).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports circuit_open when both sides are present and both breakers are open", async () => {
+    let textTimesOut = false;
+    const textEmbedder = provider(async () => {
+      if (textTimesOut) throw new EmbeddingProviderError("timeout");
+      return [Array.from({ length: EMBEDDING_DIMS }, () => 0.1)];
+    });
+    const imageEmbedder = {
+      ...provider(async () => {
+        throw new EmbeddingProviderError("timeout");
+      }),
+      model: DEFAULT_IMAGE_EMBEDDING_MODEL,
+    };
+    const queryRaw = bothSidesQueryRaw();
+
+    const primed = await trySmartBookmarkSearch(input({ search: "prime-image-breaker", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(primed.kind).toBe("ranked");
+    if (primed.kind !== "ranked") return;
+    expect(primed.orderedIds).toEqual(["note"]);
+    expect(primed.metadata.imageHits).toBeUndefined();
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(1);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    textTimesOut = true;
+    const opensTextBreaker = await trySmartBookmarkSearch(input({ search: "open-text-breaker", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(opensTextBreaker).toMatchObject({ kind: "fallback", metadata: { fallback: "timeout" } });
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(2);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
+
+    const bothOpen = await trySmartBookmarkSearch(input({ search: "both-breakers-open", searchTerms: [] }), {
+      provider: textEmbedder,
+      imageProvider: imageEmbedder,
+      queryRaw,
+    });
+    expect(bothOpen).toMatchObject({ kind: "fallback", metadata: { fallback: "circuit_open" } });
+    expect(textEmbedder.embed).toHaveBeenCalledTimes(2);
+    expect(imageEmbedder.embed).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the breaker closed when the embed error is not a timeout", async () => {
