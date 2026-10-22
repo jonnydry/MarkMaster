@@ -120,6 +120,57 @@ describe("backfillBookmarkEmbeddings", () => {
     ]);
   });
 
+  it("embeds at most limit rows and does not start a batch after the deadline", async () => {
+    const bookmarks = ["a", "b", "c"].map((id) => bookmark(id));
+    const provider = fakeProvider();
+    const capped = await backfillBookmarkEmbeddings({
+      store: fakeStore(bookmarks),
+      provider,
+      batchSize: 10,
+      limit: 1,
+    });
+    expect(capped.embedded).toBe(1);
+    expect(capped.skipped).toBe(0);
+    expect(provider.calls).toHaveLength(1);
+    expect(provider.calls[0]).toHaveLength(1);
+
+    const stopped = fakeProvider();
+    const afterDeadline = await backfillBookmarkEmbeddings({
+      store: fakeStore(bookmarks),
+      provider: stopped,
+      deadlineAt: 0,
+    });
+    expect(afterDeadline.embedded).toBe(0);
+    expect(stopped.calls).toHaveLength(0);
+
+    const seen: number[] = [];
+    const timed: EmbeddingProvider = {
+      model: "embeddinggemma-2:270m",
+      dims: EMBEDDING_DIMS,
+      async embed(texts, _kind, options) {
+        seen.push(options?.timeoutMs ?? -1);
+        return texts.map(() => Array.from({ length: EMBEDDING_DIMS }, () => 0));
+      },
+    };
+    await backfillBookmarkEmbeddings({
+      store: fakeStore([bookmark("a")]),
+      provider: timed,
+      timeoutMs: 50_000,
+      deadlineAt: Date.now() + 30_000,
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toBeGreaterThan(1_000);
+    expect(seen[0]).toBeLessThanOrEqual(30_000);
+
+    await expect(
+      backfillBookmarkEmbeddings({
+        store: fakeStore([bookmark("a")]),
+        provider: fakeProvider(),
+        limit: 0,
+      })
+    ).rejects.toThrow(/limit must be at least 1/);
+  });
+
   it("fails when the provider returns the wrong number of vectors", async () => {
     const provider: EmbeddingProvider = {
       model: "embeddinggemma-2:270m",

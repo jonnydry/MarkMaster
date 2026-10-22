@@ -64,7 +64,7 @@ If Ollama is unreachable, the call times out, or this user has no rows for the c
 
 There is no library toggle. Pagination for a fused result uses `page` and `limit`. The keyset `cursor` is for the default list.
 
-New and edited bookmarks stay unembedded until the backfill runs again. The script skips rows whose content hash is unchanged.
+A finished sync embeds that user's new and changed bookmarks on its own. The manual backfill scripts are still how you fill an existing library in one pass. Both paths skip rows whose content hash is unchanged. See [Backfill](#4-backfill).
 
 The migration creates `BookmarkEmbedding` and runs `CREATE EXTENSION IF NOT EXISTS vector`. It does not add an HNSW or IVFFlat index. Retrieval is an exact scan.
 
@@ -210,7 +210,17 @@ npm run embeddings:backfill
 
 The script prints `embedded`, `skipped`, `model`, and `dims`. A second run skips rows whose hash still matches.
 
-Every row records which model made it and its size: `BookmarkEmbedding` has `model` and `dims` columns, and `(bookmarkId, model, dims)` is the primary key. The backfill only reads rows for the configured `EMBEDDING_MODEL` and 768 dimensions, so after a model change it re-embeds every bookmark under the new model and leaves the old model's rows alone. Smart search reads only rows for the configured model and dims. The `embedding` column is `vector(768)`, so a model with a different dimension needs a schema migration first. It embeds every bookmark in that database, in batches of 16.
+Every row records which model made it and its size: `BookmarkEmbedding` has `model` and `dims` columns, and `(bookmarkId, model, dims)` is the primary key. The backfill only reads rows for the configured `EMBEDDING_MODEL` and 768 dimensions, so after a model change it re-embeds every bookmark under the new model and leaves the old model's rows alone. Smart search reads only rows for the configured model and dims. The `embedding` column is `vector(768)`, so a model with a different dimension needs a schema migration first. The manual script embeds every bookmark in that database, in batches of 16.
+
+### After a sync
+
+`executeSyncRun` (`src/lib/sync-run-executor.ts`) calls `embedBookmarksAfterSync` (`src/lib/sync-embed.ts`) after the run is marked `COMPLETED` or `RATE_LIMITED`. A failed or superseded run does not. The pass is that user only. It reuses the text and image backfills, so a row is embedded only when its content hash is missing or changed. Image rows whose media is gone are deleted for that user only. The manual scripts still omit the user filter and cover the whole library.
+
+The pass does not change the sync result. If Ollama is unreachable or a call hits its cap, the sync stays completed. One log line is written under `SyncEmbed`. That line is a fixed phrase. It does not include a bookmark id, an image URL, a connection string, or the provider error text. Rows left over wait for the next sync or a manual backfill.
+
+It runs only when `OLLAMA_BASE_URL` is set. A missing or blank value skips the pass and does not contact Ollama. Vercel production does not set `OLLAMA_BASE_URL` (it is not in the production env list; `.env.example` leaves it commented out), so a production sync does not embed and does not call Ollama. Query-time smart search and the manual scripts still default to `http://127.0.0.1:11434` when the variable is unset. That default is not used here. When the variable is set, a health check (`GET /api/tags`, 1500 ms) runs first. If it fails, the pass is skipped after that one request and logged once. No embed calls follow.
+
+Bounds for one sync, after the health check: 20 seconds overall, at most 32 text rows and 8 images, 8 seconds per embed call, 5 seconds per image fetch. Each call's timeout is clamped to the time left in the 20 seconds. A library that has never been embedded catches up 32 text rows and 8 images per successful sync. Use the manual scripts when you want the rest immediately.
 
 ### 5. Image search
 

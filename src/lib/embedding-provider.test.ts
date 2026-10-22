@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  checkOllamaReachable,
   clearQueryEmbeddingCache,
+  configuredOllamaBaseUrl,
   createImageTextEmbeddingProvider,
   createOllamaEmbeddingProvider,
   createOllamaImageEmbedder,
   DEFAULT_EMBEDDING_MODEL,
+  isOllamaConfigured,
+  OLLAMA_HEALTH_TIMEOUT_MS,
   DEFAULT_IMAGE_EMBEDDING_MODEL,
   DEFAULT_OLLAMA_BASE_URL,
   EMBEDDING_DIMS,
@@ -306,5 +310,41 @@ describe("Ollama embedding provider", () => {
     const provider = createOllamaEmbeddingProvider({});
     await expect(provider.embed([], "document")).resolves.toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Ollama health gate", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does not call the network when OLLAMA_BASE_URL is unset or blank", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(isOllamaConfigured({})).toBe(false);
+    expect(configuredOllamaBaseUrl({ OLLAMA_BASE_URL: "  " })).toBeNull();
+    await expect(checkOllamaReachable({})).resolves.toBe(false);
+    await expect(checkOllamaReachable({ OLLAMA_BASE_URL: "  " })).resolves.toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a healthy tags response and rejects a failure without throwing", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      body: { cancel: async () => undefined },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = { OLLAMA_BASE_URL: "http://127.0.0.1:11434/" };
+    await expect(checkOllamaReachable(env)).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:11434/api/tags", {
+      method: "GET",
+      signal: expect.any(AbortSignal),
+    });
+    expect(OLLAMA_HEALTH_TIMEOUT_MS).toBe(1_500);
+
+    fetchMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED http://user:secret@127.0.0.1:11434"));
+    await expect(checkOllamaReachable(env)).resolves.toBe(false);
   });
 });

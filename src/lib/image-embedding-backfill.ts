@@ -114,6 +114,10 @@ function imageRowKey(bookmarkId: string, mediaKey: string): string {
  * Embed media images that are missing or whose hash changed.
  * A second run with the same model skips rows already stored for that model.
  * A failed URL is recorded and left alone until {@link IMAGE_EMBED_FAILURE_RETRY_DAYS} have passed.
+ * `limit` caps how many stale images this call fetches. Rows still cooling down
+ * do not count. `deadlineAt` is an epoch millisecond time; a fetch does not
+ * start once that time has passed, and each fetch and embed timeout is clamped
+ * to the time remaining.
  */
 export async function backfillBookmarkImageEmbeddings(options: {
   store: ImageEmbeddingBackfillStore;
@@ -123,12 +127,15 @@ export async function backfillBookmarkImageEmbeddings(options: {
   fetchTimeoutMs?: number;
   now?: () => Date;
   onSkip?: (event: { url: string; status: string }) => void;
+  limit?: number;
+  deadlineAt?: number;
 }): Promise<ImageBackfillCounts> {
   const fetchImage = options.fetchImage ?? fetchImageAsBase64;
   const timeoutMs = options.timeoutMs ?? IMAGE_EMBED_TIMEOUT_MS;
   const fetchTimeoutMs = options.fetchTimeoutMs ?? IMAGE_FETCH_TIMEOUT_MS;
   const now = options.now ?? (() => new Date());
   const retryMs = IMAGE_EMBED_FAILURE_RETRY_DAYS * 24 * 60 * 60 * 1000;
+  const limit = resolveEmbedLimit(options.limit);
   const { embedder, store, onSkip } = options;
 
   const bookmarks = await store.listBookmarks();
@@ -148,14 +155,19 @@ export async function backfillBookmarkImageEmbeddings(options: {
   let embedded = 0;
   let failed = 0;
   let deferred = 0;
+  let attempted = 0;
   for (const target of stale) {
     const prior = failureByKey.get(imageRowKey(target.bookmarkId, target.mediaKey));
     if (prior && failureStillCooling(prior.lastFailedAt, now(), retryMs)) {
       deferred += 1;
       continue;
     }
+    if (attempted >= limit) break;
+    const fetchBudget = timeoutWithinDeadline(fetchTimeoutMs, options.deadlineAt);
+    if (fetchBudget === null) break;
+    attempted += 1;
 
-    const fetched = await fetchImage(target.url, fetchTimeoutMs);
+    const fetched = await fetchImage(target.url, fetchBudget);
     if (!fetched.ok) {
       failed += 1;
       await store.recordFailure({
@@ -170,8 +182,11 @@ export async function backfillBookmarkImageEmbeddings(options: {
       continue;
     }
 
+    const embedBudget = timeoutWithinDeadline(timeoutMs, options.deadlineAt);
+    if (embedBudget === null) break;
+
     try {
-      const vectors = await embedder.embedImages([fetched.base64], { timeoutMs });
+      const vectors = await embedder.embedImages([fetched.base64], { timeoutMs: embedBudget });
       const vector = vectors.length === 1 ? vectors[0] : undefined;
       if (!vector) {
         throw new Error("Embedding provider returned a different number of vectors than images");
@@ -212,6 +227,22 @@ export async function backfillBookmarkImageEmbeddings(options: {
     model: embedder.model,
     dims: embedder.dims,
   };
+}
+
+function resolveEmbedLimit(limit: number | undefined): number {
+  if (limit === undefined) return Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw new Error("limit must be at least 1");
+  }
+  return Math.floor(limit);
+}
+
+/** Timeout for the next fetch or embed, or null when the deadline has passed. */
+function timeoutWithinDeadline(capMs: number, deadlineAt?: number): number | null {
+  if (deadlineAt === undefined) return capMs;
+  const remaining = deadlineAt - Date.now();
+  if (remaining < 1) return null;
+  return Math.min(capMs, remaining);
 }
 
 function failureStillCooling(lastFailedAt: Date, now: Date, retryMs: number): boolean {

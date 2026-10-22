@@ -135,7 +135,7 @@ npm run env:check
 | `XAI_API_BASE_URL` / `XAI_ORBIT_MODEL` | No | Override the xAI endpoint or Grok model for Orbit scans (default `grok-4.7`) |
 | `ORBIT_SCAN_ENRICHMENT` | No | Toggle the Orbit scan enrichment phase |
 | `SKIP_DB_MIGRATION_CHECK` | No (dev) | Skip the migration-status check `npm run dev` performs |
-| `OLLAMA_BASE_URL` | No | Ollama base URL for smart search (default `http://127.0.0.1:11434`). Text and image embeddings share it |
+| `OLLAMA_BASE_URL` | No | Ollama base URL shared by text and image embeddings. Post-sync embedding runs only when this is set. Query embed and the manual backfill scripts still default to `http://127.0.0.1:11434` when it is unset. Leave it unset on Vercel production |
 | `EMBEDDING_MODEL` | No | Text embedding tag (default `embeddinggemma-2:270m`) |
 | `EMBEDDING_IMAGE_MODEL` | No | Image embedding tag (default `embeddinggemma-2:440m-q8_0-text-vision`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |
 | `IMAGE_HIT_SIMILARITY_CUTOFF` | No | Cosine cutoff for image hits (default `0.68`, must be in `[0.3, 1)`). See [docs/SMART_SEARCH.md](docs/SMART_SEARCH.md#5-image-search) |

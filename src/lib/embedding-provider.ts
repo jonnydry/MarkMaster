@@ -187,6 +187,52 @@ function ollamaBaseUrl(env: NodeJS.ProcessEnv): string {
   return (env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, "");
 }
 
+/**
+ * Set `OLLAMA_BASE_URL`, or null when it is missing or blank.
+ * Query embed and the manual backfill scripts still use {@link DEFAULT_OLLAMA_BASE_URL}
+ * when this is null. The post-sync pass does not.
+ */
+export function configuredOllamaBaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = env.OLLAMA_BASE_URL?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/+$/, "");
+}
+
+export function isOllamaConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return configuredOllamaBaseUrl(env) !== null;
+}
+
+/** Cap for one `GET /api/tags` before the post-sync embed pass. */
+export const OLLAMA_HEALTH_TIMEOUT_MS = 1_500;
+
+/**
+ * True when Ollama answers `GET /api/tags` within `timeoutMs`.
+ * Missing configuration is false and does not call the network.
+ * A failure returns false and does not throw.
+ */
+export async function checkOllamaReachable(
+  env: NodeJS.ProcessEnv = process.env,
+  timeoutMs = OLLAMA_HEALTH_TIMEOUT_MS
+): Promise<boolean> {
+  const baseUrl = configuredOllamaBaseUrl(env);
+  if (!baseUrl) return false;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    await response.body?.cancel().catch(() => undefined);
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Milliseconds in [100, 30000]. Blank, non-finite, or non-positive values use `fallback`. */
 export function smartSearchEmbedTimeoutMs(
   env: NodeJS.ProcessEnv = process.env,
