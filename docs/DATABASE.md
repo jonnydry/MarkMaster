@@ -24,6 +24,8 @@ DATABASE_URL="postgresql://user:password@localhost:5432/markmaster"
 DIRECT_URL="postgresql://user:password@localhost:5432/markmaster"
 ```
 
+Anyone with an existing `markmaster_pgdata` volume created on `postgres:16-alpine` should run `docker compose down -v` before `npm run db:up`. Alpine uses musl and `pgvector/pgvector:pg16` uses glibc, so text collation can differ for existing btree and unique indexes (Postgres cannot warn, because musl reports no collation version), and a volume that already failed the embedding migration hits P3009. That command deletes local dev data only.
+
 ### Neon setup
 
 1. In [Neon console](https://console.neon.tech) → **Connect**, copy the **pooled** string → `DATABASE_URL`.
