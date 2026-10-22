@@ -19,7 +19,7 @@ node .cursor/skills/verify-markmaster/bin/launch.mjs
 
 Launch creates run state under the OS temp directory at `markmaster-verify/<run-id>/` (`/tmp/markmaster-verify/<run-id>/` on Linux) and writes the pointer `markmaster-verify/current/state.json`. The files stay outside the repo so Postgres and the Next.js log do not trigger Fast Refresh.
 
-Postgres listens on `127.0.0.1:54329` and owns the database `markmaster_verify`. When `docker` is on `PATH`, launch starts a container named `markmaster-verify-pg-<run-id>` with the label `markmaster-verify=1` from `postgres:16-alpine`. Otherwise it runs `initdb` and `postgres` from `/usr/lib/postgresql/<version>/bin` with a data directory inside the run folder. It does not use `npm run db:up`, because that compose file publishes port 5432 and the `markmaster` database.
+Postgres listens on `127.0.0.1:54329` and owns the database `markmaster_verify`. When `docker` is on `PATH`, launch starts a container named `markmaster-verify-pg-<run-id>` with the label `markmaster-verify=1` from `pgvector/pgvector:pg16`. Otherwise it runs `initdb` and `postgres` from `/usr/lib/postgresql/<version>/bin` with a data directory inside the run folder. It does not use `npm run db:up`, because that compose file publishes port 5432 and the `markmaster` database.
 
 Launch then runs `npx prisma migrate deploy` and `node scripts/seed-verify.mjs` with the launch child environment, then mints `authjs.session-token` with `@auth/core/jwt` `encode`. The salt is the cookie name. The token carries `dbUser`, `sessionVersion`, and `sessionValidatedAt` for the seeded user.
 
