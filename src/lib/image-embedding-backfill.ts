@@ -8,6 +8,9 @@ export const IMAGE_FETCH_TIMEOUT_MS = 15_000;
 export const IMAGE_EMBED_TIMEOUT_MS = 120_000;
 export const IMAGE_BYTE_LIMIT = 8 * 1024 * 1024;
 
+/** Don't start an image embed the shared deadline would abort. Ollama logs that abort as HTTP 400. */
+const IMAGE_EMBED_MIN_REMAINING_MS = 1_500;
+
 /** A recorded image failure is retried after this many days, not on the next run. */
 export const IMAGE_EMBED_FAILURE_RETRY_DAYS = 7;
 
@@ -83,6 +86,8 @@ export type ImageBackfillCounts = {
   /** Recent failures left untouched until {@link IMAGE_EMBED_FAILURE_RETRY_DAYS}. */
   deferred: number;
   removed: number;
+  /** True when the loop stopped because the deadline left too little time. */
+  budgetStopped: boolean;
   model: string;
   dims: number;
 };
@@ -117,7 +122,7 @@ function imageRowKey(bookmarkId: string, mediaKey: string): string {
  * `limit` caps how many stale images this call fetches. Rows still cooling down
  * do not count. `deadlineAt` is an epoch millisecond time; a fetch does not
  * start once that time has passed, and each fetch and embed timeout is clamped
- * to the time remaining.
+ * to the time remaining. An image embed does not start when 1.5s or less remains.
  */
 export async function backfillBookmarkImageEmbeddings(options: {
   store: ImageEmbeddingBackfillStore;
@@ -156,6 +161,7 @@ export async function backfillBookmarkImageEmbeddings(options: {
   let failed = 0;
   let deferred = 0;
   let attempted = 0;
+  let budgetStopped = false;
   for (const target of stale) {
     const prior = failureByKey.get(imageRowKey(target.bookmarkId, target.mediaKey));
     if (prior && failureStillCooling(prior.lastFailedAt, now(), retryMs)) {
@@ -163,8 +169,15 @@ export async function backfillBookmarkImageEmbeddings(options: {
       continue;
     }
     if (attempted >= limit) break;
+    if (deadlineTooTightForImageEmbed(options.deadlineAt)) {
+      budgetStopped = true;
+      break;
+    }
     const fetchBudget = timeoutWithinDeadline(fetchTimeoutMs, options.deadlineAt);
-    if (fetchBudget === null) break;
+    if (fetchBudget === null) {
+      budgetStopped = true;
+      break;
+    }
     attempted += 1;
 
     const fetched = await fetchImage(target.url, fetchBudget);
@@ -182,8 +195,11 @@ export async function backfillBookmarkImageEmbeddings(options: {
       continue;
     }
 
-    const embedBudget = timeoutWithinDeadline(timeoutMs, options.deadlineAt);
-    if (embedBudget === null) break;
+    const embedBudget = imageEmbedTimeout(timeoutMs, options.deadlineAt);
+    if (embedBudget === null) {
+      budgetStopped = true;
+      break;
+    }
 
     try {
       const vectors = await embedder.embedImages([fetched.base64], { timeoutMs: embedBudget });
@@ -204,7 +220,14 @@ export async function backfillBookmarkImageEmbeddings(options: {
       await store.clearFailure(target.bookmarkId, target.mediaKey, embedder.model, embedder.dims);
       embedded += 1;
     } catch (error) {
-      if (!(error instanceof EmbeddingProviderError) || error.reason === "timeout") throw error;
+      if (error instanceof EmbeddingProviderError && error.reason === "timeout") {
+        if (embedBudget < timeoutMs) {
+          budgetStopped = true;
+          break;
+        }
+        throw error;
+      }
+      if (!(error instanceof EmbeddingProviderError)) throw error;
       failed += 1;
       await store.recordFailure({
         bookmarkId: target.bookmarkId,
@@ -224,6 +247,7 @@ export async function backfillBookmarkImageEmbeddings(options: {
     failed,
     deferred,
     removed,
+    budgetStopped,
     model: embedder.model,
     dims: embedder.dims,
   };
@@ -237,7 +261,7 @@ function resolveEmbedLimit(limit: number | undefined): number {
   return Math.floor(limit);
 }
 
-/** Timeout for the next fetch or embed, or null when the deadline has passed. */
+/** Timeout for the next fetch, or null when the deadline has passed. */
 function timeoutWithinDeadline(capMs: number, deadlineAt?: number): number | null {
   if (deadlineAt === undefined) return capMs;
   const remaining = deadlineAt - Date.now();
@@ -245,9 +269,40 @@ function timeoutWithinDeadline(capMs: number, deadlineAt?: number): number | nul
   return Math.min(capMs, remaining);
 }
 
+function deadlineTooTightForImageEmbed(deadlineAt?: number): boolean {
+  if (deadlineAt === undefined) return false;
+  return deadlineAt - Date.now() <= IMAGE_EMBED_MIN_REMAINING_MS;
+}
+
+/** Embed timeout, or null when 1.5s or less remains so the request is not aborted. */
+function imageEmbedTimeout(capMs: number, deadlineAt?: number): number | null {
+  if (deadlineTooTightForImageEmbed(deadlineAt)) return null;
+  return timeoutWithinDeadline(capMs, deadlineAt);
+}
+
 function failureStillCooling(lastFailedAt: Date, now: Date, retryMs: number): boolean {
   const failedAt = lastFailedAt instanceof Date ? lastFailedAt.getTime() : new Date(lastFailedAt).getTime();
   return Number.isFinite(failedAt) && now.getTime() - failedAt < retryMs;
+}
+
+const MEDIA_IMAGE_PATH = /^\/media\/([^/.]+)\.(jpe?g|png|webp)$/i;
+
+/**
+ * X photo URLs (`pbs.twimg.com/media/<id>.<ext>`) are fetched at `name=small`.
+ * The stored source URL is unchanged. Other hosts and paths are returned as-is.
+ */
+function smallMediaFetchUrl(raw: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "pbs.twimg.com") return null;
+  const match = MEDIA_IMAGE_PATH.exec(parsed.pathname);
+  if (!match) return null;
+  const ext = match[2].toLowerCase() === "jpeg" ? "jpg" : match[2].toLowerCase();
+  return `https://pbs.twimg.com/media/${match[1]}?format=${ext}&name=small`;
 }
 
 export async function fetchImageAsBase64(
@@ -257,6 +312,29 @@ export async function fetchImageAsBase64(
   const loggedUrl = loggableUrl(url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const small = smallMediaFetchUrl(url);
+    if (small) {
+      const fetched = await fetchAllowlistedImage(small, controller, loggedUrl);
+      if (fetched.ok || !shouldFallbackToOriginal(fetched, controller)) return fetched;
+    }
+    return await fetchAllowlistedImage(url, controller, loggedUrl);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function shouldFallbackToOriginal(result: ImageFetchFailure, controller: AbortController): boolean {
+  if (controller.signal.aborted || result.status === "timeout") return false;
+  if (result.status === "non-image" || result.status === "error") return true;
+  return /^\d{3}$/.test(result.status);
+}
+
+async function fetchAllowlistedImage(
+  url: string,
+  controller: AbortController,
+  loggedUrl: string
+): Promise<ImageFetchOutcome> {
   try {
     let current = url;
     for (let redirectsFollowed = 0; ; ) {
@@ -292,8 +370,6 @@ export async function fetchImageAsBase64(
       return { ok: false, url: loggedUrl, status: "timeout" };
     }
     return { ok: false, url: loggedUrl, status: "error" };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

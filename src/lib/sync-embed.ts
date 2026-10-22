@@ -36,13 +36,13 @@ import {
 import { logError, logWarn } from "@/lib/logger";
 
 /** Wall-clock cap for text and image embeds after one sync, excluding the health check. */
-export const SYNC_EMBED_BUDGET_MS = 20_000;
+export const SYNC_EMBED_BUDGET_MS = 60_000;
 
 /** Stale text rows embedded per sync. Further rows wait for the next sync. */
-export const SYNC_EMBED_TEXT_LIMIT = 32;
+export const SYNC_EMBED_TEXT_LIMIT = 128;
 
 /** Stale images fetched per sync. Cooling failures do not count. */
-export const SYNC_EMBED_IMAGE_LIMIT = 8;
+export const SYNC_EMBED_IMAGE_LIMIT = 16;
 
 export const SYNC_EMBED_TEXT_TIMEOUT_MS = 8_000;
 export const SYNC_EMBED_IMAGE_TIMEOUT_MS = 8_000;
@@ -131,8 +131,11 @@ async function runSyncEmbed(userId: string, options: SyncEmbedOptions): Promise<
   const imageEmbedder = options.imageEmbedder ?? createOllamaImageEmbedder(env);
 
   let failure: string | null = null;
+  let budgetStopped = false;
+  let textEmbedded = 0;
+  let imagesEmbedded = 0;
   try {
-    await backfillBookmarkEmbeddings({
+    const text = await backfillBookmarkEmbeddings({
       store: textStore,
       provider: textProvider,
       batchSize: EMBEDDING_BACKFILL_BATCH_SIZE,
@@ -140,12 +143,14 @@ async function runSyncEmbed(userId: string, options: SyncEmbedOptions): Promise<
       limit: options.textLimit ?? SYNC_EMBED_TEXT_LIMIT,
       deadlineAt,
     });
+    textEmbedded = text.embedded;
+    budgetStopped = text.budgetStopped;
   } catch (error) {
     failure = embedFailureLabel(error);
   }
 
   try {
-    await backfillBookmarkImageEmbeddings({
+    const images = await backfillBookmarkImageEmbeddings({
       store: imageStore,
       embedder: imageEmbedder,
       fetchImage: options.fetchImage,
@@ -154,11 +159,16 @@ async function runSyncEmbed(userId: string, options: SyncEmbedOptions): Promise<
       limit: options.imageLimit ?? SYNC_EMBED_IMAGE_LIMIT,
       deadlineAt,
     });
+    imagesEmbedded = images.embedded;
+    budgetStopped = budgetStopped || images.budgetStopped;
   } catch (error) {
     failure ??= embedFailureLabel(error);
   }
 
   if (failure) report(options, "error", failure);
+  else if (budgetStopped) {
+    report(options, "warn", `stopped at budget: text ${textEmbedded}, images ${imagesEmbedded}`);
+  }
 }
 
 function assertUserId(userId: string): void {
