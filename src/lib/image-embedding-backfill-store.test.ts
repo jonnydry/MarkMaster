@@ -17,6 +17,34 @@ function sqlText(query: unknown): string {
   return (query as { strings: readonly string[] }).strings.join(" ");
 }
 
+type OwnedBookmark = { id: string; userId: string };
+type MediaRow = { bookmarkId: string; mediaKey: string; model: string; dims: number };
+
+/**
+ * Applies one delete the store just built. Scope comes only from that SQL:
+ * a missing `"userId"` predicate matches every user's rows.
+ */
+function rowsAfterDelete(query: unknown, owners: readonly OwnedBookmark[], rows: readonly MediaRow[]): MediaRow[] {
+  const sql = query as { strings?: readonly string[]; values?: readonly unknown[] };
+  const strings = sql.strings ?? [];
+  const slots = (sql.values ?? []).map((value, index) => ({ before: strings[index] ?? "", value }));
+  const bound = (needle: string) => slots.find((slot) => slot.before.includes(needle))?.value;
+  const model = bound('"model"');
+  const dims = bound('"dims"');
+  const userSlot = slots.find((slot) => slot.before.includes('"userId"'));
+  const scopedUserId = typeof userSlot?.value === "string" ? userSlot.value : undefined;
+  const arrays = slots.filter((slot) => Array.isArray(slot.value)).map((slot) => slot.value as string[]);
+  const keep = new Set((arrays[0] ?? []).map((id, index) => `${id}\0${arrays[1]?.[index] ?? ""}`));
+
+  return rows.filter((row) => {
+    if (row.model !== model || row.dims !== dims) return true;
+    const owner = owners.find((item) => item.id === row.bookmarkId);
+    if (userSlot && owner?.userId !== scopedUserId) return true;
+    if (arrays.length > 0 && keep.has(`${row.bookmarkId}\0${row.mediaKey}`)) return true;
+    return false;
+  });
+}
+
 describe("image embed failure store", () => {
   beforeEach(() => {
     queryRaw.mockReset();
@@ -135,5 +163,59 @@ describe("image embed failure store", () => {
     expect(failureSql).toContain("unnest");
     expect(scopedFailureDelete.values).toContain("user-1");
     expect(scopedFailureDelete.values).not.toContain("other-user");
+  });
+
+  it("keeps a second user's image embeddings when this user deletes with a keep list", async () => {
+    const { deleteAbsentImageEmbeddings } = await import("./image-embedding-backfill-store");
+    const owners: OwnedBookmark[] = [
+      { id: "bookmark-a-kept", userId: "user-a" },
+      { id: "bookmark-a-gone", userId: "user-a" },
+      { id: "bookmark-b", userId: "user-b" },
+    ];
+    let rows: MediaRow[] = [
+      { bookmarkId: "bookmark-a-kept", mediaKey: "https://pbs.twimg.com/kept.jpg", model: "vision", dims: 768 },
+      { bookmarkId: "bookmark-a-gone", mediaKey: "https://pbs.twimg.com/gone.jpg", model: "vision", dims: 768 },
+      { bookmarkId: "bookmark-b", mediaKey: "https://pbs.twimg.com/other.jpg", model: "vision", dims: 768 },
+    ];
+    executeRaw.mockImplementation(async (query: unknown) => {
+      const next = rowsAfterDelete(query, owners, rows);
+      const removed = rows.length - next.length;
+      rows = next;
+      return removed;
+    });
+
+    await deleteAbsentImageEmbeddings(
+      "vision",
+      768,
+      [{ bookmarkId: "bookmark-a-kept", mediaKey: "https://pbs.twimg.com/kept.jpg" }],
+      "user-a"
+    );
+
+    expect(rows.map((row) => row.bookmarkId).sort()).toEqual(["bookmark-a-kept", "bookmark-b"]);
+    expect(sqlText(executeRaw.mock.calls[0]?.[0])).toContain('"BookmarkImageEmbedding"');
+  });
+
+  it("keeps a second user's embed failures when this user deletes with an empty keep list", async () => {
+    const { deleteAbsentImageEmbedFailures } = await import("./image-embedding-backfill-store");
+    const owners: OwnedBookmark[] = [
+      { id: "bookmark-a", userId: "user-a" },
+      { id: "bookmark-b", userId: "user-b" },
+    ];
+    let rows: MediaRow[] = [
+      { bookmarkId: "bookmark-a", mediaKey: "https://pbs.twimg.com/a.jpg", model: "vision", dims: 768 },
+      { bookmarkId: "bookmark-b", mediaKey: "https://pbs.twimg.com/b.jpg", model: "vision", dims: 768 },
+    ];
+    executeRaw.mockImplementation(async (query: unknown) => {
+      const next = rowsAfterDelete(query, owners, rows);
+      const removed = rows.length - next.length;
+      rows = next;
+      return removed;
+    });
+
+    await deleteAbsentImageEmbedFailures("vision", 768, [], "user-a");
+
+    expect(rows.map((row) => row.bookmarkId)).toEqual(["bookmark-b"]);
+    expect(sqlText(executeRaw.mock.calls[0]?.[0])).toContain('"BookmarkImageEmbedFailure"');
+    expect(sqlText(executeRaw.mock.calls[0]?.[0])).not.toContain("unnest");
   });
 });
