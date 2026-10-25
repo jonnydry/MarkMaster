@@ -22,7 +22,10 @@ import {
   appDashboardRailClassName,
   appDashboardRailMediaQuery,
 } from "@/lib/app-layout";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  getBookmarkBandClassName,
+} from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { BookmarkList } from "./bookmark-list";
@@ -318,7 +321,7 @@ function DashboardContent() {
               role="status"
               className={cn(
                 "border-b border-hairline-soft px-4 py-2 text-xs text-muted-foreground sm:px-5",
-                bookmarkFeedColumnClassName
+                getBookmarkBandClassName(viewMode)
               )}
             >
               Some library details are temporarily unavailable.
@@ -383,7 +386,7 @@ function DashboardContent() {
                 <div
                   className={cn(
                     "flex items-center gap-2 border-b border-hairline-soft px-4 py-2 text-sm sm:px-5",
-                    bookmarkFeedColumnClassName
+                    getBookmarkBandClassName(viewMode)
                   )}
                 >
                   <span className="text-xs font-semibold text-foreground">
@@ -433,7 +436,11 @@ function DashboardContent() {
                   activeBookmarkId={
                     selectionMode ? null : activeBookmarkIdForView
                   }
-                  onSelect={handleBookmarkSelect}
+                  onSelect={
+                    viewMode === "gallery"
+                      ? handleExpandedBookmarkOpen
+                      : handleBookmarkSelect
+                  }
                   onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
                   onAddTag={handleBookmarkAddTag}
@@ -448,7 +455,7 @@ function DashboardContent() {
           )}
 
           {!isLoading && !isError && bookmarks.length > 0 && (
-            <div className={bookmarkFeedColumnClassName}>
+            <div className={getBookmarkBandClassName(viewMode)}>
               <PaginationControls
                 page={filters.page}
                 totalPages={totalPages}

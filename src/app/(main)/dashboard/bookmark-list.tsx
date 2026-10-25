@@ -3,8 +3,12 @@
 import { useCallback, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { BookmarkCard } from "@/components/bookmark-card";
+import { GalleryBookmarkCard } from "@/components/gallery-bookmark-card";
 import { GridBookmarkCard } from "@/components/grid-bookmark-card";
-import { getBookmarkListContainerClassName } from "@/lib/bookmark-feed-layout";
+import {
+  galleryPosterGridClassName,
+  getBookmarkListContainerClassName,
+} from "@/lib/bookmark-feed-layout";
 import { useScrollElement } from "@/hooks/use-scroll-element";
 import { useListScrollMargin } from "@/hooks/use-list-scroll-margin";
 import { useVirtualListFocus } from "@/hooks/use-virtual-list-focus";
@@ -37,10 +41,12 @@ interface BookmarkListProps {
   disableVirtualization?: boolean;
 }
 
+type BookmarkRowViewMode = Exclude<ViewMode, "grid" | "gallery">;
+
 type BookmarkRowListProps = Omit<BookmarkListProps, "disableVirtualization"> & {
   expandedCompactBookmarkIds: Set<string>;
   onCompactExpandedChange: (bookmarkId: string, expanded: boolean) => void;
-  viewMode: Exclude<ViewMode, "grid">;
+  viewMode: BookmarkRowViewMode;
 };
 
 function VirtualizedBookmarkRows({
@@ -308,9 +314,42 @@ export function BookmarkList({
     );
   }
 
+  if (viewMode === "gallery") {
+    return (
+      // Same page size as grid (not virtualized). Offsets come from
+      // `.gallery-poster-grid`, which queries this container's width.
+      <div className="@container">
+        <div className={galleryPosterGridClassName}>
+          {bookmarks.map((bookmark, i) => (
+            <GalleryBookmarkCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              searchQuery={searchQuery}
+              priorityMedia={aboveFoldMediaBookmarkIds.has(bookmark.id)}
+              selected={
+                selectionMode
+                  ? selectedBookmarkIdSet.has(bookmark.id)
+                  : activeBookmarkId === bookmark.id
+              }
+              onSelect={onSelect}
+              selectionMode={selectionMode}
+              onSelectionChange={onSelectionChange}
+              onTagClick={onTagClick}
+              onAddTag={onAddTag}
+              onAddToCollection={onAddToCollection}
+              onAddNote={onAddNote}
+              className={getStaggerClass(i, "animate-fade-in-up")}
+              isPerformanceHighlight={performanceHighlightId === bookmark.id}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const rowProps = {
     bookmarks,
-    viewMode: viewMode as Exclude<ViewMode, "grid">,
+    viewMode,
     searchQuery,
     aboveFoldMediaBookmarkIds,
     selectionMode,

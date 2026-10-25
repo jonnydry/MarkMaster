@@ -19,7 +19,17 @@ export type SortDirection = "asc" | "desc";
 
 export type MediaFilter = "all" | "images" | "video" | "links" | "text-only";
 
-export type ViewMode = "feed" | "compact" | "grid";
+/** Bookmark list templates. `gallery` is the large-thumbnail poster layout. */
+export const BOOKMARK_VIEW_MODES = ["feed", "compact", "grid", "gallery"] as const;
+
+export type ViewMode = (typeof BOOKMARK_VIEW_MODES)[number];
+
+export function isBookmarkViewMode(value: unknown): value is ViewMode {
+  return (
+    typeof value === "string" &&
+    (BOOKMARK_VIEW_MODES as readonly string[]).includes(value)
+  );
+}
 
 export interface BookmarkFilters {
   search: string;

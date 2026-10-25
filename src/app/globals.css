@@ -507,6 +507,62 @@
   }
 }
 
+/*
+ * Poster gallery — row-major cards with a deliberate column offset.
+ * Phone is one column, zigzagged so the stack is not a straight rail.
+ * Wider containers drop the later columns down instead of sharing a top edge.
+ * The container is the `@container` wrapper around this grid (bookmark list).
+ */
+.gallery-poster-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.gallery-poster-grid > :nth-child(odd) {
+  margin-right: 12%;
+}
+
+.gallery-poster-grid > :nth-child(even) {
+  margin-left: 12%;
+}
+
+@container (min-width: 36rem) {
+  .gallery-poster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery-poster-grid > :nth-child(odd),
+  .gallery-poster-grid > :nth-child(even) {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .gallery-poster-grid > :nth-child(even) {
+    margin-top: 2.75rem;
+  }
+}
+
+@container (min-width: 68rem) {
+  .gallery-poster-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gallery-poster-grid > :nth-child(even) {
+    margin-top: 0;
+  }
+
+  .gallery-poster-grid > :nth-child(3n + 2) {
+    margin-top: 2rem;
+  }
+
+  .gallery-poster-grid > :nth-child(3n) {
+    margin-top: 4rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

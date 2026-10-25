@@ -10,7 +10,10 @@ import { ViewModeControls } from "@/components/view-mode-controls";
 import { KeyboardShortcutsHelpButton } from "@/components/keyboard-shortcuts-help-button";
 import { PaginationControls } from "@/components/pagination-controls";
 import { useBookmarkViewMode } from "@/hooks/use-bookmark-view-mode";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  getBookmarkBandClassName,
+} from "@/lib/bookmark-feed-layout";
 import {
   COLLECTION_DETAIL_SHORTCUT_GROUPS,
   useCollectionDetailPage,
@@ -110,7 +113,7 @@ export default function CollectionDetailClient({
   const handleBookmarkSelect = useCallback(
     (id: string) => {
       setActiveBookmarkId(id);
-      if (viewMode === "grid") {
+      if (viewMode === "grid" || viewMode === "gallery") {
         setGridOverlayBookmarkId(id);
       }
     },
@@ -239,7 +242,7 @@ export default function CollectionDetailClient({
           />
 
           {sortedItems.length > 0 ? (
-            <div className={bookmarkFeedColumnClassName}>
+            <div className={getBookmarkBandClassName(viewMode)}>
               <PaginationControls
                 page={currentPage}
                 totalPages={totalPages}

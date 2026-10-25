@@ -1,7 +1,7 @@
 "use client";
 
 import type { ElementType } from "react";
-import { AlignJustify, Grid3x3, LayoutList } from "lucide-react";
+import { AlignJustify, Grid3x3, Images, LayoutList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   appToolbarControlCompactHeightClassName,
@@ -16,6 +16,7 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] 
   { value: "grid", label: "Grid", icon: Grid3x3 },
   { value: "feed", label: "Feed", icon: LayoutList },
   { value: "compact", label: "Compact", icon: AlignJustify },
+  { value: "gallery", label: "Gallery", icon: Images },
 ];
 
 type ViewModeControlsProps = {

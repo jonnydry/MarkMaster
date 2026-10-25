@@ -34,7 +34,7 @@ import type { BookmarkWithRelations, ViewMode } from "@/types";
 
 interface BookmarkCardProps {
   bookmark: BookmarkWithRelations;
-  viewMode: Exclude<ViewMode, "grid">;
+  viewMode: Exclude<ViewMode, "grid" | "gallery">;
   searchQuery?: string;
   onTagClick?: (tagId: string) => void;
   onAddTag?: (bookmarkId: string) => void;

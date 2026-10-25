@@ -21,7 +21,10 @@ import { useTypography } from "@/hooks/use-typography";
 import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
 import { trackFlywheelEvent } from "@/lib/flywheel";
 import { cn } from "@/lib/utils";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  isFullWidthBookmarkView,
+} from "@/lib/bookmark-feed-layout";
 import type { BookmarkWithRelations } from "@/types";
 import type { ViewMode } from "@/types";
 import type { DiscoveryCarouselItem } from "@/lib/weekly-gems-curation";
@@ -40,7 +43,7 @@ export interface DashboardDiscoveryProps {
   /** default — chromeless strip aligned with feed; flush — frosted module (collections). */
   variant?: "default" | "flush";
   className?: string;
-  /** When the integrated (default) discovery is shown on the main dashboard, passing "grid" makes the carousel span full content width. */
+  /** Workspace grid and poster gallery stretch the carousel to the content width. */
   viewMode?: ViewMode;
 }
 
@@ -64,8 +67,8 @@ function getDiscoveryShellClass(variant: "default" | "flush", viewMode?: ViewMod
   if (variant === "flush") {
     return "mb-0 max-w-none px-0";
   }
-  if (viewMode === "grid") {
-    // Full-width carousel above the grid masonry. Matches grid container side padding.
+  if (isFullWidthBookmarkView(viewMode)) {
+    // Full-width carousel above workspace grid or poster gallery.
     return "w-full px-3 pb-3 pt-1";
   }
   return cn("pb-2 pt-1", bookmarkFeedColumnClassName);
@@ -183,8 +186,7 @@ export function DashboardDiscovery({
   });
 
   const shellClass = getDiscoveryShellClass(variant, viewMode);
-  const isGridView = viewMode === "grid";
-  const isWideStrip = isFeedIntegrated && isGridView;
+  const isWideStrip = isFeedIntegrated && isFullWidthBookmarkView(viewMode);
   const defaultExplainer =
     "A focused mix of untouched and resurfaced saves to organize in a few minutes.";
 

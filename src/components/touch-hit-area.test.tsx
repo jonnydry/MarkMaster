@@ -54,7 +54,7 @@ describe("touch hit areas", () => {
   it("expands compact view toggles without crossing the 2px gap", () => {
     render(<ViewModeControls viewMode="feed" onViewModeChange={() => {}} compact />);
 
-    for (const name of ["Grid view", "Feed view", "Compact view"]) {
+    for (const name of ["Grid view", "Feed view", "Compact view", "Gallery view"]) {
       expectExpansion(
         screen.getByRole("button", { name }),
         "relative after:absolute after:-inset-x-0.5 after:-inset-y-1"

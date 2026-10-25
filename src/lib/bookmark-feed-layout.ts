@@ -45,8 +45,28 @@ export const bookmarkCollectionRowWithReorderClassName = "mx-auto w-full max-w-[
 export const bookmarkCollectionCardCellClassName =
   "min-w-0 flex-1 max-w-[600px]";
 
+/**
+ * Poster gallery root. Offset rules live on `.gallery-poster-grid` in globals.css:
+ * a phone zigzag, then a dropped second column, then a three-column step.
+ */
+export const galleryPosterGridClassName = "gallery-poster-grid";
+
+/** Workspace grid and poster gallery use the full content width, not the 600px feed column. */
+export function isFullWidthBookmarkView(viewMode: ViewMode | undefined): boolean {
+  return viewMode === "grid" || viewMode === "gallery";
+}
+
 /** Returns the list root className for feed/list view modes. */
 export function getBookmarkListContainerClassName(viewMode: ViewMode = "feed"): string {
-  if (viewMode === "grid") return "";
+  if (isFullWidthBookmarkView(viewMode)) return "";
+  return bookmarkFeedColumnClassName;
+}
+
+/**
+ * Status and pagination bands. Gallery lines up with the poster grid's inset;
+ * row views stay in the feed column.
+ */
+export function getBookmarkBandClassName(viewMode: ViewMode): string {
+  if (viewMode === "gallery") return "w-full px-3";
   return bookmarkFeedColumnClassName;
 }
