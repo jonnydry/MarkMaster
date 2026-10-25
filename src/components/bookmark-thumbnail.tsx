@@ -81,6 +81,8 @@ export function BookmarkThumbnail({
   priority = false,
   className,
   fallback = null,
+  onLoad,
+  onError,
 }: {
   bookmark: ThumbnailBookmark;
   alt: string;
@@ -88,6 +90,8 @@ export function BookmarkThumbnail({
   priority?: boolean;
   className?: string;
   fallback?: React.ReactNode;
+  onLoad?: () => void;
+  onError?: () => void;
 }) {
   const plan = bookmarkThumbnailPlan(bookmark);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -105,7 +109,11 @@ export function BookmarkThumbnail({
         sizes={sizes}
         priority={priority}
         className={cn("object-cover", className)}
-        onError={() => setFailedSrc(plan.src)}
+        onLoad={() => onLoad?.()}
+        onError={() => {
+          setFailedSrc(plan.src);
+          onError?.();
+        }}
       />
     );
   }
@@ -121,7 +129,11 @@ export function BookmarkThumbnail({
           alt={alt}
           loading="eager"
           className={cn("size-full object-cover", className)}
-          onError={() => setFailedSrc(plan.src)}
+          onLoad={() => onLoad?.()}
+          onError={() => {
+            setFailedSrc(plan.src);
+            onError?.();
+          }}
         />
       ) : null}
     </div>

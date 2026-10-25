@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { formatDistanceToNow } from "date-fns";
 import Image from "next/image";
 import {
@@ -55,6 +55,11 @@ function mediaPosterAspectClass(media?: BookmarkMediaJson): string {
   return "aspect-[4/5]";
 }
 
+function isWidePoster(media?: BookmarkMediaJson): boolean {
+  if (!media?.width || !media.height) return false;
+  return media.width / media.height > 1.35;
+}
+
 function textPosterAspectClass(text: string): string {
   if (text.length > 160) return "aspect-[3/4]";
   if (text.length > 70) return "aspect-[4/5]";
@@ -90,6 +95,17 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
   const firstMedia = mediaItems?.[0];
   const thumbnailPlan = bookmarkThumbnailPlan(bookmark);
   const hasVisual = Boolean(thumbnailPlan);
+  const thumbnailSrc = thumbnailPlan?.src ?? null;
+  const [trackedSrc, setTrackedSrc] = useState(thumbnailSrc);
+  const [imageReady, setImageReady] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  if (trackedSrc !== thumbnailSrc) {
+    setTrackedSrc(thumbnailSrc);
+    setImageReady(false);
+    setImageFailed(false);
+  }
+  const showMedia = hasVisual && !imageFailed;
+  const widePoster = showMedia && isWidePoster(firstMedia);
   const metrics = bookmark.publicMetrics;
   const hasTag = bookmark.tags.length > 0;
   const hasCollection = Boolean(bookmark.collectionItems?.length);
@@ -120,12 +136,13 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
     <article
       data-dashboard-bookmark-id={bookmark.id}
       data-gallery-bookmark-card={bookmark.id}
-      data-gallery-card-variant={hasVisual ? "media" : "text"}
+      data-gallery-card-variant={showMedia ? "media" : "text"}
+      data-gallery-image-fallback={imageFailed ? "true" : undefined}
       className={cn(
-        "group relative min-w-0 overflow-hidden surface-card text-left [content-visibility:auto] [contain-intrinsic-size:auto_460px] transition-[border-color,background-color] duration-200",
+        "group relative min-w-0 overflow-hidden surface-card text-left transition-[border-color,background-color] duration-200 ease-out motion-reduce:transition-none",
         marked
           ? "state-selected border-primary/60"
-          : "hover:border-primary/25 hover:bg-hover",
+          : "hover:border-primary/25 hover:bg-hover active:border-primary/40",
         className
       )}
     >
@@ -148,7 +165,7 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
       ) : null}
 
       <div className="pointer-events-none relative z-10">
-        {hasVisual ? (
+        {showMedia ? (
           <div
             className={cn(
               "relative isolate overflow-hidden bg-muted",
@@ -160,12 +177,19 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
               alt={`Preview from @${bookmark.authorUsername}`}
               sizes={POSTER_IMAGE_SIZES}
               priority={priorityMedia}
-              className="transition-transform duration-500 ease-out group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-              fallback={<div className="size-full bg-muted" />}
+              onLoad={() => setImageReady(true)}
+              onError={() => setImageFailed(true)}
+              className={cn(
+                "opacity-0 transition-[transform,opacity] duration-300 ease-out",
+                imageReady && "opacity-100",
+                "group-hover:scale-[1.025] group-active:scale-[1.012] group-hover:group-active:scale-[1.012]",
+                "motion-reduce:opacity-100 motion-reduce:transition-none motion-reduce:group-hover:scale-100 motion-reduce:group-active:scale-100"
+              )}
+              fallback={null}
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-transparent transition-colors duration-200 group-hover:bg-hover motion-reduce:transition-none"
+              className="pointer-events-none absolute inset-0 bg-transparent transition-colors duration-200 ease-out group-hover:bg-hover motion-reduce:transition-none"
             />
             <div className="pointer-events-none absolute left-2 top-2">
               <span className="rounded-sm bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
@@ -173,12 +197,19 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
               </span>
             </div>
             <PosterCaption
-              className="absolute inset-x-0 bottom-0 border-t border-hairline-soft bg-popover"
+              dense={widePoster}
+              className={cn(
+                "absolute inset-x-0 bottom-0 border-t border-hairline-soft bg-popover",
+                widePoster && "p-2.5"
+              )}
               bookmark={bookmark}
               highlightedAuthorName={highlightedAuthorName}
               highlightedUsername={highlightedUsername}
               highlightedText={highlightedText}
-              textClassName={cn(GRID_POST_TEXT_MEDIA, "line-clamp-2")}
+              textClassName={cn(
+                GRID_POST_TEXT_MEDIA,
+                widePoster ? "line-clamp-1" : "line-clamp-2"
+              )}
               likeLabel={likeLabel}
               primaryTag={primaryTag}
               extraTagCount={extraTagCount}
@@ -196,7 +227,9 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
           <div
             className={cn(
               "flex flex-col justify-between p-4",
-              textPosterAspectClass(displayText)
+              hasVisual
+                ? mediaPosterAspectClass(firstMedia)
+                : textPosterAspectClass(displayText)
             )}
           >
             <p className={cn(GRID_POST_TEXT_ONLY, "line-clamp-6")}>{highlightedText}</p>
@@ -243,6 +276,7 @@ function PosterCaption({
   onAddToCollection,
   onAddNote,
   hasTag,
+  dense = false,
   className,
 }: {
   bookmark: BookmarkWithRelations;
@@ -261,10 +295,14 @@ function PosterCaption({
   onAddToCollection?: (bookmarkId: string) => void;
   onAddNote?: (bookmarkId: string) => void;
   hasTag: boolean;
+  dense?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col p-3", className)}>
+    <div
+      data-gallery-caption={dense ? "compact" : "regular"}
+      className={cn("flex flex-col p-3", className)}
+    >
       <div className="flex min-w-0 items-center gap-2">
         {bookmark.authorProfileImage ? (
           <Image
@@ -345,7 +383,12 @@ function PosterCaption({
         </div>
       )}
 
-      <div className="pointer-events-auto mt-3 flex items-center gap-1 border-t border-hairline-soft pt-2.5">
+      <div
+        className={cn(
+          "pointer-events-auto flex items-center gap-1 border-t border-hairline-soft",
+          dense ? "mt-2 pt-2" : "mt-3 pt-2.5"
+        )}
+      >
         {onAddTag ? (
           <BookmarkCardActionButton
             icon={Tags}

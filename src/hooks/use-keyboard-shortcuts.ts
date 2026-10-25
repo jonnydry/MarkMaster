@@ -106,9 +106,14 @@ export function scrollDataElementIntoView(attribute: string, value: string) {
     `[${attribute}="${escapedValue}"]`
   );
 
-  target?.scrollIntoView({
+  if (!target) return;
+
+  // Tall posters yank the page if they are centered. Nearest keeps the
+  // selected card in view; scroll-margin clears the sticky header.
+  const galleryPoster = target.hasAttribute("data-gallery-bookmark-card");
+  target.scrollIntoView({
     behavior: "smooth",
-    block: "center",
+    block: galleryPoster ? "nearest" : "center",
     inline: "nearest",
   });
 }

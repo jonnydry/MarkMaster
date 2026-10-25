@@ -512,21 +512,31 @@
  * Phone is one column, zigzagged so the stack is not a straight rail.
  * Wider containers drop the later columns down instead of sharing a top edge.
  * The container is the `@container` wrapper around this grid (bookmark list).
+ *
+ * Offsets stay short so the rhythm is a step, not a hole. Scroll-snap is
+ * omitted on purpose: dropped columns do not share a snap line, and snap
+ * fights J/K. Native scroll inertia is the feel. scroll-margin keeps the
+ * focused poster clear of the sticky header.
  */
 .gallery-poster-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 0.75rem;
+  gap: 1rem;
   padding: 0.75rem;
 }
 
+.gallery-poster-grid > * {
+  scroll-margin-top: calc(var(--header-height, 72px) + 0.75rem);
+  scroll-margin-bottom: 0.75rem;
+}
+
 .gallery-poster-grid > :nth-child(odd) {
-  margin-right: 12%;
+  margin-right: 8%;
 }
 
 .gallery-poster-grid > :nth-child(even) {
-  margin-left: 12%;
+  margin-left: 8%;
 }
 
 @container (min-width: 36rem) {
@@ -541,7 +551,7 @@
   }
 
   .gallery-poster-grid > :nth-child(even) {
-    margin-top: 2.75rem;
+    margin-top: 1.75rem;
   }
 }
 
@@ -555,11 +565,11 @@
   }
 
   .gallery-poster-grid > :nth-child(3n + 2) {
-    margin-top: 2rem;
+    margin-top: 1.25rem;
   }
 
   .gallery-poster-grid > :nth-child(3n) {
-    margin-top: 4rem;
+    margin-top: 2.5rem;
   }
 }
 
