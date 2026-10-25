@@ -164,7 +164,13 @@ export function CollectionDetailBookmarkList({
   }
 
   return (
-    <div className={bookmarkCollectionRowWithReorderClassName}>
+    <div
+      className={
+        viewMode === "gallery"
+          ? "w-full min-w-0"
+          : bookmarkCollectionRowWithReorderClassName
+      }
+    >
       <BookmarkList
         scrollRef={scrollRef}
         bookmarks={bookmarks}

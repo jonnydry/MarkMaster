@@ -45,8 +45,37 @@ export const bookmarkCollectionRowWithReorderClassName = "mx-auto w-full max-w-[
 export const bookmarkCollectionCardCellClassName =
   "min-w-0 flex-1 max-w-[600px]";
 
+/**
+ * Poster gallery root. Column count lives on `.gallery-poster-grid` in globals.css.
+ * Two columns from 22rem, three from 48rem, one shared aspect, 0.5rem gap.
+ * No column drop and no phone inset.
+ */
+export const galleryPosterGridClassName = "gallery-poster-grid";
+
+/** Workspace grid and poster gallery use the full content width, not the 600px feed column. */
+export function isFullWidthBookmarkView(viewMode: ViewMode | undefined): boolean {
+  return viewMode === "grid" || viewMode === "gallery";
+}
+
+/**
+ * Library health / top tags / top authors rail.
+ * Gallery is full-bleed. Workspace keeps the bookmark inspector instead.
+ */
+export function showsDashboardStatsRail(viewMode: ViewMode): boolean {
+  return viewMode === "feed" || viewMode === "compact";
+}
+
 /** Returns the list root className for feed/list view modes. */
 export function getBookmarkListContainerClassName(viewMode: ViewMode = "feed"): string {
-  if (viewMode === "grid") return "";
+  if (isFullWidthBookmarkView(viewMode)) return "";
+  return bookmarkFeedColumnClassName;
+}
+
+/**
+ * Status and pagination bands. Gallery lines up with the poster grid's inset;
+ * row views stay in the feed column.
+ */
+export function getBookmarkBandClassName(viewMode: ViewMode): string {
+  if (viewMode === "gallery") return "w-full px-3";
   return bookmarkFeedColumnClassName;
 }

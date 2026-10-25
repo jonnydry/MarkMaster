@@ -1,10 +1,9 @@
 "use client";
 
 import type { ElementType } from "react";
-import { AlignJustify, Grid3x3, LayoutList } from "lucide-react";
+import { AlignJustify, Grid3x3, Images, LayoutList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  appToolbarControlCompactHeightClassName,
   appToolbarControlExpandedHeightClassName,
   appToolbarSurfaceGroupClassName,
 } from "@/lib/app-chrome";
@@ -16,6 +15,7 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: React.ElementType }[] 
   { value: "grid", label: "Grid", icon: Grid3x3 },
   { value: "feed", label: "Feed", icon: LayoutList },
   { value: "compact", label: "Compact", icon: AlignJustify },
+  { value: "gallery", label: "Gallery", icon: Images },
 ];
 
 type ViewModeControlsProps = {
@@ -51,7 +51,7 @@ export function ViewModeControls({
         "dashboard-view-mode flex items-center gap-0.5 rounded-sm p-0.5",
         appToolbarSurfaceGroupClassName,
         compact
-          ? cn(appToolbarControlCompactHeightClassName, "shrink-0")
+          ? "h-11 shrink-0 p-0"
           : cn(appToolbarControlExpandedHeightClassName, "flex-1 sm:flex-none"),
         className
       )}
@@ -67,7 +67,7 @@ export function ViewModeControls({
             className={cn(
               "dashboard-view-button rounded-sm border border-transparent text-sm",
               compact
-                ? "relative size-7 px-0 after:absolute after:-inset-x-0.5 after:-inset-y-1"
+                ? "size-11 px-0"
                 : "h-8 px-2.5",
               selected
                 ? cn(highlightActiveClass, "border")

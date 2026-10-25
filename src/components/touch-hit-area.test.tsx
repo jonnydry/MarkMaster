@@ -51,14 +51,14 @@ function expectExpansion(element: HTMLElement, className: string) {
 }
 
 describe("touch hit areas", () => {
-  it("expands compact view toggles without crossing the 2px gap", () => {
+  it("gives compact view toggles a 44px box", () => {
     render(<ViewModeControls viewMode="feed" onViewModeChange={() => {}} compact />);
 
-    for (const name of ["Grid view", "Feed view", "Compact view"]) {
-      expectExpansion(
-        screen.getByRole("button", { name }),
-        "relative after:absolute after:-inset-x-0.5 after:-inset-y-1"
-      );
+    expect(document.querySelector(".dashboard-view-mode")?.className).toContain("h-11");
+    for (const name of ["Grid view", "Feed view", "Compact view", "Gallery view"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button.className).toContain("size-11");
+      expect(button.className.includes("after:")).toBe(false);
     }
   });
 

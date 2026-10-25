@@ -22,7 +22,11 @@ import {
   appDashboardRailClassName,
   appDashboardRailMediaQuery,
 } from "@/lib/app-layout";
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  getBookmarkBandClassName,
+  showsDashboardStatsRail,
+} from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
 import { BookmarkList } from "./bookmark-list";
@@ -307,9 +311,9 @@ function DashboardContent() {
           <div
             className={cn(
               "flex min-w-0 items-start",
-              viewMode === "grid"
-                ? "gap-0"
-                : "gap-4 min-[1152px]:pr-4"
+              showsDashboardStatsRail(viewMode)
+                ? "gap-4 min-[1152px]:pr-4"
+                : "gap-0"
             )}
           >
             <div className="min-w-0 flex-1">
@@ -318,7 +322,7 @@ function DashboardContent() {
               role="status"
               className={cn(
                 "border-b border-hairline-soft px-4 py-2 text-xs text-muted-foreground sm:px-5",
-                bookmarkFeedColumnClassName
+                getBookmarkBandClassName(viewMode)
               )}
             >
               Some library details are temporarily unavailable.
@@ -383,7 +387,7 @@ function DashboardContent() {
                 <div
                   className={cn(
                     "flex items-center gap-2 border-b border-hairline-soft px-4 py-2 text-sm sm:px-5",
-                    bookmarkFeedColumnClassName
+                    getBookmarkBandClassName(viewMode)
                   )}
                 >
                   <span className="text-xs font-semibold text-foreground">
@@ -433,7 +437,11 @@ function DashboardContent() {
                   activeBookmarkId={
                     selectionMode ? null : activeBookmarkIdForView
                   }
-                  onSelect={handleBookmarkSelect}
+                  onSelect={
+                    viewMode === "gallery"
+                      ? handleExpandedBookmarkOpen
+                      : handleBookmarkSelect
+                  }
                   onSelectionChange={toggleBookmarkSelection}
                   onTagClick={filters.toggleTag}
                   onAddTag={handleBookmarkAddTag}
@@ -448,7 +456,7 @@ function DashboardContent() {
           )}
 
           {!isLoading && !isError && bookmarks.length > 0 && (
-            <div className={bookmarkFeedColumnClassName}>
+            <div className={getBookmarkBandClassName(viewMode)}>
               <PaginationControls
                 page={filters.page}
                 totalPages={totalPages}
@@ -470,7 +478,7 @@ function DashboardContent() {
                 onDelete={actions.handleDeleteBookmark}
                 className={appDashboardInspectorClassName}
               />
-            ) : railOpen && viewMode !== "grid" ? (
+            ) : railOpen && showsDashboardStatsRail(viewMode) ? (
               <div className={appDashboardRailClassName}>
                 <DashboardRail
                   id="dashboard-rail"

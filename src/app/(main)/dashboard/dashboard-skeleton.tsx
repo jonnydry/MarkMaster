@@ -1,4 +1,7 @@
-import { bookmarkFeedColumnClassName } from "@/lib/bookmark-feed-layout";
+import {
+  bookmarkFeedColumnClassName,
+  galleryPosterGridClassName,
+} from "@/lib/bookmark-feed-layout";
 import { getStaggerClass } from "@/lib/stagger";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";
@@ -7,7 +10,35 @@ interface DashboardSkeletonProps {
   viewMode: ViewMode;
 }
 
+const GALLERY_SKELETON_COUNT = 6;
+
 export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
+  if (viewMode === "gallery") {
+    return (
+      <div
+        className="@container"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading bookmarks"
+      >
+        <div className={galleryPosterGridClassName}>
+          {Array.from({ length: GALLERY_SKELETON_COUNT }, (_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "aspect-[4/5] overflow-hidden surface-card",
+                getStaggerClass(i, "animate-fade-in")
+              )}
+            >
+              <div className="size-full skeleton-shimmer" />
+            </div>
+          ))}
+        </div>
+        <span className="sr-only">Loading bookmarks</span>
+      </div>
+    );
+  }
+
   if (viewMode === "grid") {
     return (
       <div

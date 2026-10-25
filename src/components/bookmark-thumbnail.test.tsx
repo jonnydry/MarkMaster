@@ -190,4 +190,19 @@ describe("BookmarkThumbnail card image", () => {
     expect(screen.getByText("Text bookmark")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Preview" })).not.toBeInTheDocument();
   });
+
+  it("reports load and error for the card image", () => {
+    const onLoad = vi.fn();
+    const onError = vi.fn();
+    intersectOnObserve = true;
+    renderThumbnail({ onLoad, onError });
+
+    const img = screen.getByRole("img", { name: "Preview" });
+    fireEvent.load(img);
+    expect(onLoad).toHaveBeenCalledOnce();
+
+    fireEvent.error(img);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(screen.getByText("Text bookmark")).toBeInTheDocument();
+  });
 });

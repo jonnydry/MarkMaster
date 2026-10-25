@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { ViewMode } from "@/types";
+import { isBookmarkViewMode, type ViewMode } from "@/types";
 
 const STORAGE_KEY = "markmaster-bookmark-view-mode";
 
@@ -9,9 +9,7 @@ function readStoredViewMode(fallback: ViewMode): ViewMode {
   if (typeof window === "undefined") return fallback;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "feed" || stored === "compact" || stored === "grid") {
-      return stored;
-    }
+    if (isBookmarkViewMode(stored)) return stored;
   } catch {
     // ignore storage errors
   }
@@ -28,7 +26,7 @@ function subscribe(callback: () => void) {
 }
 
 /**
- * Shared feed / compact / grid preference across bookmark surfaces. `defaultViewMode`
+ * Shared feed / compact / grid / gallery preference across bookmark surfaces. `defaultViewMode`
  * is the fallback before the user has made an explicit choice (persisted across surfaces).
  *
  * Waits until after hydration to apply localStorage so server markup matches the first
