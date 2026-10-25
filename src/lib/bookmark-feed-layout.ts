@@ -56,6 +56,14 @@ export function isFullWidthBookmarkView(viewMode: ViewMode | undefined): boolean
   return viewMode === "grid" || viewMode === "gallery";
 }
 
+/**
+ * Library health / top tags / top authors rail.
+ * Gallery is full-bleed. Workspace keeps the bookmark inspector instead.
+ */
+export function showsDashboardStatsRail(viewMode: ViewMode): boolean {
+  return viewMode === "feed" || viewMode === "compact";
+}
+
 /** Returns the list root className for feed/list view modes. */
 export function getBookmarkListContainerClassName(viewMode: ViewMode = "feed"): string {
   if (isFullWidthBookmarkView(viewMode)) return "";

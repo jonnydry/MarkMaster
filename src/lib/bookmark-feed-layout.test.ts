@@ -8,6 +8,7 @@ import {
   getBookmarkBandClassName,
   getBookmarkListContainerClassName,
   isFullWidthBookmarkView,
+  showsDashboardStatsRail,
 } from "@/lib/bookmark-feed-layout";
 
 describe("bookmark list layout classes", () => {
@@ -16,6 +17,13 @@ describe("bookmark list layout classes", () => {
     expect(getBookmarkListContainerClassName("compact")).toBe(bookmarkFeedColumnClassName);
     expect(getBookmarkListContainerClassName()).toBe(bookmarkFeedColumnClassName);
     expect(isFullWidthBookmarkView("feed")).toBe(false);
+  });
+
+  it("keeps the stats rail on feed and compact only", () => {
+    expect(showsDashboardStatsRail("feed")).toBe(true);
+    expect(showsDashboardStatsRail("compact")).toBe(true);
+    expect(showsDashboardStatsRail("grid")).toBe(false);
+    expect(showsDashboardStatsRail("gallery")).toBe(false);
   });
 
   it("gives grid and gallery the full content width", () => {

@@ -26,6 +26,7 @@ import {
   appToolbarControlHeightClassName,
   appToolbarSurfaceClassName,
 } from "@/lib/app-chrome";
+import { showsDashboardStatsRail } from "@/lib/bookmark-feed-layout";
 import { PageHeaderCompactToggle } from "@/components/page-header-compact-toggle";
 import { CompactFloatingSearchBubble } from "@/components/compact-floating-search";
 import { useDiscoveryHidden } from "@/hooks/use-discovery-hidden";
@@ -197,7 +198,7 @@ export function DashboardToolbar({
         className={appToolbarSurfaceClassName}
       />
 
-      {viewMode !== "grid" ? (
+      {showsDashboardStatsRail(viewMode) ? (
         <ToolbarIconButton
           active={railOpen}
           label={railOpen ? "Hide rail" : "Show rail"}

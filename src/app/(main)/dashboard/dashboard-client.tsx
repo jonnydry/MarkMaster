@@ -25,6 +25,7 @@ import {
 import {
   bookmarkFeedColumnClassName,
   getBookmarkBandClassName,
+  showsDashboardStatsRail,
 } from "@/lib/bookmark-feed-layout";
 import { cn } from "@/lib/utils";
 import { DashboardDiscovery } from "@/components/dashboard-discovery";
@@ -310,9 +311,9 @@ function DashboardContent() {
           <div
             className={cn(
               "flex min-w-0 items-start",
-              viewMode === "grid"
-                ? "gap-0"
-                : "gap-4 min-[1152px]:pr-4"
+              showsDashboardStatsRail(viewMode)
+                ? "gap-4 min-[1152px]:pr-4"
+                : "gap-0"
             )}
           >
             <div className="min-w-0 flex-1">
@@ -477,7 +478,7 @@ function DashboardContent() {
                 onDelete={actions.handleDeleteBookmark}
                 className={appDashboardInspectorClassName}
               />
-            ) : railOpen && viewMode !== "grid" ? (
+            ) : railOpen && showsDashboardStatsRail(viewMode) ? (
               <div className={appDashboardRailClassName}>
                 <DashboardRail
                   id="dashboard-rail"
