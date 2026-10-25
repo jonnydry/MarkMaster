@@ -47,8 +47,12 @@ describe("bookmark list layout classes", () => {
     const block = css.slice(start, start + 1200);
     expect(block).toContain("gap: 0.5rem");
     expect(block).toContain("scroll-margin-top");
+    expect(block).toContain("min-width: 22rem");
     expect(block).toContain("repeat(2, minmax(0, 1fr))");
+    expect(block).toContain("min-width: 48rem");
     expect(block).toContain("repeat(3, minmax(0, 1fr))");
+    expect(block).not.toContain("min-width: 36rem");
+    expect(block).not.toContain("min-width: 68rem");
     const offsets = block.replaceAll("scroll-margin-top", "").replaceAll("scroll-margin-bottom", "");
     expect(offsets).not.toContain("margin-top");
     expect(offsets).not.toContain("margin-left");

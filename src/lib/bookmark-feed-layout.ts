@@ -47,7 +47,8 @@ export const bookmarkCollectionCardCellClassName =
 
 /**
  * Poster gallery root. Column count lives on `.gallery-poster-grid` in globals.css.
- * Cards share one aspect and a 0.5rem gap — no column drop and no phone inset.
+ * Two columns from 22rem, three from 48rem, one shared aspect, 0.5rem gap.
+ * No column drop and no phone inset.
  */
 export const galleryPosterGridClassName = "gallery-poster-grid";
 
