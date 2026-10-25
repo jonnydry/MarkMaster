@@ -46,8 +46,8 @@ export const bookmarkCollectionCardCellClassName =
   "min-w-0 flex-1 max-w-[600px]";
 
 /**
- * Poster gallery root. Offset rules live on `.gallery-poster-grid` in globals.css:
- * a phone zigzag, then a dropped second column, then a three-column step.
+ * Poster gallery root. Column count lives on `.gallery-poster-grid` in globals.css.
+ * Cards share one aspect and a 0.5rem gap — no column drop and no phone inset.
  */
 export const galleryPosterGridClassName = "gallery-poster-grid";
 

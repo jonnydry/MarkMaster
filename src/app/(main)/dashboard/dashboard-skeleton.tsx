@@ -10,14 +10,7 @@ interface DashboardSkeletonProps {
   viewMode: ViewMode;
 }
 
-const GALLERY_SKELETON_ASPECTS = [
-  "aspect-[3/4]",
-  "aspect-[5/4]",
-  "aspect-[4/5]",
-  "aspect-[3/4]",
-  "aspect-[5/4]",
-  "aspect-[4/5]",
-] as const;
+const GALLERY_SKELETON_COUNT = 6;
 
 export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
   if (viewMode === "gallery") {
@@ -29,12 +22,11 @@ export function DashboardSkeleton({ viewMode }: DashboardSkeletonProps) {
         aria-label="Loading bookmarks"
       >
         <div className={galleryPosterGridClassName}>
-          {GALLERY_SKELETON_ASPECTS.map((aspect, i) => (
+          {Array.from({ length: GALLERY_SKELETON_COUNT }, (_, i) => (
             <div
               key={i}
               className={cn(
-                "overflow-hidden surface-card",
-                aspect,
+                "aspect-[4/5] overflow-hidden surface-card",
                 getStaggerClass(i, "animate-fade-in")
               )}
             >

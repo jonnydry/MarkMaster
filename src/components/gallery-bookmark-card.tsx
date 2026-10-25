@@ -45,25 +45,14 @@ interface GalleryBookmarkCardProps {
 }
 
 const POSTER_IMAGE_SIZES =
-  "(max-width: 640px) 88vw, (max-width: 1280px) 46vw, 32vw";
+  "(max-width: 640px) 100vw, (max-width: 1280px) 46vw, 32vw";
 
-function mediaPosterAspectClass(media?: BookmarkMediaJson): string {
-  if (!media?.width || !media.height) return "aspect-[4/5]";
-  const ratio = media.width / media.height;
-  if (ratio < 0.9) return "aspect-[3/4]";
-  if (ratio > 1.35) return "aspect-[5/4]";
-  return "aspect-[4/5]";
-}
+/** One box for every poster so a row stays flush. Wide photos still crop with object-cover. */
+const POSTER_ASPECT_CLASS = "aspect-[4/5]";
 
 function isWidePoster(media?: BookmarkMediaJson): boolean {
   if (!media?.width || !media.height) return false;
   return media.width / media.height > 1.35;
-}
-
-function textPosterAspectClass(text: string): string {
-  if (text.length > 160) return "aspect-[3/4]";
-  if (text.length > 70) return "aspect-[4/5]";
-  return "aspect-[5/4]";
 }
 
 function mediaLabel(mediaItems: BookmarkMediaJson[] | null | undefined): string {
@@ -169,7 +158,7 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
           <div
             className={cn(
               "relative isolate overflow-hidden bg-muted",
-              mediaPosterAspectClass(firstMedia)
+              POSTER_ASPECT_CLASS
             )}
           >
             <BookmarkThumbnail
@@ -227,9 +216,7 @@ export const GalleryBookmarkCard = memo(function GalleryBookmarkCard({
           <div
             className={cn(
               "flex flex-col justify-between p-4",
-              hasVisual
-                ? mediaPosterAspectClass(firstMedia)
-                : textPosterAspectClass(displayText)
+              POSTER_ASPECT_CLASS
             )}
           >
             <p className={cn(GRID_POST_TEXT_ONLY, "line-clamp-6")}>{highlightedText}</p>

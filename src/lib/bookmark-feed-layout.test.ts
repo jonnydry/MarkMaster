@@ -31,20 +31,21 @@ describe("bookmark list layout classes", () => {
     expect(getBookmarkBandClassName("compact")).toBe(bookmarkFeedColumnClassName);
   });
 
-  it("points the gallery at the offset poster grid", () => {
+  it("packs the gallery without column drops", () => {
     expect(galleryPosterGridClassName).toBe("gallery-poster-grid");
     const css = readFileSync(resolve("src/app/globals.css"), "utf8");
     const start = css.indexOf(".gallery-poster-grid");
     expect(start).toBeGreaterThan(-1);
-    const block = css.slice(start, start + 1800);
+    const block = css.slice(start, start + 1200);
+    expect(block).toContain("gap: 0.5rem");
     expect(block).toContain("scroll-margin-top");
-    expect(block).toContain("nth-child(odd)");
-    expect(block).toContain("margin-right: 8%");
-    expect(block).toContain("margin-left: 8%");
-    expect(block).toContain("margin-top: 1.75rem");
-    expect(block).toContain("nth-child(3n + 2)");
-    expect(block).toContain("margin-top: 1.25rem");
-    expect(block).toContain("margin-top: 2.5rem");
+    expect(block).toContain("repeat(2, minmax(0, 1fr))");
+    expect(block).toContain("repeat(3, minmax(0, 1fr))");
+    const offsets = block.replaceAll("scroll-margin-top", "").replaceAll("scroll-margin-bottom", "");
+    expect(offsets).not.toContain("margin-top");
+    expect(offsets).not.toContain("margin-left");
+    expect(offsets).not.toContain("margin-right");
+    expect(block).not.toContain("nth-child");
     expect(block).not.toContain("scroll-snap");
   });
 });

@@ -59,6 +59,7 @@ describe("GalleryBookmarkCard", () => {
 
     const card = document.querySelector("[data-gallery-bookmark-card='bm-1']");
     expect(card).toHaveAttribute("data-gallery-card-variant", "text");
+    expect(card?.querySelector("[class*='aspect-[4/5]']")).not.toBeNull();
     expect(card?.className).toContain("hover:bg-hover");
     expect(card?.className).toContain("hover:border-primary/25");
     expect(card?.className).toContain("active:border-primary/40");
@@ -82,6 +83,7 @@ describe("GalleryBookmarkCard", () => {
 
     const card = document.querySelector("[data-gallery-bookmark-card='bm-1']");
     expect(card).toHaveAttribute("data-gallery-card-variant", "media");
+    expect(card?.querySelector("[class*='aspect-[4/5]']")).not.toBeNull();
     const preview = screen.getByAltText("Preview from @ada");
     expect(preview).toBeInTheDocument();
     expect(preview.className).toContain("opacity-0");
