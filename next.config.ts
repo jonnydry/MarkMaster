@@ -9,49 +9,13 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 // Avoid wrong workspace root when a parent directory also has a lockfile.
 const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
-const isDev = process.env.NODE_ENV === "development";
-const isProduction = process.env.NODE_ENV === "production";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  // The theme bootstrap is served as a first-party script route, so script-src can stay self-only.
-  // 'unsafe-eval' is only allowed in development (Turbopack + React Refresh).
-  `script-src 'self'${isDev ? " 'unsafe-eval'" : ""}`,
-  // 'unsafe-inline' for styles is still required due to Tailwind v4 + shadcn/ui.
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data: https://pbs.twimg.com https://abs.twimg.com",
-  "media-src 'self' https://video.twimg.com https://pbs.twimg.com",
-  "font-src 'self' data:",
-  // Browser traffic stays first-party. X and xAI calls are server-side only.
-  `connect-src 'self'${isDev ? " http: ws:" : ""}`,
-  // Required for the high-performance PixiJS Orbit Map Web Worker (blob: workers)
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  ...(isProduction ? ["upgrade-insecure-requests"] : []),
-  // Report violations to our endpoint (see /api/csp-report)
-  "report-to default",
-].join("; ");
-
-// === CSP Strategy ===
-//
-// Production enforces CSP unless an operator explicitly selects report-only
-// for a short rollback/diagnostic window. Development remains report-only.
-const cspEnforce =
-  process.env.CSP_MODE === "enforce" ||
-  (isProduction && process.env.CSP_MODE !== "report-only");
-const cspHeaderKey = cspEnforce
-  ? "Content-Security-Policy"
-  : "Content-Security-Policy-Report-Only";
+// CSP is set per request in src/proxy.ts. A static header cannot carry the
+// nonce Next.js puts on its inline bootstrap, and a second policy without
+// that nonce would still block those scripts.
 
 const securityHeaders = [
-  {
-    key: cspHeaderKey,
-    value: contentSecurityPolicy,
-  },
-  // Required for modern Reporting API (pairs with report-to in CSP)
+  // Required for modern Reporting API (pairs with report-to in the proxy CSP)
   {
     key: "Reporting-Endpoints",
     value: 'default="/api/csp-report"',

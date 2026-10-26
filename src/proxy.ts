@@ -8,6 +8,7 @@ import {
   undecryptableSessionCookieNames,
 } from "@/lib/auth-edge";
 import { getClientIp } from "@/lib/client-ip";
+import { createContentSecurityPolicy } from "@/lib/content-security-policy";
 import { logError } from "@/lib/logger";
 
 // === Global Safety Limiter ===
@@ -129,6 +130,7 @@ function expireSessionCookies(
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const csp = createContentSecurityPolicy();
   // Auth.js owns Set-Cookie on its own routes (sign-in writes a new session
   // while the request may still carry the old one). Everywhere else, drop a
   // session cookie this process cannot decrypt before Server Components call
@@ -138,17 +140,26 @@ export async function proxy(request: NextRequest) {
     : await undecryptableSessionCookieNames(request);
 
   const continueNext = () => {
-    if (staleSessionCookies.length === 0) return NextResponse.next();
-    const response = NextResponse.next({
-      request: { headers: requestHeadersWithoutCookies(request, staleSessionCookies) },
-    });
+    const headers =
+      staleSessionCookies.length === 0
+        ? new Headers(request.headers)
+        : requestHeadersWithoutCookies(request, staleSessionCookies);
+    // Next reads Content-Security-Policy on the incoming request and stamps
+    // that nonce onto inline bootstrap scripts. `csp.key` is what the browser
+    // receives, so report-only mode does not enforce during development.
+    headers.set("x-nonce", csp.nonce);
+    headers.set("Content-Security-Policy", csp.value);
+    const response = NextResponse.next({ request: { headers } });
+    response.headers.set(csp.key, csp.value);
+    if (staleSessionCookies.length === 0) return response;
     return expireSessionCookies(response, staleSessionCookies);
   };
 
-  const finish = (response: NextResponse) =>
-    staleSessionCookies.length === 0
-      ? response
-      : expireSessionCookies(response, staleSessionCookies);
+  const finish = (response: NextResponse) => {
+    response.headers.set(csp.key, csp.value);
+    if (staleSessionCookies.length === 0) return response;
+    return expireSessionCookies(response, staleSessionCookies);
+  };
 
   const isApiRoute = pathname.startsWith("/api");
   const isPublicShareRoute = pathname.startsWith("/share/");
