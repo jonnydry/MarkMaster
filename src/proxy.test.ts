@@ -94,6 +94,43 @@ afterEach(() => {
 });
 
 describe("proxy routing scope", () => {
+  it("enforces the nonce policy in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const proxy = await importProxy();
+
+    const response = await proxy(makeRequest("/login"));
+
+    expect(response.headers.get("content-security-policy-report-only")).toBeNull();
+    const csp = response.headers.get("content-security-policy") ?? "";
+    const nonce = csp.match(/'nonce-([^']+)'/)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(csp).toContain("upgrade-insecure-requests");
+    expect(response.headers.get("x-middleware-request-content-security-policy")).toContain(
+      `'nonce-${nonce}'`
+    );
+  });
+
+  it("stamps a per-request script nonce onto the document request and response", async () => {
+    const proxy = await importProxy();
+
+    const response = await proxy(makeRequest("/"));
+
+    expectPassthrough(response);
+    const csp = response.headers.get("content-security-policy-report-only");
+    expect(csp).toBeTruthy();
+    const nonce = csp?.match(/'nonce-([^']+)'/)?.[1];
+    expect(nonce).toBeTruthy();
+    const scriptSrc = csp
+      ?.split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith("script-src"));
+    expect(scriptSrc).toBe(`script-src 'self' 'nonce-${nonce}'`);
+    expect(response.headers.get("x-middleware-request-content-security-policy")).toContain(
+      `'nonce-${nonce}'`
+    );
+    expect(response.headers.get("x-middleware-request-x-nonce")).toBe(nonce);
+  });
+
   it("passes non-API, non-share paths through untouched", async () => {
     const proxy = await importProxy();
 
