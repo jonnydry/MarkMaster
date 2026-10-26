@@ -2,18 +2,32 @@
 
 import "@/styles/auth.css";
 
+import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 import Image from "next/image";
 import { XLogoMark } from "@/components/brands/x-logo-mark";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ArrowRight } from "lucide-react";
 import { MarkMasterLogo } from "@/components/markmaster-logo";
+import { sendJson } from "@/lib/fetch-json";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const SPLASH_BACKGROUND_IMAGE_URL = "/rocket-launch-background.png";
 
-async function handleSignIn(callbackUrl: string, resetSession: boolean) {
+async function handleSignIn(
+  callbackUrl: string,
+  resetSession: boolean,
+  ownApp: { clientId: string; clientSecret: string } | null
+) {
+  if (ownApp) {
+    await sendJson("/api/auth/x-app", {
+      method: "POST",
+      body: ownApp,
+    });
+  }
   if (resetSession) {
     await signOut({ redirect: false });
   }
@@ -24,11 +38,37 @@ export function OrbitalAuthExperience({
   callbackUrl = "/dashboard",
   errorMessage,
   resetSession = false,
+  requiresOwnXApp = false,
 }: {
   callbackUrl?: string;
   errorMessage?: string | null;
   resetSession?: boolean;
+  /** Hosted deployment: sign-in must use the visitor's own X app, not AUTH_TWITTER_*. */
+  requiresOwnXApp?: boolean;
 }) {
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  async function onSignIn() {
+    setFormError(null);
+    if (requiresOwnXApp && (!clientId.trim() || !clientSecret.trim())) {
+      setFormError("Paste your X app client ID and secret before signing in.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await handleSignIn(
+        callbackUrl,
+        resetSession,
+        requiresOwnXApp ? { clientId, clientSecret } : null
+      );
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Could not start sign-in.");
+      setSubmitting(false);
+    }
+  }
   return (
     <div className="auth-splash dark relative isolate flex min-w-0 flex-col text-foreground">
       <div
@@ -85,9 +125,44 @@ export function OrbitalAuthExperience({
           )}
 
           <div className="auth-splash__cta animate-fade-in-up stagger-4 flex flex-col items-start">
+            {requiresOwnXApp ? (
+              <div className="grid w-full max-w-sm gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="login-x-client-id">X app client ID</Label>
+                  <Input
+                    id="login-x-client-id"
+                    name="x-client-id"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={clientId}
+                    disabled={submitting}
+                    onChange={(event) => setClientId(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="login-x-client-secret">X app client secret</Label>
+                  <Input
+                    id="login-x-client-secret"
+                    name="x-client-secret"
+                    type="password"
+                    autoComplete="new-password"
+                    spellCheck={false}
+                    value={clientSecret}
+                    disabled={submitting}
+                    onChange={(event) => setClientSecret(event.target.value)}
+                  />
+                </div>
+              </div>
+            ) : null}
+            {formError ? (
+              <p className="max-w-sm text-sm text-destructive" role="alert">
+                {formError}
+              </p>
+            ) : null}
             <Button
               type="button"
-              onClick={() => void handleSignIn(callbackUrl, resetSession)}
+              onClick={() => void onSignIn()}
+              disabled={submitting}
               className="auth-splash__primary-button w-full gap-2.5 sm:w-auto"
             >
               <XLogoMark className="size-[18px] shrink-0" title={undefined} />

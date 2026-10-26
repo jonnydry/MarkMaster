@@ -19,6 +19,16 @@ model User {
   tokenExpiresAt  DateTime?
   /** Last time valid X tokens were obtained (sign-in, reconnect, or refresh). */
   tokenRefreshedAt DateTime?
+  /**
+   * AES-256-GCM (iv:tag:ciphertext) X OAuth client id for this user's own
+   * Developer app. Null when unset. Never read another user's row for this.
+   */
+  xClientId        String?
+  /**
+   * AES-256-GCM client secret for that same app. Null when unset.
+   * Returned to the browser only as a last-4 hint, never in full.
+   */
+  xClientSecret    String?
   lastSyncAt      DateTime?
   /** When true, bookmark sync also mirrors X bookmark folders into collections. */
   syncXFolders    Boolean   @default(false)

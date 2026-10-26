@@ -219,4 +219,211 @@ describe("getFreshXAccessToken", () => {
       /Token refresh failed/,
     );
   });
+
+  it("refreshes and fetches bookmarks with that user's app only", async () => {
+    const { encrypt } = await import("./encryption");
+    const apps = {
+      "user-a": {
+        clientId: "client-user-a-1111",
+        clientSecret: "secret-user-a-zzzz",
+        refresh: "refresh-user-a",
+      },
+      "user-b": {
+        clientId: "client-user-b-2222",
+        clientSecret: "secret-user-b-yyyy",
+        refresh: "refresh-user-b",
+      },
+    } as const;
+
+    prismaMock.user.findUnique.mockImplementation(
+      async (args: { where: { id: keyof typeof apps } }) => {
+        const app = apps[args.where.id];
+        if (!app) {
+          throw new Error(`refused lookup for ${String(args.where.id)}`);
+        }
+        return {
+          accessToken: encrypt("expired-access-token"),
+          refreshToken: encrypt(app.refresh),
+          tokenExpiresAt: new Date(Date.now() - 1_000),
+          xClientId: encrypt(app.clientId),
+          xClientSecret: encrypt(app.clientSecret),
+        };
+      },
+    );
+    prismaMock.user.update.mockResolvedValue({});
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("/oauth2/token")) {
+        const refresh = new URLSearchParams(String(init?.body)).get("refresh_token");
+        return new Response(
+          JSON.stringify({
+            access_token: `access-for-${refresh}`,
+            refresh_token: `next-${refresh}`,
+            expires_in: 7200,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    const { fetchBookmarks } = await import("./x-api");
+    await fetchBookmarks("user-a", "x-user-a");
+
+    const lookedUp = prismaMock.user.findUnique.mock.calls.map(
+      (call) => (call[0] as { where: { id: string } }).where.id,
+    );
+    expect(lookedUp.length).toBeGreaterThan(0);
+    expect(lookedUp.every((id) => id === "user-a")).toBe(true);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "user-a" } }),
+    );
+
+    const tokenCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes("/oauth2/token"),
+    ) as [string, RequestInit];
+    const tokenHeader = (tokenCall[1].headers as Record<string, string>).Authorization;
+    expect(Buffer.from(tokenHeader.replace(/^Basic /, ""), "base64").toString()).toBe(
+      "client-user-a-1111:secret-user-a-zzzz",
+    );
+    expect(tokenHeader).not.toContain("secret-user-b");
+    expect(tokenHeader).not.toContain("twitter-client-secret");
+
+    const bookmarkCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes("/users/x-user-a/bookmarks"),
+    ) as [string, RequestInit];
+    expect(bookmarkCall[1].headers).toMatchObject({
+      Authorization: "Bearer access-for-refresh-user-a",
+    });
+
+    fetchMock.mockClear();
+    prismaMock.user.findUnique.mockClear();
+    prismaMock.user.update.mockClear();
+
+    await fetchBookmarks("user-b", "x-user-b");
+    const bTokenCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes("/oauth2/token"),
+    ) as [string, RequestInit];
+    const bHeader = (bTokenCall[1].headers as Record<string, string>).Authorization;
+    expect(Buffer.from(bHeader.replace(/^Basic /, ""), "base64").toString()).toBe(
+      "client-user-b-2222:secret-user-b-yyyy",
+    );
+    const bLookups = prismaMock.user.findUnique.mock.calls.map(
+      (call) => (call[0] as { where: { id: string } }).where.id,
+    );
+    expect(bLookups.every((id) => id === "user-b")).toBe(true);
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "user-b" } }),
+    );
+  });
+
+  it("does not use a still-valid token when a public hosted user has no app", async () => {
+    vi.stubEnv("VERCEL", "1");
+    const { encrypt } = await import("./encryption");
+    prismaMock.user.findUnique.mockResolvedValue({
+      accessToken: encrypt("still-valid-token"),
+      tokenExpiresAt: new Date(Date.now() + 10 * 60_000),
+      xClientId: null,
+      xClientSecret: null,
+    });
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    const { XAppCredentialsRequiredError } = await import("./x-app-credentials");
+
+    await expect(getFreshXAccessToken("public-user")).rejects.toBeInstanceOf(
+      XAppCredentialsRequiredError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "public-user" } }),
+    );
+  });
+
+  it("uses the host app for the owner when that account has no stored pair", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("OWNER_USER_ID", "owner-1");
+    const { encrypt } = await import("./encryption");
+    prismaMock.user.findUnique.mockResolvedValue({
+      accessToken: encrypt("expired-access-token"),
+      refreshToken: encrypt("owner-refresh"),
+      tokenExpiresAt: new Date(Date.now() - 1_000),
+      xClientId: null,
+      xClientSecret: null,
+    });
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "owner-access",
+          refresh_token: "owner-refresh-next",
+          expires_in: 7200,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    prismaMock.user.update.mockResolvedValue({});
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    await expect(getFreshXAccessToken("owner-1")).resolves.toBe("owner-access");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const header = (init.headers as Record<string, string>).Authorization;
+    expect(Buffer.from(header.replace(/^Basic /, ""), "base64").toString()).toBe(
+      "twitter-client-id:twitter-client-secret",
+    );
+  });
+
+  it("prefers a stored pair over the host app even for the owner", async () => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("OWNER_USER_ID", "owner-1");
+    const { encrypt } = await import("./encryption");
+    prismaMock.user.findUnique.mockResolvedValue({
+      accessToken: encrypt("expired-access-token"),
+      refreshToken: encrypt("owner-refresh"),
+      tokenExpiresAt: new Date(Date.now() - 1_000),
+      xClientId: encrypt("owner-own-client-id"),
+      xClientSecret: encrypt("owner-own-client-secret"),
+    });
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "owner-access",
+          expires_in: 7200,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    prismaMock.user.update.mockResolvedValue({});
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    await getFreshXAccessToken("owner-1");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const header = (init.headers as Record<string, string>).Authorization;
+    expect(Buffer.from(header.replace(/^Basic /, ""), "base64").toString()).toBe(
+      "owner-own-client-id:owner-own-client-secret",
+    );
+    expect(header).not.toContain("twitter-client-secret");
+  });
+
+  it("refuses to refresh with the host app when stored credentials cannot be read", async () => {
+    const { encrypt } = await import("./encryption");
+    prismaMock.user.findUnique.mockResolvedValue({
+      accessToken: encrypt("expired-access-token"),
+      refreshToken: encrypt("refresh-token"),
+      tokenExpiresAt: new Date(Date.now() - 1_000),
+      xClientId: "not-ciphertext",
+      xClientSecret: encrypt("secret-user-a-zzzz"),
+    });
+
+    const { getFreshXAccessToken } = await import("./x-api");
+    const { XAppCredentialsRequiredError } = await import("./x-app-credentials");
+
+    await expect(getFreshXAccessToken("user-1")).rejects.toBeInstanceOf(
+      XAppCredentialsRequiredError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

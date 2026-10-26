@@ -1,9 +1,16 @@
 import type { Account, Profile, Session, User } from "next-auth";
 import type { AdapterUser } from "next-auth/adapters";
 import type { JWT } from "next-auth/jwt";
+import { cookies } from "next/headers";
+import { readSessionDbUserIdFromCookieHeader } from "./auth-edge";
 import { logError } from "./logger";
 import { prisma } from "./prisma";
 import { encrypt } from "./encryption";
+import {
+  openXAppPending,
+  X_APP_PENDING_COOKIE,
+  xAppPendingCookieOptions,
+} from "./x-app-pending";
 
 export interface DbUser {
   id: string;
@@ -35,6 +42,40 @@ type JwtWithDbUser = JWT & {
  * is the maximum time a revoked session stays usable.
  */
 export const SESSION_REVALIDATE_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * Anonymous sign-in can carry a pending X app cookie (hosted login form).
+ * A session user id means this browser is already signed in, so OAuth used
+ * that account's stored pair or the owner/bootstrap env — do not let the
+ * cookie overwrite another account. Returns null when the cookie is absent
+ * or unreadable.
+ */
+async function xAppCredentialsFromPendingSignIn(): Promise<{
+  clientId: string;
+  clientSecret: string;
+} | null> {
+  try {
+    const jar = await cookies();
+    const header = jar
+      .getAll()
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+    if (await readSessionDbUserIdFromCookieHeader(header)) return null;
+    return openXAppPending(jar.get(X_APP_PENDING_COOKIE)?.value);
+  } catch (error) {
+    logError("auth", "pending X app cookie could not be read", error);
+    return null;
+  }
+}
+
+async function clearPendingXAppCookie(): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.set(X_APP_PENDING_COOKIE, "", xAppPendingCookieOptions(0));
+  } catch (error) {
+    logError("auth", "pending X app cookie could not be cleared", error);
+  }
+}
 
 export async function authSignInCallback({
   account,
@@ -78,6 +119,17 @@ export async function authSignInCallback({
       ? encrypt(account.refresh_token)
       : existingUser?.refreshToken;
 
+    // Persist the app that just issued these tokens. Only the anonymous
+    // pending-cookie path reaches here with a value; signed-in reconnect
+    // already stored the pair from Settings.
+    const pendingApp = await xAppCredentialsFromPendingSignIn();
+    const pendingFields = pendingApp
+      ? {
+          xClientId: encrypt(pendingApp.clientId),
+          xClientSecret: encrypt(pendingApp.clientSecret),
+        }
+      : {};
+
     if (!refreshToken) {
       logError("auth", "Missing refresh_token for new sign-in");
       return false;
@@ -98,6 +150,7 @@ export async function authSignInCallback({
           refreshToken,
           tokenExpiresAt,
           tokenRefreshedAt: new Date(),
+          ...pendingFields,
         },
       });
     } else {
@@ -111,9 +164,11 @@ export async function authSignInCallback({
           refreshToken,
           tokenExpiresAt,
           tokenRefreshedAt: new Date(),
+          ...pendingFields,
         },
       });
     }
+    if (pendingApp) await clearPendingXAppCookie();
   } catch (e) {
     logError("auth", "signIn prisma upsert failed", e);
     return false;

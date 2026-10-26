@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { OrbitalAuthExperience } from "@/components/auth/orbital-auth-experience";
 import { getSafeRelativeCallbackUrl } from "@/lib/safe-redirect";
+import { isPublicHostedRuntime } from "@/lib/x-app-shared";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -10,6 +11,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   AccessDenied:
     "Sign-in could not be completed. Please try again or contact the app administrator.",
   Configuration: "Sign-in is temporarily unavailable. Please try again later.",
+  XAppRequired:
+    "This hosted app does not share its X Developer credentials. Paste your own client ID and secret, then sign in. The callback URL is this site's /api/auth/callback/twitter.",
   SessionUnavailable:
     "Your session could not be loaded. Sign in again to reconnect your library.",
   Verification: "The sign-in link is invalid or has expired.",
@@ -39,6 +42,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       callbackUrl={callbackUrl}
       errorMessage={errorMessage}
       resetSession={Boolean(session && !session.dbUser)}
+      requiresOwnXApp={isPublicHostedRuntime()}
     />
   );
 }

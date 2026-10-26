@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { encrypt, decrypt } from "./encryption";
 import { tweetMediaKeys } from "./tweet-media-keys";
+import { resolveXAppCredentialsFromRow } from "./x-app-credentials";
 
 const BASE_URL = "https://api.x.com/2";
 
@@ -285,9 +286,20 @@ async function refreshAccessTokenSerialized(userId: string): Promise<string> {
 
       const user = await tx.user.findUnique({
         where: { id: userId },
-        select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
+        select: {
+          accessToken: true,
+          refreshToken: true,
+          tokenExpiresAt: true,
+          xClientId: true,
+          xClientSecret: true,
+        },
       });
       if (!user) throw new Error("User not found");
+
+      // Same row as the tokens. Per-user app wins; host env only for
+      // owner/bootstrap. A public account with no stored pair throws here
+      // and never reaches the token endpoint.
+      const credentials = resolveXAppCredentialsFromRow(userId, user);
 
       // Another holder refreshed while we waited for the lock — reuse its token.
       if (
@@ -300,7 +312,8 @@ async function refreshAccessTokenSerialized(userId: string): Promise<string> {
       const accessToken = await exchangeRefreshToken(
         tx,
         userId,
-        decrypt(user.refreshToken)
+        decrypt(user.refreshToken),
+        credentials
       );
       return accessToken;
     },
@@ -313,10 +326,12 @@ async function refreshAccessTokenSerialized(userId: string): Promise<string> {
 async function exchangeRefreshToken(
   tx: Pick<typeof prisma, "user">,
   userId: string,
-  refreshToken: string
+  refreshToken: string,
+  credentials: { clientId: string; clientSecret: string }
 ): Promise<string> {
-  const clientId = process.env.AUTH_TWITTER_ID;
-  const clientSecret = process.env.AUTH_TWITTER_SECRET;
+  // credentials were resolved from this userId's row (or the owner/bootstrap
+  // env rule). Do not read AUTH_TWITTER_* again here.
+  const { clientId, clientSecret } = credentials;
   if (!clientId) {
     throw new Error("AUTH_TWITTER_ID is not configured");
   }
@@ -389,13 +404,23 @@ async function getValidToken(
   return currentToken;
 }
 
-/** Resolves a non-expired user access token (refreshes when near expiry). */
+/**
+ * Resolves a non-expired access token for `userId`.
+ * Refuses before any X call when that account has no app of its own and is
+ * not allowed to use the host app. Refresh uses the same user's client.
+ */
 export async function getFreshXAccessToken(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { accessToken: true, tokenExpiresAt: true },
+    select: {
+      accessToken: true,
+      tokenExpiresAt: true,
+      xClientId: true,
+      xClientSecret: true,
+    },
   });
   if (!user) throw new Error("User not found");
+  resolveXAppCredentialsFromRow(userId, user);
   const accessToken = decrypt(user.accessToken);
   return getValidToken(userId, accessToken, user.tokenExpiresAt);
 }

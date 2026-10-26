@@ -65,6 +65,7 @@ import {
   SettingsSection,
   SettingsSegment,
 } from "./settings-primitives";
+import { SettingsXAppPanel } from "./settings-x-app-panel";
 
 const CreateCollectionDialog = dynamic(
   () =>
@@ -268,8 +269,11 @@ export default function SettingsPage() {
                   <SettingsSection
                     id="sync"
                     title="Sync"
-                    description="Read-only import from X. Tokens stay encrypted. A rate limit pauses the run; the next sync resumes it."
+                    description="Read-only import from X. Tokens and your X app secret stay encrypted. A rate limit pauses the run; the next sync resumes it."
                   >
+                    <SettingsXAppPanel
+                      promptSetup={searchParams.get("xApp") === "required"}
+                    />
                     <SettingsRow
                       label="Scan X bookmark folders"
                       description="Mirrors X folders into synced collections. This adds API calls and takes longer."

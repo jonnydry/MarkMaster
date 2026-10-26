@@ -1,3 +1,4 @@
+import { encode } from "@auth/core/jwt";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account, Profile } from "next-auth";
 
@@ -12,12 +13,30 @@ const prismaMock = vi.hoisted(() => ({
   },
 }));
 
+const pendingCookies = vi.hoisted(() => new Map<string, string>());
+
 vi.mock("./prisma", () => ({ prisma: prismaMock }));
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    getAll: () =>
+      [...pendingCookies.entries()].map(([name, value]) => ({ name, value })),
+    get: (name: string) => {
+      const value = pendingCookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    },
+    set: (name: string, value: string) => {
+      pendingCookies.set(name, value);
+    },
+  }),
+}));
 
 describe("authSignInCallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pendingCookies.clear();
     vi.stubEnv("ENCRYPTION_KEY", TEST_KEY);
+    vi.stubEnv("AUTH_SECRET", "test-auth-secret-not-real");
   });
 
   afterEach(() => {
@@ -78,6 +97,11 @@ describe("authSignInCallback", () => {
         tokenExpiresAt: new Date(1_700_000_000_000),
       }),
     });
+    const created = prismaMock.user.create.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(created.data).not.toHaveProperty("xClientId");
+    expect(created.data).not.toHaveProperty("xClientSecret");
   });
 
   it("updates an existing user and preserves refresh token when provider omits it", async () => {
@@ -105,6 +129,83 @@ describe("authSignInCallback", () => {
         accessToken: expect.not.stringMatching(/^new-access$/),
       }),
     });
+    const updated = prismaMock.user.update.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updated.data).not.toHaveProperty("xClientId");
+    expect(updated.data).not.toHaveProperty("xClientSecret");
+  });
+
+  it("stores the pending X app encrypted on first sign-in and clears the cookie", async () => {
+    const { authSignInCallback } = await import("./auth-callbacks");
+    const { decrypt } = await import("./encryption");
+    const { sealXAppPending, X_APP_PENDING_COOKIE } = await import("./x-app-pending");
+
+    const clientId = "pending-client-id-1234";
+    const clientSecret = "pending-client-secret-zzzz";
+    pendingCookies.set(X_APP_PENDING_COOKIE, sealXAppPending(clientId, clientSecret));
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.create.mockResolvedValue({ id: "user-1" });
+
+    const result = await authSignInCallback({
+      account: {
+        providerAccountId: "x-1",
+        access_token: "access-plain",
+        refresh_token: "refresh-plain",
+        expires_at: 1_700_000_000,
+      } as Account,
+      profile: { data: { username: "alice", name: "Alice" } } as Profile,
+    });
+
+    expect(result).toBe(true);
+    const created = prismaMock.user.create.mock.calls[0]?.[0] as {
+      data: { xClientId: string; xClientSecret: string };
+    };
+    expect(created.data.xClientId).not.toContain(clientId);
+    expect(created.data.xClientSecret).not.toContain(clientSecret);
+    expect(decrypt(created.data.xClientId)).toBe(clientId);
+    expect(decrypt(created.data.xClientSecret)).toBe(clientSecret);
+    expect(pendingCookies.get(X_APP_PENDING_COOKIE)).toBe("");
+  });
+
+  it("does not apply a pending X app cookie over an already signed-in account", async () => {
+    const { authSignInCallback } = await import("./auth-callbacks");
+    const { sealXAppPending, X_APP_PENDING_COOKIE } = await import("./x-app-pending");
+    const { getSessionCookieName } = await import("./auth-edge");
+
+    const cookieName = getSessionCookieName();
+    const session = await encode({
+      token: { sub: "other-subject", dbUser: { id: "user-already" } },
+      secret: "test-auth-secret-not-real",
+      salt: cookieName,
+    });
+    pendingCookies.set(cookieName, session);
+    pendingCookies.set(
+      X_APP_PENDING_COOKIE,
+      sealXAppPending("intruder-client-id", "intruder-client-secret")
+    );
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      refreshToken: "stored-refresh-ciphertext",
+    });
+    prismaMock.user.update.mockResolvedValue({ id: "user-1" });
+
+    const result = await authSignInCallback({
+      account: {
+        providerAccountId: "x-1",
+        access_token: "new-access",
+        refresh_token: "new-refresh",
+      } as Account,
+      profile: { data: { username: "alice", name: "Alice" } } as Profile,
+    });
+
+    expect(result).toBe(true);
+    const updated = prismaMock.user.update.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updated.data).not.toHaveProperty("xClientId");
+    expect(updated.data).not.toHaveProperty("xClientSecret");
+    expect(JSON.stringify(updated.data)).not.toContain("intruder-client-secret");
   });
 });
 

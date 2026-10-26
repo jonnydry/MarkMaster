@@ -1,7 +1,7 @@
 import { encode } from "@auth/core/jwt";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { undecryptableSessionCookieNames } from "./auth-edge";
+import { readSessionDbUserId, undecryptableSessionCookieNames } from "./auth-edge";
 
 const SECRET = "test-auth-secret-not-real";
 const OTHER_SECRET = "different-auth-secret-not-real";
@@ -65,6 +65,32 @@ describe("undecryptableSessionCookieNames", () => {
     await expect(
       undecryptableSessionCookieNames(requestWithCookie(`${COOKIE}=not-a-jwt`))
     ).resolves.toEqual([COOKIE]);
+  });
+
+  it("reads the database user id from the session, not token.sub", async () => {
+    vi.stubEnv("AUTH_SECRET", SECRET);
+    const token = await encode({
+      token: { sub: "authjs-subject", dbUser: { id: "user-db" } },
+      secret: SECRET,
+      salt: COOKIE,
+    });
+
+    await expect(
+      readSessionDbUserId(requestWithCookie(`${COOKIE}=${token}`))
+    ).resolves.toBe("user-db");
+  });
+
+  it("returns null when the session has no database user id", async () => {
+    vi.stubEnv("AUTH_SECRET", SECRET);
+    const token = await encode({
+      token: { sub: "authjs-subject" },
+      secret: SECRET,
+      salt: COOKIE,
+    });
+
+    await expect(
+      readSessionDbUserId(requestWithCookie(`${COOKIE}=${token}`))
+    ).resolves.toBeNull();
   });
 
   it("joins chunked cookies before deciding", async () => {

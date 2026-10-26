@@ -65,6 +65,38 @@ describe("processSyncRun", () => {
     );
   });
 
+  it("executes the run owner's user id", async () => {
+    tx.syncRun.findUnique
+      .mockResolvedValueOnce({
+        id: "run-b",
+        userId: "user-b",
+        status: "PENDING",
+        continuationToken: null,
+        includeFolders: true,
+      })
+      .mockResolvedValueOnce({
+        id: "run-b",
+        userId: "user-b",
+        continuationToken: null,
+        includeFolders: true,
+      });
+    tx.syncRun.findFirst.mockResolvedValue(null);
+    tx.syncRun.updateMany.mockResolvedValue({ count: 1 });
+
+    const { processSyncRun } = await import("./sync-queue");
+    const result = await processSyncRun("run-b");
+
+    expect(result).toEqual({ processed: true, runId: "run-b" });
+    expect(executeSyncRunMock).toHaveBeenCalledTimes(1);
+    expect(executeSyncRunMock).toHaveBeenCalledWith(
+      "run-b",
+      "user-b",
+      undefined,
+      true
+    );
+    expect(executeSyncRunMock.mock.calls[0]?.[1]).not.toBe("user-1");
+  });
+
   it("does not process when the claim loses a concurrent race", async () => {
     tx.syncRun.findUnique.mockResolvedValue({
       id: "run-1",

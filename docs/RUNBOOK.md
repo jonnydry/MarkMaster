@@ -79,16 +79,21 @@ manually-failed run cannot be resurrected by a still-running invocation.
   logout. For a single compromised account, prefer a per-user revocation
   (below) — rotate the secret only if the secret itself may have leaked.
 - **`ENCRYPTION_KEY`** — rotating it orphans every stored X access/refresh
-  token: token decryption fails, and every user must reconnect X before the
+  token and every per-user X app client id and secret: decryption fails, and
+  every user must save the app again in Settings and reconnect X before the
   next sync works. There is no re-encryption tool. Rotate only if the key
   itself is suspected compromised, and expect a "reconnect X" wave. User data
   (bookmarks, tags, collections) is unaffected.
 - **`SYNC_WORKER_SECRET` / `CRON_SECRET`** — safe to rotate anytime; update
   the Vercel Cron config/env in the same deploy. Both are accepted by the
   worker route, so rotate one at a time for zero downtime.
-- **X OAuth (`AUTH_TWITTER_ID`/`_SECRET`)** — rotating the app secret in the
-  X developer portal invalidates nothing stored, but new sign-ins fail until
-  the env vars match.
+- **X OAuth (`AUTH_TWITTER_ID`/`_SECRET`)** — host bootstrap/owner app only.
+  Rotating that secret in the X developer portal does not rewrite per-user
+  credentials. Owner and local sign-in fail until the env vars match. Public
+  hosted accounts use the client id and secret saved on their User row
+  (encrypted with `ENCRYPTION_KEY`); they rotate those in Settings and then
+  reconnect X. Clearing a public user's pair stops sync until they save a new
+  pair — the host secret is not a fallback for them.
 
 ## Revoking a single user's sessions
 
