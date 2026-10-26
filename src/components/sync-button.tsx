@@ -12,6 +12,11 @@ import { useRelativeTime } from "@/hooks/use-relative-time";
 import { useSyncStatus } from "@/hooks/use-sync-status";
 import { findTerminalRunForId, isExpectedFinishedRun } from "@/lib/sync-client-completion";
 import { TWITTER_PROVIDER_ID } from "@/lib/constants";
+import {
+  X_APP_CREDENTIALS_REQUIRED,
+  X_APP_CREDENTIALS_REQUIRED_MESSAGE,
+  X_APP_SETTINGS_PATH,
+} from "@/lib/x-app-shared";
 import type { SyncRunSummary } from "@/types";
 
 interface SyncButtonProps {
@@ -203,6 +208,22 @@ export function SyncButton({
       void refetchSyncStatus();
       onSyncComplete?.();
     } catch (error) {
+      if (error instanceof FetchJsonError && error.status === 422) {
+        const body = error.body as { code?: string } | null;
+        if (body?.code === X_APP_CREDENTIALS_REQUIRED) {
+          toast.error("X app credentials required", {
+            description: X_APP_CREDENTIALS_REQUIRED_MESSAGE,
+            action: {
+              label: "Open Settings",
+              onClick: () => {
+                window.location.assign(X_APP_SETTINGS_PATH);
+              },
+            },
+          });
+          return;
+        }
+      }
+
       if (error instanceof FetchJsonError && error.status === 409) {
         const body = error.body as Record<string, unknown> | null;
         const conflictRun = body?.currentRun as SyncRunSummary | undefined;

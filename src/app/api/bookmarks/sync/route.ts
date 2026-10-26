@@ -2,6 +2,10 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDbUser } from "@/lib/auth";
+import {
+  resolveXAppCredentials,
+  XAppCredentialsRequiredError,
+} from "@/lib/x-app-credentials";
 import { checkRateLimit, checkGlobalRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import {
   ACTIVE_SYNC_STATUSES,
@@ -141,6 +145,24 @@ export async function POST(req: Request) {
       );
     }
     return syncCooldownResponse(gate.cooldown.retryUntil, gate.cooldown.latestRun);
+  }
+
+  // Fail closed before enqueue or the sync rate-limit token. The worker
+  // checks again so a cron run cannot call X with the host app either.
+  try {
+    await resolveXAppCredentials(user.id);
+  } catch (error) {
+    if (error instanceof XAppCredentialsRequiredError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          settingsPath: error.settingsPath,
+        },
+        { status: 422 }
+      );
+    }
+    throw error;
   }
 
   const [rateLimitResult, globalResult] = await Promise.all([

@@ -118,7 +118,7 @@ npm run env:check
 | `DATABASE_URL` | Yes | PostgreSQL connection string (pooled on Neon) |
 | `DIRECT_URL` | Yes | Direct Postgres URL for Prisma migrations ([Neon: non-pooler host](docs/DATABASE.md)) |
 | `AUTH_SECRET` | Yes | Session signing (`openssl rand -base64 32`) |
-| `AUTH_TWITTER_ID` / `AUTH_TWITTER_SECRET` | Yes | X OAuth 2.0 credentials |
+| `AUTH_TWITTER_ID` / `AUTH_TWITTER_SECRET` | Yes | Host X OAuth app. Local/self-hosted bootstrap, and the owner fallback on the hosted app. Public hosted accounts use their own app instead |
 | `NEXTAUTH_URL` | Yes | App URL (e.g. `http://localhost:3000`) |
 | `AUTH_TRUST_HOST` | Self-hosted production | Set `true` only behind a trusted reverse proxy that replaces forwarded Host headers; Vercel is detected automatically |
 | `ENCRYPTION_KEY` | Yes | 64-char hex for token encryption (`openssl rand -hex 32`) |
@@ -162,11 +162,28 @@ npx prisma migrate dev --name <change-name>
 
 ### 4. X Developer App
 
+**Local and self-hosted (one X app for the install)**
+
 1. Create an app at [developer.x.com](https://developer.x.com)
-2. Enable **OAuth 2.0** under User authentication settings
-3. Callback URL: `http://localhost:3000/api/auth/callback/twitter`
+2. Enable **OAuth 2.0** under User authentication settings (Web App, confidential client)
+3. Callback URL: `http://localhost:3000/api/auth/callback/twitter` (use the public origin in production)
 4. Scopes: `tweet.read`, `users.read`, `bookmark.read`, `offline.access`
-5. Copy Client ID and Secret into `.env`
+5. Copy Client ID and Secret into `AUTH_TWITTER_ID` and `AUTH_TWITTER_SECRET`
+
+That env pair is the bootstrap app. It is used for sign-in, token refresh, and sync when the signed-in user has not saved their own credentials.
+
+**Hosted app (each public user brings their own X app)**
+
+On Vercel (`VERCEL=1`), `AUTH_TWITTER_*` is only the fallback for `OWNER_USER_ID` (the operator account) and for that operator's first sign-in. It is never sent for any other account.
+
+Everyone else:
+
+1. Create their own app with the same OAuth 2.0 settings and scopes.
+2. Set the callback URL to `https://<this-site>/api/auth/callback/twitter`.
+3. On the sign-in page, paste the client ID and secret, then sign in with X. MarkMaster stores both encrypted with `ENCRYPTION_KEY` on that user and uses them for the OAuth exchange.
+4. Later, Settings → Sync can rotate or remove the pair. The full secret is not shown again (last 4 only). After a rotation, reconnect X so new tokens are issued to the new app.
+
+A public account with no stored pair cannot sync or refresh. The host secret is not used as a silent fallback. The screen tells them to add the app in Settings.
 
 ### 5. Run
 

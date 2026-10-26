@@ -67,6 +67,56 @@ function sessionCookieChunks(
   });
 }
 
+function joinedSessionToken(request: NextRequest): string | null {
+  const chunks = sessionCookieChunks(request);
+  if (chunks.length === 0) return null;
+  const token = [...chunks]
+    .sort((a, b) => {
+      const aSuffix = parseInt(a.name.split(".").pop() || "0", 10);
+      const bSuffix = parseInt(b.name.split(".").pop() || "0", 10);
+      return aSuffix - bSuffix;
+    })
+    .map((chunk) => chunk.value)
+    .join("");
+  return token || null;
+}
+
+/**
+ * Prisma User.id embedded in the Auth.js JWT (`dbUser.id`).
+ * This is not `token.sub` — Auth.js mints that as a random UUID.
+ * Returns null when the cookie is missing, undecryptable, or has no dbUser.
+ */
+export async function readSessionDbUserId(
+  request: NextRequest
+): Promise<string | null> {
+  const token = joinedSessionToken(request);
+  const secret = process.env.AUTH_SECRET;
+  if (!token || !secret) return null;
+  try {
+    const payload = await decode({
+      token,
+      secret,
+      salt: getSessionCookieName(),
+    });
+    const id = (payload?.dbUser as { id?: unknown } | undefined)?.id;
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Same as {@link readSessionDbUserId} for a raw Cookie header. */
+export async function readSessionDbUserIdFromCookieHeader(
+  cookieHeader: string
+): Promise<string | null> {
+  if (!cookieHeader.trim()) return null;
+  return readSessionDbUserId(
+    new NextRequest("http://localhost/api/auth/callback/twitter", {
+      headers: { cookie: cookieHeader },
+    })
+  );
+}
+
 /**
  * Names of session cookies this process cannot decrypt.
  *
@@ -87,14 +137,7 @@ export async function undecryptableSessionCookieNames(
   const secret = process.env.AUTH_SECRET;
   if (chunks.length === 0 || !secret) return [];
 
-  const token = [...chunks]
-    .sort((a, b) => {
-      const aSuffix = parseInt(a.name.split(".").pop() || "0", 10);
-      const bSuffix = parseInt(b.name.split(".").pop() || "0", 10);
-      return aSuffix - bSuffix;
-    })
-    .map((chunk) => chunk.value)
-    .join("");
+  const token = joinedSessionToken(request);
 
   if (!token) return chunks.map((chunk) => chunk.name);
 

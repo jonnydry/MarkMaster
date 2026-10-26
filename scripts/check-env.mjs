@@ -33,6 +33,10 @@ for (const key of required) {
 
 if (ok) {
   console.log("All required environment variables are set.");
+  console.log(
+    "X app: AUTH_TWITTER_* is the host bootstrap/owner app. On Vercel, other accounts must save their own client id and secret in Settings."
+  );
+
   if (process.env.XAI_API_KEY?.trim()) {
     console.log("Optional: XAI_API_KEY is set — Grok Orbit scan can call xAI.");
   } else {
